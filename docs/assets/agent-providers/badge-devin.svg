@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="87" height="30" viewBox="0 0 87 30" role="img" aria-label="Devin">
+<rect x="0.5" y="0.5" width="86" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAS1BMVEVHcEwOEBUOEBX///8OEBUOEBUOEBUOEBUOEBUOEBUAAAMGCQ8mKCtUVVf7+/zw8PFAQUOhoaLQ0NDe39+0tLVrbG6Sk5SGh4h8fX/5B65SAAAACnRSTlMAmv//NfyczF4i3263WgAAAaBJREFUWIXNl+2ugyAMhh045+oXioL3f6UHRJ0KBKQ7yd5fy2IfKLSlzbJdZfEkUXoWZWYpf8UZb3rlZ/vHPXOtx8H8fXP5dRPv3T7FXGsjJK2/7CHZ/03LOeTp9oTkGAe0tBMYe0JU/OEAZVbgAEUWGf8+PZFHoA7hnwAVKCEAUI90YFAlAgAE1RpJxCYcAJg6atTK8CZsAAz0I05CBAtQ1fSoJuSFA9D+JKDynmYIIBcAEFF7thICdDokYVb/9e7QDN0C7WQzc/NrciEccdBTnzizCa5IZFsodQO/IGyCA6AycQnmblbeT2eAfauebATRmkO7OBQL0Ahz88DSAcYfkujCxKVxQSYAKnMPvFHbYO19AJBx/XwYB0pvA0AeFj2vr2LR+jwYyrSfxVriRFQoX5KprXUy6WDwlNgQQJh0rsfGUxGiC4qvMv1kTQxcfAhA4FgDuvr2w6LOS+xO9OHX0fm4rrEc9T57spFxTw2NBKh8ZqgGQyOizL/RI6HbPHSjiW510c02vt1HDxzokQc/dOHHPvTgiR99vzB8p4//fwLlLMybayB1AAAAAElFTkSuQmCC" x="8" y="6" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">Devin</text>
+</svg>

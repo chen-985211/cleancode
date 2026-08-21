@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="111" height="30" viewBox="0 0 111 30" role="img" aria-label="Codebuff">
+<rect x="0.5" y="0.5" width="110" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAJ1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAD///+oqKg3NzfCwsL5+fn09PQtTdIMAAAABnRSTlMA1qgZlf08AdSDAAAA/klEQVRYhe2X2Q6DIBBFoYDD9v/fWwRrFEjkOrYPDeeR5B7HYUlGiITS0iwgRmolNl5o+MOr5OXd/LJI1vcTJtWgGPmEErpe8hYR6LYD3iMCKZr9o4AIjKhXHJFDDI3AEkFNaASU4AjsKkBKqASOMkAXKkEsAmAjTgIXaCMO13AUWDow2odd4E7xrBiqogi8D3U8M3Csi8D6bj4MXKyHfqHAa2KuIu7F39rGxNbLOBp//iizLxP/OvMfFPaTljYCyXcE2LP+DQHIpaB3SyFB76H4rYD9C1dMwRRMwRT8kwAeGM8YztC3ItuhC0Pzxz7W4FmG3/tdMPKZ4Zs3/r8BezZgSZXiO4kAAAAASUVORK5CYII=" x="8" y="6" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">Codebuff</text>
+</svg>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="148" height="30" viewBox="0 0 148 30" role="img" aria-label="Any CLI Agent">
+<rect x="0.5" y="0.5" width="147" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<g transform="translate(8 6) scale(0.8181818181818182)"><g fill="none" stroke="#e6edf3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M5.5 7.5 9.5 11 5.5 14.5"/><path d="M11.5 14.5h5"/></g></g>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">Any CLI Agent</text>
+</svg>

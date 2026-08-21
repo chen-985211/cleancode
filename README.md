@@ -6,8 +6,8 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-  <a href="#bring-your-favorite-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-  <a href="#draw-it-and-run-it"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+  <a href="#bring-agents-back-to-the-development-context"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+  <a href="#draw-the-dependencies-then-run-them"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
 </p>
 
 <p align="center">
@@ -15,33 +15,31 @@
 </p>
 
 <p align="center">
-  <strong>Give every development branch its own Agents, terminals, and executable workflow.</strong><br />
-  Keep parallel work isolated, organize scattered development tools, and run them according to real dependencies.
+  <strong>A canvas-based ADE that puts each feature's Agents, terminals, and workflows into one runnable development context.</strong><br />
+  Start with branch isolation, keep context and runtime state, and turn proven setups into reusable development assets.
 </p>
 
-<p align="center"><em>One branch. One visible, executable workspace.</em></p>
+<p align="center"><em>One feature. One visible, executable development context.</em></p>
 
 <h3 align="center">
   <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview (macOS / Windows / Linux)</ins></a>
 </h3>
 
 <p align="center">
-  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the cleancode canvas" width="960" />
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the CleanCode canvas" width="960" />
 </p>
 
 <p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
 
 ---
 
-When you work on several changes at once, Coding Agents, terminals, development services, and working directories quickly scatter across different windows. After switching branches, you still have to confirm where each command is running, which services are already up, and which change each Agent is handling.
+Software development is moving from “one person writing code” to people and Agents advancing multiple development contexts together. One change may have its own branch, terminals, services, test commands, ports, and Agent conversation; another change has a similar context of its own. The problem is not a lack of tools. Once these contexts scatter across different windows, you have to keep rebuilding them from memory: which branch a terminal belongs to, whether a service is still alive, whether ports conflict, whether dependencies are ready, and whether the Agent still understands the current change. That is why I increasingly think a development environment should not be organized only around code files and editors. It should be organized around the change currently in motion. It needs to remember branches, terminals, services, ports, dependency order, and Agent context at the same time, and make them visible in a form people can understand and Agents can operate.
 
-**cleancode is a canvas-first, local-first executable development workspace.** It keeps a separate canvas for local projects and Git branch workspaces, bringing interactive terminals, dependency workflows, and the Coding Agents you already use together so each change stays isolated, visible, and runnable.
+**CleanCode is a canvas-based ADE (Agentic Development Environment).** In CleanCode, a change is not just a branch name. It is a development context you can keep working in: Agents, terminals, services, ports, and dependency relationships all live on the same canvas. You can see how they relate to each other and run them directly; once that context is proven, it can be saved as a project template or global favorite, becoming an asset you can reuse the next time you build.
 
-cleancode is not a full IDE and does not provide a file tree or code editor. Keep using your existing editor, command-line tools, and Coding Agents; cleancode organizes the workspace around them and runs real local commands.
+## One Change, One Development Context
 
-## One Branch, One Isolated Workspace
-
-Create a branch workspace for `feature/auth`, and cleancode gives it a dedicated Git worktree. The canvas, terminals, execution scope, and Agent sessions all switch together with that workspace:
+When you create a branch workspace for `feature/auth`, CleanCode is not just checking out another Git branch. It opens an isolated development context for that change. It has its own Git worktree, and its own canvas, terminals, execution scope, and Agent sessions:
 
 ```txt
 feature/auth (isolated worktree)
@@ -51,13 +49,15 @@ feature/auth (isolated worktree)
                                                └─> Tests
 ```
 
-Work on `feature/auth`, `fix/search`, and `experiment/new-ui` at the same time. When you return to a workspace, you do not need to clear terminals, recheck the working directory, or remind an Agent that you switched branches.
+That means you can work on `feature/auth`, `fix/search`, and `experiment/new-ui` at the same time without squeezing them into the same terminal history and service state. When you return to any workspace, you come back to that change's own context: terminal output is still there, Agent context is still there, and the working directory has not moved.
 
-Running ordinary terminals keep working and retain their output while you switch to another change. If two branches need to start the same development service, preferred or automatic ports avoid manual conflicts: cleancode allocates an available port, injects it through the launch environment or command arguments, and shows the actual address for that run on the canvas.
+If two branches both need to start the same development service, CleanCode helps them avoid port conflicts. It can use fixed, preferred, or automatic ports, inject the final endpoint through the launch environment or command arguments, and show the actual address on the canvas.
 
-## Draw It and Run It
+## Draw the Dependencies, Then Run Them
 
-A development environment usually takes more than one command: install or build first, wait for the API service to become ready, then start the web app and tests. cleancode makes those startup conditions part of the workflow instead of leaving them in script comments or human memory.
+Many development environments do not break because the commands themselves cannot run. They break because the order and conditions are not remembered by the environment: install dependencies first, wait until the API service is actually ready, then start the web app, and finally run tests. Those details often scatter across READMEs, script comments, terminal history, and human memory. Switch branches, or come back a few days later, and the whole flow has to be checked again.
+
+In CleanCode, those startup conditions become an executable workflow on the canvas:
 
 - Terminal blocks run real builds, tests, development servers, and everyday commands.
 - Directed connections declare real dependencies. Tasks without upstream dependencies can start in parallel; downstream tasks wait until every direct dependency has completed or become ready.
@@ -65,88 +65,98 @@ A development environment usually takes more than one command: install or build 
 - Services can use fixed, preferred, or automatic ports; the runtime allocates and injects the final endpoint.
 - An upstream failure explicitly blocks its descendants; stopping a workflow cleans up active processes in reverse dependency order.
 
-The canvas shows node state, failure reasons, and actual service addresses, but it is not a static flowchart pretending to be runtime truth. Every run produces an immutable execution plan from the current terminal graph.
+So the canvas is not a static flowchart. Every run produces an immutable execution plan from the current terminal graph, and CleanCode keeps node state, failure reasons, and actual service addresses on the canvas.
 
-If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. The canvas identifies the failed node, its blocked descendants, and the actual reason, so you can see where the workflow stopped without searching every terminal.
+If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. You can see exactly where the workflow stopped, which descendants were blocked, and what actually failed.
 
-## Bring Your Favorite Agent
+## Prove It Once, Turn It into an Asset
 
-**Switch Agents without changing how you work.** cleancode does not introduce another built-in Coding Agent. It brings the local Agent CLIs you already use into the current branch workspace.
+Once a development context actually works, its value no longer belongs to just that one change. The exact command, the readiness signal, the port strategy, and the layout of the nodes are all experience you had to discover. In many teams, that experience stays in someone's terminal history, chat thread, or memory. The next branch starts, and the same context has to be rebuilt.
 
-Agent integration has two levels: every built-in Provider can have its own console, while Agents that support the native cleancode MCP can also read, inspect, and build terminal workflows on the current canvas.
+In CleanCode, proven terminals, workflows, or combinations can be saved as project templates; if they belong in more than one project, move them into global favorites. The next time a similar change appears, choose **Place** or **Place and run**, and CleanCode creates a new set of terminals and connections with their own identities, bringing back the commands, dependency relationships, port strategy, and relative layout together.
 
-When you create an Agent, cleancode detects the Provider CLIs installed on your machine and only shows the Agents currently available.
+Templates keep reusable development structure, not temporary state from the last run. They do not copy terminal output, runtime state, actual endpoints, Agents, or Agent conversations. You can also bind frequently used terminals, complete workflows, or combinations to slots `1` through `5` in the current workspace, then run them with `Command/Ctrl + 1` through `5`.
+
+## Bring Agents Back to the Development Context
+
+If CleanCode is an ADE (Agentic Development Environment), the first problem it should solve is not inventing another Agent. You may already have tools that feel right: Claude Code, Codex, Gemini, Cursor, OpenCode, or another local Agent CLI. The real question is whether those Agents can enter a change and stand in the same context as the branch, terminals, services, ports, and dependency relationships.
+
+**What needs to be preserved is not only the Agent itself, but the way you have learned to work with it.** You know when it should change code directly, when it should read the project first, and when it needs to stop and ask you. It has also adapted to your command line, permission habits, and the way you carry context. Asking you to switch Agents looks like switching tools; in practice, it means rebuilding a collaboration pattern.
+
+That is why CleanCode does not try to start over. It does not ship a new Coding Agent or lock you into a closed system; it brings the local Agent CLIs already installed on your machine into the current branch workspace. Then an Agent is not entering an isolated chat window. It enters the place where the current change is actually happening: the right directory, the same canvas, running terminals, services, ports, and dependency relationships.
+
+On top of that, Agents can participate in two ways. Every built-in Provider can have its own console, running a real local CLI in the current workspace; Agents that support the native CleanCode MCP can also read, inspect, and build terminal workflows on the canvas through explicit tool boundaries. When you create an Agent, CleanCode checks the Provider CLIs installed on your machine, so the menu is not a theoretical compatibility list. It shows the Agents that can actually start here.
 
 <!-- agent-provider-wall:start -->
 
-cleancode includes **33 Coding Agent Providers**. Each Agent runs the corresponding real local CLI in the current workspace directory; one workspace can host multiple Agents from the same or different Providers.
+There is a key idea here: CleanCode is not built by binding itself to a few specific Agents. Its foundation is the terminal, so the **33 Coding Agent Providers** are more like entries we prepared first: common Agent commands, icons, detection, and default arguments are already organized.
+
+Look one layer deeper, and any Agent that can start from the command line can theoretically enter this canvas as a terminal process. Run the command in a terminal, then pin it to the current workspace with the pin button in the terminal header. Now it is no longer just a temporary command opened for one conversation. It becomes an Agent context that can stay in the background and keep working.
 
 <p>
-  <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="./docs/assets/agent-providers/claude-code.svg" width="18" height="18" alt="" /> Claude Code</kbd></a>
-  <a href="https://developers.openai.com/codex/cli/"><kbd><img src="./docs/assets/agent-providers/codex.svg" width="18" height="18" alt="" /> Codex</kbd></a>
-  <a href="https://opencode.ai/docs/cli/"><kbd><img src="./docs/assets/agent-providers/opencode.svg" width="18" height="18" alt="" /> OpenCode</kbd></a>
-  <a href="https://github.com/google-gemini/gemini-cli"><kbd><img src="./docs/assets/agent-providers/gemini.png" width="18" height="18" alt="" /> Gemini</kbd></a>
-  <a href="https://cursor.com/cli"><kbd><img src="./docs/assets/agent-providers/cursor.png" width="18" height="18" alt="" /> Cursor</kbd></a>
-  <a href="https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli"><kbd><img src="./docs/assets/agent-providers/copilot.svg" width="18" height="18" alt="" /> GitHub Copilot</kbd></a>
-  <a href="https://github.com/openclaw/openclaw"><kbd><img src="./docs/assets/agent-providers/openclaw.png" width="18" height="18" alt="" /> OpenClaw</kbd></a>
-  <a href="https://hermes-agent.nousresearch.com/docs/"><kbd><img src="./docs/assets/agent-providers/hermes.png" width="18" height="18" alt="" /> Hermes</kbd></a>
-  <a href="https://pi.dev"><kbd><img src="./docs/assets/agent-providers/pi.svg" width="18" height="18" alt="" /> Pi</kbd></a>
-  <a href="https://docs.cline.bot/cline-cli/overview"><kbd><img src="./docs/assets/agent-providers/cline.png" width="18" height="18" alt="" /> Cline</kbd></a>
-  <a href="https://block.github.io/goose/docs/quickstart/"><kbd><img src="./docs/assets/agent-providers/goose.png" width="18" height="18" alt="" /> Goose</kbd></a>
-  <a href="https://aider.chat/docs/"><kbd><img src="./docs/assets/agent-providers/aider.svg" width="18" height="18" alt="" /> Aider</kbd></a>
-  <a href="https://docs.continue.dev/guides/cli"><kbd><img src="./docs/assets/agent-providers/continue.png" width="18" height="18" alt="" /> Continue</kbd></a>
-  <a href="https://github.com/charmbracelet/crush"><kbd><img src="./docs/assets/agent-providers/crush.png" width="18" height="18" alt="" /> Charm</kbd></a>
-  <a href="https://kilo.ai/docs/cli"><kbd><img src="./docs/assets/agent-providers/kilo.svg" width="18" height="18" alt="" /> Kilocode</kbd></a>
-  <a href="https://github.com/QwenLM/qwen-code"><kbd><img src="./docs/assets/agent-providers/qwen-code.png" width="18" height="18" alt="" /> Qwen Code</kbd></a>
-  <a href="https://www.kimi.com/code/docs/en/kimi-code-cli/getting-started.html"><kbd><img src="./docs/assets/agent-providers/kimi.png" width="18" height="18" alt="" /> Kimi</kbd></a>
-  <a href="https://ampcode.com/manual#install"><kbd><img src="./docs/assets/agent-providers/amp.png" width="18" height="18" alt="" /> Amp</kbd></a>
-  <a href="https://x.ai/cli"><kbd><img src="./docs/assets/agent-providers/grok.png" width="18" height="18" alt="" /> Grok</kbd></a>
-  <a href="https://docs.factory.ai/cli/getting-started/quickstart"><kbd><img src="./docs/assets/agent-providers/droid.svg" width="18" height="18" alt="" /> Droid</kbd></a>
-  <a href="https://antigravity.google/docs/cli-overview"><kbd><img src="./docs/assets/agent-providers/antigravity.png" width="18" height="18" alt="" /> Antigravity</kbd></a>
-  <a href="https://kiro.dev/docs/cli/"><kbd><img src="./docs/assets/agent-providers/kiro.png" width="18" height="18" alt="" /> Kiro</kbd></a>
-  <a href="https://github.com/mistralai/mistral-vibe"><kbd><img src="./docs/assets/agent-providers/mistral-vibe.png" width="18" height="18" alt="" /> Mistral Vibe</kbd></a>
-  <a href="https://mimo.xiaomi.com/coder"><kbd><img src="./docs/assets/agent-providers/mimo-code.png" width="18" height="18" alt="" /> MiMo Code</kbd></a>
-  <a href="https://openclaude.gitlawb.com/"><kbd><img src="./docs/assets/agent-providers/openclaude.png" width="18" height="18" alt="" /> OpenClaude</kbd></a>
-  <a href="https://omp.sh"><kbd><img src="./docs/assets/agent-providers/omp.svg" width="18" height="18" alt="" /> OMP</kbd></a>
-  <a href="https://devin.ai/cli"><kbd><img src="./docs/assets/agent-providers/devin.png" width="18" height="18" alt="" /> Devin</kbd></a>
-  <a href="https://docs.augmentcode.com/cli/overview"><kbd><img src="./docs/assets/agent-providers/aug.png" width="18" height="18" alt="" /> Auggie</kbd></a>
-  <a href="https://www.codebuff.com/docs/help/quick-start"><kbd><img src="./docs/assets/agent-providers/codebuff.png" width="18" height="18" alt="" /> Codebuff</kbd></a>
-  <a href="https://github.com/autohandai/code-cli"><kbd><img src="./docs/assets/agent-providers/autohand.png" width="18" height="18" alt="" /> Autohand Code</kbd></a>
-  <a href="https://commandcode.ai/docs/quickstart"><kbd><img src="./docs/assets/agent-providers/command-code.png" width="18" height="18" alt="" /> Command Code</kbd></a>
-  <a href="https://github.com/AntigmaLabs/ante-preview"><kbd><img src="./docs/assets/agent-providers/ante.png" width="18" height="18" alt="" /> Ante</kbd></a>
-  <a href="https://support.atlassian.com/rovo/docs/install-and-run-rovo-dev-cli-on-your-device/"><kbd><img src="./docs/assets/agent-providers/rovo.png" width="18" height="18" alt="" /> Rovo Dev</kbd></a>
+  <a href="https://docs.anthropic.com/claude/docs/claude-code"><img src="./docs/assets/agent-providers/badge-claude-code.svg" height="30" alt="Claude Code" /></a>
+  <a href="https://developers.openai.com/codex/cli/"><img src="./docs/assets/agent-providers/badge-codex.svg" height="30" alt="Codex" /></a>
+  <a href="https://opencode.ai/docs/cli/"><img src="./docs/assets/agent-providers/badge-opencode.svg" height="30" alt="OpenCode" /></a>
+  <a href="https://github.com/google-gemini/gemini-cli"><img src="./docs/assets/agent-providers/badge-gemini.svg" height="30" alt="Gemini" /></a>
+  <a href="https://cursor.com/cli"><img src="./docs/assets/agent-providers/badge-cursor.svg" height="30" alt="Cursor" /></a>
+  <a href="https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli"><img src="./docs/assets/agent-providers/badge-copilot.svg" height="30" alt="GitHub Copilot" /></a>
+  <a href="https://github.com/openclaw/openclaw"><img src="./docs/assets/agent-providers/badge-openclaw.svg" height="30" alt="OpenClaw" /></a>
+  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="./docs/assets/agent-providers/badge-hermes.svg" height="30" alt="Hermes" /></a>
+  <a href="https://pi.dev"><img src="./docs/assets/agent-providers/badge-pi.svg" height="30" alt="Pi" /></a>
+  <a href="https://docs.cline.bot/cline-cli/overview"><img src="./docs/assets/agent-providers/badge-cline.svg" height="30" alt="Cline" /></a>
+  <a href="https://block.github.io/goose/docs/quickstart/"><img src="./docs/assets/agent-providers/badge-goose.svg" height="30" alt="Goose" /></a>
+  <a href="https://aider.chat/docs/"><img src="./docs/assets/agent-providers/badge-aider.svg" height="30" alt="Aider" /></a>
+  <a href="https://docs.continue.dev/guides/cli"><img src="./docs/assets/agent-providers/badge-continue.svg" height="30" alt="Continue" /></a>
+  <a href="https://github.com/charmbracelet/crush"><img src="./docs/assets/agent-providers/badge-crush.svg" height="30" alt="Charm" /></a>
+  <a href="https://kilo.ai/docs/cli"><img src="./docs/assets/agent-providers/badge-kilo.svg" height="30" alt="Kilocode" /></a>
+  <a href="https://github.com/QwenLM/qwen-code"><img src="./docs/assets/agent-providers/badge-qwen-code.svg" height="30" alt="Qwen Code" /></a>
+  <a href="https://www.kimi.com/code/docs/en/kimi-code-cli/getting-started.html"><img src="./docs/assets/agent-providers/badge-kimi.svg" height="30" alt="Kimi" /></a>
+  <a href="https://ampcode.com/manual#install"><img src="./docs/assets/agent-providers/badge-amp.svg" height="30" alt="Amp" /></a>
+  <a href="https://x.ai/cli"><img src="./docs/assets/agent-providers/badge-grok.svg" height="30" alt="Grok" /></a>
+  <a href="https://docs.factory.ai/cli/getting-started/quickstart"><img src="./docs/assets/agent-providers/badge-droid.svg" height="30" alt="Droid" /></a>
+  <a href="https://antigravity.google/docs/cli-overview"><img src="./docs/assets/agent-providers/badge-antigravity.svg" height="30" alt="Antigravity" /></a>
+  <a href="https://kiro.dev/docs/cli/"><img src="./docs/assets/agent-providers/badge-kiro.svg" height="30" alt="Kiro" /></a>
+  <a href="https://github.com/mistralai/mistral-vibe"><img src="./docs/assets/agent-providers/badge-mistral-vibe.svg" height="30" alt="Mistral Vibe" /></a>
+  <a href="https://mimo.xiaomi.com/coder"><img src="./docs/assets/agent-providers/badge-mimo-code.svg" height="30" alt="MiMo Code" /></a>
+  <a href="https://openclaude.gitlawb.com/"><img src="./docs/assets/agent-providers/badge-openclaude.svg" height="30" alt="OpenClaude" /></a>
+  <a href="https://omp.sh"><img src="./docs/assets/agent-providers/badge-omp.svg" height="30" alt="OMP" /></a>
+  <a href="https://devin.ai/cli"><img src="./docs/assets/agent-providers/badge-devin.svg" height="30" alt="Devin" /></a>
+  <a href="https://docs.augmentcode.com/cli/overview"><img src="./docs/assets/agent-providers/badge-aug.svg" height="30" alt="Auggie" /></a>
+  <a href="https://www.codebuff.com/docs/help/quick-start"><img src="./docs/assets/agent-providers/badge-codebuff.svg" height="30" alt="Codebuff" /></a>
+  <a href="https://github.com/autohandai/code-cli"><img src="./docs/assets/agent-providers/badge-autohand.svg" height="30" alt="Autohand Code" /></a>
+  <a href="https://commandcode.ai/docs/quickstart"><img src="./docs/assets/agent-providers/badge-command-code.svg" height="30" alt="Command Code" /></a>
+  <a href="https://github.com/AntigmaLabs/ante-preview"><img src="./docs/assets/agent-providers/badge-ante.svg" height="30" alt="Ante" /></a>
+  <a href="https://support.atlassian.com/rovo/docs/install-and-run-rovo-dev-cli-on-your-device/"><img src="./docs/assets/agent-providers/badge-rovo.svg" height="30" alt="Rovo Dev" /></a>
+  <img src="./docs/assets/agent-providers/badge-any-cli-agent.svg" height="30" alt="Any CLI Agent" />
 </p>
 
-**Keep using the Agents you already know, with the current branch, terminals, and runtime state in the same workspace.**
+**Keep using the Agents you already know; CleanCode pins those CLI processes into a visible, runnable development context that stays with the work.**
 
 <!-- agent-provider-wall:end -->
 
-## Let Agents Help You Build
+## Let Agents Build the Context, Without Crossing the Boundary
 
-Agents that support the native cleancode MCP understand and organize the same workspace through stable tools instead of editing internal canvas data. For example, you can tell an Agent:
+We said above that Agents can stand on the same canvas as terminals, services, and ports. But being in the development context does not mean an Agent should bypass you and edit the canvas data behind your back. Agents that support the native CleanCode MCP use stable tools to understand the current workspace: they can see existing terminals and connections, inspect the real startup commands in the project, and build a new terminal workflow from your goal.
 
-> Inspect the current project and create terminals for installing dependencies, starting the API, and starting the web app. Configure the correct dependencies, service readiness conditions, and ports.
+For example, you can simply tell it:
 
-The Agent first inspects the existing canvas and, when needed, reads the project to confirm the real startup commands. It then uses MCP to create, configure, connect, and validate the complete workflow. The result lands on the canvas as one atomic change; inspect the terminals, dependencies, ports, and execution plan before deciding whether to run it.
+> Help me set up a workflow for starting this project.
 
-Deleting blocks, dissolving groups, and disconnecting dependencies require approval in the cleancode UI. Starting and stopping workflows remain under human control. Agents can help build the environment, but actions that change your local development setup stay visible to you.
+The Agent first inspects the existing canvas, then reads the project to figure out what should be installed first, which services should start, and how ports and dependencies should connect. What lands on the canvas is not a suggestion, but a development context you can see, inspect, and keep running.
 
-## Build Once, Reuse Anytime
+But there is an important boundary here: actions that change the structure of the context, such as deleting blocks, dissolving groups, or disconnecting dependencies, require approval in the CleanCode UI. Starting and stopping workflows also remain under human control. Agents can help build the context, but they should not turn your local development environment into a black box. What they changed, what they created, and what would run next should stay visible to you.
 
-Once the “install dependencies → API service → web app and tests” workflow is proven, save it as a project template. In the next branch, choose **Place** or **Place and run** to create a new set of terminals and connections with independent identities—without re-entering commands, ports, or startup order. Move the template to global favorites when you want to reuse it across projects.
+## Let One Feature Grow into a Development Context
 
-Templates preserve configuration, dependencies, and relative layout, but they do not copy terminal output, runtime state, actual endpoints, Agents, or Agent conversations. You can also bind frequently used terminals, complete workflows, or combinations to slots `1` through `5` in the current workspace, then run them with `Command/Ctrl + 1` through `5`.
+Using CleanCode does not require planning a complete system first. Start with the feature you are working on right now: add the local project, create an isolated branch workspace for it, and bring in the Coding Agent you already use.
 
-## Start with One Feature
+From there, you can turn installation, builds, tests, and development servers into terminal blocks yourself, or ask an Agent that supports the CleanCode MCP to build the first startup workflow. CleanCode puts finite tasks, long-running services, readiness conditions, ports, and dependency relationships on the same canvas, so the feature becomes more than a branch. It becomes a runnable context you can inspect and keep adjusting.
 
-1. Add a local project and create an isolated branch workspace for the feature.
-2. Add the Coding Agent you use.
-3. Turn installation, builds, tests, and development servers into terminal blocks.
-4. Separate finite tasks from long-running services, then configure readiness conditions, ports, and dependencies.
-5. Run the workflow from its root terminal and inspect startup order, state, failure reasons, and actual endpoints on the same canvas.
-6. Save the proven terminal, workflow, or combination as a template, or bind it to a quick execution slot for next time.
+Once the workflow runs, start it from the root terminal and inspect startup order, runtime state, failure reasons, and actual endpoints on the canvas. After the context has been proven, save the terminals, workflow, or combination as a template, or bind it to a quick execution slot. The next time a similar feature appears, it is no longer just a configuration you repeat. It is reusable experience.
 
 ## Quick Start
+
+If you just want to get CleanCode running, you do not need to understand every concept first. The steps below are enough.
 
 ### Download the Preview
 
@@ -214,7 +224,7 @@ When you push a `v*` tag that matches the version in `package.json`, GitHub Acti
 
 ## Current Limitations
 
-cleancode is under active development. Keep these current limitations in mind:
+It is worth saying this directly: CleanCode is still a Preview. It can already organize terminals, Agents, branch workspaces, and executable workflows together, but some boundaries are not fully open yet.
 
 - Executable block types currently remain terminal-centered, with terminal dependency workflows and terminal combinations. Preview, HTTP, Test, File, Plugin, and other standalone block types remain on the roadmap.
 - Connections between terminals express startup dependencies only; they do not pass standard output, files, or structured artifacts between nodes.
@@ -225,6 +235,8 @@ cleancode is under active development. Keep these current limitations in mind:
 - The prebuilt packages on GitHub Releases are unsigned Preview builds, not signed production releases.
 
 ## Design Principles
+
+These principles are not decorative slogans. They exist so the canvas can feel free while the runtime stays trustworthy.
 
 - **The canvas is not the source of truth.** It only projects the domain model and runtime state.
 - **People and Agents share the same use cases.** Agents do not bypass application boundaries to manipulate internal implementations.
@@ -241,7 +253,7 @@ For architecture and domain boundaries, see the [Architecture Guide](./docs/engi
 - [UI Contract](./docs/product/ui-contract.md)
 - [Terminal Dependency Workflows](./docs/contexts/run/terminal-workflow.md)
 - [Agent and Session Lifecycle](./docs/contexts/agent/agent-session.md)
-- [Native cleancode MCP](./docs/contexts/agent/cleancode-mcp.md)
+- [Native CleanCode MCP](./docs/contexts/agent/cleancode-mcp.md)
 - [Development Guidelines](./docs/engineering/development.md)
 
 ## Contributing
@@ -257,7 +269,7 @@ Issues, discussions, and pull requests are welcome. Before you begin, read the [
 <div align="center">
   <h2>Join the CleanCode Community</h2>
 
-  <p>Talk workflows, Coding Agents, and developer experience—and share your feedback and ideas.</p>
+  <p>Share the workflows you build, the way you use Agents, and Preview feedback.</p>
 
   <img src="./docs/assets/cleancode-qq-group.png" alt="Scan to join the CleanCode QQ group (group number: 186885114)" width="320" />
 

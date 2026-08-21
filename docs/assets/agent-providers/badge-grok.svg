@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="79" height="30" viewBox="0 0 79 30" role="img" aria-label="Grok">
+<rect x="0.5" y="0.5" width="78" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAaVBMVEX///8AAABjY2M2Njb4+Pjy8vL7+/stLS0wMDCrq6tfX1+SkpKoqKiysrJPT0+EhITr6+vY2NjNzc0+Pj4fHx/l5eUoKCiMjIwMDAx7e3vExMSioqK9vb1XV1dGRkZpaWkVFRVxcXGamprh3+DVAAABoElEQVRYhe1V2ZaDIAwtreBSq9aKu7X1/z9yZAlgB1vry5wzh/sWws0lIYHDwcHB4a9B42w/2WvTAKFwJxtfIsRx3sPO4rtg3zq8RzsR7Dq97hBvR8FGSU++Z2dTKelPmzjBnsAKPT9KNprsmZOn9Ae2u7340lvE60dsQeLy4sATePxX1xJZAjmaeeAK6OV7OsMZtqoqaXrdbSl8/pDbO24SiIhQtVbdF3ii2A2vdKzo0RdTE849yjNo4dqRn2+nz7jy49NByU/8aO1XQQ46+Ttldl8s7+YDcl/xjeOUm8enUfQbl8eLaJ/la8WH94KoKdzwAqjOQTUvfsqjhLD4qZb0rvgDU7ueZlnWBPQkl9O3/F7RUcXszpCFyoi62JFqfs/s7GHKquhrQ+Ulmg8qIBuwBQz5jda5ooW+PV3sHFb5FwD99bC0RK7lIyZQlQHDTYUdPTPe9KZ8z9kkehQUCibrQUsMy5YI9b6G2UN5MgCtxWVhyGuzJTrNt90zgSeZdyL1TSmRf3KUiH7lJk8YCbd4WSphDc2O78XBwcHhX+MHkowR/Jk9Ot8AAAAASUVORK5CYII=" x="8" y="6" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">Grok</text>
+</svg>

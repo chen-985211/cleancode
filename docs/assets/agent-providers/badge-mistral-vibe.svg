@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="141" height="30" viewBox="0 0 141 30" role="img" aria-label="Mistral Vibe">
+<rect x="0.5" y="0.5" width="140" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAWlBMVEVHcEzdBAb/ggPfBAT/hQP/lwLbAwjIABrLARf/rgHFABz/hAPGABzEAB37UA//rQH6UA/7Tw/7ggDEAB37UA//ggThBQD/rwH6TQ//gwPgAAD/ngLQAhTiBQB30kzeAAAAEnRSTlMA2XFnXaBUc5lzhNjrpnPc29q2zZkpAAAAvElEQVRYhe2SwQ6CMBBEgVYoBUUjIEX5/99U0mkPa1YNJgbJPi6d2c1rDySJIGwOXYKlC+UFcIId5o0I1iy4Aq11Nn9h8DjPja4w5wRZR4g3++ic84dqsaD7ThARwQuBI0QB6TnBYSC0HloPJ07QfshRBCsWFKOnDwXymCMb5JQT9CAUIUcB8s8FExFMG36Bmjz8C7BABbnxpDeAbBSwZKFGthDYM0O4Yc/MaxGsSJAXDMmbBfX8MwrCv3IHTWBri0Dy7JIAAAAASUVORK5CYII=" x="8" y="6" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">Mistral Vibe</text>
+</svg>
