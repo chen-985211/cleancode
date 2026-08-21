@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent
+} from 'react'
 
 import type {
   BlockGraphSnapshot,
@@ -7,10 +15,21 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
   listQuickExecutionCandidates,
+  readQuickExecutionSlots,
   resolveQuickExecutionBinding,
   type QuickExecutionBindingProjection,
   type QuickExecutionCandidate
 } from './quickExecutionTargets'
+import {
+  blackHoleProximityThreshold,
+  createQuickExecutionReturnAnimation,
+  distanceBetweenRectangles,
+  isQuickExecutionDropTarget,
+  type DragAnimation,
+  type DragPreview,
+  type DragPreviewGeometry
+} from './quickExecutionDrag'
+import { QuickExecutionProxyCard, TypeIcon } from './quickExecutionDragPresentation'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import {
   defaultApplicationShortcutBindings,
@@ -22,9 +41,8 @@ import blackHoleAssetUrl from './assets/quick-execution-black-hole.png'
 import { useI18n } from './i18n/useI18n'
 import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
-import type { WorkbenchObjectMotion } from './types'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
-import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
+import { WorkbenchIcon } from './WorkbenchIcons'
 import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
@@ -60,29 +78,6 @@ interface PopoverPresentation {
   readonly open: boolean
 }
 
-interface DragPreviewGeometry {
-  readonly grabOffsetX: number
-  readonly grabOffsetY: number
-  readonly height: number
-  readonly width: number
-}
-
-interface DragPreview extends DragPreviewGeometry {
-  readonly isUnavailable: boolean
-  readonly left: number
-  readonly number: QuickExecutionSlotNumber
-  readonly projection: QuickExecutionBindingProjection
-  readonly top: number
-}
-
-interface ClearAnimation extends DragPreview {
-  readonly motion: WorkbenchObjectMotion
-  readonly targetLeft: number
-  readonly targetTop: number
-}
-
-const blackHoleProximityThreshold = 44
-
 export function QuickExecutionBar({
   isExternalDropTarget = false,
   graph,
@@ -105,7 +100,9 @@ export function QuickExecutionBar({
   const popoverTriggerRef = useRef<HTMLButtonElement | null>(null)
   const draggedNumberRef = useRef<QuickExecutionSlotNumber | null>(null)
   const dragPreviewGeometryRef = useRef<DragPreviewGeometry | null>(null)
+  const dragPreviewRef = useRef<DragPreview | null>(null)
   const clearAnimationIdRef = useRef(0)
+  const returnAnimationIdRef = useRef(0)
   const [popoverPresentation, setPopoverPresentation] = useState<PopoverPresentation | null>(null)
   const [renderedOpen, setRenderedOpen] = useState(open)
   const [draggedNumber, setDraggedNumber] = useState<QuickExecutionSlotNumber | null>(null)
@@ -115,7 +112,8 @@ export function QuickExecutionBar({
   const [isClearTarget, setIsClearTarget] = useState(false)
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const [isNearBlackHole, setIsNearBlackHole] = useState(false)
-  const [clearAnimation, setClearAnimation] = useState<ClearAnimation | null>(null)
+  const [clearAnimation, setClearAnimation] = useState<DragAnimation | null>(null)
+  const [returnAnimation, setReturnAnimation] = useState<DragAnimation | null>(null)
   const completeClearAnimation = (motionId: string): void => {
     setClearAnimation((current) => (current?.motion.id === motionId ? null : current))
     if (blackHoleMotionRef.current) blackHoleMotionRef.current.playbackRate = 1
@@ -125,6 +123,14 @@ export function QuickExecutionBar({
     onAnimationEnd: onClearMotionAnimationEnd,
     surfaceRef: clearMotionSurfaceRef
   } = useWorkbenchObjectMotionPresentation(clearAnimation?.motion, completeClearAnimation)
+  const completeReturnAnimation = useCallback((motionId: string): void => {
+    setReturnAnimation((current) => (current?.motion.id === motionId ? null : current))
+  }, [])
+  const {
+    className: returnMotionClassName,
+    onAnimationEnd: onReturnMotionAnimationEnd,
+    surfaceRef: returnMotionSurfaceRef
+  } = useWorkbenchObjectMotionPresentation(returnAnimation?.motion, completeReturnAnimation)
   const candidates = useMemo(() => listQuickExecutionCandidates(graph), [graph])
   const slots = useMemo(
     () =>
@@ -176,7 +182,6 @@ export function QuickExecutionBar({
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [closePopoverAndRestoreFocus, isPopoverOpen])
-
   const bind = (
     number: QuickExecutionSlotNumber | null,
     target: QuickExecutionTargetSnapshot
@@ -188,10 +193,10 @@ export function QuickExecutionBar({
     }
     void onAdd(target)
   }
-
   const resetReorder = (): void => {
     draggedNumberRef.current = null
     dragPreviewGeometryRef.current = null
+    dragPreviewRef.current = null
     setDraggedNumber(null)
     setDragPreview(null)
     setIsNearBlackHole(false)
@@ -199,6 +204,45 @@ export function QuickExecutionBar({
     setIsClearTarget(false)
     if (blackHoleMotionRef.current) blackHoleMotionRef.current.playbackRate = 1
   }
+
+  const returnReorder = (): void => {
+    const preview = dragPreviewRef.current
+    if (!preview) {
+      resetReorder()
+      return
+    }
+
+    returnAnimationIdRef.current += 1
+    setReturnAnimation(
+      createQuickExecutionReturnAnimation(
+        preview,
+        `quick-execution-return:${returnAnimationIdRef.current}`
+      )
+    )
+    resetReorder()
+  }
+  const returnReorderFromDocument = useEffectEvent(returnReorder)
+
+  useEffect(() => {
+    const acceptInternalDrag = (event: globalThis.DragEvent): void => {
+      if (!draggedNumberRef.current) return
+      event.preventDefault()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    }
+    const returnFromInvalidDrop = (event: globalThis.DragEvent): void => {
+      if (!draggedNumberRef.current || isQuickExecutionDropTarget(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+      returnReorderFromDocument()
+    }
+
+    document.addEventListener('dragover', acceptInternalDrag, true)
+    document.addEventListener('drop', returnFromInvalidDrop, true)
+    return () => {
+      document.removeEventListener('dragover', acceptInternalDrag, true)
+      document.removeEventListener('drop', returnFromInvalidDrop, true)
+    }
+  }, [])
 
   const beginReorder = (
     event: DragEvent<HTMLDivElement>,
@@ -215,18 +259,25 @@ export function QuickExecutionBar({
       height: sourceBounds.height,
       width: sourceBounds.width
     }
+    const originLeft = sourceBounds.left - (rootBounds?.left ?? 0)
+    const originTop = sourceBounds.top - (rootBounds?.top ?? 0)
+    const preview = {
+      ...geometry,
+      isUnavailable: !projection.isAvailable,
+      left: originLeft,
+      number,
+      originLeft,
+      originTop,
+      projection,
+      top: originTop
+    }
 
     draggedNumberRef.current = number
     dragPreviewGeometryRef.current = geometry
+    dragPreviewRef.current = preview
+    setReturnAnimation(null)
     setDraggedNumber(number)
-    setDragPreview({
-      ...geometry,
-      isUnavailable: !projection.isAvailable,
-      left: sourceBounds.left - (rootBounds?.left ?? 0),
-      number,
-      projection,
-      top: sourceBounds.top - (rootBounds?.top ?? 0)
-    })
+    setDragPreview(preview)
     setIsNearBlackHole(false)
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move'
@@ -250,15 +301,16 @@ export function QuickExecutionBar({
     }
     const blackHoleBounds = blackHoleTargetRef.current?.getBoundingClientRect()
 
-    setDragPreview((current) =>
-      current
-        ? {
-            ...current,
-            left: previewBounds.left - rootBounds.left,
-            top: previewBounds.top - rootBounds.top
-          }
-        : current
-    )
+    const currentPreview = dragPreviewRef.current
+    if (currentPreview) {
+      const nextPreview = {
+        ...currentPreview,
+        left: previewBounds.left - rootBounds.left,
+        top: previewBounds.top - rootBounds.top
+      }
+      dragPreviewRef.current = nextPreview
+      setDragPreview(nextPreview)
+    }
     setIsNearBlackHole(
       blackHoleBounds
         ? distanceBetweenRectangles(previewBounds, blackHoleBounds) <= blackHoleProximityThreshold
@@ -277,8 +329,8 @@ export function QuickExecutionBar({
     setReorderTargetNumber(null)
   }
 
-  const createClearAnimation = (): ClearAnimation | null => {
-    const preview = dragPreview
+  const createClearAnimation = (): DragAnimation | null => {
+    const preview = dragPreviewRef.current
     const rootBounds = rootRef.current?.getBoundingClientRect()
     const blackHoleBounds = blackHoleTargetRef.current?.getBoundingClientRect()
     if (!preview || !rootBounds || !blackHoleBounds) return null
@@ -389,7 +441,9 @@ export function QuickExecutionBar({
                 className={[
                   'quick-execution__slot',
                   projection ? 'quick-execution__slot--filled' : '',
-                  draggedNumber === slot.number ? 'quick-execution__slot--dragging' : '',
+                  draggedNumber === slot.number || returnAnimation?.number === slot.number
+                    ? 'quick-execution__slot--dragging'
+                    : '',
                   reorderTargetNumber === slot.number
                     ? 'quick-execution__slot--reorder-target'
                     : '',
@@ -403,7 +457,7 @@ export function QuickExecutionBar({
                   projection ? (event) => beginReorder(event, slot.number, projection) : undefined
                 }
                 onDrag={projection ? updateDragPreview : undefined}
-                onDragEnd={projection ? resetReorder : undefined}
+                onDragEnd={projection ? returnReorder : undefined}
                 onDragOver={(event) => {
                   if (!draggedNumberRef.current) return
                   event.preventDefault()
@@ -492,6 +546,29 @@ export function QuickExecutionBar({
         >
           <QuickExecutionProxyCard
             preview={clearAnimation}
+            unavailableLabel={t('quickExecution.unavailable')}
+          />
+        </div>
+      ) : null}
+      {returnAnimation ? (
+        <div
+          ref={returnMotionSurfaceRef}
+          className={['quick-execution__return-animation', returnMotionClassName]
+            .filter(Boolean)
+            .join(' ')}
+          data-quick-execution-return-animation
+          data-quick-execution-return-motion={returnAnimation.motion.id}
+          aria-hidden="true"
+          onAnimationEnd={onReturnMotionAnimationEnd}
+          style={{
+            height: returnAnimation.height,
+            left: returnAnimation.targetLeft,
+            top: returnAnimation.targetTop,
+            width: returnAnimation.width
+          }}
+        >
+          <QuickExecutionProxyCard
+            preview={returnAnimation}
             unavailableLabel={t('quickExecution.unavailable')}
           />
         </div>
@@ -596,21 +673,6 @@ export function QuickExecutionBar({
   )
 }
 
-function readQuickExecutionSlots(graph: BlockGraphSnapshot): readonly {
-  readonly number: QuickExecutionSlotNumber
-  readonly target: QuickExecutionTargetSnapshot | null
-}[] {
-  return (
-    graph.quickExecutionSlots ?? [
-      { number: 1, target: null },
-      { number: 2, target: null },
-      { number: 3, target: null },
-      { number: 4, target: null },
-      { number: 5, target: null }
-    ]
-  )
-}
-
 function CandidatePicker({
   candidates,
   onSelect
@@ -634,47 +696,4 @@ function CandidatePicker({
       ))}
     </div>
   )
-}
-
-function TypeIcon({ type }: { readonly type: QuickExecutionTargetSnapshot['type'] }) {
-  const role: WorkbenchIconRole =
-    type === 'terminal' ? 'terminal' : type === 'workflow' ? 'workflow' : 'terminal-group'
-  return <WorkbenchIcon className="quick-execution__type-icon" role={role} size={13} />
-}
-
-function QuickExecutionProxyCard({
-  preview,
-  unavailableLabel
-}: {
-  readonly preview: DragPreview
-  readonly unavailableLabel: string
-}) {
-  return (
-    <div
-      className={[
-        'quick-execution__drag-proxy-card',
-        preview.isUnavailable ? 'quick-execution__drag-proxy-card--unavailable' : ''
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      <div className="quick-execution__content quick-execution__drag-proxy-content">
-        <kbd>{preview.number}</kbd>
-        <TypeIcon type={preview.projection.type} />
-        <span className="quick-execution__copy">
-          <strong>{preview.projection.name}</strong>
-          {preview.isUnavailable ? <small>{unavailableLabel}</small> : null}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function distanceBetweenRectangles(
-  source: Pick<DOMRect, 'bottom' | 'left' | 'right' | 'top'>,
-  target: Pick<DOMRect, 'bottom' | 'left' | 'right' | 'top'>
-): number {
-  const horizontalGap = Math.max(target.left - source.right, source.left - target.right, 0)
-  const verticalGap = Math.max(target.top - source.bottom, source.top - target.bottom, 0)
-  return Math.hypot(horizontalGap, verticalGap)
 }

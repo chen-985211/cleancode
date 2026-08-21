@@ -371,7 +371,7 @@ describe('quick execution bar', () => {
     )
   })
 
-  it('restores the source slot when a black-hole drag is cancelled', () => {
+  it('starts returning the source slot when a black-hole drag is cancelled', () => {
     render(
       <QuickExecutionBar
         graph={createGraph()}
@@ -390,8 +390,91 @@ describe('quick execution bar', () => {
 
     fireEvent.dragEnd(source)
 
-    expect(source).not.toHaveClass('quick-execution__slot--dragging')
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
+    expect(source).toHaveClass('quick-execution__slot--dragging')
+    expect(document.querySelector('[data-quick-execution-return-animation]')).toBeInTheDocument()
+  })
+
+  it('returns a cancelled drag proxy to its source without changing the binding', () => {
+    const onClear = vi.fn()
+    const onReorder = vi.fn()
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={onClear}
+        onFocus={vi.fn()}
+        onReorder={onReorder}
+      />
+    )
+
+    const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    const bar = document.querySelector<HTMLElement>('[data-quick-execution-bar]')!
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue(
+      createDomRect({ height: 36, left: 100, top: 180, width: 440 })
+    )
+    vi.spyOn(source, 'getBoundingClientRect').mockReturnValue(
+      createDomRect({ height: 36, left: 190, top: 180, width: 85 })
+    )
+    const dataTransfer = {
+      dropEffect: 'none',
+      effectAllowed: 'none',
+      setData: vi.fn(),
+      setDragImage: vi.fn()
+    }
+
+    fireEvent.dragStart(source, { clientX: 230, clientY: 198, dataTransfer })
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 430, clientY: 198 }))
+
+    expect(fireEvent.dragOver(document.body, { dataTransfer })).toBe(false)
+    fireEvent.drop(document.body, { dataTransfer })
+
+    expect(onClear).not.toHaveBeenCalled()
+    expect(onReorder).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-quick-execution-drag-proxy]')).not.toBeInTheDocument()
+    expect(source).toHaveClass('quick-execution__slot--dragging')
+    expect(document.querySelector('[data-quick-execution-trash]')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    )
+    const returnAnimation = document.querySelector<HTMLElement>(
+      '[data-quick-execution-return-animation]'
+    )!
+    expect(returnAnimation).toBeInTheDocument()
+    expect(returnAnimation).toHaveClass('workbench-object-motion--move')
+    expect(returnAnimation).toHaveStyle({ height: '36px', left: '90px', top: '0px', width: '85px' })
+    expect(
+      Number.parseFloat(returnAnimation.style.getPropertyValue('--workbench-object-motion-x'))
+    ).toBeGreaterThan(0)
+    expect(returnAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
+  })
+
+  it('restores a cancelled drag immediately when motion is reduced', () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue(createMediaQueryList(true))
+    try {
+      render(
+        <QuickExecutionBar
+          graph={createGraph()}
+          onAdd={vi.fn()}
+          onBind={vi.fn()}
+          onClear={vi.fn()}
+          onFocus={vi.fn()}
+          onReorder={vi.fn()}
+        />
+      )
+
+      const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+      fireEvent.dragStart(source)
+      fireEvent.dragEnd(source)
+
+      expect(source).not.toHaveClass('quick-execution__slot--dragging')
+      expect(
+        document.querySelector('[data-quick-execution-return-animation]')
+      ).not.toBeInTheDocument()
+    } finally {
+      matchMedia.mockRestore()
+    }
   })
 })
 
@@ -458,5 +541,18 @@ function createDomRect({
     width,
     x: left,
     y: top
+  }
+}
+
+function createMediaQueryList(matches: boolean): MediaQueryList {
+  return {
+    matches,
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => true
   }
 }

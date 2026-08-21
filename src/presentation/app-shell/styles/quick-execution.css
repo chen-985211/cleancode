@@ -266,11 +266,19 @@
   transform-origin: 0 0;
 }
 
-.quick-execution__clear-animation {
+.quick-execution__clear-animation,
+.quick-execution__return-animation {
   position: absolute;
   z-index: 6;
   pointer-events: none;
+}
+
+.quick-execution__clear-animation {
   transform-origin: center;
+}
+
+.quick-execution__return-animation {
+  transform-origin: 0 0;
 }
 
 .quick-execution__drag-proxy-card {
