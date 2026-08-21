@@ -253,6 +253,7 @@ export const enMessages = {
   'quickExecution.openSlotActions': 'Open actions for quick slot {number}',
   'quickExecution.rebind': 'Rebind',
   'quickExecution.removeDropTarget': 'Drop here to clear quick slot {number}',
+  'quickExecution.releaseDropTarget': 'Release to clear quick slot {number}',
   'quickExecution.unavailable': 'Unavailable',
   'quickExecution.type.terminal': 'Terminal',
   'quickExecution.type.workflow': 'Workflow',

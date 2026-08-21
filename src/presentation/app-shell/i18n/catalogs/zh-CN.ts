@@ -247,6 +247,7 @@ export const zhCNMessages = {
   'quickExecution.openSlotActions': '打开快捷位 {number} 的操作',
   'quickExecution.rebind': '重新绑定',
   'quickExecution.removeDropTarget': '拖到此处清空快捷位 {number}',
+  'quickExecution.releaseDropTarget': '松开以清空 {number} 号快捷位',
   'quickExecution.unavailable': '不可用',
   'quickExecution.type.terminal': '终端',
   'quickExecution.type.workflow': '流程',
