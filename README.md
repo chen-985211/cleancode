@@ -134,24 +134,25 @@ Look one layer deeper, and any Agent that can start from the command line can th
 
 <!-- agent-provider-wall:end -->
 
-## Let Agents Help You Build
+## Let Agents Build the Context, Without Crossing the Boundary
 
-Agents that support the native CleanCode MCP understand and organize the same workspace through stable tools instead of editing internal canvas data. For example, you can tell an Agent:
+We said above that Agents can stand on the same canvas as terminals, services, and ports. But being in the development context does not mean an Agent should bypass you and edit the canvas data behind your back. Agents that support the native CleanCode MCP use stable tools to understand the current workspace: they can see existing terminals and connections, inspect the real startup commands in the project, and build a new terminal workflow from your goal.
 
-> Inspect the current project and create terminals for installing dependencies, starting the API, and starting the web app. Configure the correct dependencies, service readiness conditions, and ports.
+For example, you can simply tell it:
 
-The Agent first inspects the existing canvas and, when needed, reads the project to confirm the real startup commands. It then uses MCP to create, configure, connect, and validate the complete workflow. The result lands on the canvas as one atomic change; inspect the terminals, dependencies, ports, and execution plan before deciding whether to run it.
+> Help me set up a workflow for starting this project.
 
-Deleting blocks, dissolving groups, and disconnecting dependencies require approval in the CleanCode UI. Starting and stopping workflows remain under human control. Agents can help build the environment, but actions that change your local development setup stay visible to you.
+The Agent first inspects the existing canvas, then reads the project to figure out what should be installed first, which services should start, and how ports and dependencies should connect. What lands on the canvas is not a suggestion, but a development context you can see, inspect, and keep running.
 
-## Start with One Feature
+But there is an important boundary here: actions that change the structure of the context, such as deleting blocks, dissolving groups, or disconnecting dependencies, require approval in the CleanCode UI. Starting and stopping workflows also remain under human control. Agents can help build the context, but they should not turn your local development environment into a black box. What they changed, what they created, and what would run next should stay visible to you.
 
-1. Add a local project and create an isolated branch workspace for the feature.
-2. Add the Coding Agent you use.
-3. Turn installation, builds, tests, and development servers into terminal blocks.
-4. Separate finite tasks from long-running services, then configure readiness conditions, ports, and dependencies.
-5. Run the workflow from its root terminal and inspect startup order, state, failure reasons, and actual endpoints on the same canvas.
-6. Save the proven terminal, workflow, or combination as a template, or bind it to a quick execution slot for next time.
+## Let One Feature Grow into a Development Context
+
+Using CleanCode does not require planning a complete system first. Start with the feature you are working on right now: add the local project, create an isolated branch workspace for it, and bring in the Coding Agent you already use.
+
+From there, you can turn installation, builds, tests, and development servers into terminal blocks yourself, or ask an Agent that supports the CleanCode MCP to build the first startup workflow. CleanCode puts finite tasks, long-running services, readiness conditions, ports, and dependency relationships on the same canvas, so the feature becomes more than a branch. It becomes a runnable context you can inspect and keep adjusting.
+
+Once the workflow runs, start it from the root terminal and inspect startup order, runtime state, failure reasons, and actual endpoints on the canvas. After the context has been proven, save the terminals, workflow, or combination as a template, or bind it to a quick execution slot. The next time a similar feature appears, it is no longer just a configuration you repeat. It is reusable experience.
 
 ## Quick Start
 
