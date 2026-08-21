@@ -6,8 +6,8 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-  <a href="#bring-your-favorite-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-  <a href="#draw-it-and-run-it"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+  <a href="#bring-agents-back-to-the-development-context"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+  <a href="#draw-the-dependencies-then-run-them"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
 </p>
 
 <p align="center">
@@ -35,11 +35,11 @@
 
 Software development is moving from “one person writing code” to people and Agents advancing multiple development contexts together. One change may have its own branch, terminals, services, test commands, ports, and Agent conversation; another change has a similar context of its own. The problem is not a lack of tools. Once these contexts scatter across different windows, you have to keep rebuilding them from memory: which branch a terminal belongs to, whether a service is still alive, whether ports conflict, whether dependencies are ready, and whether the Agent still understands the current change. That is why I increasingly think a development environment should not be organized only around code files and editors. It should be organized around the change currently in motion. It needs to remember branches, terminals, services, ports, dependency order, and Agent context at the same time, and make them visible in a form people can understand and Agents can operate.
 
-**CleanCode is a canvas-based ADE (Agentic Development Environment).** It keeps a separate canvas for local projects and Git branch workspaces, bringing interactive terminals, dependency workflows, and the Coding Agents you already use together so each change stays isolated, visible, and runnable; a proven development context can also become a reusable asset inside one project or across all projects.
+**CleanCode is a canvas-based ADE (Agentic Development Environment).** In CleanCode, a change is not just a branch name. It is a development context you can keep working in: Agents, terminals, services, ports, and dependency relationships all live on the same canvas. You can see how they relate to each other and run them directly; once that context is proven, it can be saved as a project template or global favorite, becoming an asset you can reuse the next time you build.
 
-## One Branch, One Isolated Workspace
+## One Change, One Development Context
 
-Create a branch workspace for `feature/auth`, and CleanCode gives it a dedicated Git worktree. The canvas, terminals, execution scope, and Agent sessions all switch together with that workspace:
+When you create a branch workspace for `feature/auth`, CleanCode is not just checking out another Git branch. It opens an isolated development context for that change. It has its own Git worktree, and its own canvas, terminals, execution scope, and Agent sessions:
 
 ```txt
 feature/auth (isolated worktree)
@@ -49,13 +49,15 @@ feature/auth (isolated worktree)
                                                └─> Tests
 ```
 
-Work on `feature/auth`, `fix/search`, and `experiment/new-ui` at the same time. When you return to a workspace, you do not need to clear terminals, recheck the working directory, or remind an Agent that you switched branches.
+That means you can work on `feature/auth`, `fix/search`, and `experiment/new-ui` at the same time without squeezing them into the same terminal history and service state. When you return to any workspace, you come back to that change's own context: terminal output is still there, Agent context is still there, and the working directory has not moved.
 
-Running ordinary terminals keep working and retain their output while you switch to another change. If two branches need to start the same development service, preferred or automatic ports avoid manual conflicts: CleanCode allocates an available port, injects it through the launch environment or command arguments, and shows the actual address for that run on the canvas.
+If two branches both need to start the same development service, CleanCode helps them avoid port conflicts. It can use fixed, preferred, or automatic ports, inject the final endpoint through the launch environment or command arguments, and show the actual address on the canvas.
 
-## Draw It and Run It
+## Draw the Dependencies, Then Run Them
 
-A development environment usually takes more than one command: install or build first, wait for the API service to become ready, then start the web app and tests. CleanCode makes those startup conditions part of the workflow instead of leaving them in script comments or human memory.
+Many development environments do not break because the commands themselves cannot run. They break because the order and conditions are not remembered by the environment: install dependencies first, wait until the API service is actually ready, then start the web app, and finally run tests. Those details often scatter across READMEs, script comments, terminal history, and human memory. Switch branches, or come back a few days later, and the whole flow has to be checked again.
+
+In CleanCode, those startup conditions become an executable workflow on the canvas:
 
 - Terminal blocks run real builds, tests, development servers, and everyday commands.
 - Directed connections declare real dependencies. Tasks without upstream dependencies can start in parallel; downstream tasks wait until every direct dependency has completed or become ready.
@@ -63,17 +65,27 @@ A development environment usually takes more than one command: install or build 
 - Services can use fixed, preferred, or automatic ports; the runtime allocates and injects the final endpoint.
 - An upstream failure explicitly blocks its descendants; stopping a workflow cleans up active processes in reverse dependency order.
 
-The canvas shows node state, failure reasons, and actual service addresses, but it is not a static flowchart pretending to be runtime truth. Every run produces an immutable execution plan from the current terminal graph.
+So the canvas is not a static flowchart. Every run produces an immutable execution plan from the current terminal graph, and CleanCode keeps node state, failure reasons, and actual service addresses on the canvas.
 
-If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. The canvas identifies the failed node, its blocked descendants, and the actual reason, so you can see where the workflow stopped without searching every terminal.
+If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. You can see exactly where the workflow stopped, which descendants were blocked, and what actually failed.
 
-## Bring Your Favorite Agent
+## Prove It Once, Turn It into an Asset
 
-**Switch Agents without changing how you work.** CleanCode does not introduce another built-in Coding Agent. It brings the local Agent CLIs you already use into the current branch workspace.
+Once a development context actually works, its value no longer belongs to just that one change. The exact command, the readiness signal, the port strategy, and the layout of the nodes are all experience you had to discover. In many teams, that experience stays in someone's terminal history, chat thread, or memory. The next branch starts, and the same context has to be rebuilt.
 
-Agent integration has two levels: every built-in Provider can have its own console, while Agents that support the native CleanCode MCP can also read, inspect, and build terminal workflows on the current canvas.
+In CleanCode, proven terminals, workflows, or combinations can be saved as project templates; if they belong in more than one project, move them into global favorites. The next time a similar change appears, choose **Place** or **Place and run**, and CleanCode creates a new set of terminals and connections with their own identities, bringing back the commands, dependency relationships, port strategy, and relative layout together.
 
-When you create an Agent, CleanCode detects the Provider CLIs installed on your machine and only shows the Agents currently available.
+Templates keep reusable development structure, not temporary state from the last run. They do not copy terminal output, runtime state, actual endpoints, Agents, or Agent conversations. You can also bind frequently used terminals, complete workflows, or combinations to slots `1` through `5` in the current workspace, then run them with `Command/Ctrl + 1` through `5`.
+
+## Bring Agents Back to the Development Context
+
+If CleanCode is an ADE (Agentic Development Environment), the first problem it should solve is not inventing another Agent. You may already have tools that feel right: Claude Code, Codex, Gemini, Cursor, OpenCode, or another local Agent CLI. The real question is whether those Agents can enter a change and stand in the same context as the branch, terminals, services, ports, and dependency relationships.
+
+**Switch Agents without changing how you work.** CleanCode does not ship another built-in Coding Agent or ask you to move your habits into a closed system. It brings the local Agent CLIs already installed on your machine into the current branch workspace, so each Agent works in the right directory, with the right context, on the same canvas.
+
+Agent integration has two levels: every built-in Provider can have an independent console running the corresponding real local CLI in the current workspace; Agents that support the native CleanCode MCP can also read, inspect, and build terminal workflows on the current canvas through explicit tool boundaries.
+
+When you create an Agent, CleanCode detects the Provider CLIs installed on your machine. The menu is not a theoretical compatibility list; it shows the Agents that can actually start here.
 
 <!-- agent-provider-wall:start -->
 
@@ -128,14 +140,6 @@ Agents that support the native CleanCode MCP understand and organize the same wo
 The Agent first inspects the existing canvas and, when needed, reads the project to confirm the real startup commands. It then uses MCP to create, configure, connect, and validate the complete workflow. The result lands on the canvas as one atomic change; inspect the terminals, dependencies, ports, and execution plan before deciding whether to run it.
 
 Deleting blocks, dissolving groups, and disconnecting dependencies require approval in the CleanCode UI. Starting and stopping workflows remain under human control. Agents can help build the environment, but actions that change your local development setup stay visible to you.
-
-## Build Once, Reuse Anytime
-
-Many development contexts are not one-off. Once you have proven the “install dependencies → API service → web app and tests” flow, what you really want to keep is not just a command. It is the command, dependency graph, port strategy, and relative layout as one reusable piece of experience.
-
-In CleanCode, a proven terminal, workflow, or combination can be saved as a project template. If it belongs in more than one project, move it to global favorites. In the next branch, choose **Place** or **Place and run** to create a new set of terminals and connections with independent identities—without re-entering commands, ports, or startup order.
-
-Templates preserve configuration, dependencies, and relative layout, but they do not copy terminal output, runtime state, actual endpoints, Agents, or Agent conversations. You can also bind frequently used terminals, complete workflows, or combinations to slots `1` through `5` in the current workspace, then run them with `Command/Ctrl + 1` through `5`.
 
 ## Start with One Feature
 
