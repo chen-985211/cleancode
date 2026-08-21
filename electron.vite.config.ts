@@ -29,6 +29,9 @@ export default defineConfig({
   renderer: {
     root: '.',
     plugins: [react()],
+    server: {
+      open: false
+    },
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'index.html')
