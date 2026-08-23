@@ -104,6 +104,23 @@ describe('platform main window state lifecycle', () => {
     expect(target.listenerCount('enter-full-screen')).toBe(0)
   })
 
+  it('flushes the current normal bounds when native normal bounds lag behind', () => {
+    const target = new FakeWindow()
+    const store = createStore()
+    const binding = bindMainWindowStatePersistence({
+      initialState: snapshot(target.normalBounds, 'normal'),
+      persistDisplayMode: true,
+      store,
+      target
+    })
+    target.currentBounds = { x: 120, y: 80, width: 1_100, height: 700 }
+
+    target.emit('close')
+
+    expect(store.save).toHaveBeenCalledWith(snapshot(target.currentBounds, 'normal'))
+    binding.dispose()
+  })
+
   it('records an unmaximize transition before a rapid minimize and close', () => {
     const target = new FakeWindow()
     const store = createStore()
@@ -166,6 +183,7 @@ describe('platform main window state lifecycle', () => {
 })
 
 class FakeWindow extends EventEmitter {
+  currentBounds: MainWindowBounds | null = null
   normalBounds: MainWindowBounds = { x: 120, y: 80, width: 1_200, height: 800 }
   isFullScreenValue = false
   isMaximizedValue = false
@@ -173,6 +191,10 @@ class FakeWindow extends EventEmitter {
 
   getNormalBounds(): MainWindowBounds {
     return this.normalBounds
+  }
+
+  getBounds(): MainWindowBounds {
+    return this.currentBounds ?? this.normalBounds
   }
 
   isFullScreen(): boolean {

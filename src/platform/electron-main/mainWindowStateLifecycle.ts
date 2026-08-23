@@ -10,6 +10,7 @@ import {
 export const mainWindowStateSaveDelayMs = 200
 
 interface MainWindowStateTarget {
+  getBounds(): MainWindowBounds
   getNormalBounds(): MainWindowBounds
   isFullScreen(): boolean
   isMaximized(): boolean
@@ -45,7 +46,9 @@ export function bindMainWindowStatePersistence(input: {
       decodeMainWindowState({
         version: mainWindowStateSchemaVersion,
         displayMode,
-        normalBounds: input.target.getNormalBounds()
+        normalBounds: isNormalWindow(input.target)
+          ? input.target.getBounds()
+          : input.target.getNormalBounds()
       }) ?? { ...lastSnapshot, displayMode }
     )
   }
@@ -106,6 +109,12 @@ export function bindMainWindowStatePersistence(input: {
   for (const [event, listener] of listeners) input.target.on(event, listener)
 
   return { dispose, flush }
+}
+
+function isNormalWindow(
+  target: Pick<MainWindowStateTarget, 'isFullScreen' | 'isMaximized' | 'isMinimized'>
+): boolean {
+  return !target.isMinimized() && !target.isFullScreen() && !target.isMaximized()
 }
 
 function resolveDisplayMode(
