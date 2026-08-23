@@ -83,11 +83,11 @@ export function useWorkbenchNodeSelection({
   )
 
   const selectTerminal = useCallback(
-    (blockId: string, additive: boolean, shouldFocus: boolean) => {
+    (blockId: string, shouldFocus: boolean) => {
       setSelectedAgentId(null)
       setSelectedTerminalGroupId(null)
-      selectTerminalBlock(blockId, additive)
-      if (shouldFocus && !additive && !isTerminalGroupSelectionMode) {
+      selectTerminalBlock(blockId, false)
+      if (shouldFocus && !isTerminalGroupSelectionMode) {
         focusSelectedWorkbenchNode(blockId)
       }
     },
@@ -100,14 +100,14 @@ export function useWorkbenchNodeSelection({
     ]
   )
   const selectTerminalFromTitle = useCallback(
-    (blockId: string, additive: boolean) => selectTerminal(blockId, additive, true),
+    (blockId: string) => selectTerminal(blockId, true),
     [selectTerminal]
   )
 
   const selectWorkbenchNodeFromShortcut = useCallback(
     (node: WorkbenchFlowNode) => {
       if (node.type === 'terminal') {
-        selectTerminal(node.id, false, false)
+        selectTerminal(node.id, false)
         return
       }
 

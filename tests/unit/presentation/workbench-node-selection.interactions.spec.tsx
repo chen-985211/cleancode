@@ -33,11 +33,11 @@ describe('workbench node selection', () => {
     expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(expectedNodeId)
   })
 
-  it.each([
-    { selectedTerminalBlockIds: ['terminal-1', 'terminal-2'] },
-    { isTerminalGroupSelectionMode: true, selectedTerminalBlockIds: ['terminal-1'] }
-  ])('does not choose an arbitrary return anchor from multi-selection', (options) => {
-    const { input, result } = renderSelectionHook(options)
+  it('does not choose an arbitrary return anchor from terminal-group candidates', () => {
+    const { input, result } = renderSelectionHook({
+      isTerminalGroupSelectionMode: true,
+      selectedTerminalBlockIds: ['terminal-1', 'terminal-2']
+    })
 
     act(() => {
       result.current.clearWorkbenchSelection()
@@ -78,7 +78,7 @@ describe('workbench node selection', () => {
     const { input, result } = renderSelectionHook()
 
     act(() => {
-      result.current.selectTerminalFromTitle('backend-terminal', false)
+      result.current.selectTerminalFromTitle('backend-terminal')
     })
 
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
@@ -87,22 +87,15 @@ describe('workbench node selection', () => {
     expect(input.focusSelectedWorkbenchNode).toHaveBeenCalledWith('backend-terminal')
   })
 
-  it('does not focus the canvas for additive or terminal-group candidate selection', () => {
-    const additiveSelection = renderSelectionHook()
+  it('does not focus the canvas from a terminal title during terminal-group selection', () => {
+    const selection = renderSelectionHook({ isTerminalGroupSelectionMode: true })
 
     act(() => {
-      additiveSelection.result.current.selectTerminalFromTitle('backend-terminal', true)
+      selection.result.current.selectTerminalFromTitle('backend-terminal')
     })
 
-    expect(additiveSelection.input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
-
-    const candidateSelection = renderSelectionHook({ isTerminalGroupSelectionMode: true })
-
-    act(() => {
-      candidateSelection.result.current.selectTerminalFromTitle('backend-terminal', false)
-    })
-
-    expect(candidateSelection.input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+    expect(selection.input.selectTerminalBlock).toHaveBeenCalledWith('backend-terminal', false)
+    expect(selection.input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
   })
 
   it('focuses an Agent selected from its title', () => {

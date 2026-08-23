@@ -53,7 +53,7 @@ interface TerminalFlowNodeHandlers {
     block: TerminalBlockSnapshot,
     layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
-  readonly onSelect?: (block: TerminalBlockSnapshot, additive: boolean) => void
+  readonly onSelect?: (block: TerminalBlockSnapshot) => void
   readonly onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) => void
 }
 

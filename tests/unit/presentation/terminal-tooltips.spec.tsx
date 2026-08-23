@@ -187,7 +187,10 @@ describe('terminal tooltips', () => {
     )
   })
 
-  it('selects the whole terminal only from the title area', () => {
+  it.each([
+    ['without Shift', false],
+    ['with Shift', true]
+  ] as const)('selects the whole terminal only from the title area %s', (_label, shiftKey) => {
     const onSelect = vi.fn()
     const data = { ...createTerminalNodeData(), onSelect }
     const { container } = render(
@@ -207,13 +210,16 @@ describe('terminal tooltips', () => {
       />
     )
 
-    fireEvent.click(container.querySelector('.terminal-frame')!)
+    fireEvent.click(container.querySelector('.terminal-frame')!, { shiftKey })
     expect(onSelect).not.toHaveBeenCalled()
 
-    fireEvent.click(container.querySelector('.terminal-node__header')!)
+    fireEvent.click(container.querySelector('.terminal-node__header')!, { shiftKey })
     expect(onSelect).toHaveBeenCalledOnce()
+    expect(onSelect).toHaveBeenCalledWith(data.block)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 重开空终端会话' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 重开空终端会话' }), {
+      shiftKey
+    })
     expect(onSelect).toHaveBeenCalledOnce()
   })
 

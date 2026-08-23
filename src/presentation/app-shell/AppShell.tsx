@@ -440,8 +440,7 @@ export function AppShell({
       onPaste: writeTerminalImmediately,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
-      onSelect: (block: TerminalBlockSnapshot, additive: boolean) =>
-        selectTerminalFromTitle(block.id, additive),
+      onSelect: (block: TerminalBlockSnapshot) => selectTerminalFromTitle(block.id),
       onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) =>
         selectTerminalBlock(block.id, true),
       ...terminalGroupActions
