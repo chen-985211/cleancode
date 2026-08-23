@@ -38,7 +38,7 @@ describe('window state persistence e2e', () => {
   it(
     'restores the previous normal window size in a new application process',
     async () => {
-      const expectedSize = { width: 1_100, height: 700 }
+      const expectedSize = { width: 1_000, height: 700 }
       const resized = await readMainWindowSizeAfterResize(electronApp, expectedSize)
       expect(resized).toEqual(expectedSize)
 
