@@ -37,6 +37,7 @@ function TimingProbe({
     graph: null,
     handlers: {} as never,
     hoveredTerminalBlockId: null,
+    editingTerminalGroupId: null,
     isTerminalGroupSelectionMode: false,
     onMcpCapabilityChange: async () => undefined,
     onRemoveAgent: async () => undefined,

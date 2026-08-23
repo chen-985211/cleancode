@@ -204,7 +204,7 @@ describe('app shell create terminal focus', () => {
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
-        name: '启动项目',
+        name: '终端组合 1',
         position: { x: 320, y: 240 },
         projectDirectory: '/tmp/alpha-project',
         workspaceId: 'main'

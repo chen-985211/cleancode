@@ -130,11 +130,11 @@ describe('terminal groups e2e', () => {
         await waitForTerminalVisuallyInsideGroup(page, emptyGroup.id, terminal.id)
       }
       await page.getByRole('button', { name: '完成' }).click()
-      await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
+      await page.getByRole('button', { name: '终端组合 1 折叠组合' }).waitFor()
       await page.getByRole('button', { name: '适应画布' }).click()
       await waitForCanvasViewportToSettle(page)
 
-      await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
+      await page.getByRole('button', { name: '终端组合 1 折叠组合' }).click()
       const collapsingGroup = terminalGroupLocator(page, emptyGroup.id)
       await page
         .locator(
@@ -157,9 +157,9 @@ describe('terminal groups e2e', () => {
           )
         )
       })
-      await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).waitFor()
+      await page.getByRole('button', { name: '聚焦终端组合 终端组合 1' }).waitFor()
 
-      await page.getByRole('button', { name: '启动项目 展开组合' }).click()
+      await page.getByRole('button', { name: '终端组合 1 展开组合' }).click()
       await page.waitForFunction(
         () =>
           document.querySelectorAll('[data-terminal-block-id]').length === 2 &&
@@ -169,9 +169,9 @@ describe('terminal groups e2e', () => {
             '[data-terminal-block-id] .workbench-object-motion--group-expand'
           ).length === 0
       )
-      expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
+      expect(await page.getByRole('button', { name: '聚焦终端组合 终端组合 1' }).count()).toBe(0)
 
-      await page.getByRole('button', { name: '启动项目 管理组合内容' }).click()
+      await page.getByRole('button', { name: '终端组合 1 管理组合内容' }).click()
       await page.getByRole('button', { name: '缩小画布' }).click()
       await waitForCanvasViewportToSettle(page)
 

@@ -266,7 +266,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           workflowStatus={data.workflowStatus}
           isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
           isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
-          onSelect={(additive) => data.onSelect?.(block, additive)}
+          onSelect={() => data.onSelect?.(block)}
           onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
           onStartEditing={startEditingMetadata}
           onStop={stopTerminal}
@@ -358,7 +358,7 @@ interface TerminalHeaderProps {
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
-  readonly onSelect: (additive: boolean) => void
+  readonly onSelect: () => void
   readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
   readonly onStop: () => void
@@ -419,7 +419,7 @@ function TerminalHeader({
       ? t('terminal.retention.disable')
       : t('terminal.retention.enable')
   return (
-    <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
+    <div className="terminal-node__header" onClick={() => onSelect()}>
       <span className="terminal-node__icon">
         <WorkbenchIcon size={19} data-icon="terminal-node" role="terminal" />
       </span>

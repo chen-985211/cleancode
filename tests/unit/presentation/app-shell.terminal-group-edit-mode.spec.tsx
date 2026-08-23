@@ -262,7 +262,7 @@ describe('app shell terminal group edit mode', () => {
         {
           id: 'new-group',
           type: 'terminal-group',
-          name: '启动项目',
+          name: '终端组合 1',
           position: { x: 320, y: 240 },
           size: { width: 520, height: 320 },
           isCollapsed: false,
@@ -287,7 +287,7 @@ describe('app shell terminal group edit mode', () => {
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
         workspaceId: 'main',
-        name: '启动项目',
+        name: '终端组合 1',
         position: { x: 320, y: 240 }
       })
     )
@@ -349,6 +349,39 @@ describe('app shell terminal group edit mode', () => {
         (node) => node.id === 'development-group' && node.type === 'terminalGroup'
       )
     ).toMatchObject({ data: { isEditing: true } })
+  })
+
+  it('keeps the container editing when ordinary canvas selection is cleared', async () => {
+    const workbench = createWorkbenchWithTerminalGroup()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    await enterTerminalGroupEditMode()
+    await waitFor(() =>
+      expect(
+        reactFlowProps.latest?.nodes.find(
+          (node) => node.id === 'development-group' && node.type === 'terminalGroup'
+        )
+      ).toMatchObject({ data: { isEditing: true } })
+    )
+
+    act(() => reactFlowProps.latest?.onPaneClick?.())
+
+    await waitFor(() =>
+      expect(
+        reactFlowProps.latest?.nodes.find(
+          (node) => node.id === 'development-group' && node.type === 'terminalGroup'
+        )
+      ).toMatchObject({ data: { isEditing: true } })
+    )
   })
 
   it('keeps the group shell size stable while dragging a member in edit mode', async () => {
@@ -500,6 +533,7 @@ interface MockReactFlowProps {
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void | Promise<void>
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  readonly onPaneClick?: () => void
   readonly onPaneContextMenu?: (event: ReactMouseEvent) => void
 }
 

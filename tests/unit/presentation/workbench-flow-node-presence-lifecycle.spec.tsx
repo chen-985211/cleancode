@@ -76,6 +76,7 @@ function Harness({ onReady }: { readonly onReady: (controls: HarnessControls) =>
     graph,
     handlers: terminalHandlers,
     hoveredTerminalBlockId: null,
+    editingTerminalGroupId: null,
     isTerminalGroupSelectionMode: false,
     onAgentGraphUpdated: noop,
     onMcpCapabilityChange: noopOptionalAsync,

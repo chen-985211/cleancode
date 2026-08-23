@@ -316,8 +316,6 @@ export function AppShell({
     beginTerminalGroupSelection,
     currentWorkbench,
     currentWorkspace,
-    defaultGroupName: t('group.defaultName'),
-    firstGroupName: t('group.defaultFirstName'),
     notifications,
     setCurrentGraph,
     terminateTerminalSession
@@ -440,8 +438,7 @@ export function AppShell({
       onPaste: writeTerminalImmediately,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
-      onSelect: (block: TerminalBlockSnapshot, additive: boolean) =>
-        selectTerminalFromTitle(block.id, additive),
+      onSelect: (block: TerminalBlockSnapshot) => selectTerminalFromTitle(block.id),
       onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) =>
         selectTerminalBlock(block.id, true),
       ...terminalGroupActions
@@ -479,6 +476,7 @@ export function AppShell({
     handlers: terminalFlowNodeHandlers,
     hoveredTerminalBlockId,
     selectedAgentId,
+    editingTerminalGroupId,
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
