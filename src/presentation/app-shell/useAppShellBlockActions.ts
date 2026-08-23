@@ -15,8 +15,6 @@ interface UseAppShellBlockActionsInput {
   readonly completeTerminalGroupSelection?: () => void
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
-  readonly defaultGroupName: string
-  readonly firstGroupName: string
   readonly notifications: AppNotificationController
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
   readonly selectedUngroupedTerminalBlockIds?: readonly string[]
@@ -28,8 +26,6 @@ export function useAppShellBlockActions({
   beginTerminalGroupSelection,
   currentWorkbench,
   currentWorkspace,
-  defaultGroupName,
-  firstGroupName,
   notifications,
   setCurrentGraph,
   terminateTerminalSession
@@ -46,8 +42,9 @@ export function useAppShellBlockActions({
       const graphSnapshot = await window.cleancode?.createTerminalGroup({
         projectDirectory: currentWorkbench.project.directory,
         workspaceId: currentWorkspace.workspaceId,
-        name:
-          currentWorkbench.graph.terminalGroups.length === 0 ? firstGroupName : defaultGroupName,
+        name: t('group.defaultName', {
+          index: currentWorkbench.graph.terminalGroups.length + 1
+        }),
         position
       })
 
@@ -59,14 +56,7 @@ export function useAppShellBlockActions({
       )?.id
       if (createdGroupId) beginTerminalGroupSelection?.(createdGroupId)
     },
-    [
-      beginTerminalGroupSelection,
-      currentWorkbench,
-      currentWorkspace,
-      defaultGroupName,
-      firstGroupName,
-      setCurrentGraph
-    ]
+    [beginTerminalGroupSelection, currentWorkbench, currentWorkspace, setCurrentGraph, t]
   )
 
   const deleteTerminalBlock = useCallback(

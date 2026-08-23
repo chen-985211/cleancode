@@ -5,6 +5,48 @@ import type { AppNotificationController } from '../../../src/presentation/app-sh
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 import { useAppShellBlockActions } from '../../../src/presentation/app-shell/useAppShellBlockActions'
 
+describe('app shell terminal group creation', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'cleancode', { configurable: true, value: undefined })
+  })
+
+  it.each([
+    [0, '终端组合 1'],
+    [1, '终端组合 2']
+  ] as const)(
+    'numbers a new group like a terminal when %i groups exist',
+    async (groupCount, name) => {
+      const currentWorkbench = createWorkbench(groupCount)
+      const createTerminalGroup = vi.fn(async () => currentWorkbench.graph)
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: { createTerminalGroup }
+      })
+
+      const { result } = renderHook(() =>
+        useAppShellBlockActions({
+          currentWorkbench,
+          currentWorkspace: currentWorkbench.project.workspaces[0],
+          notifications: createNotifications(),
+          setCurrentGraph: vi.fn(),
+          terminateTerminalSession: vi.fn(async () => undefined)
+        })
+      )
+
+      await act(async () => {
+        await result.current.createTerminalGroup({ x: 320, y: 240 })
+      })
+
+      expect(createTerminalGroup).toHaveBeenCalledWith({
+        name,
+        position: { x: 320, y: 240 },
+        projectDirectory: '/project',
+        workspaceId: 'main'
+      })
+    }
+  )
+})
+
 describe('app shell terminal scope removal', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'cleancode', { configurable: true, value: undefined })
@@ -28,8 +70,6 @@ describe('app shell terminal scope removal', () => {
         completeTerminalGroupSelection: vi.fn(),
         currentWorkbench: createWorkbench(),
         currentWorkspace: createWorkbench().project.workspaces[0],
-        defaultGroupName: '组合',
-        firstGroupName: '第一个组合',
         notifications,
         selectedUngroupedTerminalBlockIds: [],
         setCurrentGraph,
@@ -76,8 +116,6 @@ describe('app shell terminal scope removal', () => {
         completeTerminalGroupSelection: vi.fn(),
         currentWorkbench: createWorkbench(),
         currentWorkspace: createWorkbench().project.workspaces[0],
-        defaultGroupName: '组合',
-        firstGroupName: '第一个组合',
         notifications,
         selectedUngroupedTerminalBlockIds: [],
         setCurrentGraph: vi.fn(),
@@ -110,7 +148,7 @@ function createNotifications(): AppNotificationController {
   }
 }
 
-function createWorkbench(): WorkbenchSnapshot {
+function createWorkbench(terminalGroupCount = 0): WorkbenchSnapshot {
   return {
     agents: [],
     gitBranches: [],
@@ -121,7 +159,15 @@ function createWorkbench(): WorkbenchSnapshot {
       viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [],
       connections: [],
-      terminalGroups: []
+      terminalGroups: Array.from({ length: terminalGroupCount }, (_, index) => ({
+        id: `group-${index + 1}`,
+        isCollapsed: false,
+        memberBlockIds: [],
+        name: `Existing group ${index + 1}`,
+        position: { x: index * 560, y: 0 },
+        size: { width: 520, height: 320 },
+        type: 'terminal-group'
+      }))
     },
     project: {
       id: 'project-1',

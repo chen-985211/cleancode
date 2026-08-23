@@ -316,8 +316,6 @@ export function AppShell({
     beginTerminalGroupSelection,
     currentWorkbench,
     currentWorkspace,
-    defaultGroupName: t('group.defaultName'),
-    firstGroupName: t('group.defaultFirstName'),
     notifications,
     setCurrentGraph,
     terminateTerminalSession
