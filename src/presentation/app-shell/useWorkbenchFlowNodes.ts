@@ -42,6 +42,7 @@ interface UseWorkbenchFlowNodesInput {
   readonly handlers: TerminalFlowNodeHandlers
   readonly hoveredTerminalBlockId: string | null
   readonly selectedAgentId: string | null
+  readonly editingTerminalGroupId: string | null
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalBlockIds: readonly string[]
   readonly selectedTerminalGroupId: string | null
@@ -81,6 +82,7 @@ export function useWorkbenchFlowNodes({
   handlers,
   hoveredTerminalBlockId,
   selectedAgentId,
+  editingTerminalGroupId,
   isTerminalGroupSelectionMode,
   selectedTerminalBlockIds,
   selectedTerminalGroupId,
@@ -183,7 +185,7 @@ export function useWorkbenchFlowNodes({
         activeWorkflowRootBlockIds,
         isStoppingWorkflow,
         launchCommandEditRequest,
-        isTerminalGroupSelectionMode,
+        editingTerminalGroupId,
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
         terminalStateStore,
@@ -320,6 +322,7 @@ export function useWorkbenchFlowNodes({
     isStoppingWorkflow,
     launchCommandEditRequest,
     selectedAgentId,
+    editingTerminalGroupId,
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,

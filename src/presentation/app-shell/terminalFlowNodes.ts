@@ -83,7 +83,7 @@ interface CreateTerminalFlowNodesInput {
   readonly selectedTerminalBlockId?: string | null
   readonly selectedTerminalBlockIds?: readonly string[]
   readonly selectedTerminalGroupId?: string | null
-  readonly isTerminalGroupSelectionMode?: boolean
+  readonly editingTerminalGroupId?: string | null
   readonly terminalGroupDropAction?: TerminalGroupDropAction
   readonly hoveredTerminalBlockId: string | null
   readonly activeWorkflowRootBlockIds?: readonly string[]
@@ -106,7 +106,7 @@ export function createTerminalFlowNodes({
   selectedTerminalBlockId,
   selectedTerminalBlockIds,
   selectedTerminalGroupId,
-  isTerminalGroupSelectionMode = false,
+  editingTerminalGroupId,
   terminalGroupDropAction = { type: 'none' },
   hoveredTerminalBlockId,
   activeWorkflowRootBlockIds = [],
@@ -136,7 +136,7 @@ export function createTerminalFlowNodes({
       group,
       handlers,
       selectedTerminalGroupId: selectedTerminalGroupId ?? null,
-      isEditing: isTerminalGroupSelectionMode && selectedTerminalGroupId === group.id,
+      isEditing: editingTerminalGroupId === group.id,
       terminalGroupDropAction,
       terminalStateStore,
       workflowBuildPresentation

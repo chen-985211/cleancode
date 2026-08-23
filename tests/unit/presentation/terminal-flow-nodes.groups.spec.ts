@@ -121,7 +121,6 @@ describe('terminal flow nodes for terminal groups', () => {
       selectedTerminalBlockIds: ['backend-terminal'],
       selectedTerminalGroupId: 'development-group',
       hoveredTerminalBlockId: null,
-      isTerminalGroupSelectionMode: true,
       terminalStates: createTerminalStates(),
       handlers: createHandlers()
     })
@@ -139,10 +138,10 @@ describe('terminal flow nodes for terminal groups', () => {
   it('marks only the active container as editing', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph({ isCollapsed: false }),
+      editingTerminalGroupId: 'development-group',
       selectedTerminalBlockIds: ['backend-terminal'],
       selectedTerminalGroupId: 'development-group',
       hoveredTerminalBlockId: null,
-      isTerminalGroupSelectionMode: true,
       terminalStates: createTerminalStates(),
       handlers: createHandlers()
     })
@@ -162,6 +161,28 @@ describe('terminal flow nodes for terminal groups', () => {
       type: 'terminalGroup',
       data: {
         isEditing: true
+      }
+    })
+  })
+
+  it('keeps group editing independent from ordinary group selection', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph({ isCollapsed: false }),
+      editingTerminalGroupId: 'development-group',
+      selectedTerminalBlockIds: [],
+      selectedTerminalGroupId: null,
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers()
+    })
+
+    expect(nodes[0]).toMatchObject({
+      id: 'development-group',
+      type: 'terminalGroup',
+      selected: false,
+      data: {
+        isEditing: true,
+        isSelected: false
       }
     })
   })

@@ -85,6 +85,7 @@ function Harness({
     graph,
     handlers: terminalHandlers,
     hoveredTerminalBlockId: null,
+    editingTerminalGroupId: null,
     isTerminalGroupSelectionMode: false,
     onAgentGraphUpdated: coordination.onAgentGraphUpdated,
     onMcpCapabilityChange: noopOptionalAsync,

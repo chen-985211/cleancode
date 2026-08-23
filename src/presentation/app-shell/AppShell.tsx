@@ -476,6 +476,7 @@ export function AppShell({
     handlers: terminalFlowNodeHandlers,
     hoveredTerminalBlockId,
     selectedAgentId,
+    editingTerminalGroupId,
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
