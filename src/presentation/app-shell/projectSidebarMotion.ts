@@ -46,9 +46,8 @@ export interface ProjectSidebarMotionController {
 
 const transformProperty = 'transform'
 const stateAttribute = 'data-project-sidebar-motion-state'
-const springDynamics = { dampingRatio: 0.78, response: 0.42 }
+const springDynamics = { dampingRatio: 1, response: 0.42 }
 const settlementThresholds = { speed: 0.001, value: 0.0001 }
-const surfaceProgressBounds = { maximum: 1.025, minimum: -0.025 }
 export const projectSidebarExpandedWidth = 280
 
 const browserFrameScheduler: ProjectSidebarMotionFrameScheduler = {
@@ -92,17 +91,12 @@ export function createProjectSidebarMotionController({
   const present = (state: 'collapsed' | 'closing' | 'expanded' | 'opening'): void => {
     if (!elements) return
     const layoutProgress = clamp(axis.value, 0, 1)
-    const surfaceProgress = clamp(
-      axis.value,
-      surfaceProgressBounds.minimum,
-      surfaceProgressBounds.maximum
-    )
     const spatialOffset = expandedWidth * layoutProgress
     if (state === 'collapsed' || state === 'expanded') {
       clearTranslations(elements)
     } else {
-      setTranslation(elements.sidebar, expandedWidth * (surfaceProgress - 1))
-      setTranslation(elements.titlebar, expandedWidth * (surfaceProgress - 1))
+      setTranslation(elements.sidebar, expandedWidth * (layoutProgress - 1))
+      setTranslation(elements.titlebar, expandedWidth * (layoutProgress - 1))
       setTranslation(elements.spatial, spatialOffset)
       setTranslation(elements.center, spatialOffset / 2)
       setTranslation(elements.statusbar ?? null, spatialOffset)

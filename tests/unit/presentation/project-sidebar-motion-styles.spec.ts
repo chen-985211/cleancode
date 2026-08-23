@@ -64,6 +64,10 @@ describe('project sidebar motion styles', () => {
 
   it('moves the titlebar material with the sidebar while keeping its toggle stationary', () => {
     const navigationRule = readRule(titlebarStyles, '.app-shell__titlebar-navigation')
+    const collapsedNavigationRule = readRule(
+      titlebarStyles,
+      '.app-shell--sidebar-collapsed .app-shell__titlebar-navigation'
+    )
     const titlebarSurfaceRule = readRule(titlebarStyles, '.app-shell__titlebar-navigation-surface')
     const collapsedTitlebarSurfaceRule = readRule(
       titlebarStyles,
@@ -72,6 +76,7 @@ describe('project sidebar motion styles', () => {
     const toggleRule = readRule(titlebarStyles, '.project-sidebar-toggle')
 
     expect(navigationRule).toContain('position: relative;')
+    expect(navigationRule).toContain('flex: 0 0 var(--cc-titlebar-height);')
     expect(navigationRule).toContain('overflow: visible;')
     expect(navigationRule).toContain('background: transparent;')
     expect(navigationRule).not.toContain('will-change: transform;')
@@ -83,6 +88,8 @@ describe('project sidebar motion styles', () => {
     expect(collapsedTitlebarSurfaceRule).toContain(
       'transform: translate3d(calc(-1 * var(--cc-sidebar-expanded-width)), 0, 0);'
     )
+    expect(collapsedNavigationRule).toContain('width: max-content;')
+    expect(collapsedNavigationRule).not.toContain('position: absolute;')
     expect(toggleRule).toContain('position: relative;')
     expect(toggleRule).toContain('z-index: 1;')
   })

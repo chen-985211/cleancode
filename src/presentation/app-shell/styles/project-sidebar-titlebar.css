@@ -42,9 +42,6 @@
 }
 
 .app-shell--sidebar-collapsed .app-shell__titlebar-navigation {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: max-content;
 }
 
