@@ -265,6 +265,7 @@ export function AppShell({
   const terminalWorkflow = useTerminalWorkflow({
     currentWorkbench,
     currentWorkspace,
+    focusWorkbenchNode,
     notifications,
     setCurrentGraph
   })

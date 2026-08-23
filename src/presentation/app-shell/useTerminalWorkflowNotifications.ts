@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
+import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { AppNotificationController } from './appNotifications'
 import { createWorkflowRunNotification } from './terminalWorkflowNotifications'
 import { useI18n } from './i18n/useI18n'
@@ -8,8 +9,9 @@ import { useI18n } from './i18n/useI18n'
 interface UseTerminalWorkflowNotificationsInput {
   readonly isStopping: boolean
   readonly notifications: AppNotificationController
+  readonly onNavigateToTarget: (target: CanvasObjectIdentity) => Promise<void> | void
   readonly onStop: () => Promise<void> | void
-  readonly projectDirectory: string | null
+  readonly projectId: string | null
   readonly run: WorkflowRunSnapshot | null
   readonly workspaceId: string | null
 }
@@ -24,15 +26,22 @@ interface PublishedWorkflowNotification {
 export function useTerminalWorkflowNotifications({
   isStopping,
   notifications,
+  onNavigateToTarget,
   onStop,
-  projectDirectory,
+  projectId,
   run,
   workspaceId
 }: UseTerminalWorkflowNotificationsInput): void {
   const { t } = useI18n()
   const publishedByScope = useRef(new Map<string, PublishedWorkflowNotification>())
+  const navigateToTargetRef = useRef(onNavigateToTarget)
+  navigateToTargetRef.current = onNavigateToTarget
+  const navigateToTarget = useCallback(
+    (target: CanvasObjectIdentity): Promise<void> | void => navigateToTargetRef.current(target),
+    []
+  )
   const { dismiss, notify, update } = notifications
-  const scopeKey = createWorkflowScopeKey(projectDirectory, workspaceId)
+  const scopeKey = createWorkflowScopeKey(projectId, workspaceId)
 
   useEffect(
     () => () => {
@@ -50,7 +59,14 @@ export function useTerminalWorkflowNotifications({
   )
 
   useEffect(() => {
-    if (!run || !scopeKey || !workspaceId || run.workspaceId !== workspaceId) {
+    if (
+      !run ||
+      !scopeKey ||
+      !projectId ||
+      !workspaceId ||
+      run.projectId !== projectId ||
+      run.workspaceId !== workspaceId
+    ) {
       return
     }
 
@@ -59,7 +75,11 @@ export function useTerminalWorkflowNotifications({
       return
     }
 
-    const notification = createWorkflowRunNotification(run, { isStopping, onStop }, t)
+    const notification = createWorkflowRunNotification(
+      run,
+      { isStopping, onNavigateToTarget: navigateToTarget, onStop },
+      t
+    )
     const isTerminalStatus =
       run.status === 'failed' || run.status === 'succeeded' || run.status === 'stopped'
 
@@ -83,12 +103,23 @@ export function useTerminalWorkflowNotifications({
       existing.notificationId = notify(notification)
     }
     existing.hiddenByScopeChange = false
-  }, [isStopping, notify, onStop, run, scopeKey, t, update, workspaceId])
+  }, [
+    isStopping,
+    navigateToTarget,
+    notify,
+    onStop,
+    projectId,
+    run,
+    scopeKey,
+    t,
+    update,
+    workspaceId
+  ])
 }
 
 function createWorkflowScopeKey(
-  projectDirectory: string | null,
+  projectId: string | null,
   workspaceId: string | null
 ): string | null {
-  return projectDirectory && workspaceId ? JSON.stringify([projectDirectory, workspaceId]) : null
+  return projectId && workspaceId ? JSON.stringify([projectId, workspaceId]) : null
 }

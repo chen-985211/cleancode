@@ -15,6 +15,7 @@ import type { Translate } from './i18n/messages'
 import { getWorkflowRunRootBlockIds } from './terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from './types'
 import { useTerminalWorkflowNotifications } from './useTerminalWorkflowNotifications'
+import { useWorkflowNotificationNavigation } from './useWorkflowNotificationNavigation'
 import { readTerminalSourceTheme } from './terminalTheme'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
@@ -22,6 +23,7 @@ type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 interface UseTerminalWorkflowInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly focusWorkbenchNode: (nodeId: string) => void
   readonly notifications: AppNotificationController
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
 }
@@ -29,6 +31,7 @@ interface UseTerminalWorkflowInput {
 export function useTerminalWorkflow({
   currentWorkbench,
   currentWorkspace,
+  focusWorkbenchNode,
   notifications,
   setCurrentGraph
 }: UseTerminalWorkflowInput) {
@@ -37,9 +40,11 @@ export function useTerminalWorkflow({
   const [isStopping, setIsStopping] = useState(false)
   const isStoppingRef = useRef(false)
   const graphId = currentWorkbench?.graph.id ?? null
+  const projectId = currentWorkbench?.project.id ?? null
   const projectDirectory = currentWorkbench?.project.directory ?? null
   const workspaceId = currentWorkspace?.workspaceId ?? null
   const { notify } = notifications
+  const focusWorkflowNode = useWorkflowNotificationNavigation(currentWorkbench, focusWorkbenchNode)
 
   useEffect(() => {
     const api = window.cleancode
@@ -210,8 +215,9 @@ export function useTerminalWorkflow({
   useTerminalWorkflowNotifications({
     isStopping,
     notifications,
+    onNavigateToTarget: focusWorkflowNode,
     onStop: stop,
-    projectDirectory,
+    projectId,
     run,
     workspaceId
   })

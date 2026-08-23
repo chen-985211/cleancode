@@ -614,6 +614,7 @@ export const enMessages = {
   'workflow.operationFailedTitle': 'Workflow action failed',
   'workflow.operationFailed': 'The workflow action failed. Try again later.',
   'workflow.failureTitle': 'Workflow failed',
+  'workflow.focusNode': 'Focus workflow node “{terminalName}”',
   'workflow.inspectOutput': 'Check this terminal’s output.',
   'workflow.exitCodeOutput': 'Exit code {exitCode}. Check the terminal output.',
   'workflow.singleFailure': 'Terminal “{terminalName}” failed. {detail}',
