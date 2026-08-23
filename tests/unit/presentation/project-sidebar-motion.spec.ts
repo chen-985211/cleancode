@@ -6,7 +6,49 @@ import {
 } from '../../../src/presentation/app-shell/projectSidebarMotion'
 
 describe('project sidebar motion', () => {
-  it('moves compositor surfaces with a perceptible spring and settles at the expanded endpoint', () => {
+  it.each([
+    {
+      initialIsCollapsed: true,
+      label: 'opening',
+      nextIsCollapsed: false,
+      progressesTowardTarget: (previous: number, current: number) => current >= previous
+    },
+    {
+      initialIsCollapsed: false,
+      label: 'closing',
+      nextIsCollapsed: true,
+      progressesTowardTarget: (previous: number, current: number) => current <= previous
+    }
+  ])(
+    'keeps sidebar content within its endpoints without reverse motion while $label',
+    ({ initialIsCollapsed, nextIsCollapsed, progressesTowardTarget }) => {
+      const scheduler = createFrameScheduler()
+      const elements = createElements()
+      const controller = createProjectSidebarMotionController({ scheduler })
+
+      controller.intentChanged(elements, {
+        expandedWidth: 280,
+        isCollapsed: initialIsCollapsed,
+        reducedMotion: false
+      })
+      controller.intentChanged(elements, {
+        expandedWidth: 280,
+        isCollapsed: nextIsCollapsed,
+        reducedMotion: false
+      })
+
+      const sidebarOffsets = advanceAndReadSidebarPresentation(scheduler, elements.sidebar, 280)
+
+      expect(sidebarOffsets.every((offset) => offset >= -280 && offset <= 0)).toBe(true)
+      expect(
+        sidebarOffsets
+          .slice(1)
+          .every((offset, index) => progressesTowardTarget(sidebarOffsets[index] ?? offset, offset))
+      ).toBe(true)
+    }
+  )
+
+  it('moves compositor surfaces with a perceptible critically damped spring and settles at the expanded endpoint', () => {
     const scheduler = createFrameScheduler()
     const elements = createElements()
     const controller = createProjectSidebarMotionController({ scheduler })
@@ -31,7 +73,7 @@ describe('project sidebar motion', () => {
     expect(readTranslation(elements.titlebar)).toBeCloseTo(readTranslation(elements.sidebar), 4)
 
     const sidebarOffsets = advanceAndReadTranslations(scheduler, elements.sidebar)
-    expect(Math.max(...sidebarOffsets)).toBeGreaterThan(0)
+    expect(sidebarOffsets.some((offset) => offset < 0)).toBe(true)
     expect(elements.spatial.properties.has('transform')).toBe(false)
     expect(elements.center.properties.has('transform')).toBe(false)
     expect(elements.statusbar.properties.has('transform')).toBe(false)
@@ -238,6 +280,29 @@ function advanceAndReadTranslations(
     values.push(readTranslation(surface))
   }
   return values
+}
+
+function advanceAndReadSidebarPresentation(
+  scheduler: ReturnType<typeof createFrameScheduler>,
+  surface: ReturnType<typeof createSurface>,
+  expandedWidth: number
+): number[] {
+  const values = [readSidebarPresentation(surface, expandedWidth)]
+  for (let frame = 0; frame < 240 && scheduler.pendingFrames() > 0; frame += 1) {
+    scheduler.advanceNextFrame()
+    values.push(readSidebarPresentation(surface, expandedWidth))
+  }
+  return values
+}
+
+function readSidebarPresentation(
+  surface: ReturnType<typeof createSurface>,
+  expandedWidth: number
+): number {
+  if (surface.properties.has('transform')) return readTranslation(surface)
+  return surface.attributes.get('data-project-sidebar-motion-state') === 'collapsed'
+    ? -expandedWidth
+    : 0
 }
 
 function createElements(): ProjectSidebarMotionElements & {
