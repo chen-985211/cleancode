@@ -22,6 +22,8 @@ interface MainWindowDisplay {
   readonly workArea: MainWindowBounds
 }
 
+type VerticalInterval = readonly [start: number, end: number]
+
 type MainWindowStartupPolicy =
   | { readonly mode: 'normal' }
   | {
@@ -82,10 +84,14 @@ export function resolveMainWindowStartupState(input: {
     }
   }
 
-  const targetWorkArea = resolveTargetWorkArea(sourceBounds, input.displays, primaryWorkArea)
   return {
     displayMode: input.persistedState?.displayMode ?? 'normal',
-    normalBounds: fitBoundsIntoWorkArea(sourceBounds, targetWorkArea)
+    normalBounds: isBoundsCoveredByDisplays(sourceBounds, input.displays)
+      ? sourceBounds
+      : fitBoundsIntoWorkArea(
+          sourceBounds,
+          resolveTargetWorkArea(sourceBounds, input.displays, primaryWorkArea)
+        )
   }
 }
 
@@ -137,6 +143,59 @@ function fitBoundsIntoWorkArea(
     width,
     height
   }
+}
+
+function isBoundsCoveredByDisplays(
+  bounds: MainWindowBounds,
+  displays: readonly MainWindowDisplay[]
+): boolean {
+  const right = bounds.x + bounds.width
+  const bottom = bounds.y + bounds.height
+  const horizontalBoundaries = new Set([bounds.x, right])
+  for (const { workArea } of displays) {
+    const clippedLeft = Math.max(bounds.x, workArea.x)
+    const clippedRight = Math.min(right, workArea.x + workArea.width)
+    if (clippedLeft >= clippedRight) continue
+    horizontalBoundaries.add(clippedLeft)
+    horizontalBoundaries.add(clippedRight)
+  }
+  const sortedBoundaries = [...horizontalBoundaries].sort((first, second) => first - second)
+
+  for (let index = 1; index < sortedBoundaries.length; index += 1) {
+    const left = sortedBoundaries[index - 1]!
+    const segmentRight = sortedBoundaries[index]!
+    if (
+      !isVerticalRangeCovered(
+        bounds.y,
+        bottom,
+        displays
+          .map(({ workArea }) => workArea)
+          .filter((workArea) => workArea.x <= left && workArea.x + workArea.width >= segmentRight)
+          .map((workArea): VerticalInterval => [
+            Math.max(bounds.y, workArea.y),
+            Math.min(bottom, workArea.y + workArea.height)
+          ])
+      )
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+function isVerticalRangeCovered(
+  top: number,
+  bottom: number,
+  intervals: readonly VerticalInterval[]
+): boolean {
+  let coveredUntil = top
+  for (const [start, end] of [...intervals].sort((first, second) => first[0] - second[0])) {
+    if (end <= coveredUntil) continue
+    if (start > coveredUntil) return false
+    coveredUntil = end
+    if (coveredUntil >= bottom) return true
+  }
+  return false
 }
 
 function intersectionArea(first: MainWindowBounds, second: MainWindowBounds): number {

@@ -99,6 +99,47 @@ describe('main window state policy', () => {
     ).toEqual({ displayMode: 'normal', normalBounds })
   })
 
+  it('preserves bounds fully covered by adjacent displays when the layout is unchanged', () => {
+    const normalBounds = { x: 1_600, y: 100, width: 1_200, height: 800 }
+
+    expect(
+      resolveMainWindowStartupState({
+        displays: [
+          primaryDisplay,
+          {
+            isPrimary: false,
+            workArea: { x: 1_920, y: 0, width: 1_920, height: 1_080 }
+          }
+        ],
+        persistedState: { version: 1, displayMode: 'normal', normalBounds },
+        policy: { mode: 'normal' }
+      })
+    ).toEqual({ displayMode: 'normal', normalBounds })
+  })
+
+  it('normalizes spanning bounds when the current displays leave an uncovered gap', () => {
+    expect(
+      resolveMainWindowStartupState({
+        displays: [
+          primaryDisplay,
+          {
+            isPrimary: false,
+            workArea: { x: 2_000, y: 0, width: 1_920, height: 1_080 }
+          }
+        ],
+        persistedState: {
+          version: 1,
+          displayMode: 'normal',
+          normalBounds: { x: 1_600, y: 100, width: 1_200, height: 800 }
+        },
+        policy: { mode: 'normal' }
+      })
+    ).toEqual({
+      displayMode: 'normal',
+      normalBounds: { x: 2_000, y: 100, width: 1_200, height: 800 }
+    })
+  })
+
   it('fits an offscreen saved window into the primary work area after displays change', () => {
     expect(
       resolveMainWindowStartupState({

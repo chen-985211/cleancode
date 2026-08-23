@@ -67,6 +67,16 @@ export function bindMainWindowStatePersistence(input: {
       persist()
     }, mainWindowStateSaveDelayMs)
   }
+  const rememberModeAndScheduleSave = (): void => {
+    if (!input.target.isMinimized()) {
+      lastNonMinimizedMode = resolveDisplayMode(
+        input.target,
+        input.persistDisplayMode,
+        lastNonMinimizedMode
+      )
+    }
+    scheduleSave()
+  }
   const dispose = (): void => {
     if (disposed) return
     disposed = true
@@ -83,12 +93,12 @@ export function bindMainWindowStatePersistence(input: {
   const listeners: ReadonlyArray<readonly [string, () => void]> = [
     ['move', scheduleSave],
     ['resize', scheduleSave],
-    ['maximize', scheduleSave],
-    ['unmaximize', scheduleSave],
-    ['enter-full-screen', scheduleSave],
-    ['leave-full-screen', scheduleSave],
+    ['maximize', rememberModeAndScheduleSave],
+    ['unmaximize', rememberModeAndScheduleSave],
+    ['enter-full-screen', rememberModeAndScheduleSave],
+    ['leave-full-screen', rememberModeAndScheduleSave],
     ['minimize', scheduleSave],
-    ['restore', scheduleSave],
+    ['restore', rememberModeAndScheduleSave],
     ['close', flush],
     ['closed', dispose]
   ]

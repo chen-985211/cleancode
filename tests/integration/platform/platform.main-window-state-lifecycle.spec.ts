@@ -104,6 +104,27 @@ describe('platform main window state lifecycle', () => {
     expect(target.listenerCount('enter-full-screen')).toBe(0)
   })
 
+  it('records an unmaximize transition before a rapid minimize and close', () => {
+    const target = new FakeWindow()
+    const store = createStore()
+    const binding = bindMainWindowStatePersistence({
+      initialState: snapshot(target.normalBounds, 'maximized'),
+      persistDisplayMode: true,
+      store,
+      target
+    })
+
+    target.isMaximizedValue = false
+    target.emit('unmaximize')
+    target.isMinimizedValue = true
+    target.emit('minimize')
+    target.emit('close')
+
+    expect(store.save).toHaveBeenCalledTimes(1)
+    expect(store.save).toHaveBeenCalledWith(snapshot(target.normalBounds, 'normal'))
+    binding.dispose()
+  })
+
   it('persists only normal mode for the isolated offscreen E2E window', () => {
     const target = new FakeWindow()
     const store = createStore()
