@@ -1,11 +1,19 @@
-import { BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, screen, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { consoleLogger } from '../logging/ConsoleLogSink'
+import { FileSystemMainWindowStateStore } from './FileSystemMainWindowStateStore'
 import { bindElectronExternalNavigationPolicy } from './electronExternalNavigationPolicy'
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
+import { bindMainWindowStatePersistence } from './mainWindowStateLifecycle'
+import {
+  mainWindowMinimumSize,
+  mainWindowStateSchemaVersion,
+  resolveMainWindowFullScreenOptions,
+  resolveMainWindowStartupState
+} from './mainWindowStatePolicy'
 import { resolveWindowFrameOptions, shouldRemoveDefaultWindowMenu } from './windowFrameOptions'
 import { bindWindowFullScreenState } from './windowFullScreenState'
 
@@ -15,19 +23,34 @@ export function createMainWindow(input: {
   readonly appIconPath: string | undefined
   readonly policy: ElectronWindowPolicy
 }): void {
+  const windowStateStore = new FileSystemMainWindowStateStore({
+    filePath: join(app.getPath('userData'), 'window-state-v1.json'),
+    logger: consoleLogger
+  })
+  const primaryDisplayId = screen.getPrimaryDisplay().id
+  const startupState = resolveMainWindowStartupState({
+    displays: screen.getAllDisplays().map((display) => ({
+      isPrimary: display.id === primaryDisplayId,
+      workArea: display.workArea
+    })),
+    persistedState: windowStateStore.load(),
+    policy:
+      input.policy.mode === 'normal'
+        ? { mode: 'normal' }
+        : { mode: 'offscreen-inactive', position: input.policy.position }
+  })
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 960,
-    minHeight: 640,
+    ...startupState.normalBounds,
+    minWidth: mainWindowMinimumSize.width,
+    minHeight: mainWindowMinimumSize.height,
+    ...resolveMainWindowFullScreenOptions(startupState.displayMode),
     title: 'cleancode',
     backgroundColor: '#f7f8fa',
     icon: input.appIconPath,
     show: input.policy.show,
     ...(input.policy.mode === 'offscreen-inactive'
       ? {
-          enableLargerThanScreen: input.policy.enableLargerThanScreen,
-          ...input.policy.position
+          enableLargerThanScreen: input.policy.enableLargerThanScreen
         }
       : {}),
     ...resolveWindowFrameOptions(process.platform),
@@ -39,6 +62,15 @@ export function createMainWindow(input: {
       sandbox: false
     }
   })
+  const windowStateBinding = bindMainWindowStatePersistence({
+    initialState: {
+      version: mainWindowStateSchemaVersion,
+      ...startupState
+    },
+    persistDisplayMode: input.policy.mode === 'normal',
+    store: windowStateStore,
+    target: mainWindow
+  })
   if (shouldRemoveDefaultWindowMenu(process.platform)) mainWindow.removeMenu()
   bindWindowFullScreenState(mainWindow)
   bindElectronPageZoomStartup(mainWindow.webContents)
@@ -47,6 +79,8 @@ export function createMainWindow(input: {
     openExternal: (address) => shell.openExternal(address),
     webContents: mainWindow.webContents
   })
+
+  if (startupState.displayMode === 'maximized') mainWindow.maximize()
 
   if (input.policy.mode === 'offscreen-inactive') {
     const { position } = input.policy
@@ -68,6 +102,7 @@ export function createMainWindow(input: {
   }
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit' || mainWindow.isDestroyed()) return
+    windowStateBinding.flush()
     createMainWindow(input)
     mainWindow.destroy()
   })
