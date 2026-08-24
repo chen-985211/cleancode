@@ -19,8 +19,9 @@ describe('terminal workflow notification publishing', () => {
 
   it('creates one activity notification and updates it through the run lifecycle', async () => {
     let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
+    const focusWorkbenchNode = vi.fn()
     const notifications = createNotificationController()
-    const workbench = createWorkbenchSnapshot('/project', 'Project')
+    const workbench = withWorkflowTerminal(createWorkbenchSnapshot('/project', 'Project'))
     window.cleancode = createWorkflowRuntime({
       onEvent: (listener) => {
         publishEvent = listener
@@ -31,6 +32,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode,
         notifications,
         setCurrentGraph: vi.fn()
       })
@@ -43,6 +45,9 @@ describe('terminal workflow notification publishing', () => {
     expect(notifications.notify).toHaveBeenCalledWith(
       expect.objectContaining({ isActivity: true, title: '流程运行中' })
     )
+    const runningNotification = notifications.notify.mock.calls[0]?.[0]
+    runningNotification?.activation?.onClick()
+    expect(focusWorkbenchNode).toHaveBeenCalledWith('dev')
 
     act(() => publishEvent?.({ type: 'run-updated', run: workflowRun('run-1', 'ready') }))
     await waitFor(() =>
@@ -67,22 +72,30 @@ describe('terminal workflow notification publishing', () => {
   it('does not update an active notification when only the canvas viewport changes', async () => {
     let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
     const notifications = createNotificationController()
-    const workbench = createWorkbenchSnapshot('/project', 'Project')
+    const workbench = withWorkflowTerminal(createWorkbenchSnapshot('/project', 'Project'))
     window.cleancode = createWorkflowRuntime({
       onEvent: (listener) => {
         publishEvent = listener
       }
     })
     const setCurrentGraph = vi.fn()
+    const initialFocusWorkflowNode = vi.fn()
+    const latestFocusWorkflowNode = vi.fn()
     const { rerender } = renderHook(
-      ({ currentWorkbench }) =>
+      ({ currentWorkbench, focusWorkbenchNode }) =>
         useTerminalWorkflow({
           currentWorkbench,
           currentWorkspace: currentWorkbench.project.workspaces[0],
+          focusWorkbenchNode,
           notifications,
           setCurrentGraph
         }),
-      { initialProps: { currentWorkbench: workbench } }
+      {
+        initialProps: {
+          currentWorkbench: workbench,
+          focusWorkbenchNode: initialFocusWorkflowNode
+        }
+      }
     )
 
     await waitFor(() => expect(publishEvent).toBeTypeOf('function'))
@@ -96,10 +109,51 @@ describe('terminal workflow notification publishing', () => {
           ...workbench.graph,
           viewport: { x: 240, y: -120, zoom: 0.8 }
         }
-      }
+      },
+      focusWorkbenchNode: latestFocusWorkflowNode
     })
 
     expect(notifications.update).not.toHaveBeenCalled()
+    notifications.notify.mock.calls[0]?.[0].activation?.onClick()
+    expect(initialFocusWorkflowNode).not.toHaveBeenCalled()
+    expect(latestFocusWorkflowNode).toHaveBeenCalledWith('dev')
+  })
+
+  it('does not navigate an old notification to a same-id node in another project', async () => {
+    let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
+    const notifications = createNotificationController()
+    const focusWorkbenchNode = vi.fn()
+    const firstWorkbench = withWorkflowTerminal(createWorkbenchSnapshot('/first', 'Project'))
+    const secondWorkbench = withWorkflowTerminal(createWorkbenchSnapshot('/second', 'Other'))
+    window.cleancode = createWorkflowRuntime({
+      onEvent: (listener) => {
+        publishEvent = listener
+      }
+    })
+
+    const { rerender } = renderHook(
+      ({ workbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench: workbench,
+          currentWorkspace: workbench.project.workspaces[0],
+          focusWorkbenchNode,
+          notifications,
+          setCurrentGraph: vi.fn()
+        }),
+      { initialProps: { workbench: firstWorkbench } }
+    )
+
+    await waitFor(() => expect(publishEvent).toBeTypeOf('function'))
+    act(() => publishEvent?.({ type: 'run-updated', run: workflowRun('run-1', 'running') }))
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledOnce())
+    const oldNotification = notifications.notify.mock.calls[0]?.[0]
+
+    rerender({ workbench: secondWorkbench })
+    await waitFor(() => expect(notifications.dismiss).toHaveBeenCalledWith('notification-1'))
+    act(() => oldNotification?.activation?.onClick())
+
+    expect(focusWorkbenchNode).not.toHaveBeenCalled()
+    expect(notifications.notify).toHaveBeenCalledTimes(1)
   })
 
   it('restores a dismissed activity only when the run later fails', async () => {
@@ -116,6 +170,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode: vi.fn(),
         notifications,
         setCurrentGraph: vi.fn()
       })
@@ -150,6 +205,7 @@ describe('terminal workflow notification publishing', () => {
         useTerminalWorkflow({
           currentWorkbench: workbench,
           currentWorkspace: workbench.project.workspaces[0],
+          focusWorkbenchNode: vi.fn(),
           notifications,
           setCurrentGraph: vi.fn()
         }),
@@ -189,6 +245,7 @@ describe('terminal workflow notification publishing', () => {
         useTerminalWorkflow({
           currentWorkbench: workbench,
           currentWorkspace: workbench.project.workspaces[0],
+          focusWorkbenchNode: vi.fn(),
           notifications,
           setCurrentGraph: vi.fn()
         }),
@@ -224,6 +281,7 @@ describe('terminal workflow notification publishing', () => {
         useTerminalWorkflow({
           currentWorkbench: workbench,
           currentWorkspace: workbench.project.workspaces[0],
+          focusWorkbenchNode: vi.fn(),
           notifications,
           setCurrentGraph: vi.fn()
         }),
@@ -269,6 +327,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode: vi.fn(),
         notifications,
         setCurrentGraph: vi.fn()
       })
@@ -300,6 +359,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode: vi.fn(),
         notifications,
         setCurrentGraph: vi.fn()
       })
@@ -322,6 +382,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode: vi.fn(),
         notifications: createNotificationController(),
         setCurrentGraph: vi.fn()
       })
@@ -358,6 +419,7 @@ describe('terminal workflow notification publishing', () => {
       useTerminalWorkflow({
         currentWorkbench: workbench,
         currentWorkspace: workbench.project.workspaces[0],
+        focusWorkbenchNode: vi.fn(),
         notifications: createNotificationController(),
         setCurrentGraph: vi.fn()
       })
@@ -393,6 +455,7 @@ describe('terminal workflow notification publishing', () => {
         useTerminalWorkflow({
           currentWorkbench,
           currentWorkspace: currentWorkbench.project.workspaces[0],
+          focusWorkbenchNode: vi.fn(),
           notifications,
           setCurrentGraph
         }),
@@ -414,6 +477,26 @@ interface CreateWorkflowRuntimeOptions {
   readonly onEvent?: (listener: (event: TerminalWorkflowEvent) => void) => void
   readonly start?: ReturnType<typeof vi.fn>
   readonly stop?: ReturnType<typeof vi.fn>
+}
+
+function withWorkflowTerminal(workbench: ReturnType<typeof createWorkbenchSnapshot>) {
+  return {
+    ...workbench,
+    graph: {
+      ...workbench.graph,
+      blocks: [
+        {
+          id: 'dev',
+          type: 'terminal' as const,
+          name: '开发环境',
+          description: '',
+          launchCommand: 'pnpm dev',
+          position: { x: 0, y: 0 },
+          size: { width: 320, height: 240 }
+        }
+      ]
+    }
+  }
 }
 
 function createWorkflowRuntime(

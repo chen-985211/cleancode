@@ -1,4 +1,8 @@
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
+import {
+  createCanvasObjectIdentity,
+  type CanvasObjectIdentity
+} from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { AppNotificationInput } from './appNotifications'
 import { translate, type Translate } from './i18n/messages'
 
@@ -37,52 +41,86 @@ export function createWorkflowFailureNotification(
 
 interface CreateWorkflowRunNotificationOptions {
   readonly isStopping: boolean
+  readonly onNavigateToTarget: (target: CanvasObjectIdentity) => Promise<void> | void
   readonly onStop: () => Promise<void> | void
 }
 
 export function createWorkflowRunNotification(
   run: WorkflowRunSnapshot,
-  { isStopping, onStop }: CreateWorkflowRunNotificationOptions,
+  { isStopping, onNavigateToTarget, onStop }: CreateWorkflowRunNotificationOptions,
   t: Translate = defaultTranslate
 ): AppNotificationInput {
+  let notification: AppNotificationInput
+
   if (run.status === 'failed') {
-    return createWorkflowFailureNotification(run, t)
-  }
-
-  const scopeMessage = createWorkflowRunScopeMessage(run, t)
-
-  if (run.status === 'succeeded') {
-    return {
+    notification = createWorkflowFailureNotification(run, t)
+  } else if (run.status === 'succeeded') {
+    notification = {
       autoDismissMs: 4_000,
       kind: 'success',
-      source: { label: scopeMessage },
+      source: { label: createWorkflowRunScopeMessage(run, t) },
       title: t('workflow.succeededTitle')
     }
-  }
-
-  if (run.status === 'stopped') {
-    return {
+  } else if (run.status === 'stopped') {
+    notification = {
       autoDismissMs: 4_000,
       kind: 'warning',
-      source: { label: scopeMessage },
+      source: { label: createWorkflowRunScopeMessage(run, t) },
       title: t('workflow.stoppedTitle')
+    }
+  } else {
+    notification = {
+      action: {
+        disabled: isStopping,
+        icon: 'stop',
+        label: t('workflow.stopAction'),
+        onClick: onStop,
+        pendingLabel: t('workflow.stoppingAction'),
+        tone: 'danger'
+      },
+      isActivity: true,
+      kind: 'info',
+      source: { label: createWorkflowRunScopeMessage(run, t) },
+      title: run.status === 'ready' ? t('workflow.readyTitle') : t('workflow.runningTitle')
     }
   }
 
-  return {
-    action: {
-      disabled: isStopping,
-      icon: 'stop',
-      label: t('workflow.stopAction'),
-      onClick: onStop,
-      pendingLabel: t('workflow.stoppingAction'),
-      tone: 'danger'
-    },
-    isActivity: true,
-    kind: 'info',
-    source: { label: scopeMessage },
-    title: run.status === 'ready' ? t('workflow.readyTitle') : t('workflow.runningTitle')
+  const accessibleNotification = {
+    ...notification,
+    accessibleLabel: [notification.title, notification.message, notification.source?.label]
+      .filter((part): part is string => Boolean(part))
+      .join(' — ')
   }
+  const targetNode = resolveWorkflowRunNotificationTarget(run)
+  return targetNode
+    ? {
+        ...accessibleNotification,
+        activation: {
+          label: t('workflow.focusNode', { terminalName: targetNode.name }),
+          onClick: () =>
+            onNavigateToTarget(
+              createCanvasObjectIdentity({
+                objectId: targetNode.blockId,
+                objectKind: 'terminal',
+                projectId: run.projectId,
+                workspaceId: run.workspaceId
+              })
+            )
+        }
+      }
+    : accessibleNotification
+}
+
+function resolveWorkflowRunNotificationTarget(
+  run: WorkflowRunSnapshot
+): WorkflowRunSnapshot['nodes'][number] | null {
+  for (const status of ['failed', 'running', 'ready'] as const) {
+    const node = run.nodes.find((candidate) => candidate.status === status)
+    if (node) return node
+  }
+
+  const rootBlockId = getWorkflowRunRootBlockIds(run)[0]
+  return run.nodes.find((node) => node.blockId === rootBlockId) ?? null
 }
 
 export function getWorkflowRunRootBlockIds(run: WorkflowRunSnapshot): string[] {

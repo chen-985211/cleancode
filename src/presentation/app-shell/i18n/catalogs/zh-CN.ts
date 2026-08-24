@@ -582,6 +582,7 @@ export const zhCNMessages = {
   'workflow.operationFailedTitle': '流程操作失败',
   'workflow.operationFailed': '流程操作失败，请稍后重试。',
   'workflow.failureTitle': '流程失败',
+  'workflow.focusNode': '定位到流程节点“{terminalName}”',
   'workflow.inspectOutput': '请查看该终端输出。',
   'workflow.exitCodeOutput': '退出码 {exitCode}。请查看终端输出。',
   'workflow.singleFailure': '终端“{terminalName}”运行失败，{detail}',

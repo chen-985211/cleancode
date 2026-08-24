@@ -43,6 +43,7 @@ describe('terminal workflow notifications', () => {
 
   it('describes an active run with its root and exact terminal count', () => {
     const onStop = vi.fn()
+    const onNavigateToTarget = vi.fn()
     const run = workflowRun(
       'run-1',
       [
@@ -53,7 +54,14 @@ describe('terminal workflow notifications', () => {
     )
 
     expect(getWorkflowRunRootBlockIds(run)).toEqual(['install'])
-    expect(createWorkflowRunNotification(run, { isStopping: false, onStop })).toEqual({
+    const notification = createWorkflowRunNotification(run, {
+      isStopping: false,
+      onNavigateToTarget,
+      onStop
+    })
+
+    expect(notification).toEqual({
+      accessibleLabel: '流程运行中 — 从“依赖就绪”开始 · 涉及 2 个终端',
       action: {
         disabled: false,
         icon: 'stop',
@@ -62,11 +70,106 @@ describe('terminal workflow notifications', () => {
         pendingLabel: '正在停止…',
         tone: 'danger'
       },
+      activation: {
+        label: '定位到流程节点“OpenCove 开发环境”',
+        onClick: expect.any(Function)
+      },
       isActivity: true,
       kind: 'info',
       source: { label: '从“依赖就绪”开始 · 涉及 2 个终端' },
       title: '流程运行中'
     })
+    notification.activation?.onClick()
+    expect(onNavigateToTarget).toHaveBeenCalledWith({
+      objectId: 'dev',
+      objectKind: 'terminal',
+      projectId: 'project-1',
+      workspaceId: 'main'
+    })
+  })
+
+  it('includes the failure detail in the accessible notification label', () => {
+    const notification = createWorkflowRunNotification(
+      workflowRun('run-1', [failedNode('dev', 'OpenCove 开发环境', 1)]),
+      {
+        isStopping: false,
+        onNavigateToTarget: vi.fn(),
+        onStop: vi.fn()
+      }
+    )
+
+    expect(notification.accessibleLabel).toBe(
+      '流程失败 — 终端“OpenCove 开发环境”运行失败，退出码 1。请查看终端输出。'
+    )
+  })
+
+  it.each([
+    {
+      expectedBlockId: 'failed',
+      name: 'failed node',
+      nodes: [
+        workflowNode('root', 'Root', [], 'succeeded'),
+        workflowNode('running', 'Running', ['root'], 'running'),
+        workflowNode('failed', 'Failed', ['root'], 'failed')
+      ],
+      status: 'failed' as const
+    },
+    {
+      expectedBlockId: 'running',
+      name: 'running node',
+      nodes: [
+        workflowNode('root', 'Root', [], 'succeeded'),
+        workflowNode('ready', 'Ready', ['root'], 'ready'),
+        workflowNode('running', 'Running', ['root'], 'running')
+      ],
+      status: 'running' as const
+    },
+    {
+      expectedBlockId: 'ready',
+      name: 'ready service',
+      nodes: [
+        workflowNode('root', 'Root', [], 'succeeded'),
+        workflowNode('ready', 'Ready', ['root'], 'ready')
+      ],
+      status: 'ready' as const
+    },
+    {
+      expectedBlockId: 'root',
+      name: 'workflow root fallback',
+      nodes: [
+        workflowNode('child', 'Child', ['root'], 'succeeded'),
+        workflowNode('root', 'Root', [], 'succeeded')
+      ],
+      status: 'succeeded' as const
+    }
+  ])('navigates to the $name', ({ expectedBlockId, nodes, status }) => {
+    const onNavigateToTarget = vi.fn()
+    const notification = createWorkflowRunNotification(workflowRun('run-1', nodes, status), {
+      isStopping: false,
+      onNavigateToTarget,
+      onStop: vi.fn()
+    })
+
+    notification.activation?.onClick()
+
+    expect(onNavigateToTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        objectId: expectedBlockId,
+        objectKind: 'terminal',
+        projectId: 'project-1',
+        workspaceId: 'main'
+      })
+    )
+  })
+
+  it('does not expose an activation when the workflow has no target node', () => {
+    const notification = createWorkflowRunNotification(workflowRun('run-1', [], 'succeeded'), {
+      isStopping: false,
+      onNavigateToTarget: vi.fn(),
+      onStop: vi.fn()
+    })
+
+    expect(notification.activation).toBeUndefined()
   })
 
   it('turns terminal workflow outcomes into stable notification states', () => {
@@ -75,6 +178,7 @@ describe('terminal workflow notifications', () => {
     expect(
       createWorkflowRunNotification(workflowRun('ready', nodes, 'ready'), {
         isStopping: false,
+        onNavigateToTarget: vi.fn(),
         onStop: vi.fn()
       })
     ).toMatchObject({
@@ -86,6 +190,7 @@ describe('terminal workflow notifications', () => {
     expect(
       createWorkflowRunNotification(workflowRun('succeeded', nodes, 'succeeded'), {
         isStopping: false,
+        onNavigateToTarget: vi.fn(),
         onStop: vi.fn()
       })
     ).toMatchObject({
@@ -97,6 +202,7 @@ describe('terminal workflow notifications', () => {
     expect(
       createWorkflowRunNotification(workflowRun('stopped', nodes, 'stopped'), {
         isStopping: false,
+        onNavigateToTarget: vi.fn(),
         onStop: vi.fn()
       })
     ).toMatchObject({

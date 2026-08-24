@@ -10,6 +10,7 @@ import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import type { AgentActivityNavigationRequest } from './agentActivityNavigation'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { WorkspaceSelectionResult } from './useBranchWorkspaceActions'
+import { resolveVisibleTerminalCanvasTarget } from './visibleTerminalCanvasTarget'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 
 interface UseAgentActivityNotificationNavigationInput {
@@ -168,21 +169,19 @@ function resolveFocusTarget(
   }
 
   if (target.objectKind !== 'terminal') return null
-  const terminal = workbench.graph.blocks.find((candidate) => candidate.id === target.objectId)
-  if (!terminal) return null
-
-  const collapsedGroup = workbench.graph.terminalGroups.find(
-    (group) => group.isCollapsed && group.memberBlockIds.includes(terminal.id)
-  )
-  if (!collapsedGroup) return { identity: target, nodeId: terminal.id }
+  const visibleTarget = resolveVisibleTerminalCanvasTarget(workbench.graph, target.objectId)
+  if (!visibleTarget) return null
+  if (visibleTarget.objectKind === 'terminal') {
+    return { identity: target, nodeId: visibleTarget.nodeId }
+  }
 
   return {
     identity: createCanvasObjectIdentity({
-      objectId: collapsedGroup.id,
+      objectId: visibleTarget.objectId,
       objectKind: 'terminal-group',
       projectId: target.projectId,
       workspaceId: target.workspaceId
     }),
-    nodeId: collapsedGroup.id
+    nodeId: visibleTarget.nodeId
   }
 }
