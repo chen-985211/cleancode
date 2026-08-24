@@ -21,25 +21,21 @@ describe('Electron workspace external open adapter', () => {
     expect(createVsCodeWorkspaceUri(directory, platform)).toBe(expected)
   })
 
-  it('reports the registered VS Code protocol handler', async () => {
+  it('reports the registered VS Code protocol handler without requiring application metadata', async () => {
+    const getApplicationNameForProtocol = vi.fn(() => 'code.desktop')
     const adapter = createAdapter({
-      getApplicationInfoForProtocol: vi.fn(async () => ({
-        icon: { toDataURL: () => 'data:image/png;base64,vscode' },
-        name: 'Visual Studio Code',
-        path: '/Applications/Visual Studio Code.app'
-      }))
+      getApplicationNameForProtocol
     })
 
     await expect(adapter.getCapabilities()).resolves.toEqual({
       vscode: { available: true }
     })
+    expect(getApplicationNameForProtocol).toHaveBeenCalledWith('vscode://')
   })
 
   it('treats a missing protocol registration as unavailable', async () => {
     const adapter = createAdapter({
-      getApplicationInfoForProtocol: vi.fn(async () => {
-        throw new Error('no handler')
-      })
+      getApplicationNameForProtocol: vi.fn(() => '')
     })
 
     await expect(adapter.getCapabilities()).resolves.toEqual({
@@ -48,25 +44,19 @@ describe('Electron workspace external open adapter', () => {
   })
 
   it('opens VS Code through the fixed protocol after rechecking availability', async () => {
-    const getApplicationInfoForProtocol = vi.fn(async () => ({
-      icon: { toDataURL: () => '' },
-      name: 'Visual Studio Code',
-      path: '/Applications/Visual Studio Code.app'
-    }))
+    const getApplicationNameForProtocol = vi.fn(() => 'Visual Studio Code')
     const openExternal = vi.fn(async () => undefined)
-    const adapter = createAdapter({ getApplicationInfoForProtocol, openExternal })
+    const adapter = createAdapter({ getApplicationNameForProtocol, openExternal })
 
     await adapter.open({ directory: '/work/My Project', target: 'vscode' })
 
-    expect(getApplicationInfoForProtocol).toHaveBeenCalledWith('vscode://')
+    expect(getApplicationNameForProtocol).toHaveBeenCalledWith('vscode://')
     expect(openExternal).toHaveBeenCalledWith('vscode://file/work/My%20Project/')
   })
 
   it('returns a stable unavailable error when VS Code loses protocol registration', async () => {
     const adapter = createAdapter({
-      getApplicationInfoForProtocol: vi.fn(async () => {
-        throw new Error('no handler')
-      })
+      getApplicationNameForProtocol: vi.fn(() => '')
     })
 
     await expect(adapter.open({ directory: '/work/app', target: 'vscode' })).rejects.toMatchObject({
@@ -94,11 +84,7 @@ function createAdapter(
   overrides: Partial<ConstructorParameters<typeof ElectronWorkspaceExternalOpenAdapter>[0]> = {}
 ) {
   return new ElectronWorkspaceExternalOpenAdapter({
-    getApplicationInfoForProtocol: vi.fn(async () => ({
-      icon: { toDataURL: () => 'data:image/png;base64,vscode' },
-      name: 'Visual Studio Code',
-      path: '/Applications/Visual Studio Code.app'
-    })),
+    getApplicationNameForProtocol: vi.fn(() => 'Visual Studio Code'),
     openExternal: vi.fn(async () => undefined),
     openPath: vi.fn(async () => ''),
     ...overrides

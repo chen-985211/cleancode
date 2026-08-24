@@ -46,6 +46,24 @@ describe('workspace external open action', () => {
     expect(openWorkspaceExternally.mock.calls[0]?.[0]).not.toHaveProperty('directory')
   })
 
+  it('refreshes transient VS Code availability when the window regains focus', async () => {
+    const workbench = createWorkbenchSnapshot('/work/app', 'app')
+    const getWorkspaceExternalOpenCapabilities = vi
+      .fn()
+      .mockResolvedValueOnce({ vscode: { available: false } })
+      .mockResolvedValueOnce({ vscode: { available: true } })
+    installRuntime({ getWorkspaceExternalOpenCapabilities })
+    const { result } = renderWorkspaceExternalOpen(workbench)
+
+    await waitFor(() => expect(getWorkspaceExternalOpenCapabilities).toHaveBeenCalledTimes(1))
+    expect(result.current.capabilities.vscode.available).toBe(false)
+
+    act(() => window.dispatchEvent(new Event('focus')))
+
+    await waitFor(() => expect(result.current.capabilities.vscode.available).toBe(true))
+    expect(getWorkspaceExternalOpenCapabilities).toHaveBeenCalledTimes(2)
+  })
+
   it('publishes a localized error when the selected target becomes unavailable', async () => {
     const workbench = createWorkbenchSnapshot('/work/app', 'app')
     const notifications = createNotifications()

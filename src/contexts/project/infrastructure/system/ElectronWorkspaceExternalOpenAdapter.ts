@@ -6,7 +6,7 @@ import type {
 import type { WorkspaceExternalOpenPort } from '../../application/ports/WorkspaceExternalOpenPort'
 
 interface ElectronWorkspaceExternalOpenDependencies {
-  readonly getApplicationInfoForProtocol: (url: string) => Promise<unknown>
+  readonly getApplicationNameForProtocol: (url: string) => string
   readonly openExternal: (url: string) => Promise<void>
   readonly openPath: (path: string) => Promise<string>
 }
@@ -15,19 +15,9 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
   constructor(private readonly dependencies: ElectronWorkspaceExternalOpenDependencies) {}
 
   async getCapabilities(): Promise<WorkspaceExternalOpenCapabilitiesSnapshot> {
-    try {
-      await this.dependencies.getApplicationInfoForProtocol('vscode://')
-
-      return {
-        vscode: {
-          available: true
-        }
-      }
-    } catch {
-      return {
-        vscode: {
-          available: false
-        }
+    return {
+      vscode: {
+        available: this.hasVsCodeProtocolHandler()
       }
     }
   }
@@ -59,9 +49,7 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
   }
 
   private async openVsCode(directory: string): Promise<void> {
-    try {
-      await this.dependencies.getApplicationInfoForProtocol('vscode://')
-    } catch {
+    if (!this.hasVsCodeProtocolHandler()) {
       throw createExpectedAppError(
         'WORKSPACE_OPEN_TARGET_UNAVAILABLE',
         'VS Code is not registered as a protocol handler.',
@@ -73,6 +61,14 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
       await this.dependencies.openExternal(createVsCodeWorkspaceUri(directory))
     } catch {
       throw createExternalOpenFailedError('vscode')
+    }
+  }
+
+  private hasVsCodeProtocolHandler(): boolean {
+    try {
+      return this.dependencies.getApplicationNameForProtocol('vscode://').trim().length > 0
+    } catch {
+      return false
     }
   }
 }

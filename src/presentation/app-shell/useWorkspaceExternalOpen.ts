@@ -39,6 +39,7 @@ export function useWorkspaceExternalOpen({
   const [capabilities, setCapabilities] =
     useState<WorkspaceExternalOpenCapabilitiesSnapshot>(unavailableCapabilities)
   const [isPending, setIsPending] = useState(false)
+  const capabilityDiscoveryGenerationRef = useRef(0)
   const isPendingRef = useRef(false)
   const notificationsRef = useRef(notifications)
   const publishedErrorsRef = useRef(new Map<string, PublishedWorkspaceExternalOpenError>())
@@ -49,22 +50,37 @@ export function useWorkspaceExternalOpen({
     translateRef.current = t
   }, [notifications, t])
 
-  useEffect(() => {
-    let cancelled = false
+  const refreshCapabilities = useCallback((): void => {
+    const generation = ++capabilityDiscoveryGenerationRef.current
+    const runtime = window.cleancode
+    if (!runtime) {
+      setCapabilities(unavailableCapabilities)
+      return
+    }
 
-    void window.cleancode
-      ?.getWorkspaceExternalOpenCapabilities()
+    void runtime
+      .getWorkspaceExternalOpenCapabilities()
       .then((nextCapabilities) => {
-        if (!cancelled) setCapabilities(nextCapabilities)
+        if (capabilityDiscoveryGenerationRef.current === generation) {
+          setCapabilities(nextCapabilities)
+        }
       })
       .catch(() => {
-        if (!cancelled) setCapabilities(unavailableCapabilities)
+        if (capabilityDiscoveryGenerationRef.current === generation) {
+          setCapabilities(unavailableCapabilities)
+        }
       })
+  }, [])
+
+  useEffect(() => {
+    refreshCapabilities()
+    window.addEventListener('focus', refreshCapabilities)
 
     return () => {
-      cancelled = true
+      window.removeEventListener('focus', refreshCapabilities)
+      capabilityDiscoveryGenerationRef.current += 1
     }
-  }, [])
+  }, [refreshCapabilities])
 
   useEffect(() => {
     for (const [key, published] of publishedErrorsRef.current) {
@@ -101,6 +117,7 @@ export function useWorkspaceExternalOpen({
         })
       } catch (error) {
         if (target === 'vscode' && getAppErrorCode(error) === 'WORKSPACE_OPEN_TARGET_UNAVAILABLE') {
+          capabilityDiscoveryGenerationRef.current += 1
           setCapabilities(unavailableCapabilities)
         }
 

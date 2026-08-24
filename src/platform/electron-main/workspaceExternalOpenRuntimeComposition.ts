@@ -7,7 +7,7 @@ import { ElectronWorkspaceExternalOpenAdapter } from '../../contexts/project/inf
 
 export function createWorkspaceExternalOpenRuntime(projects: ProjectRepository) {
   const externalOpen = new ElectronWorkspaceExternalOpenAdapter({
-    getApplicationInfoForProtocol: (url) => app.getApplicationInfoForProtocol(url),
+    getApplicationNameForProtocol: (url) => app.getApplicationNameForProtocol(url),
     openExternal: (url) => shell.openExternal(url),
     openPath: (path) => shell.openPath(path)
   })
