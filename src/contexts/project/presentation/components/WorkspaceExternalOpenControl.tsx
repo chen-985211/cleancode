@@ -25,6 +25,8 @@ interface WorkspaceExternalOpenControlProps {
   readonly onOpen: (target: WorkspaceExternalOpenTarget) => Promise<void> | void
 }
 
+type WorkspaceExternalOpenActionProps = Omit<WorkspaceExternalOpenControlProps, 'capabilities'>
+
 interface MenuPosition {
   readonly left: number
   readonly top: number
@@ -37,6 +39,42 @@ export function WorkspaceExternalOpenControl({
   isPending,
   onOpen
 }: WorkspaceExternalOpenControlProps) {
+  if (!capabilities.vscode.available) {
+    return <WorkspaceExternalFolderOpenControl isPending={isPending} onOpen={onOpen} />
+  }
+
+  return <WorkspaceExternalOpenSplitControl isPending={isPending} onOpen={onOpen} />
+}
+
+function WorkspaceExternalFolderOpenControl({
+  isPending,
+  onOpen
+}: WorkspaceExternalOpenActionProps) {
+  const { t } = useI18n()
+
+  return (
+    <div className="workspace-external-open-control">
+      <TooltipLabel content={t('workspaceExternalOpen.folder')}>
+        <button
+          className="workspace-external-open-control__button"
+          type="button"
+          aria-label={t('workspaceExternalOpen.folder')}
+          aria-disabled={isPending}
+          onClick={() => {
+            if (!isPending) void onOpen('folder')
+          }}
+        >
+          <FolderOpenIcon size={14} weight="bold" aria-hidden="true" />
+        </button>
+      </TooltipLabel>
+    </div>
+  )
+}
+
+function WorkspaceExternalOpenSplitControl({
+  isPending,
+  onOpen
+}: WorkspaceExternalOpenActionProps) {
   const { t } = useI18n()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
@@ -105,26 +143,6 @@ export function WorkspaceExternalOpenControl({
     window.addEventListener('resize', positionMenu)
     return () => window.removeEventListener('resize', positionMenu)
   }, [isMenuOpen])
-
-  if (!capabilities.vscode.available) {
-    return (
-      <div className="workspace-external-open-control">
-        <TooltipLabel content={t('workspaceExternalOpen.folder')}>
-          <button
-            className="workspace-external-open-control__button"
-            type="button"
-            aria-label={t('workspaceExternalOpen.folder')}
-            aria-disabled={isPending}
-            onClick={() => {
-              if (!isPending) void onOpen('folder')
-            }}
-          >
-            <FolderOpenIcon size={14} weight="bold" aria-hidden="true" />
-          </button>
-        </TooltipLabel>
-      </div>
-    )
-  }
 
   return (
     <>

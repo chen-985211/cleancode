@@ -60,6 +60,67 @@ describe('workspace external open control', () => {
     expect(screen.queryByRole('button', { name: '选择打开方式' })).not.toBeInTheDocument()
   })
 
+  it('does not consume the first folder action after availability drops with the menu open', () => {
+    const onOpen = vi.fn()
+    const view = renderControl({
+      capabilities: { vscode: { available: true } },
+      onOpen
+    })
+    fireEvent.click(screen.getByRole('button', { name: '选择打开方式' }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    view.rerender(
+      <I18nProvider initialLocale="zh-CN">
+        <WorkspaceExternalOpenControl
+          key="project-1:main"
+          capabilities={{ vscode: { available: false } }}
+          isPending={false}
+          onOpen={onOpen}
+        />
+      </I18nProvider>
+    )
+    const folderAction = screen.getByRole('button', { name: '打开所在文件夹' })
+
+    fireEvent.pointerDown(folderAction, { pointerId: 1 })
+    fireEvent.pointerUp(folderAction, { pointerId: 1 })
+    fireEvent.click(folderAction)
+
+    expect(onOpen).toHaveBeenCalledWith('folder')
+  })
+
+  it('does not revive a stale menu when VS Code availability returns', () => {
+    const view = renderControl({
+      capabilities: { vscode: { available: true } }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '选择打开方式' }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    view.rerender(
+      <I18nProvider initialLocale="zh-CN">
+        <WorkspaceExternalOpenControl
+          key="project-1:main"
+          capabilities={{ vscode: { available: false } }}
+          isPending={false}
+          onOpen={vi.fn()}
+        />
+      </I18nProvider>
+    )
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    view.rerender(
+      <I18nProvider initialLocale="zh-CN">
+        <WorkspaceExternalOpenControl
+          key="project-1:main"
+          capabilities={{ vscode: { available: true } }}
+          isPending={false}
+          onOpen={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
   it('keeps the complete control focusable while gating submissions during pending', () => {
     const onOpen = vi.fn()
     renderControl({
