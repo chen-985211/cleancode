@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
+import { WorkspaceExternalOpenControl } from '../../../src/contexts/project/presentation/components/WorkspaceExternalOpenControl'
 import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
-import { WorkspaceExternalOpenControl } from '../../../src/presentation/app-shell/WorkspaceExternalOpenControl'
 
 describe('workspace external open control', () => {
   it('shows a VS Code primary action and a two-item menu when the protocol is available', async () => {
@@ -60,14 +60,29 @@ describe('workspace external open control', () => {
     expect(screen.queryByRole('button', { name: '选择打开方式' })).not.toBeInTheDocument()
   })
 
-  it('disables the complete control while an external open is pending', () => {
+  it('keeps the complete control focusable while gating submissions during pending', () => {
+    const onOpen = vi.fn()
     renderControl({
       capabilities: { vscode: { available: true } },
-      isPending: true
+      isPending: true,
+      onOpen
     })
 
-    expect(screen.getByRole('button', { name: '用 VS Code 打开' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '选择打开方式' })).toBeDisabled()
+    const primaryAction = screen.getByRole('button', { name: '用 VS Code 打开' })
+    const menuTrigger = screen.getByRole('button', { name: '选择打开方式' })
+    primaryAction.focus()
+
+    expect(primaryAction).toHaveFocus()
+    expect(primaryAction).not.toBeDisabled()
+    expect(primaryAction).toHaveAttribute('aria-disabled', 'true')
+    expect(menuTrigger).not.toBeDisabled()
+    expect(menuTrigger).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(primaryAction)
+    fireEvent.click(menuTrigger)
+
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('uses pointer proximity only for feedback instead of changing the menu state', () => {
@@ -124,6 +139,37 @@ describe('workspace external open control', () => {
     trigger.focus()
     fireEvent.keyDown(trigger, { key: 'ArrowUp' })
     expect(screen.getByRole('menuitem', { name: '打开所在文件夹' })).toHaveFocus()
+  })
+
+  it('keeps the menu trigger focused when a selected action enters pending', () => {
+    const onOpen = vi.fn()
+    const view = renderControl({
+      capabilities: { vscode: { available: true } },
+      onOpen
+    })
+    const trigger = screen.getByRole('button', { name: '选择打开方式' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    const folderAction = screen.getByRole('menuitem', { name: '打开所在文件夹' })
+    folderAction.focus()
+    fireEvent.click(folderAction)
+    expect(trigger).toHaveFocus()
+
+    view.rerender(
+      <I18nProvider initialLocale="zh-CN">
+        <WorkspaceExternalOpenControl
+          key="project-1:main"
+          capabilities={{ vscode: { available: true } }}
+          isPending
+          onOpen={onOpen}
+        />
+      </I18nProvider>
+    )
+
+    expect(trigger).toHaveFocus()
+    expect(trigger).not.toBeDisabled()
+    expect(trigger).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('reuses the live menu surface when a repeated click reverses its exit', () => {

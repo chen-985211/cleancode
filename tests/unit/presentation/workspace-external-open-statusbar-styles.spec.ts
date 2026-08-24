@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const styles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workspace-external-open.css'),
+  resolve(process.cwd(), 'src/contexts/project/presentation/styles/workspace-external-open.css'),
   'utf8'
 )
 const themeStyles = readFileSync(
@@ -22,10 +22,10 @@ describe('workspace external open statusbar styles', () => {
       '.workspace-external-open-menu__item:hover:not(:disabled),\n.workspace-external-open-menu__item:focus-visible'
     )
     const buttonHoverRule = readRule(
-      '.workspace-external-open-control__button:hover:not(:disabled)'
+      ".workspace-external-open-control__button:hover:not([aria-disabled='true'])"
     )
     const menuButtonStateRule = readRule(
-      ".workspace-external-open-control__button--menu:hover:not(:disabled),\n.workspace-external-open-control__button--menu[aria-expanded='true']"
+      ".workspace-external-open-control__button--menu:hover:not([aria-disabled='true']),\n.workspace-external-open-control__button--menu[aria-expanded='true']"
     )
     const interactiveGroupRule = readRule(
       ".workspace-external-open-control:hover,\n.workspace-external-open-control:focus-within,\n.workspace-external-open-control[data-menu-open='true']"

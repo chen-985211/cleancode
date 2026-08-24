@@ -13,11 +13,11 @@ import {
 import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
-} from '../../contexts/project/application/dto/WorkspaceExternalOpen'
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
-import { useI18n } from './i18n/useI18n'
-import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+} from '../../application/dto/WorkspaceExternalOpen'
+import { AnchoredSurfaceMotion } from '../../../../presentation/app-shell/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/app-shell/Tooltip'
+import { useI18n } from '../../../../presentation/app-shell/i18n/useI18n'
+import { useOutsidePointerDismiss } from '../../../../presentation/app-shell/useOutsidePointerDismiss'
 
 interface WorkspaceExternalOpenControlProps {
   readonly capabilities: WorkspaceExternalOpenCapabilitiesSnapshot
@@ -114,8 +114,10 @@ export function WorkspaceExternalOpenControl({
             className="workspace-external-open-control__button"
             type="button"
             aria-label={t('workspaceExternalOpen.folder')}
-            disabled={isPending}
-            onClick={() => void onOpen('folder')}
+            aria-disabled={isPending}
+            onClick={() => {
+              if (!isPending) void onOpen('folder')
+            }}
           >
             <FolderOpenIcon size={14} weight="bold" aria-hidden="true" />
           </button>
@@ -141,7 +143,7 @@ export function WorkspaceExternalOpenControl({
             className="workspace-external-open-control__button workspace-external-open-control__button--primary"
             type="button"
             aria-label={t('workspaceExternalOpen.vscode')}
-            disabled={isPending}
+            aria-disabled={isPending}
             onClick={() => executeTarget('vscode')}
           >
             <WorkspaceEditorIcon />
@@ -157,10 +159,10 @@ export function WorkspaceExternalOpenControl({
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
             aria-label={t('workspaceExternalOpen.choose')}
-            disabled={isPending}
+            aria-disabled={isPending}
             onClick={() => toggleMenu()}
             onKeyDown={(event) => {
-              if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return
+              if (isPending || !['ArrowDown', 'ArrowUp'].includes(event.key)) return
               event.preventDefault()
               const initialFocus = event.key === 'ArrowDown' ? 'first' : 'last'
               if (isMenuOpen) {
@@ -224,6 +226,7 @@ export function WorkspaceExternalOpenControl({
   )
 
   function toggleMenu(): void {
+    if (isPending) return
     if (isMenuOpen) {
       closeMenu()
       return
@@ -237,6 +240,7 @@ export function WorkspaceExternalOpenControl({
   }
 
   function executeTarget(target: WorkspaceExternalOpenTarget): void {
+    if (isPending) return
     closeMenu()
     void onOpen(target)
   }

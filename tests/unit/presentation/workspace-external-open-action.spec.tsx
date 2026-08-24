@@ -1,13 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
+import { useWorkspaceExternalOpen } from '../../../src/contexts/project/presentation/view-models/useWorkspaceExternalOpen'
 import type {
   AppNotificationController,
   AppNotificationInput
 } from '../../../src/presentation/app-shell/appNotifications'
 import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
 import { useI18n } from '../../../src/presentation/app-shell/i18n/useI18n'
-import { useWorkspaceExternalOpen } from '../../../src/presentation/app-shell/useWorkspaceExternalOpen'
 import { createExpectedAppError } from '../../../src/shared-kernel/application/errors/AppError'
 import {
   createRuntimeApi,
@@ -148,7 +148,7 @@ function renderWorkspaceExternalOpen(
   return renderHook(
     ({ workbench: activeWorkbench }) => {
       const externalOpen = useWorkspaceExternalOpen({
-        currentWorkbench: activeWorkbench,
+        currentProject: activeWorkbench.project,
         currentWorkspace: activeWorkbench.project.workspaces[0],
         notifications
       })

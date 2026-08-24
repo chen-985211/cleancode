@@ -1,13 +1,13 @@
 import type { CSSProperties, Ref } from 'react'
 
+import { WorkspaceExternalOpenControl } from '../../contexts/project/presentation/components/WorkspaceExternalOpenControl'
+import { useWorkspaceExternalOpen } from '../../contexts/project/presentation/view-models/useWorkspaceExternalOpen'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { AppNotificationController } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { WorkspaceExternalOpenControl } from './WorkspaceExternalOpenControl'
-import { useWorkspaceExternalOpen } from './useWorkspaceExternalOpen'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -137,7 +137,7 @@ export function CanvasStatusbar({
 }: CanvasStatusbarProps) {
   const { t } = useI18n()
   const workspaceExternalOpen = useWorkspaceExternalOpen({
-    currentWorkbench,
+    currentProject: currentWorkbench?.project ?? null,
     currentWorkspace,
     notifications
   })

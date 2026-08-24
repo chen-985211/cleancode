@@ -3,18 +3,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
-} from '../../contexts/project/application/dto/WorkspaceExternalOpen'
-import { getAppErrorCode } from '../../shared-kernel/application/errors/AppError'
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
-import type { AppNotificationController, AppNotificationInput } from './appNotifications'
-import type { Translate } from './i18n/messages'
-import { useI18n } from './i18n/useI18n'
-import type { WorkbenchSnapshot } from './types'
+} from '../../application/dto/WorkspaceExternalOpen'
+import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
+import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
+import { resolveUserFacingErrorMessage } from '../../../../presentation/app-shell/appErrorMessages'
+import type {
+  AppNotificationController,
+  AppNotificationInput
+} from '../../../../presentation/app-shell/appNotifications'
+import type { Translate } from '../../../../presentation/app-shell/i18n/messages'
+import { useI18n } from '../../../../presentation/app-shell/i18n/useI18n'
 
-type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
+type CurrentWorkspace = ProjectSnapshot['workspaces'][number]
 
 interface UseWorkspaceExternalOpenInput {
-  readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly currentProject: ProjectSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly notifications: AppNotificationController
 }
@@ -31,7 +34,7 @@ const unavailableCapabilities: WorkspaceExternalOpenCapabilitiesSnapshot = {
 }
 
 export function useWorkspaceExternalOpen({
-  currentWorkbench,
+  currentProject,
   currentWorkspace,
   notifications
 }: UseWorkspaceExternalOpenInput) {
@@ -99,9 +102,9 @@ export function useWorkspaceExternalOpen({
   const openWorkspace = useCallback(
     async (target: WorkspaceExternalOpenTarget): Promise<void> => {
       const runtime = window.cleancode
-      if (!runtime || !currentWorkbench || !currentWorkspace || isPendingRef.current) return
+      if (!runtime || !currentProject || !currentWorkspace || isPendingRef.current) return
 
-      const key = `workspace:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:external-open`
+      const key = `workspace:${currentProject.id}:${currentWorkspace.workspaceId}:external-open`
       const previousError = publishedErrorsRef.current.get(key)
       publishedErrorsRef.current.delete(key)
       if (previousError) notificationsRef.current.dismiss(previousError.notificationId)
@@ -111,7 +114,7 @@ export function useWorkspaceExternalOpen({
 
       try {
         await runtime.openWorkspaceExternally({
-          projectDirectory: currentWorkbench.project.directory,
+          projectDirectory: currentProject.directory,
           target,
           workspaceId: currentWorkspace.workspaceId
         })
@@ -137,7 +140,7 @@ export function useWorkspaceExternalOpen({
         setIsPending(false)
       }
     },
-    [currentWorkbench, currentWorkspace]
+    [currentProject, currentWorkspace]
   )
 
   return { capabilities, isPending, openWorkspace }
