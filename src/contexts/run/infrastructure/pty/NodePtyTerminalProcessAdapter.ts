@@ -32,7 +32,10 @@ import {
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
 import { createTerminalProcessEnvironment } from './TerminalProcessEnvironment'
-import { readPosixProcessGroupId, terminatePosixProcessGroup } from './PosixProcessGroupTermination'
+import {
+  readPosixProcessGroupSnapshot,
+  terminatePosixProcessGroup
+} from './PosixProcessGroupTermination'
 import type { TerminalPrivateOutputControl } from './TerminalPrivateOutputControl'
 import {
   acceptTerminalPrivateOutputControl,
@@ -112,6 +115,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       foregroundJob: null,
       foregroundJobInterruptPromise: null,
       hasObservedShellOutput: false,
+      outputPaused: false,
       pendingForegroundProbe: null,
       privateOutputControl: privateOutputControlLaunch?.control ?? null,
       process: ptyProcess,
@@ -257,11 +261,15 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   }
 
   pauseOutput(sessionId: string): void {
-    this.requireProcess(sessionId).process.pause()
+    const terminalProcess = this.requireProcess(sessionId)
+    terminalProcess.process.pause()
+    terminalProcess.outputPaused = true
   }
 
   resumeOutput(sessionId: string): void {
-    this.requireProcess(sessionId).process.resume()
+    const terminalProcess = this.requireProcess(sessionId)
+    terminalProcess.process.resume()
+    terminalProcess.outputPaused = false
   }
 
   async readWorkingDirectory(sessionId: string): Promise<string | null> {
@@ -450,6 +458,7 @@ interface ManagedTerminalProcess {
   foregroundJob: ForegroundJobShellControl | null
   foregroundJobInterruptPromise: Promise<void> | null
   hasObservedShellOutput: boolean
+  outputPaused: boolean
   pendingForegroundProbe: string | null
   readonly privateOutputControl: TerminalPrivateOutputControl | null
   readonly process: IPty
@@ -488,15 +497,22 @@ async function stopManagedProcess(
   managedProcess: ManagedTerminalProcess,
   runtimePlatform: NodeJS.Platform
 ): Promise<void> {
+  if (managedProcess.outputPaused) {
+    managedProcess.process.resume()
+    managedProcess.outputPaused = false
+  }
   if (runtimePlatform === 'win32') {
     managedProcess.process.kill()
     await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
     return
   }
-  const terminalProcessGroupId = await readPosixProcessGroupId(managedProcess.process.pid)
-  const foregroundProcessGroupId = managedProcess.foregroundJob?.processGroupId ?? null
+  const processGroupSnapshot = await readPosixProcessGroupSnapshot(managedProcess.process.pid)
+  const terminalProcessGroupId = processGroupSnapshot?.processGroupId ?? null
+  const foregroundProcessGroupId = managedProcess.foregroundJob
+    ? (processGroupSnapshot?.foregroundProcessGroupId ?? terminalProcessGroupId)
+    : null
   const failures: unknown[] = []
-  if (foregroundProcessGroupId && foregroundProcessGroupId !== terminalProcessGroupId) {
+  if (foregroundProcessGroupId) {
     try {
       await terminatePosixProcessGroup(
         foregroundProcessGroupId,
@@ -508,13 +524,13 @@ async function stopManagedProcess(
     }
   }
   try {
-    if (terminalProcessGroupId) {
+    if (terminalProcessGroupId && terminalProcessGroupId !== foregroundProcessGroupId) {
       await terminatePosixProcessGroup(
         terminalProcessGroupId,
         TERMINATION_GRACE_MS,
         TERMINATION_FORCE_MS
       )
-    } else {
+    } else if (!terminalProcessGroupId) {
       managedProcess.process.kill('SIGTERM')
     }
     await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)

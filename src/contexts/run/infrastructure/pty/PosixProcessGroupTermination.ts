@@ -3,16 +3,36 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
-export async function readPosixProcessGroupId(processId: number): Promise<number | null> {
+export interface PosixProcessGroupSnapshot {
+  readonly foregroundProcessGroupId: number | null
+  readonly processGroupId: number
+}
+
+export async function readPosixProcessGroupSnapshot(
+  processId: number
+): Promise<PosixProcessGroupSnapshot | null> {
   try {
-    const { stdout } = await execFileAsync('/bin/ps', ['-o', 'pgid=', '-p', String(processId)], {
-      timeout: 1_000
-    })
-    const processGroupId = Number.parseInt(stdout.trim(), 10)
-    return Number.isSafeInteger(processGroupId) && processGroupId > 1 ? processGroupId : null
+    const { stdout } = await execFileAsync(
+      '/bin/ps',
+      ['-o', 'pgid=', '-o', 'tpgid=', '-p', String(processId)],
+      { timeout: 1_000 }
+    )
+    const [processGroupValue, foregroundProcessGroupValue] = stdout.trim().split(/\s+/u)
+    const processGroupId = parseProcessGroupId(processGroupValue)
+    if (!processGroupId) return null
+
+    return {
+      foregroundProcessGroupId: parseProcessGroupId(foregroundProcessGroupValue),
+      processGroupId
+    }
   } catch {
     return null
   }
+}
+
+function parseProcessGroupId(value: string | undefined): number | null {
+  const processGroupId = Number(value)
+  return Number.isSafeInteger(processGroupId) && processGroupId > 1 ? processGroupId : null
 }
 
 export async function terminatePosixProcessGroup(

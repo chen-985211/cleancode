@@ -460,48 +460,78 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     expect(output).toContain('xterm-256color|truecolor|cleancode|15;0|respect-no-color')
   })
 
-  it('lets an Agent foreground job finish SIGTERM cleanup before escalating', async () => {
-    const cleanupPath = join(workingDirectory, 'foreground-cleanup.txt')
-    const started = createDeferred<void>()
-    let output = ''
-    const nodeProgram = [
-      'const { writeFileSync } = require("node:fs")',
-      `const cleanupPath = ${JSON.stringify(cleanupPath)}`,
-      'let terminating = false',
-      'process.on("SIGHUP", () => {})',
-      'process.on("SIGTERM", () => { if (terminating) return; terminating = true; setTimeout(() => { writeFileSync(cleanupPath, "cleanup-finished"); process.exit(0) }, 750) })',
-      'console.log("CLEANUP_READY")',
-      'setInterval(() => {}, 1000)'
-    ].join(';')
+  it.each([
+    { disableJobControl: false, pauseOutput: false, scenario: 'after its started marker' },
+    { disableJobControl: true, pauseOutput: false, scenario: 'with shell job control disabled' },
+    {
+      disableJobControl: false,
+      pauseOutput: true,
+      scenario: 'before its started marker is consumed'
+    }
+  ])(
+    'lets an Agent foreground job finish SIGTERM cleanup $scenario',
+    async (testCase) => {
+      const cleanupPath = join(workingDirectory, 'foreground-cleanup.txt')
+      const readyPath = join(workingDirectory, 'foreground-ready.txt')
+      const started = createDeferred<void>()
+      let output = ''
+      const nodeProgram = [
+        'const { writeFileSync } = require("node:fs")',
+        `const cleanupPath = ${JSON.stringify(cleanupPath)}`,
+        `const readyPath = ${JSON.stringify(readyPath)}`,
+        'let terminating = false',
+        'process.on("SIGHUP", () => {})',
+        'process.on("SIGTERM", () => { if (terminating) return; terminating = true; setTimeout(() => { writeFileSync(cleanupPath, "cleanup-finished"); process.exit(0) }, 750) })',
+        'writeFileSync(readyPath, String(process.pid))',
+        'setInterval(() => {}, 1000)'
+      ].join(';')
+      let foregroundProcessId: number | null = null
 
-    await adapter.start({
-      scope: agentRunScope('foreground-cleanup-session'),
-      workingDirectory,
-      shell: '/bin/sh',
-      columns: 80,
-      rows: 24,
-      onOutput: (event) => {
-        output += event.data
-      },
-      onExit: () => undefined
-    })
-    adapter.launchForegroundJob({
-      args: ['-e', nodeProgram],
-      environment: {},
-      executable: process.execPath,
-      generation: 1,
-      launchId: 'foreground-cleanup-launch',
-      onExit: () => undefined,
-      onStarted: () => started.resolve(),
-      sessionId: 'foreground-cleanup-session'
-    })
-    await started.promise
-    await waitUntil(() => output.includes('CLEANUP_READY'))
+      try {
+        await adapter.start({
+          scope: agentRunScope('foreground-cleanup-session'),
+          workingDirectory,
+          shell: '/bin/sh',
+          columns: 80,
+          rows: 24,
+          onOutput: (event) => {
+            output += event.data
+          },
+          onExit: () => undefined
+        })
+        if (testCase.disableJobControl) {
+          adapter.write('foreground-cleanup-session', 'set +m; printf "JOB_CONTROL_DISABLED\\n"\r')
+          await waitUntil(() => output.includes('JOB_CONTROL_DISABLED'))
+        }
+        if (testCase.pauseOutput) adapter.pauseOutput('foreground-cleanup-session')
+        adapter.launchForegroundJob({
+          args: ['-e', nodeProgram],
+          environment: {},
+          executable: process.execPath,
+          generation: 1,
+          launchId: 'foreground-cleanup-launch',
+          onExit: () => undefined,
+          onStarted: () => started.resolve(),
+          sessionId: 'foreground-cleanup-session'
+        })
+        if (!testCase.pauseOutput) await started.promise
+        foregroundProcessId = Number.parseInt(await waitForFile(readyPath), 10)
 
-    await adapter.stop('foreground-cleanup-session')
+        await adapter.stop('foreground-cleanup-session')
 
-    await expect(readFile(cleanupPath, 'utf8')).resolves.toBe('cleanup-finished')
-  }, 10_000)
+        await expect(readFile(cleanupPath, 'utf8')).resolves.toBe('cleanup-finished')
+      } finally {
+        if (foregroundProcessId) {
+          try {
+            process.kill(foregroundProcessId, 'SIGKILL')
+          } catch {
+            // The expected cleanup path has already reaped the foreground process.
+          }
+        }
+      }
+    },
+    10_000
+  )
 
   it('waits for an ignoring child process group to exit and releases its listening port', async () => {
     const port = await reservePort()
@@ -623,5 +653,20 @@ async function waitUntil(assertion: () => boolean): Promise<void> {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
+async function waitForFile(path: string): Promise<string> {
+  const startedAt = Date.now()
+
+  while (true) {
+    try {
+      return await readFile(path, 'utf8')
+    } catch {
+      if (Date.now() - startedAt > 5_000) {
+        throw new Error(`Timed out waiting for file: ${path}`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
   }
 }
