@@ -345,16 +345,10 @@ const agentSessionService = new AgentSessionService(
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
-  archiveBranchWorkspaceUseCase,
-  checkoutMainWorkspaceBranchUseCase,
-  createBranchWorkspaceUseCase,
   createOrOpenProjectUseCase,
-  forgetProjectUseCase,
+  projectIpcHandlers,
   rememberProjectUseCase,
-  reorderProjectsUseCase,
-  selectCurrentProjectUseCase,
-  switchBranchWorkspaceUseCase,
-  synchronizeProjectGitStateUseCase
+  selectCurrentProjectUseCase
 } = createProjectLifecycleUseCases({
   agentLifecycle: workspaceAgentLifecycleAdapter,
   runLifecycle: workspaceRuns,
@@ -383,22 +377,15 @@ registerWindowFullScreenStateIpc({
   resolveWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender)
 })
 registerProjectIpcHandlers({
-  archiveBranchWorkspace: (command) => archiveBranchWorkspaceUseCase.execute(command),
-  checkoutMainWorkspaceBranch: (command) => checkoutMainWorkspaceBranchUseCase.execute(command),
-  createBranchWorkspace: (command) => createBranchWorkspaceUseCase.execute(command),
-  createOrOpenProject: (command) => createOrOpenProjectUseCase.execute(command),
-  forgetProject: (directory) => forgetProjectUseCase.execute({ directory }),
+  ...projectIpcHandlers,
   inferProjectName,
   ipcMain,
   loadRememberedWorkbenches,
   loadWorkbench,
   logger: consoleLogger,
   rememberProject,
-  reorderProjects: (command) => reorderProjectsUseCase.execute(command),
   selectCurrentProject,
-  selectProjectDirectory,
-  switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command),
-  synchronizeProjectGitState: (command) => synchronizeProjectGitStateUseCase.execute(command)
+  selectProjectDirectory
 })
 
 registerBlockGraphIpcHandlers({

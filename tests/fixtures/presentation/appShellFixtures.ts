@@ -43,6 +43,8 @@ export interface RuntimeApiOverrides {
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
+  readonly getWorkspaceExternalOpenCapabilities?: ReturnType<typeof vi.fn>
+  readonly openWorkspaceExternally?: ReturnType<typeof vi.fn>
   readonly inspectCodexCli?: ReturnType<typeof vi.fn>
   readonly inspectAgentProvider?: ReturnType<typeof vi.fn>
   readonly getAgentProviderPreferences?: ReturnType<typeof vi.fn>
@@ -96,6 +98,10 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     synchronizeProjectGitState: overrides.synchronizeProjectGitState ?? vi.fn(async () => null),
+    getWorkspaceExternalOpenCapabilities:
+      overrides.getWorkspaceExternalOpenCapabilities ??
+      vi.fn(async () => ({ vscode: { available: false } })),
+    openWorkspaceExternally: overrides.openWorkspaceExternally ?? vi.fn(async () => undefined),
     inspectAgentProvider:
       overrides.inspectAgentProvider ??
       vi.fn(async (command: { readonly providerId: string }) =>

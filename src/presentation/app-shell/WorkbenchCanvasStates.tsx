@@ -1,6 +1,9 @@
 import type { CSSProperties, Ref } from 'react'
 
+import { WorkspaceExternalOpenControl } from '../../contexts/project/presentation/components/WorkspaceExternalOpenControl'
+import { useWorkspaceExternalOpen } from '../../contexts/project/presentation/view-models/useWorkspaceExternalOpen'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
+import type { AppNotificationController } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
@@ -120,6 +123,7 @@ interface CanvasStatusbarProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly motionRef?: Ref<HTMLElement>
+  readonly notifications: AppNotificationController
 }
 
 export function CanvasStatusbar({
@@ -128,11 +132,25 @@ export function CanvasStatusbar({
   initialWorkbenchLoadPhase,
   currentWorkbench,
   currentWorkspace,
-  motionRef
+  motionRef,
+  notifications
 }: CanvasStatusbarProps) {
   const { t } = useI18n()
+  const workspaceExternalOpen = useWorkspaceExternalOpen({
+    currentProject: currentWorkbench?.project ?? null,
+    currentWorkspace,
+    notifications
+  })
   return (
     <footer ref={motionRef} className="app-shell__statusbar">
+      {isDesktopRuntime && currentWorkbench && currentWorkspace ? (
+        <WorkspaceExternalOpenControl
+          key={`${currentWorkbench.project.id}:${currentWorkspace.workspaceId}`}
+          capabilities={workspaceExternalOpen.capabilities}
+          isPending={workspaceExternalOpen.isPending}
+          onOpen={workspaceExternalOpen.openWorkspace}
+        />
+      ) : null}
       <span
         className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
       />

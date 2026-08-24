@@ -5,7 +5,11 @@ import {
 } from './springProgressMotion'
 
 export type SurfaceSpringPreset =
-  'anchored-top-right' | 'bottom-control' | 'drawer-right' | 'fullscreen-right'
+  | 'anchored-bottom-left'
+  | 'anchored-top-right'
+  | 'bottom-control'
+  | 'drawer-right'
+  | 'fullscreen-right'
 
 export type SurfaceSpringMotionRoot = SpringProgressMotionRoot
 
@@ -73,6 +77,15 @@ function presentSurface(
 }
 
 function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
+  if (preset === 'anchored-bottom-left') {
+    return {
+      contentOpacity: 1,
+      opacity: 1 - remaining,
+      scale: 1,
+      translateX: '0px',
+      translateY: `${round(4 * remaining)}px`
+    }
+  }
   if (preset === 'anchored-top-right') {
     return {
       contentOpacity: 1,
@@ -110,6 +123,7 @@ function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
 }
 
 function responseForPreset(preset: SurfaceSpringPreset): number {
+  if (preset === 'anchored-bottom-left') return 0.18
   if (preset === 'anchored-top-right') return 0.24
   if (preset === 'bottom-control') return 0.16
   if (preset === 'drawer-right') return 0.34

@@ -630,6 +630,7 @@ export function AppShell({
             terminalRuntimeAvailability={terminalRuntimeAvailability}
             currentWorkbench={currentWorkbench}
             currentWorkspace={currentWorkspace}
+            notifications={notifications}
             nodeStore={nodeStore}
             nodeTypes={workbenchNodeTypes}
             canvasSizeRef={canvasSizeRef}

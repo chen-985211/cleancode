@@ -578,6 +578,7 @@
 .status-path {
   overflow: hidden;
   min-width: 0;
+  flex: 0 1 auto;
   margin-left: 3px;
   border-left: 1px solid var(--cc-divider);
   padding-left: 10px;

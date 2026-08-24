@@ -16,6 +16,8 @@ import { ReorderProjectsUseCase } from '../../contexts/project/application/use-c
 import { SelectCurrentProjectUseCase } from '../../contexts/project/application/use-cases/SelectCurrentProjectUseCase'
 import { SwitchBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
 import { SynchronizeProjectGitStateUseCase } from '../../contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
+import type { ProjectIpcHandlersInput } from './projectIpcHandlers'
+import { createWorkspaceExternalOpenRuntime } from './workspaceExternalOpenRuntimeComposition'
 
 export function createProjectLifecycleUseCases(input: {
   readonly agentLifecycle: WorkspaceAgentLifecyclePort
@@ -29,55 +31,86 @@ export function createProjectLifecycleUseCases(input: {
   const registryTransactions = new ProjectRegistryTransactionCoordinator()
   const workspaceTransactions =
     input.workspaceTransactions ?? new ProjectWorkspaceTransactionCoordinator()
+  const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(
+    input.projects,
+    input.gitWorkspace,
+    input.agentLifecycle,
+    workspaceTransactions,
+    input.runLifecycle
+  )
+  const checkoutMainWorkspaceBranch = new CheckoutMainWorkspaceBranchUseCase(
+    input.projects,
+    input.gitWorkspace,
+    workspaceTransactions
+  )
+  const createBranchWorkspace = new CreateBranchWorkspaceUseCase(
+    input.projects,
+    input.gitWorkspace,
+    input.branchDirectories,
+    workspaceTransactions
+  )
+  const createOrOpenProjectUseCase = new CreateOrOpenProjectUseCase(
+    input.projects,
+    input.gitWorkspace,
+    input.agentLifecycle,
+    workspaceTransactions,
+    input.runLifecycle
+  )
+  const forgetProject = new ForgetProjectUseCase(
+    input.projectRegistry,
+    input.agentLifecycle,
+    workspaceTransactions,
+    registryTransactions,
+    input.runLifecycle
+  )
+  const rememberProjectUseCase = new RememberProjectUseCase(
+    input.projectRegistry,
+    registryTransactions
+  )
+  const reorderProjects = new ReorderProjectsUseCase(input.projectRegistry, registryTransactions)
+  const selectCurrentProjectUseCase = new SelectCurrentProjectUseCase(
+    input.projectRegistry,
+    registryTransactions
+  )
+  const switchBranchWorkspace = new SwitchBranchWorkspaceUseCase(
+    input.projects,
+    workspaceTransactions
+  )
+  const synchronizeProjectGitState = new SynchronizeProjectGitStateUseCase(
+    input.projects,
+    input.gitWorkspace,
+    input.agentLifecycle,
+    workspaceTransactions,
+    input.runLifecycle
+  )
+  const projectIpcHandlers = {
+    archiveBranchWorkspace: (command) => archiveBranchWorkspace.execute(command),
+    checkoutMainWorkspaceBranch: (command) => checkoutMainWorkspaceBranch.execute(command),
+    createBranchWorkspace: (command) => createBranchWorkspace.execute(command),
+    createOrOpenProject: (command) => createOrOpenProjectUseCase.execute(command),
+    forgetProject: (directory) => forgetProject.execute({ directory }),
+    reorderProjects: (command) => reorderProjects.execute(command),
+    switchBranchWorkspace: (command) => switchBranchWorkspace.execute(command),
+    synchronizeProjectGitState: (command) => synchronizeProjectGitState.execute(command),
+    ...createWorkspaceExternalOpenRuntime(input.projects)
+  } satisfies Pick<
+    ProjectIpcHandlersInput,
+    | 'archiveBranchWorkspace'
+    | 'checkoutMainWorkspaceBranch'
+    | 'createBranchWorkspace'
+    | 'createOrOpenProject'
+    | 'forgetProject'
+    | 'getWorkspaceExternalOpenCapabilities'
+    | 'openWorkspaceExternally'
+    | 'reorderProjects'
+    | 'switchBranchWorkspace'
+    | 'synchronizeProjectGitState'
+  >
+
   return {
-    archiveBranchWorkspaceUseCase: new ArchiveBranchWorkspaceUseCase(
-      input.projects,
-      input.gitWorkspace,
-      input.agentLifecycle,
-      workspaceTransactions,
-      input.runLifecycle
-    ),
-    checkoutMainWorkspaceBranchUseCase: new CheckoutMainWorkspaceBranchUseCase(
-      input.projects,
-      input.gitWorkspace,
-      workspaceTransactions
-    ),
-    createBranchWorkspaceUseCase: new CreateBranchWorkspaceUseCase(
-      input.projects,
-      input.gitWorkspace,
-      input.branchDirectories,
-      workspaceTransactions
-    ),
-    createOrOpenProjectUseCase: new CreateOrOpenProjectUseCase(
-      input.projects,
-      input.gitWorkspace,
-      input.agentLifecycle,
-      workspaceTransactions,
-      input.runLifecycle
-    ),
-    forgetProjectUseCase: new ForgetProjectUseCase(
-      input.projectRegistry,
-      input.agentLifecycle,
-      workspaceTransactions,
-      registryTransactions,
-      input.runLifecycle
-    ),
-    rememberProjectUseCase: new RememberProjectUseCase(input.projectRegistry, registryTransactions),
-    reorderProjectsUseCase: new ReorderProjectsUseCase(input.projectRegistry, registryTransactions),
-    selectCurrentProjectUseCase: new SelectCurrentProjectUseCase(
-      input.projectRegistry,
-      registryTransactions
-    ),
-    switchBranchWorkspaceUseCase: new SwitchBranchWorkspaceUseCase(
-      input.projects,
-      workspaceTransactions
-    ),
-    synchronizeProjectGitStateUseCase: new SynchronizeProjectGitStateUseCase(
-      input.projects,
-      input.gitWorkspace,
-      input.agentLifecycle,
-      workspaceTransactions,
-      input.runLifecycle
-    )
+    createOrOpenProjectUseCase,
+    projectIpcHandlers,
+    rememberProjectUseCase,
+    selectCurrentProjectUseCase
   }
 }
