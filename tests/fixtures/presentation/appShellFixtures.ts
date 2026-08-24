@@ -100,7 +100,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     synchronizeProjectGitState: overrides.synchronizeProjectGitState ?? vi.fn(async () => null),
     getWorkspaceExternalOpenCapabilities:
       overrides.getWorkspaceExternalOpenCapabilities ??
-      vi.fn(async () => ({ vscode: { available: false, iconDataUrl: null } })),
+      vi.fn(async () => ({ vscode: { available: false } })),
     openWorkspaceExternally: overrides.openWorkspaceExternally ?? vi.fn(async () => undefined),
     inspectAgentProvider:
       overrides.inspectAgentProvider ??

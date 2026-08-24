@@ -12,7 +12,7 @@ describe('Electron workspace external open adapter', () => {
     expect(createVsCodeWorkspaceUri(directory)).toBe(expected)
   })
 
-  it('reports the registered VS Code protocol handler and its icon', async () => {
+  it('reports the registered VS Code protocol handler', async () => {
     const adapter = createAdapter({
       getApplicationInfoForProtocol: vi.fn(async () => ({
         icon: { toDataURL: () => 'data:image/png;base64,vscode' },
@@ -22,7 +22,7 @@ describe('Electron workspace external open adapter', () => {
     })
 
     await expect(adapter.getCapabilities()).resolves.toEqual({
-      vscode: { available: true, iconDataUrl: 'data:image/png;base64,vscode' }
+      vscode: { available: true }
     })
   })
 
@@ -34,7 +34,7 @@ describe('Electron workspace external open adapter', () => {
     })
 
     await expect(adapter.getCapabilities()).resolves.toEqual({
-      vscode: { available: false, iconDataUrl: null }
+      vscode: { available: false }
     })
   })
 

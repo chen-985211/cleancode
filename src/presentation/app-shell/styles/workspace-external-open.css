@@ -1,53 +1,81 @@
 .workspace-external-open-control {
   display: inline-flex;
-  height: 100%;
+  height: 22px;
   flex: 0 0 auto;
   align-items: stretch;
-  overflow: hidden;
+  gap: 1px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
+  box-shadow: none;
   color: var(--cc-muted-strong);
+  transition:
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.workspace-external-open-control:hover,
+.workspace-external-open-control:focus-within,
+.workspace-external-open-control[data-menu-open='true'] {
+  border-color: var(--cc-border);
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow-xs);
+  color: var(--cc-foreground);
 }
 
 .workspace-external-open-control__button {
   display: inline-flex;
-  width: 24px;
+  width: 25px;
   min-width: 0;
   align-items: center;
   justify-content: center;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   padding: 0;
   color: inherit;
+  transition:
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard);
 }
 
 .workspace-external-open-control__button--menu {
-  width: 18px;
-  border-left: 1px solid var(--cc-divider);
+  width: 17px;
+  color: var(--cc-muted);
 }
 
-.workspace-external-open-control__button:hover:not(:disabled),
-.workspace-external-open-control__button[aria-expanded='true'] {
-  background: var(--cc-neutral-overlay);
+.workspace-external-open-control__button:hover:not(:disabled) {
+  background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
+}
+
+.workspace-external-open-control__button--menu:hover:not(:disabled),
+.workspace-external-open-control__button--menu[aria-expanded='true'] {
+  background: var(--cc-primary-border);
+  color: var(--cc-primary-hover);
 }
 
 .workspace-external-open-control__button:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid var(--cc-primary);
-  outline-offset: -2px;
 }
 
-.workspace-external-open-control__button:disabled {
-  cursor: default;
-  opacity: 0.45;
+.workspace-external-open-control__button:active:not(:disabled) {
+  box-shadow: 0 1px 2px var(--cc-shadow-color) inset;
+  transform: translateY(1px);
 }
 
 .workspace-external-open-control__app-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  object-fit: contain;
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  background: var(--cc-brand-vscode);
+  mask: url('../assets/vscode-code-icon.svg') center / contain no-repeat;
 }
 
 .workspace-external-open-menu {
@@ -57,9 +85,9 @@
   min-width: 178px;
   gap: 1px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--cc-surface-overlay);
-  padding: 5px;
+  padding: 6px;
   box-shadow: var(--cc-shadow-floating);
   transform-origin: left bottom;
 }
@@ -71,19 +99,23 @@
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   padding: 0 8px;
   color: var(--cc-foreground);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
+  transition:
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
-.workspace-external-open-menu__item:hover,
+.workspace-external-open-menu__item:hover:not(:disabled),
 .workspace-external-open-menu__item:focus-visible {
-  background: var(--cc-neutral-overlay);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
   outline: none;
 }
 
@@ -98,6 +130,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .workspace-external-open-control,
   .workspace-external-open-control__button {
     transition: none;
   }

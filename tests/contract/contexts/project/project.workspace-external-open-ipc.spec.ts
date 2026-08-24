@@ -7,7 +7,7 @@ describe('workspace external open IPC contract', () => {
   it('returns the system capabilities without a renderer-supplied path', async () => {
     const ipcMain = new FakeIpcMain()
     const capabilities: WorkspaceExternalOpenCapabilitiesSnapshot = {
-      vscode: { available: true, iconDataUrl: 'data:image/png;base64,vscode' }
+      vscode: { available: true }
     }
     const getWorkspaceExternalOpenCapabilities = vi.fn(async () => capabilities)
 
@@ -76,7 +76,7 @@ function createProjectIpcHandlersInput(ipcMain: IpcMainLike) {
     createOrOpenProject: vi.fn(),
     forgetProject: vi.fn(),
     getWorkspaceExternalOpenCapabilities: vi.fn(async () => ({
-      vscode: { available: false, iconDataUrl: null }
+      vscode: { available: false }
     })),
     inferProjectName: (directory: string) => directory,
     ipcMain,

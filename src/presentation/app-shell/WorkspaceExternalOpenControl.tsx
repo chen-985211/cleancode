@@ -1,7 +1,7 @@
 import { CaretUpIcon } from '@phosphor-icons/react/dist/csr/CaretUp'
-import { CodeIcon } from '@phosphor-icons/react/dist/csr/Code'
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen'
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -44,14 +44,18 @@ export function WorkspaceExternalOpenControl({
   const pendingInitialFocusRef = useRef(false)
   const menuId = useId()
   const triggerId = useId()
+  const closeMenu = useCallback((restoreTriggerFocus = false): void => {
+    pendingInitialFocusRef.current = false
+    setIsMenuOpen(false)
+    if (restoreTriggerFocus) menuTriggerRef.current?.focus({ preventScroll: true })
+  }, [])
 
   useOutsidePointerDismiss({
     active: isMenuOpen,
     isInside: (target) =>
       controlRef.current?.contains(target) === true || menuRef.current?.contains(target) === true,
     onDismiss: () => {
-      setIsMenuOpen(false)
-      menuTriggerRef.current?.focus({ preventScroll: true })
+      closeMenu(true)
     },
     pointerPolicy: 'consume'
   })
@@ -61,13 +65,12 @@ export function WorkspaceExternalOpenControl({
 
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
-      setIsMenuOpen(false)
-      menuTriggerRef.current?.focus({ preventScroll: true })
+      closeMenu(true)
     }
 
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [isMenuOpen])
+  }, [closeMenu, isMenuOpen])
 
   useEffect(() => {
     if (!isMenuOpen || !menuPosition || !pendingInitialFocusRef.current) return
@@ -122,8 +125,12 @@ export function WorkspaceExternalOpenControl({
       <div
         ref={controlRef}
         className="workspace-external-open-control workspace-external-open-control--split"
+        data-menu-open={isMenuOpen}
         role="group"
         aria-label={t('workspaceExternalOpen.group')}
+        onBlur={(event) => {
+          if (!isWithinComposite(event.relatedTarget)) closeMenu()
+        }}
       >
         <TooltipLabel content={t('workspaceExternalOpen.vscode')}>
           <button
@@ -131,9 +138,9 @@ export function WorkspaceExternalOpenControl({
             type="button"
             aria-label={t('workspaceExternalOpen.vscode')}
             disabled={isPending}
-            onClick={() => void onOpen('vscode')}
+            onClick={() => executeTarget('vscode')}
           >
-            <WorkspaceEditorIcon iconDataUrl={capabilities.vscode.iconDataUrl} />
+            <WorkspaceEditorIcon />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('workspaceExternalOpen.choose')}>
@@ -164,13 +171,15 @@ export function WorkspaceExternalOpenControl({
         className="workspace-external-open-menu anchored-surface-motion"
         data-side="top"
         open={isMenuOpen}
+        springPreset="anchored-bottom-left"
         portalContainer={document.body}
         role="menu"
         aria-labelledby={triggerId}
+        onExitComplete={() => {
+          setMenuPosition(null)
+        }}
         onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setIsMenuOpen(false)
-          }
+          if (!isWithinComposite(event.relatedTarget)) closeMenu()
         }}
         onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
         style={{
@@ -186,7 +195,7 @@ export function WorkspaceExternalOpenControl({
           disabled={isPending}
           onClick={() => selectTarget('vscode')}
         >
-          <WorkspaceEditorIcon iconDataUrl={capabilities.vscode.iconDataUrl} />
+          <WorkspaceEditorIcon />
           {t('workspaceExternalOpen.vscode')}
         </button>
         <button
@@ -204,24 +213,38 @@ export function WorkspaceExternalOpenControl({
   )
 
   function toggleMenu(focusFirstItem = false): void {
-    setMenuPosition(null)
-    pendingInitialFocusRef.current = focusFirstItem || !isMenuOpen
-    setIsMenuOpen((open) => !open)
+    if (isMenuOpen) {
+      closeMenu()
+      return
+    }
+    openMenu(focusFirstItem)
   }
 
   function selectTarget(target: WorkspaceExternalOpenTarget): void {
-    setIsMenuOpen(false)
-    menuTriggerRef.current?.focus({ preventScroll: true })
+    closeMenu(true)
     void onOpen(target)
+  }
+
+  function executeTarget(target: WorkspaceExternalOpenTarget): void {
+    closeMenu()
+    void onOpen(target)
+  }
+
+  function openMenu(focusFirstItem = false): void {
+    pendingInitialFocusRef.current = focusFirstItem
+    setIsMenuOpen(true)
+  }
+
+  function isWithinComposite(target: EventTarget | null): boolean {
+    if (!(target instanceof Node)) return false
+    return (
+      controlRef.current?.contains(target) === true || menuRef.current?.contains(target) === true
+    )
   }
 }
 
-function WorkspaceEditorIcon({ iconDataUrl }: { readonly iconDataUrl: string | null }) {
-  return iconDataUrl ? (
-    <img className="workspace-external-open-control__app-icon" src={iconDataUrl} alt="" />
-  ) : (
-    <CodeIcon size={14} weight="bold" aria-hidden="true" />
-  )
+function WorkspaceEditorIcon() {
+  return <span className="workspace-external-open-control__app-icon" aria-hidden="true" />
 }
 
 function resolveMenuPosition(input: {

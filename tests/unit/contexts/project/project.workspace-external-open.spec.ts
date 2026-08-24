@@ -59,7 +59,7 @@ describe('workspace external open use cases', () => {
 
   it('projects system discovery through the application capability query', async () => {
     const capabilities = {
-      vscode: { available: true, iconDataUrl: 'data:image/png;base64,icon' }
+      vscode: { available: true }
     }
     const externalOpen = createExternalOpenPort()
     externalOpen.getCapabilities.mockResolvedValue(capabilities)
@@ -107,7 +107,7 @@ function createExternalOpenPort(): WorkspaceExternalOpenPort & {
 } {
   return {
     getCapabilities: vi.fn(async () => ({
-      vscode: { available: false, iconDataUrl: null }
+      vscode: { available: false }
     })),
     open: vi.fn(async () => undefined)
   } satisfies WorkspaceExternalOpenPort

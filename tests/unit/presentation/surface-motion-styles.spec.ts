@@ -41,6 +41,9 @@ describe('surface motion styles', () => {
       ".anchored-surface-motion[data-surface-spring-preset='anchored-top-right']"
     )
     expect(surfaceMotionStyles).toContain(
+      ".anchored-surface-motion[data-surface-spring-preset='anchored-bottom-left']"
+    )
+    expect(surfaceMotionStyles).toContain(
       '.overlay-surface-motion[data-surface-spring-preset][data-surface-motion-state]\n  .overlay-surface-motion__content'
     )
     expect(surfaceMotionStyles).toContain('var(--cc-surface-motion-translate-x, 0)')

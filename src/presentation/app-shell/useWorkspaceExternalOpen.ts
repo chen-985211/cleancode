@@ -26,7 +26,7 @@ interface PublishedWorkspaceExternalOpenError {
 }
 
 const unavailableCapabilities: WorkspaceExternalOpenCapabilitiesSnapshot = {
-  vscode: { available: false, iconDataUrl: null }
+  vscode: { available: false }
 }
 
 export function useWorkspaceExternalOpen({

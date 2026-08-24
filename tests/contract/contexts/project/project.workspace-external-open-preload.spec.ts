@@ -27,7 +27,7 @@ describe('workspace external open preload contract', () => {
   beforeEach(() => electronMocks.invoke.mockReset())
 
   it('forwards capability discovery without a command payload', async () => {
-    const capabilities = { vscode: { available: true, iconDataUrl: null } }
+    const capabilities = { vscode: { available: true } }
     electronMocks.invoke.mockResolvedValue({ ok: true, value: capabilities })
 
     await expect(api.getWorkspaceExternalOpenCapabilities()).resolves.toBe(capabilities)

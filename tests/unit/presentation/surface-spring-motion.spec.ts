@@ -6,6 +6,7 @@ import type { SpringProgressMotionFrameScheduler } from '../../../src/presentati
 
 describe('surface spring motion', () => {
   it.each([
+    ['anchored-bottom-left', '--cc-surface-motion-translate-y', 1],
     ['anchored-top-right', '--cc-surface-motion-translate-x', 1],
     ['drawer-right', '--cc-surface-motion-translate-x', 1],
     ['fullscreen-right', '--cc-surface-motion-translate-x', 1]
@@ -79,6 +80,25 @@ describe('surface spring motion', () => {
     expect(readNumber(root, '--cc-surface-motion-scale')).toBeGreaterThanOrEqual(0.94)
     expect(Math.abs(readNumber(root, '--cc-surface-motion-translate-x'))).toBeLessThanOrEqual(6)
     expect(Math.abs(readNumber(root, '--cc-surface-motion-translate-y'))).toBeLessThanOrEqual(6)
+  })
+
+  it('moves a bottom-left anchored menu only toward its trigger without scaling', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'anchored-bottom-left',
+      scheduler
+    })
+
+    controller.intentChanged(root, {
+      onSettled: vi.fn(),
+      reducedMotion: false,
+      visible: true
+    })
+
+    expect(readNumber(root, '--cc-surface-motion-translate-x')).toBe(0)
+    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBe(4)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
   })
 
   it('hands bottom controls upward and dismisses them downward without scaling', () => {

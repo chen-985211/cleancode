@@ -17,7 +17,7 @@ describe('workspace external open action', () => {
       workspaceDirectory: '/work/app-feature'
     })
     const getWorkspaceExternalOpenCapabilities = vi.fn(async () => ({
-      vscode: { available: true, iconDataUrl: 'data:image/png;base64,vscode' }
+      vscode: { available: true }
     }))
     const openWorkspaceExternally = vi.fn(
       async (_command: {

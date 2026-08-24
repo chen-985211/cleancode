@@ -15,7 +15,7 @@ describe('workspace external open statusbar placement', () => {
       configurable: true,
       value: createRuntimeApi({
         getWorkspaceExternalOpenCapabilities: vi.fn(async () => ({
-          vscode: { available: true, iconDataUrl: 'data:image/png;base64,vscode' }
+          vscode: { available: true }
         }))
       })
     })

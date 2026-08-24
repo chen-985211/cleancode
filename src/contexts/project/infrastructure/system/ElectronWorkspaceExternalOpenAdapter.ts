@@ -5,14 +5,8 @@ import type {
 } from '../../application/dto/WorkspaceExternalOpen'
 import type { WorkspaceExternalOpenPort } from '../../application/ports/WorkspaceExternalOpenPort'
 
-interface ProtocolApplicationInfo {
-  readonly icon: { toDataURL(): string }
-  readonly name: string
-  readonly path: string
-}
-
 interface ElectronWorkspaceExternalOpenDependencies {
-  readonly getApplicationInfoForProtocol: (url: string) => Promise<ProtocolApplicationInfo>
+  readonly getApplicationInfoForProtocol: (url: string) => Promise<unknown>
   readonly openExternal: (url: string) => Promise<void>
   readonly openPath: (path: string) => Promise<string>
 }
@@ -22,19 +16,17 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
 
   async getCapabilities(): Promise<WorkspaceExternalOpenCapabilitiesSnapshot> {
     try {
-      const application = await this.dependencies.getApplicationInfoForProtocol('vscode://')
+      await this.dependencies.getApplicationInfoForProtocol('vscode://')
 
       return {
         vscode: {
-          available: true,
-          iconDataUrl: readIconDataUrl(application)
+          available: true
         }
       }
     } catch {
       return {
         vscode: {
-          available: false,
-          iconDataUrl: null
+          available: false
         }
       }
     }
@@ -92,14 +84,6 @@ export function createVsCodeWorkspaceUri(directory: string): string {
   url.pathname = `${normalizedDirectory.startsWith('/') ? '' : '/'}${normalizedDirectory}/`
 
   return url.toString()
-}
-
-function readIconDataUrl(application: ProtocolApplicationInfo): string | null {
-  try {
-    return application.icon.toDataURL() || null
-  } catch {
-    return null
-  }
 }
 
 function createExternalOpenFailedError(target: WorkspaceExternalOpenTarget) {

@@ -88,7 +88,7 @@ function createProjectIpcHandlersInput(ipcMain: IpcMainLike) {
     createOrOpenProject: vi.fn(),
     forgetProject: vi.fn(),
     getWorkspaceExternalOpenCapabilities: vi.fn(async () => ({
-      vscode: { available: false, iconDataUrl: null }
+      vscode: { available: false }
     })),
     inferProjectName: (directory: string) => directory,
     ipcMain,
