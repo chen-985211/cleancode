@@ -55,11 +55,9 @@ export function useWorkspaceExternalOpen({
 
   const refreshCapabilities = useCallback((): void => {
     const generation = ++capabilityDiscoveryGenerationRef.current
+    setCapabilities(unavailableCapabilities)
     const runtime = window.cleancode
-    if (!runtime) {
-      setCapabilities(unavailableCapabilities)
-      return
-    }
+    if (!runtime) return
 
     void runtime
       .getWorkspaceExternalOpenCapabilities()
@@ -106,8 +104,6 @@ export function useWorkspaceExternalOpen({
 
       const key = `workspace:${currentProject.id}:${currentWorkspace.workspaceId}:external-open`
       const previousError = publishedErrorsRef.current.get(key)
-      publishedErrorsRef.current.delete(key)
-      if (previousError) notificationsRef.current.dismiss(previousError.notificationId)
 
       isPendingRef.current = true
       setIsPending(true)
@@ -118,6 +114,10 @@ export function useWorkspaceExternalOpen({
           target,
           workspaceId: currentWorkspace.workspaceId
         })
+        if (previousError && publishedErrorsRef.current.get(key) === previousError) {
+          publishedErrorsRef.current.delete(key)
+          notificationsRef.current.dismiss(previousError.notificationId)
+        }
       } catch (error) {
         if (target === 'vscode' && getAppErrorCode(error) === 'WORKSPACE_OPEN_TARGET_UNAVAILABLE') {
           capabilityDiscoveryGenerationRef.current += 1

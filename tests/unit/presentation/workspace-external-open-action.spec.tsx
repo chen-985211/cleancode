@@ -48,20 +48,22 @@ describe('workspace external open action', () => {
 
   it('refreshes transient VS Code availability when the window regains focus', async () => {
     const workbench = createWorkbenchSnapshot('/work/app', 'app')
+    const refreshedCapabilities = createDeferred<{ vscode: { available: boolean } }>()
     const getWorkspaceExternalOpenCapabilities = vi
       .fn()
-      .mockResolvedValueOnce({ vscode: { available: false } })
       .mockResolvedValueOnce({ vscode: { available: true } })
+      .mockImplementationOnce(() => refreshedCapabilities.promise)
     installRuntime({ getWorkspaceExternalOpenCapabilities })
     const { result } = renderWorkspaceExternalOpen(workbench)
 
-    await waitFor(() => expect(getWorkspaceExternalOpenCapabilities).toHaveBeenCalledTimes(1))
-    expect(result.current.capabilities.vscode.available).toBe(false)
+    await waitFor(() => expect(result.current.capabilities.vscode.available).toBe(true))
 
     act(() => window.dispatchEvent(new Event('focus')))
-
-    await waitFor(() => expect(result.current.capabilities.vscode.available).toBe(true))
     expect(getWorkspaceExternalOpenCapabilities).toHaveBeenCalledTimes(2)
+    expect(result.current.capabilities.vscode.available).toBe(false)
+
+    act(() => refreshedCapabilities.resolve({ vscode: { available: true } }))
+    await waitFor(() => expect(result.current.capabilities.vscode.available).toBe(true))
   })
 
   it('publishes a localized error when the selected target becomes unavailable', async () => {
@@ -137,6 +139,50 @@ describe('workspace external open action', () => {
     await act(() => view.result.current.openWorkspace('folder'))
 
     expect(notifications.dismiss).not.toHaveBeenCalledWith('notification-a')
+    expect(notifications.notify).toHaveBeenCalledTimes(2)
+  })
+
+  it('retains the previous error until its retry succeeds', async () => {
+    const workbench = createWorkbenchSnapshot('/work/app', 'app')
+    const notifications = createNotifications()
+    const retry = createDeferred<void>()
+    const openWorkspaceExternally = vi
+      .fn()
+      .mockRejectedValueOnce(
+        createExpectedAppError('WORKSPACE_EXTERNAL_OPEN_FAILED', 'system open failed')
+      )
+      .mockImplementationOnce(() => retry.promise)
+    installRuntime({ openWorkspaceExternally })
+    const { result } = renderWorkspaceExternalOpen(workbench, notifications)
+
+    await act(() => result.current.openWorkspace('folder'))
+    let retryRequest: Promise<void> | undefined
+    act(() => {
+      retryRequest = result.current.openWorkspace('folder')
+    })
+
+    expect(notifications.dismiss).not.toHaveBeenCalled()
+
+    await act(async () => {
+      retry.resolve()
+      await retryRequest
+    })
+    expect(notifications.dismiss).toHaveBeenCalledWith('notification-1')
+  })
+
+  it('does not dismiss the previous error when its retry also fails', async () => {
+    const workbench = createWorkbenchSnapshot('/work/app', 'app')
+    const notifications = createNotifications()
+    const openWorkspaceExternally = vi.fn(async () => {
+      throw createExpectedAppError('WORKSPACE_EXTERNAL_OPEN_FAILED', 'system open failed')
+    })
+    installRuntime({ openWorkspaceExternally })
+    const { result } = renderWorkspaceExternalOpen(workbench, notifications)
+
+    await act(() => result.current.openWorkspace('folder'))
+    await act(() => result.current.openWorkspace('folder'))
+
+    expect(notifications.dismiss).not.toHaveBeenCalled()
     expect(notifications.notify).toHaveBeenCalledTimes(2)
   })
 })

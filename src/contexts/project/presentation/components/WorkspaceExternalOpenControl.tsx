@@ -128,20 +128,37 @@ function WorkspaceExternalOpenSplitControl({
       const menu = menuRef.current
       if (!control || !menu) return
 
-      setMenuPosition(
-        resolveMenuPosition({
-          menuHeight: menu.offsetHeight,
-          menuWidth: menu.offsetWidth,
-          triggerRect: control.getBoundingClientRect(),
-          viewportHeight: window.innerHeight,
-          viewportWidth: window.innerWidth
-        })
+      const nextPosition = resolveMenuPosition({
+        menuHeight: menu.offsetHeight,
+        menuWidth: menu.offsetWidth,
+        triggerRect: control.getBoundingClientRect(),
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth
+      })
+      setMenuPosition((currentPosition) =>
+        currentPosition?.left === nextPosition.left && currentPosition.top === nextPosition.top
+          ? currentPosition
+          : nextPosition
       )
     }
 
     positionMenu()
+    const layoutOwner = controlRef.current?.parentElement ?? null
+    let layoutObserver: MutationObserver | null = null
+    if (typeof MutationObserver !== 'undefined' && layoutOwner) {
+      layoutObserver = new MutationObserver(positionMenu)
+      layoutObserver.observe(layoutOwner, {
+        attributeFilter: ['data-project-sidebar-motion-state', 'style'],
+        attributes: true
+      })
+    }
     window.addEventListener('resize', positionMenu)
-    return () => window.removeEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      layoutObserver?.disconnect()
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
   }, [isMenuOpen])
 
   return (

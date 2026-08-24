@@ -163,6 +163,40 @@ describe('workspace external open control', () => {
     expect(screen.getByRole('menu')).toBe(menu)
   })
 
+  it('keeps the portaled menu anchored while its status bar moves', async () => {
+    renderControl({
+      capabilities: { vscode: { available: true } }
+    })
+    const control = screen.getByRole('group', { name: '打开当前工作区' })
+    let controlLeft = 24
+    const controlRect = vi.spyOn(control, 'getBoundingClientRect').mockImplementation(
+      () =>
+        ({
+          bottom: 726,
+          height: 26,
+          left: controlLeft,
+          right: controlLeft + 60,
+          top: 700,
+          width: 60,
+          x: controlLeft,
+          y: 700,
+          toJSON: () => undefined
+        }) as DOMRect
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '选择打开方式' }))
+    const menu = screen.getByRole('menu')
+    await waitFor(() => expect(menu.style.left).toBe('24px'))
+
+    controlLeft = 304
+    const statusbar = control.parentElement
+    expect(statusbar).not.toBeNull()
+    statusbar?.style.setProperty('transform', 'translate3d(280px, 0, 0)')
+
+    await waitFor(() => expect(menu.style.left).toBe('304px'))
+    controlRect.mockRestore()
+  })
+
   it('keeps click focus on the trigger and moves focus into the menu for arrow-key open', async () => {
     const { unmount } = renderControl({
       capabilities: { vscode: { available: true } }
