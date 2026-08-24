@@ -1,6 +1,10 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
+import type {
+  WorkspaceExternalOpenCapabilitiesSnapshot,
+  WorkspaceExternalOpenTarget
+} from '../../contexts/project/application/dto/WorkspaceExternalOpen'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -50,6 +54,12 @@ export interface ProjectIpcHandlersInput {
   readonly selectCurrentProject: (directory: string) => Promise<void>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<WorkbenchSnapshot>
   readonly loadRememberedWorkbenches: () => Promise<WorkbenchSnapshot[]>
+  readonly getWorkspaceExternalOpenCapabilities: () => Promise<WorkspaceExternalOpenCapabilitiesSnapshot>
+  readonly openWorkspaceExternally: (command: {
+    readonly projectDirectory: string
+    readonly target: WorkspaceExternalOpenTarget
+    readonly workspaceId: string
+  }) => Promise<void>
 }
 
 export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void {
@@ -84,6 +94,29 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'listWorkbenches',
+    scope: 'project.workspace'
+  })
+
+  registerIpcHandler<void, WorkspaceExternalOpenCapabilitiesSnapshot>({
+    channel: 'cleancode:get-workspace-external-open-capabilities',
+    handler: () => input.getWorkspaceExternalOpenCapabilities(),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'getWorkspaceExternalOpenCapabilities',
+    scope: 'project.workspace'
+  })
+
+  registerIpcHandler<unknown, void>({
+    channel: 'cleancode:open-workspace-externally',
+    handler: (command) =>
+      input.openWorkspaceExternally({
+        projectDirectory: readStringField(command, 'projectDirectory'),
+        target: readWorkspaceExternalOpenTarget(command),
+        workspaceId: readStringField(command, 'workspaceId')
+      }),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'openWorkspaceExternally',
     scope: 'project.workspace'
   })
 
@@ -258,6 +291,17 @@ function readLockedWorktreeConfirmation(
   }
 
   return { lockReason: confirmation.lockReason }
+}
+
+function readWorkspaceExternalOpenTarget(command: unknown): WorkspaceExternalOpenTarget {
+  if (!isRecord(command) || (command.target !== 'vscode' && command.target !== 'folder')) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      'Invalid IPC command: target must be vscode or folder.'
+    )
+  }
+
+  return command.target
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

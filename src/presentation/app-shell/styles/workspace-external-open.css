@@ -1,0 +1,111 @@
+.workspace-external-open-control {
+  display: inline-flex;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  margin-left: auto;
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-surface);
+  color: var(--cc-muted-strong);
+}
+
+.workspace-external-open-control--split {
+  box-shadow: var(--cc-shadow-xs);
+}
+
+.workspace-external-open-control__button {
+  display: inline-flex;
+  width: 24px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.workspace-external-open-control__button--menu {
+  width: 18px;
+  border-left: 1px solid var(--cc-divider);
+}
+
+.workspace-external-open-control__button:hover:not(:disabled),
+.workspace-external-open-control__button[aria-expanded='true'] {
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-foreground);
+}
+
+.workspace-external-open-control__button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -2px;
+}
+
+.workspace-external-open-control__button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.workspace-external-open-control__app-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.workspace-external-open-menu {
+  position: fixed;
+  z-index: 220;
+  display: grid;
+  min-width: 178px;
+  gap: 1px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 10px;
+  background: var(--cc-surface-overlay);
+  padding: 5px;
+  box-shadow: var(--cc-shadow-floating);
+  transform-origin: right bottom;
+}
+
+.workspace-external-open-menu__item {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 8px;
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.workspace-external-open-menu__item:hover,
+.workspace-external-open-menu__item:focus-visible {
+  background: var(--cc-neutral-overlay);
+  outline: none;
+}
+
+.workspace-external-open-menu__item:focus-visible {
+  box-shadow: 0 0 0 1px var(--cc-border-strong) inset;
+}
+
+.workspace-external-open-menu__item svg,
+.workspace-external-open-menu__item img {
+  flex: 0 0 auto;
+  color: var(--cc-muted-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-external-open-control__button {
+    transition: none;
+  }
+}

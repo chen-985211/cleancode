@@ -59,6 +59,7 @@ import {
 } from './workbenchCanvasInteractionTargets'
 import { useWorkbenchCanvasViewportRestoration } from './useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchCanvasProps } from './workbenchCanvasProps'
+import { ignoreAppNotifications } from './appNotifications'
 import {
   createWorkbenchCanvasViewportStore,
   useWorkbenchCanvasDetailLevel
@@ -75,6 +76,7 @@ export function WorkbenchCanvas({
   terminalRuntimeAvailability,
   currentWorkbench,
   currentWorkspace,
+  notifications = ignoreAppNotifications,
   nodeStore,
   nodeTypes,
   canvasSizeRef,
@@ -578,6 +580,7 @@ export function WorkbenchCanvas({
           initialWorkbenchLoadPhase={initialWorkbenchLoadPhase}
           currentWorkbench={currentWorkbench}
           currentWorkspace={currentWorkspace}
+          notifications={notifications}
         />
       </CanvasMenuMotionProvider>
     </section>

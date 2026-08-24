@@ -27,6 +27,10 @@ const cleancodeApi = {
     invokeCleancode('cleancode:checkout-main-workspace-branch', command),
   synchronizeProjectGitState: (command: unknown) =>
     invokeCleancode('cleancode:synchronize-project-git-state', command),
+  getWorkspaceExternalOpenCapabilities: () =>
+    invokeCleancode('cleancode:get-workspace-external-open-capabilities'),
+  openWorkspaceExternally: (command: unknown) =>
+    invokeCleancode('cleancode:open-workspace-externally', command),
   inspectAgentProvider: (command: unknown) =>
     invokeCleancode('cleancode:inspect-agent-provider', command),
   getAgentProviderPreferences: () => invokeCleancode('cleancode:get-agent-provider-preferences'),

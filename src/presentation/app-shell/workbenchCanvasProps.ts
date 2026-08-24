@@ -9,6 +9,7 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
+import type { AppNotificationController } from './appNotifications'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import type { ShortcutPlatform } from './applicationShortcuts'
@@ -35,6 +36,7 @@ export interface WorkbenchCanvasProps {
   readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly notifications?: AppNotificationController
   readonly nodeStore: WorkbenchNodeStore
   readonly nodeTypes: NodeTypes
   readonly canvasSizeRef?: MutableRefObject<{ width: number; height: number }>

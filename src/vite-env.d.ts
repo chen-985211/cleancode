@@ -14,6 +14,10 @@ import type {
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type {
+  WorkspaceExternalOpenCapabilitiesSnapshot,
+  WorkspaceExternalOpenTarget
+} from './contexts/project/application/dto/WorkspaceExternalOpen'
+import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot
 } from './contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
@@ -103,6 +107,12 @@ declare global {
       synchronizeProjectGitState(command: {
         readonly projectDirectory: string
       }): Promise<WorkbenchSnapshot | null>
+      getWorkspaceExternalOpenCapabilities(): Promise<WorkspaceExternalOpenCapabilitiesSnapshot>
+      openWorkspaceExternally(command: {
+        readonly projectDirectory: string
+        readonly target: WorkspaceExternalOpenTarget
+        readonly workspaceId: string
+      }): Promise<void>
       inspectAgentProvider(command: {
         readonly providerId: string
       }): Promise<AgentProviderAvailability>

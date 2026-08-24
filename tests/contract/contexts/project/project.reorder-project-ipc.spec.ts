@@ -87,11 +87,15 @@ function createProjectIpcHandlersInput(ipcMain: IpcMainLike) {
     createBranchWorkspace: vi.fn(),
     createOrOpenProject: vi.fn(),
     forgetProject: vi.fn(),
+    getWorkspaceExternalOpenCapabilities: vi.fn(async () => ({
+      vscode: { available: false, iconDataUrl: null }
+    })),
     inferProjectName: (directory: string) => directory,
     ipcMain,
     loadRememberedWorkbenches: vi.fn(async () => []),
     loadWorkbench: vi.fn(),
     logger: new SilentLogger(),
+    openWorkspaceExternally: vi.fn(),
     rememberProject: vi.fn(),
     reorderProjects: vi.fn(),
     selectCurrentProject: vi.fn(),
