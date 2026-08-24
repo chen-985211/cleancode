@@ -1,17 +1,11 @@
 .workspace-external-open-control {
   display: inline-flex;
-  height: 20px;
+  height: 100%;
   flex: 0 0 auto;
   align-items: stretch;
   overflow: hidden;
-  border: 1px solid var(--cc-border);
-  border-radius: 6px;
-  background: var(--cc-surface);
+  background: transparent;
   color: var(--cc-muted-strong);
-}
-
-.workspace-external-open-control--split {
-  box-shadow: var(--cc-shadow-xs);
 }
 
 .workspace-external-open-control__button {
