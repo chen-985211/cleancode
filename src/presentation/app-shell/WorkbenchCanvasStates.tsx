@@ -143,6 +143,14 @@ export function CanvasStatusbar({
   })
   return (
     <footer ref={motionRef} className="app-shell__statusbar">
+      {isDesktopRuntime && currentWorkbench && currentWorkspace ? (
+        <WorkspaceExternalOpenControl
+          key={`${currentWorkbench.project.id}:${currentWorkspace.workspaceId}`}
+          capabilities={workspaceExternalOpen.capabilities}
+          isPending={workspaceExternalOpen.isPending}
+          onOpen={workspaceExternalOpen.openWorkspace}
+        />
+      ) : null}
       <span
         className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
       />
@@ -162,14 +170,6 @@ export function CanvasStatusbar({
                     : t('canvas.statusWaiting')}
       </span>
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
-      {isDesktopRuntime && currentWorkbench && currentWorkspace ? (
-        <WorkspaceExternalOpenControl
-          key={`${currentWorkbench.project.id}:${currentWorkspace.workspaceId}`}
-          capabilities={workspaceExternalOpen.capabilities}
-          isPending={workspaceExternalOpen.isPending}
-          onOpen={workspaceExternalOpen.openWorkspace}
-        />
-      ) : null}
     </footer>
   )
 }

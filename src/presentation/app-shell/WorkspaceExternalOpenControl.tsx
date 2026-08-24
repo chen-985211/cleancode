@@ -243,10 +243,7 @@ function resolveMenuPosition(input: {
   )
 
   return {
-    left: Math.min(
-      Math.max(viewportPadding, input.triggerRect.right - input.menuWidth),
-      maximumLeft
-    ),
+    left: Math.min(Math.max(viewportPadding, input.triggerRect.left), maximumLeft),
     top: Math.min(
       Math.max(viewportPadding, input.triggerRect.top - gap - input.menuHeight),
       maximumTop
