@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createServer, type Server } from 'node:net'
@@ -459,6 +459,49 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     await expect(exited.promise).resolves.toBe(0)
     expect(output).toContain('xterm-256color|truecolor|cleancode|15;0|respect-no-color')
   })
+
+  it('lets an Agent foreground job finish SIGTERM cleanup before escalating', async () => {
+    const cleanupPath = join(workingDirectory, 'foreground-cleanup.txt')
+    const started = createDeferred<void>()
+    let output = ''
+    const nodeProgram = [
+      'const { writeFileSync } = require("node:fs")',
+      `const cleanupPath = ${JSON.stringify(cleanupPath)}`,
+      'let terminating = false',
+      'process.on("SIGHUP", () => {})',
+      'process.on("SIGTERM", () => { if (terminating) return; terminating = true; setTimeout(() => { writeFileSync(cleanupPath, "cleanup-finished"); process.exit(0) }, 750) })',
+      'console.log("CLEANUP_READY")',
+      'setInterval(() => {}, 1000)'
+    ].join(';')
+
+    await adapter.start({
+      scope: agentRunScope('foreground-cleanup-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    adapter.launchForegroundJob({
+      args: ['-e', nodeProgram],
+      environment: {},
+      executable: process.execPath,
+      generation: 1,
+      launchId: 'foreground-cleanup-launch',
+      onExit: () => undefined,
+      onStarted: () => started.resolve(),
+      sessionId: 'foreground-cleanup-session'
+    })
+    await started.promise
+    await waitUntil(() => output.includes('CLEANUP_READY'))
+
+    await adapter.stop('foreground-cleanup-session')
+
+    await expect(readFile(cleanupPath, 'utf8')).resolves.toBe('cleanup-finished')
+  }, 10_000)
 
   it('waits for an ignoring child process group to exit and releases its listening port', async () => {
     const port = await reservePort()

@@ -165,7 +165,8 @@ describe('foreground job shell control', () => {
     expect(probe).toContain('IFS= read -r cleancode_job_status')
     expect(probe).toContain('CLEANCODE_JOB:fixedtoken:exit:%s')
     expect(script).toContain("trap ':' INT")
-    expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
+    expect(script).toContain('CLEANCODE_JOB:fixedtoken:started:%s')
+    expect(script).toContain('"$$"')
     expect(script).toContain(`> '${control.statusPath?.replaceAll("'", "'\"'\"'")}'`)
     expect(script).toContain('exit 0')
 
@@ -217,7 +218,7 @@ describe('foreground job shell control', () => {
     expect(acceptForegroundJobOutput(control, '\x1eCLEANCODE_JOB:fixedtoken:star', handlers)).toBe(
       ''
     )
-    expect(acceptForegroundJobOutput(control, 'ted\x1fCodex ready\r\n', handlers)).toBe(
+    expect(acceptForegroundJobOutput(control, 'ted:4321\x1fCodex ready\r\n', handlers)).toBe(
       'Codex ready\r\n'
     )
     expect(
@@ -228,6 +229,7 @@ describe('foreground job shell control', () => {
       )
     ).toBe('Agent output\r\nprompt % ')
     expect(onStarted).toHaveBeenCalledWith(control.command)
+    expect(control.processGroupId).toBe(4321)
     expect(onExit).toHaveBeenCalledWith({ ...control.command, exitCode: 7 })
 
     disposeForegroundJobShellControl(control)

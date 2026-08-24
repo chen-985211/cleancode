@@ -32,6 +32,7 @@ import {
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
 import { createTerminalProcessEnvironment } from './TerminalProcessEnvironment'
+import { readPosixProcessGroupId, terminatePosixProcessGroup } from './PosixProcessGroupTermination'
 import type { TerminalPrivateOutputControl } from './TerminalPrivateOutputControl'
 import {
   acceptTerminalPrivateOutputControl,
@@ -55,6 +56,7 @@ import {
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
+const FOREGROUND_JOB_TERMINATION_GRACE_MS = 5_000
 const TERMINATION_GRACE_MS = 500
 const TERMINATION_FORCE_MS = 1_500
 
@@ -491,76 +493,36 @@ async function stopManagedProcess(
     await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
     return
   }
-
-  const processGroupId = await readProcessGroupId(managedProcess.process.pid)
-
-  if (!processGroupId) {
-    managedProcess.process.kill('SIGTERM')
-    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
-    return
-  }
-
-  signalProcessGroup(processGroupId, 'SIGTERM')
-  if (await waitForProcessGroupExit(processGroupId, TERMINATION_GRACE_MS)) {
-    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
-    return
-  }
-
-  signalProcessGroup(processGroupId, 'SIGKILL')
-  const groupExited = await waitForProcessGroupExit(processGroupId, TERMINATION_FORCE_MS)
-
-  if (!groupExited) {
-    throw new Error(`Terminal process group ${processGroupId} did not exit.`)
-  }
-
-  await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
-}
-
-async function readProcessGroupId(processId: number): Promise<number | null> {
-  try {
-    const { stdout } = await execFileAsync('/bin/ps', ['-o', 'pgid=', '-p', String(processId)], {
-      timeout: 1_000
-    })
-    const processGroupId = Number.parseInt(stdout.trim(), 10)
-    return Number.isSafeInteger(processGroupId) && processGroupId > 1 ? processGroupId : null
-  } catch {
-    return null
-  }
-}
-
-function signalProcessGroup(processGroupId: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-processGroupId, signal)
-  } catch (error) {
-    if (!isNoSuchProcessError(error)) {
-      throw error
+  const terminalProcessGroupId = await readPosixProcessGroupId(managedProcess.process.pid)
+  const foregroundProcessGroupId = managedProcess.foregroundJob?.processGroupId ?? null
+  const failures: unknown[] = []
+  if (foregroundProcessGroupId && foregroundProcessGroupId !== terminalProcessGroupId) {
+    try {
+      await terminatePosixProcessGroup(
+        foregroundProcessGroupId,
+        FOREGROUND_JOB_TERMINATION_GRACE_MS,
+        TERMINATION_FORCE_MS
+      )
+    } catch (error) {
+      failures.push(error)
     }
   }
-}
-
-async function waitForProcessGroupExit(
-  processGroupId: number,
-  timeoutMs: number
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-
-  while (isProcessGroupAlive(processGroupId)) {
-    if (Date.now() >= deadline) {
-      return false
-    }
-    await delay(25)
-  }
-
-  return true
-}
-
-function isProcessGroupAlive(processGroupId: number): boolean {
   try {
-    process.kill(-processGroupId, 0)
-    return true
+    if (terminalProcessGroupId) {
+      await terminatePosixProcessGroup(
+        terminalProcessGroupId,
+        TERMINATION_GRACE_MS,
+        TERMINATION_FORCE_MS
+      )
+    } else {
+      managedProcess.process.kill('SIGTERM')
+    }
+    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
   } catch (error) {
-    return !isNoSuchProcessError(error)
+    failures.push(error)
   }
+  if (failures.length === 1) throw failures[0]
+  if (failures.length > 1) throw new AggregateError(failures, 'Unable to stop terminal process.')
 }
 
 async function waitForPromise(
@@ -585,15 +547,6 @@ async function waitForPromise(
 
 function delay(durationMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, durationMs))
-}
-
-function isNoSuchProcessError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { readonly code?: unknown }).code === 'ESRCH'
-  )
 }
 
 async function readProcessWorkingDirectory(

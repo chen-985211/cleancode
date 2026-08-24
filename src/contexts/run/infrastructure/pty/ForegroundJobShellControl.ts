@@ -21,6 +21,7 @@ export interface ForegroundJobShellControl {
   readonly command: LaunchForegroundJobProcessCommand
   buffer: string
   outputPhase: 'awaiting_started' | 'running'
+  processGroupId: number | null
   readonly shellExecutable: string
   readonly shellFamily: 'posix' | 'powershell'
   readonly scriptDirectory: string
@@ -71,6 +72,7 @@ export function createForegroundJobShellControl(
     buffer: '',
     command,
     outputPhase: 'awaiting_started',
+    processGroupId: null,
     shellExecutable,
     shellFamily,
     scriptDirectory,
@@ -142,7 +144,7 @@ function createPosixLaunchScript(
     [
       '#!/bin/sh',
       "trap ':' INT",
-      `printf '\\036CLEANCODE_JOB:${token}:started\\037'`,
+      `printf '\\036CLEANCODE_JOB:${token}:started:%s\\037' "$$"`,
       invocation,
       'cleancode_job_status=$?',
       `printf '%s\\n' "$cleancode_job_status" > ${quotePosixShellWord(statusPath)}`,
@@ -309,7 +311,9 @@ export function acceptForegroundJobOutput(
     }
     const payload = control.buffer.slice(markerIndex + exactPrefix.length, endIndex)
     control.buffer = control.buffer.slice(endIndex + markerEnd.length)
-    if (payload === 'started' && control.outputPhase === 'awaiting_started') {
+    const startedProcessGroupId = parseStartedProcessGroupId(payload)
+    if (startedProcessGroupId !== undefined && control.outputPhase === 'awaiting_started') {
+      control.processGroupId = startedProcessGroupId
       control.outputPhase = 'running'
       handlers.onStarted(control.command)
     } else if (payload.startsWith('exit:')) {
@@ -322,6 +326,14 @@ export function acceptForegroundJobOutput(
     }
   }
   return output
+}
+
+function parseStartedProcessGroupId(payload: string): number | null | undefined {
+  if (payload === 'started') return null
+  if (!payload.startsWith('started:')) return undefined
+
+  const processGroupId = Number.parseInt(payload.slice('started:'.length), 10)
+  return Number.isSafeInteger(processGroupId) && processGroupId > 1 ? processGroupId : undefined
 }
 
 export function acceptForegroundJobFinalOutput(
