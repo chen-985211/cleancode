@@ -77,13 +77,29 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
   }
 }
 
-export function createVsCodeWorkspaceUri(directory: string): string {
-  const normalizedDirectory = directory.replaceAll('\\', '/').replace(/\/$/, '')
-  const url = new URL('vscode://file')
+export function createVsCodeWorkspaceUri(
+  directory: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  const normalizedDirectory = platform === 'win32' ? directory.replaceAll('\\', '/') : directory
+  const directoryWithoutTrailingSlash =
+    normalizedDirectory === '/' ? normalizedDirectory : normalizedDirectory.replace(/\/+$/, '')
+  const encodedDirectory = directoryWithoutTrailingSlash
+    .split('/')
+    .map((segment) =>
+      platform === 'win32' && /^[A-Za-z]:$/.test(segment)
+        ? `${segment.slice(0, 1)}:`
+        : encodeURIComponent(segment)
+    )
+    .join('/')
+  const absoluteDirectory = encodedDirectory.startsWith('/')
+    ? encodedDirectory
+    : `/${encodedDirectory}`
+  const workspacePath = absoluteDirectory.endsWith('/')
+    ? absoluteDirectory
+    : `${absoluteDirectory}/`
 
-  url.pathname = `${normalizedDirectory.startsWith('/') ? '' : '/'}${normalizedDirectory}/`
-
-  return url.toString()
+  return `vscode://file${workspacePath}`
 }
 
 function createExternalOpenFailedError(target: WorkspaceExternalOpenTarget) {

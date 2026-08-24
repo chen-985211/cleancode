@@ -5,11 +5,20 @@ import {
 
 describe('Electron workspace external open adapter', () => {
   it.each([
-    ['/Users/nature/My Project/#demo?', 'vscode://file/Users/nature/My%20Project/%23demo%3F/'],
-    ['C:\\Work\\My Project', 'vscode://file/C:/Work/My%20Project/'],
-    ['/home/nature/开发/clean code/', 'vscode://file/home/nature/%E5%BC%80%E5%8F%91/clean%20code/']
-  ])('creates a safe VS Code workspace URI for %s', (directory, expected) => {
-    expect(createVsCodeWorkspaceUri(directory)).toBe(expected)
+    [
+      'darwin',
+      '/Users/nature/My Project/#demo?',
+      'vscode://file/Users/nature/My%20Project/%23demo%3F/'
+    ],
+    ['win32', 'C:\\Work\\My Project', 'vscode://file/C:/Work/My%20Project/'],
+    [
+      'linux',
+      '/home/nature/开发/clean code/',
+      'vscode://file/home/nature/%E5%BC%80%E5%8F%91/clean%20code/'
+    ],
+    ['linux', '/work/foo\\bar', 'vscode://file/work/foo%5Cbar/']
+  ] as const)('creates a safe %s VS Code workspace URI for %s', (platform, directory, expected) => {
+    expect(createVsCodeWorkspaceUri(directory, platform)).toBe(expected)
   })
 
   it('reports the registered VS Code protocol handler', async () => {

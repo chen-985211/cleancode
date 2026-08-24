@@ -106,8 +106,24 @@ describe('workspace external open control', () => {
     fireEvent.keyDown(keyboardTrigger, { key: 'ArrowUp' })
 
     await waitFor(() =>
-      expect(screen.getByRole('menuitem', { name: '用 VS Code 打开' })).toHaveFocus()
+      expect(screen.getByRole('menuitem', { name: '打开所在文件夹' })).toHaveFocus()
     )
+  })
+
+  it('routes arrow keys from the focused trigger into an already-open menu', () => {
+    renderControl({
+      capabilities: { vscode: { available: true } }
+    })
+    const trigger = screen.getByRole('button', { name: '选择打开方式' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitem', { name: '用 VS Code 打开' })).toHaveFocus()
+
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowUp' })
+    expect(screen.getByRole('menuitem', { name: '打开所在文件夹' })).toHaveFocus()
   })
 
   it('reuses the live menu surface when a repeated click reverses its exit', () => {

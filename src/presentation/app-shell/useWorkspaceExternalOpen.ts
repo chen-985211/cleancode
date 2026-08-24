@@ -4,6 +4,7 @@ import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
 } from '../../contexts/project/application/dto/WorkspaceExternalOpen'
+import { getAppErrorCode } from '../../shared-kernel/application/errors/AppError'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import type { AppNotificationController, AppNotificationInput } from './appNotifications'
 import type { Translate } from './i18n/messages'
@@ -39,7 +40,14 @@ export function useWorkspaceExternalOpen({
     useState<WorkspaceExternalOpenCapabilitiesSnapshot>(unavailableCapabilities)
   const [isPending, setIsPending] = useState(false)
   const isPendingRef = useRef(false)
-  const publishedErrorRef = useRef<PublishedWorkspaceExternalOpenError | null>(null)
+  const notificationsRef = useRef(notifications)
+  const publishedErrorsRef = useRef(new Map<string, PublishedWorkspaceExternalOpenError>())
+  const translateRef = useRef(t)
+
+  useEffect(() => {
+    notificationsRef.current = notifications
+    translateRef.current = t
+  }, [notifications, t])
 
   useEffect(() => {
     let cancelled = false
@@ -59,15 +67,16 @@ export function useWorkspaceExternalOpen({
   }, [])
 
   useEffect(() => {
-    const published = publishedErrorRef.current
-    if (!published) return
+    for (const [key, published] of publishedErrorsRef.current) {
+      if (publishedErrorsRef.current.get(key) !== published) continue
 
-    const updated = notifications.update(
-      published.notificationId,
-      createExternalOpenErrorNotification(published, t)
-    )
-    if (!updated && publishedErrorRef.current === published) {
-      publishedErrorRef.current = null
+      const updated = notifications.update(
+        published.notificationId,
+        createExternalOpenErrorNotification(published, t)
+      )
+      if (!updated && publishedErrorsRef.current.get(key) === published) {
+        publishedErrorsRef.current.delete(key)
+      }
     }
   }, [notifications, t])
 
@@ -76,10 +85,10 @@ export function useWorkspaceExternalOpen({
       const runtime = window.cleancode
       if (!runtime || !currentWorkbench || !currentWorkspace || isPendingRef.current) return
 
-      if (publishedErrorRef.current) {
-        notifications.dismiss(publishedErrorRef.current.notificationId)
-        publishedErrorRef.current = null
-      }
+      const key = `workspace:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:external-open`
+      const previousError = publishedErrorsRef.current.get(key)
+      publishedErrorsRef.current.delete(key)
+      if (previousError) notificationsRef.current.dismiss(previousError.notificationId)
 
       isPendingRef.current = true
       setIsPending(true)
@@ -91,21 +100,27 @@ export function useWorkspaceExternalOpen({
           workspaceId: currentWorkspace.workspaceId
         })
       } catch (error) {
+        if (target === 'vscode' && getAppErrorCode(error) === 'WORKSPACE_OPEN_TARGET_UNAVAILABLE') {
+          setCapabilities(unavailableCapabilities)
+        }
+
         const published = {
           error,
-          key: `workspace:${currentWorkspace.workspaceId}:external-open`,
+          key,
           occurrenceId: createOccurrenceId()
         }
-        const notificationId = notifications.notify(
-          createExternalOpenErrorNotification(published, t)
+        const notificationId = notificationsRef.current.notify(
+          createExternalOpenErrorNotification(published, translateRef.current)
         )
-        publishedErrorRef.current = notificationId ? { ...published, notificationId } : null
+        if (notificationId) {
+          publishedErrorsRef.current.set(key, { ...published, notificationId })
+        }
       } finally {
         isPendingRef.current = false
         setIsPending(false)
       }
     },
-    [currentWorkbench, currentWorkspace, notifications, t]
+    [currentWorkbench, currentWorkspace]
   )
 
   return { capabilities, isPending, openWorkspace }

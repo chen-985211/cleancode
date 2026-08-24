@@ -30,6 +30,8 @@ interface MenuPosition {
   readonly top: number
 }
 
+type MenuInitialFocus = 'first' | 'last'
+
 export function WorkspaceExternalOpenControl({
   capabilities,
   isPending,
@@ -41,11 +43,11 @@ export function WorkspaceExternalOpenControl({
   const controlRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const pendingInitialFocusRef = useRef(false)
+  const pendingInitialFocusRef = useRef<MenuInitialFocus | null>(null)
   const menuId = useId()
   const triggerId = useId()
   const closeMenu = useCallback((restoreTriggerFocus = false): void => {
-    pendingInitialFocusRef.current = false
+    pendingInitialFocusRef.current = null
     setIsMenuOpen(false)
     if (restoreTriggerFocus) menuTriggerRef.current?.focus({ preventScroll: true })
   }, [])
@@ -73,9 +75,11 @@ export function WorkspaceExternalOpenControl({
   }, [closeMenu, isMenuOpen])
 
   useEffect(() => {
-    if (!isMenuOpen || !menuPosition || !pendingInitialFocusRef.current) return
-    pendingInitialFocusRef.current = false
-    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+    const initialFocus = pendingInitialFocusRef.current
+    if (!isMenuOpen || !menuPosition || !initialFocus) return
+
+    pendingInitialFocusRef.current = null
+    focusMenuBoundary(menuRef.current, initialFocus)
   }, [isMenuOpen, menuPosition])
 
   useLayoutEffect(() => {
@@ -156,9 +160,16 @@ export function WorkspaceExternalOpenControl({
             disabled={isPending}
             onClick={() => toggleMenu()}
             onKeyDown={(event) => {
-              if (isMenuOpen || !['ArrowDown', 'ArrowUp'].includes(event.key)) return
+              if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return
               event.preventDefault()
-              toggleMenu(true)
+              const initialFocus = event.key === 'ArrowDown' ? 'first' : 'last'
+              if (isMenuOpen) {
+                if (!focusMenuBoundary(menuRef.current, initialFocus)) {
+                  pendingInitialFocusRef.current = initialFocus
+                }
+                return
+              }
+              openMenu(initialFocus)
             }}
           >
             <CaretUpIcon size={11} weight="bold" aria-hidden="true" />
@@ -212,12 +223,12 @@ export function WorkspaceExternalOpenControl({
     </>
   )
 
-  function toggleMenu(focusFirstItem = false): void {
+  function toggleMenu(): void {
     if (isMenuOpen) {
       closeMenu()
       return
     }
-    openMenu(focusFirstItem)
+    openMenu()
   }
 
   function selectTarget(target: WorkspaceExternalOpenTarget): void {
@@ -230,8 +241,8 @@ export function WorkspaceExternalOpenControl({
     void onOpen(target)
   }
 
-  function openMenu(focusFirstItem = false): void {
-    pendingInitialFocusRef.current = focusFirstItem
+  function openMenu(initialFocus: MenuInitialFocus | null = null): void {
+    pendingInitialFocusRef.current = initialFocus
     setIsMenuOpen(true)
   }
 
@@ -292,7 +303,20 @@ function moveMenuFocus(event: ReactKeyboardEvent<HTMLElement>, menu: HTMLElement
     return
   }
 
+  if (currentIndex < 0) {
+    items[event.key === 'ArrowDown' ? 0 : items.length - 1]?.focus()
+    return
+  }
+
   const direction = event.key === 'ArrowDown' ? 1 : -1
-  const nextIndex = (Math.max(currentIndex, 0) + direction + items.length) % items.length
+  const nextIndex = (currentIndex + direction + items.length) % items.length
   items[nextIndex]?.focus()
+}
+
+function focusMenuBoundary(menu: HTMLElement | null, boundary: MenuInitialFocus): boolean {
+  const items = menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+  if (!items || items.length === 0) return false
+
+  items[boundary === 'first' ? 0 : items.length - 1]?.focus()
+  return true
 }
