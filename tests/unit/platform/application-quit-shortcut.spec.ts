@@ -25,10 +25,12 @@ function shortcutInput(
 
 describe('application quit shortcut', () => {
   it.each([
-    ['darwin', shortcutInput({ meta: true })],
-    ['win32', shortcutInput({ control: true })],
-    ['linux', shortcutInput({ control: true })]
-  ] as const)('matches the primary-modifier Q shortcut on %s', (platform, input) => {
+    ['darwin', 'darwin', shortcutInput({ meta: true })],
+    ['win32', 'win32', shortcutInput({ control: true })],
+    ['linux', 'linux', shortcutInput({ control: true })],
+    ['linux auto repeat', 'linux', shortcutInput({ control: true, isAutoRepeat: true })],
+    ['win32 IME composition', 'win32', shortcutInput({ control: true, isComposing: true })]
+  ] as const)('matches the primary-modifier Q shortcut on %s', (_name, platform, input) => {
     expect(matchesApplicationQuitShortcut(input, platform)).toBe(true)
   })
 
@@ -39,14 +41,12 @@ describe('application quit shortcut', () => {
     ['additional Shift', 'linux', shortcutInput({ control: true, shift: true })],
     ['additional Alt', 'win32', shortcutInput({ alt: true, control: true })],
     ['key release', 'darwin', shortcutInput({ meta: true, type: 'keyUp' })],
-    ['auto repeat', 'linux', shortcutInput({ control: true, isAutoRepeat: true })],
-    ['IME composition', 'win32', shortcutInput({ control: true, isComposing: true })],
     ['different key', 'darwin', shortcutInput({ key: 'w', meta: true })]
   ] as const)('rejects %s', (_name, platform, input) => {
     expect(matchesApplicationQuitShortcut(input, platform)).toBe(false)
   })
 
-  it('prevents the page and menu shortcut before requesting one confirmation', () => {
+  it('prevents every matching page and menu event while forwarding deduplication to the coordinator', () => {
     const target = new EventEmitter()
     const requestConfirmation = vi.fn()
     const preventDefault = vi.fn()
@@ -63,11 +63,11 @@ describe('application quit shortcut', () => {
       shortcutInput({ meta: true, isAutoRepeat: true })
     )
 
-    expect(preventDefault).toHaveBeenCalledOnce()
-    expect(requestConfirmation).toHaveBeenCalledOnce()
+    expect(preventDefault).toHaveBeenCalledTimes(2)
+    expect(requestConfirmation).toHaveBeenCalledTimes(2)
 
     dispose()
     target.emit('before-input-event', { preventDefault }, shortcutInput({ meta: true }))
-    expect(requestConfirmation).toHaveBeenCalledOnce()
+    expect(requestConfirmation).toHaveBeenCalledTimes(2)
   })
 })

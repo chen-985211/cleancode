@@ -18,6 +18,8 @@ import { registerIpcHandler, type IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
 import { bindApplicationQuitShortcut } from './applicationQuitShortcut'
 
+const applicationQuitRendererResponseTimeoutMs = 5_000
+
 export interface ApplicationQuitConfirmationTarget {
   isDestroyed(): boolean
   readonly webContents: {
@@ -121,23 +123,43 @@ export function createApplicationQuitConfirmationCoordinator(input: {
 }): ApplicationQuitConfirmationCoordinator {
   let pending:
     | {
+        readonly cancelExpiry: () => void
         isShowing: boolean
         readonly request: ApplicationQuitRequest
         readonly target: ApplicationQuitConfirmationTarget
       }
     | undefined
   const createRequestId = input.createRequestId ?? randomUUID
+  const clearPending = (activeConfirmation: NonNullable<typeof pending>): void => {
+    if (pending !== activeConfirmation) return
+
+    activeConfirmation.cancelExpiry()
+    pending = undefined
+  }
 
   return {
     release(target) {
-      if (pending?.target === target) pending = undefined
+      if (pending?.target === target) clearPending(pending)
     },
     request(target) {
       if (pending || target.isDestroyed() || target.webContents.isDestroyed()) return false
 
       const request = { requestId: createRequestId() }
-      pending = { isShowing: false, request, target }
-      target.webContents.send(applicationQuitChannels.requested, request)
+      let cancelExpiry = (): void => undefined
+      const activeConfirmation = {
+        cancelExpiry: () => cancelExpiry(),
+        isShowing: false,
+        request,
+        target
+      }
+      pending = activeConfirmation
+      cancelExpiry = scheduleApplicationQuitRequestExpiry(() => clearPending(activeConfirmation))
+      try {
+        target.webContents.send(applicationQuitChannels.requested, request)
+      } catch (error) {
+        clearPending(activeConfirmation)
+        throw error
+      }
       return true
     },
     async show(command, target) {
@@ -153,6 +175,7 @@ export function createApplicationQuitConfirmationCoordinator(input: {
       }
 
       activeConfirmation.isShowing = true
+      activeConfirmation.cancelExpiry()
       try {
         const response = await input.showDialog(activeConfirmation.target, {
           cancelLabel: command.cancelLabel,
@@ -161,13 +184,19 @@ export function createApplicationQuitConfirmationCoordinator(input: {
         })
         if (pending !== activeConfirmation) return false
 
-        pending = undefined
+        clearPending(activeConfirmation)
         if (response === 1) input.quit()
         return true
       } catch (error) {
-        if (pending === activeConfirmation) pending = undefined
+        clearPending(activeConfirmation)
         throw error
       }
     }
   }
+}
+
+function scheduleApplicationQuitRequestExpiry(expire: () => void): () => void {
+  const timeout = setTimeout(expire, applicationQuitRendererResponseTimeoutMs)
+  timeout.unref()
+  return () => clearTimeout(timeout)
 }

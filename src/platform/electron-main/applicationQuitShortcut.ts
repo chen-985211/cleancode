@@ -23,8 +23,6 @@ export function matchesApplicationQuitShortcut(
 ): boolean {
   if (
     input.type !== 'keyDown' ||
-    input.isAutoRepeat ||
-    input.isComposing ||
     input.alt ||
     input.shift ||
     input.key.toLocaleLowerCase('en-US') !== 'q'

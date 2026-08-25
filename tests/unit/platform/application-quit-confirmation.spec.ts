@@ -111,28 +111,56 @@ describe('application quit confirmation', () => {
     })
   })
 
+  it('expires an unanswered renderer request so a later shortcut can retry', () => {
+    vi.useFakeTimers()
+    try {
+      const target = quitTarget()
+      const requestIds = ['quit-request-1', 'quit-request-2']
+      const coordinator = createApplicationQuitConfirmationCoordinator({
+        createRequestId: () => requestIds.shift() ?? 'unexpected-request',
+        quit: vi.fn(),
+        showDialog: vi.fn()
+      })
+
+      expect(coordinator.request(target)).toBe(true)
+      vi.runOnlyPendingTimers()
+      expect(coordinator.request(target)).toBe(true)
+      expect(target.send).toHaveBeenLastCalledWith(applicationQuitChannels.requested, {
+        requestId: 'quit-request-2'
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps only one native dialog open for repeated renderer requests', async () => {
-    const target = quitTarget()
-    let resolveDialog: ((response: number) => void) | undefined
-    const showDialog = vi.fn(
-      () =>
-        new Promise<number>((resolve) => {
-          resolveDialog = resolve
-        })
-    )
-    const coordinator = createApplicationQuitConfirmationCoordinator({
-      createRequestId: () => 'quit-request-1',
-      quit: vi.fn(),
-      showDialog
-    })
+    vi.useFakeTimers()
+    try {
+      const target = quitTarget()
+      let resolveDialog: ((response: number) => void) | undefined
+      const showDialog = vi.fn(
+        () =>
+          new Promise<number>((resolve) => {
+            resolveDialog = resolve
+          })
+      )
+      const coordinator = createApplicationQuitConfirmationCoordinator({
+        createRequestId: () => 'quit-request-1',
+        quit: vi.fn(),
+        showDialog
+      })
 
-    coordinator.request(target)
-    const firstResult = coordinator.show(confirmationCommand(), target)
-    await expect(coordinator.show(confirmationCommand(), target)).resolves.toBe(false)
+      coordinator.request(target)
+      const firstResult = coordinator.show(confirmationCommand(), target)
+      vi.runOnlyPendingTimers()
+      await expect(coordinator.show(confirmationCommand(), target)).resolves.toBe(false)
 
-    expect(showDialog).toHaveBeenCalledOnce()
-    resolveDialog?.(0)
-    await expect(firstResult).resolves.toBe(true)
+      expect(showDialog).toHaveBeenCalledOnce()
+      resolveDialog?.(0)
+      await expect(firstResult).resolves.toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('cancels natively without quitting and allows the next shortcut request', async () => {
