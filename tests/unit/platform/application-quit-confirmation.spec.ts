@@ -133,6 +133,29 @@ describe('application quit confirmation', () => {
     }
   })
 
+  it('contains a renderer send failure, reports it, and allows the next shortcut to retry', () => {
+    const target = quitTarget()
+    const sendError = new Error('Render frame was disposed.')
+    target.send.mockImplementationOnce(() => {
+      throw sendError
+    })
+    const onRequestError = vi.fn()
+    const requestIds = ['quit-request-1', 'quit-request-2']
+    const coordinator = createApplicationQuitConfirmationCoordinator({
+      createRequestId: () => requestIds.shift() ?? 'unexpected-request',
+      onRequestError,
+      quit: vi.fn(),
+      showDialog: vi.fn()
+    })
+
+    expect(coordinator.request(target)).toBe(false)
+    expect(onRequestError).toHaveBeenCalledWith(sendError)
+    expect(coordinator.request(target)).toBe(true)
+    expect(target.send).toHaveBeenLastCalledWith(applicationQuitChannels.requested, {
+      requestId: 'quit-request-2'
+    })
+  })
+
   it('keeps only one native dialog open for repeated renderer requests', async () => {
     vi.useFakeTimers()
     try {

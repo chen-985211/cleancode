@@ -43,6 +43,7 @@ export function configureApplicationQuitConfirmation(input: {
   readonly logger: Logger
 }): ApplicationQuitConfirmationCoordinator {
   const coordinator = createApplicationQuitConfirmationCoordinator({
+    onRequestError: (error) => logApplicationQuitRequestError(input.logger, error),
     quit: () => input.app.quit(),
     showDialog: async (target, copy) => {
       const result = await dialog.showMessageBox(
@@ -115,6 +116,7 @@ export function registerApplicationQuitConfirmationIpc(input: {
 
 export function createApplicationQuitConfirmationCoordinator(input: {
   readonly createRequestId?: () => string
+  readonly onRequestError?: (error: unknown) => void
   readonly quit: () => void
   readonly showDialog: (
     target: ApplicationQuitConfirmationTarget,
@@ -158,7 +160,12 @@ export function createApplicationQuitConfirmationCoordinator(input: {
         target.webContents.send(applicationQuitChannels.requested, request)
       } catch (error) {
         clearPending(activeConfirmation)
-        throw error
+        try {
+          input.onRequestError?.(error)
+        } catch {
+          // A diagnostic sink failure must not escape the protected shortcut event.
+        }
+        return false
       }
       return true
     },
@@ -199,4 +206,16 @@ function scheduleApplicationQuitRequestExpiry(expire: () => void): () => void {
   const timeout = setTimeout(expire, applicationQuitRendererResponseTimeoutMs)
   timeout.unref()
   return () => clearTimeout(timeout)
+}
+
+function logApplicationQuitRequestError(logger: Logger, error: unknown): void {
+  logger.error({
+    scope: 'platform.application',
+    operation: 'requestApplicationQuitConfirmation',
+    outcome: 'failure',
+    error:
+      error instanceof Error
+        ? { message: error.message, ...(error.stack ? { stack: error.stack } : {}) }
+        : { message: String(error) }
+  })
 }
