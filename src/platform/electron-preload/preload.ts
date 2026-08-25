@@ -5,14 +5,23 @@ import {
   isSerializedAppError
 } from '../../shared-kernel/application/errors/AppError'
 import type { IpcInvokeResult } from '../ipc/registerIpcHandler'
+import {
+  applicationQuitChannels,
+  type ApplicationQuitConfirmationCommand,
+  type ApplicationQuitRequest
+} from '../ipc/applicationQuitChannels'
 import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChannels'
 
 const cleancodeApi = {
   appName: 'cleancode',
+  showApplicationQuitConfirmation: (command: ApplicationQuitConfirmationCommand) =>
+    invokeCleancode<boolean>(applicationQuitChannels.show, command),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   getWindowFullScreenState: () => invokeCleancode<boolean>(windowFullScreenStateChannels.get),
   onWindowFullScreenStateChange: (listener: (event: unknown) => void) =>
     subscribeRendererEvent(windowFullScreenStateChannels.changed, listener),
+  onApplicationQuitRequested: (listener: (request: ApplicationQuitRequest) => void) =>
+    subscribeRendererEvent(applicationQuitChannels.requested, listener),
   listWorkbenches: () => invokeCleancode('cleancode:list-workbenches'),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
@@ -197,9 +206,12 @@ const cleancodeApi = {
 
 contextBridge.exposeInMainWorld('cleancode', cleancodeApi)
 
-function subscribeRendererEvent(channel: string, listener: (event: unknown) => void): () => void {
+function subscribeRendererEvent<TEvent>(
+  channel: string,
+  listener: (event: TEvent) => void
+): () => void {
   const subscription = (_event: Electron.IpcRendererEvent, payload: unknown) => {
-    listener(payload)
+    listener(payload as TEvent)
   }
 
   ipcRenderer.on(channel, subscription)

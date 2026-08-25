@@ -7,6 +7,10 @@ import { FileSystemMainWindowStateStore } from './FileSystemMainWindowStateStore
 import { bindElectronExternalNavigationPolicy } from './electronExternalNavigationPolicy'
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
+import {
+  bindApplicationQuitConfirmationToWindow,
+  type ApplicationQuitConfirmationCoordinator
+} from './applicationQuitConfirmation'
 import { bindMainWindowStatePersistence } from './mainWindowStateLifecycle'
 import {
   mainWindowMinimumSize,
@@ -20,6 +24,7 @@ import { bindWindowFullScreenState } from './windowFullScreenState'
 const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 
 export function createMainWindow(input: {
+  readonly applicationQuitConfirmation: ApplicationQuitConfirmationCoordinator
   readonly appIconPath: string | undefined
   readonly policy: ElectronWindowPolicy
 }): void {
@@ -73,6 +78,11 @@ export function createMainWindow(input: {
   })
   if (shouldRemoveDefaultWindowMenu(process.platform)) mainWindow.removeMenu()
   bindWindowFullScreenState(mainWindow)
+  bindApplicationQuitConfirmationToWindow({
+    coordinator: input.applicationQuitConfirmation,
+    platform: process.platform,
+    target: mainWindow
+  })
   bindElectronPageZoomStartup(mainWindow.webContents)
   bindElectronExternalNavigationPolicy({
     onOpenError: logExternalNavigationError,

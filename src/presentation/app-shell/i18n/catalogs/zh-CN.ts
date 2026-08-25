@@ -5,6 +5,8 @@ export const zhCNMessages = {
   'common.cancel': '取消',
   'common.close': '关闭',
   'common.remove': '移除',
+  'applicationQuit.title': '退出 cleancode？',
+  'applicationQuit.confirm': '退出',
   'language.settings': '语言',
   'language.simplifiedChinese': '简体中文',
   'language.english': 'English',

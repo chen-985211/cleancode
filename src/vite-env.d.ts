@@ -63,6 +63,10 @@ import type {
   TerminalOutputEvent,
   TerminalWorkingDirectorySnapshot
 } from './contexts/run/application/ports/TerminalProcessPort'
+import type {
+  ApplicationQuitConfirmationCommand,
+  ApplicationQuitRequest
+} from './platform/ipc/applicationQuitChannels'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -77,9 +81,11 @@ declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      showApplicationQuitConfirmation(command: ApplicationQuitConfirmationCommand): Promise<boolean>
       getPathForFile(file: File): string
       getWindowFullScreenState(): Promise<boolean>
       onWindowFullScreenStateChange(listener: (isFullScreen: boolean) => void): () => void
+      onApplicationQuitRequested(listener: (request: ApplicationQuitRequest) => void): () => void
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>

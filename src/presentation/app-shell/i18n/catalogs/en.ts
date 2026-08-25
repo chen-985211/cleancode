@@ -1,5 +1,4 @@
 import type { MessageCatalog } from './zh-CN'
-
 export const enMessages = {
   'app.settings': 'Application settings',
   'app.windowNavigation': 'Window navigation',
@@ -7,6 +6,8 @@ export const enMessages = {
   'common.cancel': 'Cancel',
   'common.close': 'Close',
   'common.remove': 'Remove',
+  'applicationQuit.title': 'Quit cleancode?',
+  'applicationQuit.confirm': 'Quit',
   'language.settings': 'Language',
   'language.simplifiedChinese': '简体中文',
   'language.english': 'English',
