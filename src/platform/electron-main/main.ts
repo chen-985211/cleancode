@@ -105,6 +105,7 @@ import {
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
+import { configureApplicationQuitConfirmation as configureQuitConfirmation } from './applicationQuitConfirmation'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
@@ -371,6 +372,7 @@ const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT
 const electronWindowPolicy = resolveElectronWindowPolicy({
   backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
 })
+const quitConfirmation = configureQuitConfirmation({ app, ipcMain, logger: consoleLogger })
 registerWindowFullScreenStateIpc({
   ipcMain,
   logger: consoleLogger,
@@ -639,11 +641,19 @@ if (isPrimaryAppInstance) {
       app.dock?.setIcon(appIconPath)
     }
 
-    createMainWindow({ appIconPath, policy: electronWindowPolicy })
+    createMainWindow({
+      applicationQuitConfirmation: quitConfirmation,
+      appIconPath,
+      policy: electronWindowPolicy
+    })
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow({ appIconPath, policy: electronWindowPolicy })
+        createMainWindow({
+          applicationQuitConfirmation: quitConfirmation,
+          appIconPath,
+          policy: electronWindowPolicy
+        })
       }
     })
   })

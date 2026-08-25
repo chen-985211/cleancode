@@ -10,6 +10,7 @@ import { I18nProvider } from './i18n/I18nProvider'
 import { NotificationProvider } from './NotificationProvider'
 import { TooltipProvider } from './Tooltip'
 import { useNotifications } from './useNotifications'
+import { ApplicationQuitConfirmationBridge } from './ApplicationQuitConfirmationBridge'
 
 export function AppShellRoot() {
   const nextNavigationRequestIdRef = useRef(0)
@@ -26,6 +27,7 @@ export function AppShellRoot() {
 
   return (
     <I18nProvider>
+      <ApplicationQuitConfirmationBridge />
       <TooltipProvider>
         <NotificationProvider>
           <AgentActivityObserver onNavigate={navigateToAgentActivity}>
