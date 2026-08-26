@@ -188,6 +188,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > preview-release-notes.md <<'EOF'
+          > [!TIP]
+          > **下载安装包：请展开本页底部的 Assets，并选择与你的系统对应的文件。**
+          >
+          > macOS 下载 `.dmg`，Windows 下载 `.exe`，Linux 下载 `.AppImage` 或 `.deb`。
+
           ## Preview 安全提示
 
           这是公开测试用的 **Preview / Pre-release**，尚未使用正式开发者证书签名。
