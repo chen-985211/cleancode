@@ -188,11 +188,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > preview-release-notes.md <<'EOF'
+          > [!TIP]
+          > **下载安装包：请展开本页底部的 Assets，并选择与你的系统对应的文件。**
+          >
+          > macOS 下载 `.dmg`，Windows 下载 `.exe`，Linux 下载 `.AppImage` 或 `.deb`。
+
           ## Preview 安全提示
 
           这是公开测试用的 **Preview / Pre-release**，尚未使用正式开发者证书签名。
 
-          - macOS：应用使用 ad-hoc 签名，未完成 Apple notarization，Gatekeeper 可能阻止首次打开。
+          - macOS：应用使用 ad-hoc 签名，未完成 Apple notarization，Gatekeeper 可能阻止首次打开。把 `CleanCode.app` 拖入 `/Applications`，确认安装包来源和校验值无误后，在终端运行：
+
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/CleanCode.app
+            open /Applications/CleanCode.app
+            ```
+
+            命令只应作用于 `CleanCode.app`；请勿把目标路径替换为 `/Applications`、下载目录或用户目录。
           - Windows：安装程序未签名，SmartScreen 会显示“未知发布者”警告。
           - Linux：请使用 `SHA256SUMS.txt` 校验下载文件。
 
