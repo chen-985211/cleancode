@@ -31,6 +31,10 @@
 
 <p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
 
+<p align="center"><strong>▶ Full demo (2:33, with sound)</strong></p>
+
+https://github.com/user-attachments/assets/cafe373f-97b7-4f8c-b4a4-dfbc88ab26c3
+
 ---
 
 Software development is moving from “one person writing code” to people and Agents advancing multiple development contexts together. One change may have its own branch, terminals, services, test commands, ports, and Agent conversation; another change has a similar context of its own. The problem is not a lack of tools. Once these contexts scatter across different windows, you have to keep rebuilding them from memory: which branch a terminal belongs to, whether a service is still alive, whether ports conflict, whether dependencies are ready, and whether the Agent still understands the current change. That is why I increasingly think a development environment should not be organized only around code files and editors. It should be organized around the change currently in motion. It needs to remember branches, terminals, services, ports, dependency order, and Agent context at the same time, and make them visible in a form people can understand and Agents can operate.
