@@ -106,7 +106,9 @@ export class TerminalWorkflowService {
           }
         )
       }
-      for (const retainedRun of overlappingRuns) this.removeRunProjection(retainedRun)
+      for (const terminalRun of overlappingRuns) {
+        await beginWorkflowHardDispose(terminalRun, () => this.performHardDispose(terminalRun))
+      }
       this.activeRuns.store(activeRun)
       trackWorkflowRun(this.lifecycle, activeRun, () =>
         beginWorkflowHardDispose(activeRun, () => this.performHardDispose(activeRun))
@@ -574,11 +576,6 @@ export class TerminalWorkflowService {
       .filter((activeRun) =>
         activeRun.plan.nodes.some((node) => requestedBlockIds.has(node.blockId))
       )
-  }
-
-  private removeRunProjection(activeRun: ActiveWorkflowRun): void {
-    this.activeRuns.remove(activeRun)
-    for (const unregister of activeRun.lifecycleUnregisters.splice(0)) unregister()
   }
 }
 

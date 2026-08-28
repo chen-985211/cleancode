@@ -100,6 +100,33 @@ describe('terminal workflow concurrency', () => {
     expect(runtime.startedBlockIds).toEqual(['frontend', 'frontend'])
   })
 
+  it('hard-disposes ready services before replacing a failed workflow projection', async () => {
+    const runtime = new RecordingRuntime()
+    const service = createService(runtime, new RunLifecycleService())
+
+    const failed = await service.start(startCommands(['service', 'failure']))
+    runtime.output('service', 'service-ready')
+    runtime.exit('failure', 1)
+    await vi.waitFor(() =>
+      expect(service.getRuns(workflowScope())).toEqual([
+        expect.objectContaining({
+          id: failed.id,
+          status: 'failed',
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ blockId: 'service', status: 'ready' })
+          ])
+        })
+      ])
+    )
+
+    const replacement = await service.start(startCommand('failure'))
+
+    expect(runtime.hardStops).toContain(sessionId('service', failed.id))
+    expect(service.getRuns(workflowScope())).toEqual([
+      expect.objectContaining({ id: replacement.id, status: 'running' })
+    ])
+  })
+
   it('hard-disposes only the workflow that owns a deleted terminal', async () => {
     const runtime = new RecordingRuntime()
     const lifecycle = new RunLifecycleService()
@@ -146,13 +173,7 @@ class BlockSetPlanPort implements TerminalWorkflowPlanPort {
     return {
       graphId: 'graph-1',
       workspaceId: query.workspaceId,
-      nodes: blockIds.map((blockId) => ({
-        blockId,
-        name: blockId,
-        launchCommand: `run ${blockId}`,
-        dependencyBlockIds: [],
-        executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
-      }))
+      nodes: blockIds.map(createPlanNode)
     }
   }
 }
@@ -178,6 +199,13 @@ class RecordingRuntime implements TerminalWorkflowRuntimePort {
     return null
   }
 
+  output(blockId: string, data: string): void {
+    const command = this.commands.get(blockId)
+    if (!command) return
+    const session = workflowSession(command)
+    command.onOutput({ scope: session, sessionId: session.id, sequence: 1, data })
+  }
+
   exit(blockId: string, exitCode: number): void {
     const command = this.commands.get(blockId)
     if (!command) return
@@ -196,6 +224,10 @@ class SilentPublisher implements TerminalWorkflowEventPublisherPort {
 }
 
 function startCommand(blockId: string) {
+  return startCommands([blockId])
+}
+
+function startCommands(blockIds: readonly string[]) {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
@@ -203,7 +235,24 @@ function startCommand(blockId: string) {
     workspaceDirectory: '/project',
     gitBranch: 'main',
     workingDirectory: '/project',
-    scope: { type: 'block-set' as const, blockIds: [blockId] }
+    scope: { type: 'block-set' as const, blockIds }
+  }
+}
+
+function createPlanNode(blockId: string): WorkflowRunPlanSnapshot['nodes'][number] {
+  return {
+    blockId,
+    name: blockId,
+    launchCommand: `run ${blockId}`,
+    dependencyBlockIds: [],
+    executionConfig:
+      blockId === 'service'
+        ? {
+            mode: 'service',
+            readiness: { type: 'output', text: 'service-ready' },
+            readinessTimeoutMs: 10_000
+          }
+        : { mode: 'task', successExitCodes: [0], timeoutMs: null }
   }
 }
 
