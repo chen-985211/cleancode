@@ -44,7 +44,7 @@ interface TerminalFlowNodeHandlers {
   readonly onLocateManagedServiceOwner?: TerminalFlowNode['data']['onLocateManagedServiceOwner']
   readonly onDismissPortConflict?: TerminalFlowNode['data']['onDismissPortConflict']
   readonly onRunFromHere?: TerminalFlowNode['data']['onRunFromHere']
-  readonly onStopWorkflow?: TerminalFlowNode['data']['onStopWorkflow']
+  readonly onStopWorkflow?: (runId: string) => void
   readonly onViewIdentityStale?: TerminalFlowNode['data']['onViewIdentityStale']
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
@@ -86,8 +86,8 @@ interface CreateTerminalFlowNodesInput {
   readonly editingTerminalGroupId?: string | null
   readonly terminalGroupDropAction?: TerminalGroupDropAction
   readonly hoveredTerminalBlockId: string | null
-  readonly activeWorkflowRootBlockIds?: readonly string[]
-  readonly isStoppingWorkflow?: boolean
+  readonly activeWorkflowRunIdByRootBlockId?: Readonly<Record<string, string>>
+  readonly stoppingWorkflowRunIds?: readonly string[]
   readonly launchCommandEditRequest?: {
     readonly blockId: string
     readonly requestId: number
@@ -109,8 +109,8 @@ export function createTerminalFlowNodes({
   editingTerminalGroupId,
   terminalGroupDropAction = { type: 'none' },
   hoveredTerminalBlockId,
-  activeWorkflowRootBlockIds = [],
-  isStoppingWorkflow = false,
+  activeWorkflowRunIdByRootBlockId = {},
+  stoppingWorkflowRunIds = [],
   launchCommandEditRequest = null,
   terminalStates = {},
   terminalStateStore: providedTerminalStateStore,
@@ -120,7 +120,7 @@ export function createTerminalFlowNodes({
   includeCollapsedMembers = false
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
   const terminalStateStore = providedTerminalStateStore ?? createTerminalStateStore(terminalStates)
-  const activeWorkflowRootIds = new Set(activeWorkflowRootBlockIds)
+  const stoppingWorkflowRunIdSet = new Set(stoppingWorkflowRunIds)
   const selectedBlockIds = new Set(
     selectedTerminalBlockIds ?? (selectedTerminalBlockId ? [selectedTerminalBlockId] : [])
   )
@@ -144,17 +144,21 @@ export function createTerminalFlowNodes({
   )
   const terminalNodes = (graph?.blocks ?? [])
     .filter((block) => includeCollapsedMembers || !collapsedGroupMemberIds.has(block.id))
-    .map((block) =>
-      createTerminalFlowNode({
+    .map((block) => {
+      const activeWorkflowRunId = activeWorkflowRunIdByRootBlockId[block.id]
+      return createTerminalFlowNode({
         approvalIntent: approvalNodeIntents.get(block.id),
+        activeWorkflowRunId,
         block,
         projectId: graph!.projectId,
         workspaceId: graph!.workspaceId,
         canSelectForTerminalGroup: false,
         handlers,
         isNavigationHighlighted: hoveredTerminalBlockId === block.id,
-        isActiveWorkflowRoot: activeWorkflowRootIds.has(block.id),
-        isStoppingWorkflow,
+        isActiveWorkflowRoot: Boolean(activeWorkflowRunId),
+        isStoppingWorkflow: activeWorkflowRunId
+          ? stoppingWorkflowRunIdSet.has(activeWorkflowRunId)
+          : false,
         launchCommandEditRequestId:
           launchCommandEditRequest?.blockId === block.id
             ? launchCommandEditRequest.requestId
@@ -165,12 +169,13 @@ export function createTerminalFlowNodes({
         workflowBuildPresentation,
         workflowStatus: workflowNodeStatuses[block.id]
       })
-    )
+    })
 
   return [...groupNodes, ...terminalNodes]
 }
 
 interface CreateTerminalFlowNodeInput {
+  readonly activeWorkflowRunId?: string
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly projectId: string
@@ -190,6 +195,7 @@ interface CreateTerminalFlowNodeInput {
 
 function createTerminalFlowNode({
   approvalIntent,
+  activeWorkflowRunId,
   block,
   projectId,
   workspaceId,
@@ -243,7 +249,11 @@ function createTerminalFlowNode({
       isObjectLayoutChoreographed: workflowBuildPresentation?.terminalBlockIds.has(block.id),
       objectPresence,
       workflowStatus,
-      ...handlers
+      ...handlers,
+      onStopWorkflow:
+        activeWorkflowRunId && handlers.onStopWorkflow
+          ? () => handlers.onStopWorkflow?.(activeWorkflowRunId)
+          : undefined
     }
   }
 }

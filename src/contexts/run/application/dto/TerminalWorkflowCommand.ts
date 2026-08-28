@@ -6,6 +6,10 @@ export interface TerminalWorkflowScopeCommand {
   readonly workspaceId: string
 }
 
+export interface StopTerminalWorkflowCommand extends TerminalWorkflowScopeCommand {
+  readonly runId: string
+}
+
 export interface StartTerminalWorkflowCommand extends TerminalWorkflowScopeCommand {
   readonly projectId: string
   readonly workingDirectory: string

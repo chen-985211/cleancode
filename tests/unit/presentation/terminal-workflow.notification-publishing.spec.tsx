@@ -196,7 +196,7 @@ describe('terminal workflow notification publishing', () => {
       workspaceId: 'feature'
     })
     const get = vi.fn(async (command: { readonly workspaceId: string }) =>
-      command.workspaceId === 'main' ? failedRun('run-1', 1) : null
+      command.workspaceId === 'main' ? [failedRun('run-1', 1)] : []
     )
     window.cleancode = createWorkflowRuntime({ get })
 
@@ -236,7 +236,7 @@ describe('terminal workflow notification publishing', () => {
       workspaceId: 'feature'
     })
     const get = vi.fn(async (command: { readonly workspaceId: string }) =>
-      command.workspaceId === 'main' ? workflowRun('run-1', 'running') : null
+      command.workspaceId === 'main' ? [workflowRun('run-1', 'running')] : []
     )
     window.cleancode = createWorkflowRuntime({ get })
 
@@ -268,7 +268,7 @@ describe('terminal workflow notification publishing', () => {
     const notifications = createNotificationController()
     const firstWorkbench = createWorkbenchSnapshot('/first-project', 'First')
     const secondWorkbench = createWorkbenchSnapshot('/second-project', 'Second')
-    const get = vi.fn(async () => null)
+    const get = vi.fn(async () => [])
     window.cleancode = createWorkflowRuntime({
       get,
       onEvent: (listener) => {
@@ -427,17 +427,17 @@ describe('terminal workflow notification publishing', () => {
 
     let firstStop: Promise<void> | undefined
     act(() => {
-      firstStop = result.current.stop()
-      void result.current.stop()
+      firstStop = result.current.stop('run-1')
+      void result.current.stop('run-1')
     })
 
     expect(stop).toHaveBeenCalledOnce()
-    expect(result.current.isStopping).toBe(true)
+    expect(result.current.stoppingRunIds).toEqual(['run-1'])
 
     finishStop?.(workflowRun('run-1', 'stopped'))
     await act(async () => firstStop)
 
-    expect(result.current.isStopping).toBe(false)
+    expect(result.current.stoppingRunIds).toEqual([])
   })
 
   it('stops the workflow in the latest project and workspace scope', async () => {
@@ -463,11 +463,12 @@ describe('terminal workflow notification publishing', () => {
     )
 
     rerender({ currentWorkbench: latestWorkbench })
-    await act(() => result.current.stop())
+    await act(() => result.current.stop('run-1'))
 
     expect(stop).toHaveBeenCalledWith({
       projectDirectory: '/latest-project',
-      workspaceId: 'feature'
+      workspaceId: 'feature',
+      runId: 'run-1'
     })
   })
 })
@@ -504,7 +505,7 @@ function createWorkflowRuntime(
 ): NonNullable<Window['cleancode']> {
   return {
     appName: 'cleancode',
-    getTerminalWorkflow: options.get ?? vi.fn(async () => null),
+    getTerminalWorkflows: options.get ?? vi.fn(async () => []),
     onTerminalWorkflowEvent: vi.fn((listener) => {
       options.onEvent?.(listener)
       return vi.fn()

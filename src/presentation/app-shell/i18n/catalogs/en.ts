@@ -1,4 +1,6 @@
 import type { MessageCatalog } from './zh-CN'
+import { enWorkflowMessages } from './enWorkflow'
+
 export const enMessages = {
   'app.settings': 'Application settings',
   'app.windowNavigation': 'Window navigation',
@@ -618,26 +620,7 @@ export const enMessages = {
   'agentActivity.focusSource': 'Focus {agentName} in {source}',
   'agentActivity.waitingInput': '{agentName} is waiting for input',
   'agentActivity.waitingApproval': '{agentName} is waiting for approval',
-  'workflow.operationFailedTitle': 'Workflow action failed',
-  'workflow.operationFailed': 'The workflow action failed. Try again later.',
-  'workflow.failureTitle': 'Workflow failed',
-  'workflow.focusNode': 'Focus workflow node “{terminalName}”',
-  'workflow.inspectOutput': 'Check this terminal’s output.',
-  'workflow.exitCodeOutput': 'Exit code {exitCode}. Check the terminal output.',
-  'workflow.singleFailure': 'Terminal “{terminalName}” failed. {detail}',
-  'workflow.multipleFailures': '{count} terminals failed. Check the failed nodes’ terminal output.',
-  'workflow.generalFailure':
-    'The workflow did not complete. Check the failed nodes’ terminal output.',
-  'workflow.succeededTitle': 'Workflow succeeded',
-  'workflow.stoppedTitle': 'Workflow stopped',
-  'workflow.stopAction': 'Stop this run',
-  'workflow.stoppingAction': 'Stopping…',
-  'workflow.readyTitle': 'Workflow services are ready',
-  'workflow.runningTitle': 'Workflow running',
-  'workflow.scopeSingle': 'Starting from “{rootName}” · {count} terminals',
-  'workflow.scopeMultiple': '{rootCount} starting points · {count} terminals',
-  'workflow.scopeCount': '{count} terminals',
-  'workflow.scopeEmpty': 'This run contains no terminals',
+  ...enWorkflowMessages,
   'terminalLaunch.failedTitle': 'Launch command failed',
   'terminalLaunch.failed': 'The launch command failed. Check the terminal output and try again.',
   'error.BLOCK_GRAPH_SNAPSHOT_CORRUPTED':
@@ -696,5 +679,7 @@ export const enMessages = {
     'Every terminal in the workflow needs a launch command.',
   'error.TERMINAL_WORKFLOW_CYCLE': 'This dependency would create a cycle and cannot be connected.',
   'error.TERMINAL_WORKFLOW_EMPTY': 'There are no terminal commands to run.',
+  'error.TERMINAL_WORKFLOW_SCOPE_CONFLICT':
+    'Some terminals already belong to a running workflow. Stop that run first.',
   'error.UNEXPECTED_ERROR': 'The action failed. Try again later.'
 } satisfies MessageCatalog

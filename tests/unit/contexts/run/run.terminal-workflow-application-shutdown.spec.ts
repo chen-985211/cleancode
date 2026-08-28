@@ -26,12 +26,12 @@ describe('terminal workflow application shutdown', () => {
     await vi.advanceTimersByTimeAsync(1_000)
 
     expect(runtime.stops).toEqual([])
-    expect(service.getActiveRun(workflowScope())).not.toBeNull()
+    expect(service.getRuns(workflowScope())).toHaveLength(1)
 
     await service.completeApplicationShutdown()
     await service.completeApplicationShutdown()
 
-    expect(service.getActiveRun(workflowScope())).toBeNull()
+    expect(service.getRuns(workflowScope())).toEqual([])
     expect(runtime.stops).toEqual([])
     await expect(service.start(startCommand())).rejects.toMatchObject({
       code: 'RUN_START_BLOCKED'
@@ -49,13 +49,13 @@ describe('terminal workflow application shutdown', () => {
     const preparing = service.prepareApplicationShutdown()
     const completion = service.completeApplicationShutdown()
     await Promise.resolve()
-    expect(service.getActiveRun(workflowScope())).not.toBeNull()
+    expect(service.getRuns(workflowScope())).toHaveLength(1)
 
     startGate.resolve()
     await Promise.all([starting, preparing, completion, service.completeApplicationShutdown()])
 
     expect(runtime.stops).toEqual([])
-    expect(service.getActiveRun(workflowScope())).toBeNull()
+    expect(service.getRuns(workflowScope())).toEqual([])
   })
 
   it('keeps explicit stopAll as the PTY-owning hard-dispose path', async () => {
@@ -66,7 +66,7 @@ describe('terminal workflow application shutdown', () => {
     await service.stopAll()
 
     expect(runtime.stops).toEqual(['task-session'])
-    expect(service.getActiveRun(workflowScope())).toBeNull()
+    expect(service.getRuns(workflowScope())).toEqual([])
   })
 
   it('arms managed-service Provider handoff before aborting workflow readiness', async () => {

@@ -52,8 +52,8 @@ interface UseWorkbenchFlowNodesInput {
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly terminalStates?: Record<string, TerminalViewState>
   readonly terminalStateStore?: TerminalStateStore
-  readonly activeWorkflowRootBlockIds?: readonly string[]
-  readonly isStoppingWorkflow?: boolean
+  readonly activeWorkflowRunIdByRootBlockId?: Readonly<Record<string, string>>
+  readonly stoppingWorkflowRunIds?: readonly string[]
   readonly launchCommandEditRequest?: {
     readonly blockId: string
     readonly requestId: number
@@ -91,8 +91,8 @@ export function useWorkbenchFlowNodes({
   setNodes,
   terminalStates = {},
   terminalStateStore: providedTerminalStateStore,
-  activeWorkflowRootBlockIds,
-  isStoppingWorkflow,
+  activeWorkflowRunIdByRootBlockId,
+  stoppingWorkflowRunIds,
   launchCommandEditRequest,
   workflowNodeStatuses,
   terminalWorkflowBuildPresentation,
@@ -182,8 +182,8 @@ export function useWorkbenchFlowNodes({
         graph,
         handlers,
         hoveredTerminalBlockId,
-        activeWorkflowRootBlockIds,
-        isStoppingWorkflow,
+        activeWorkflowRunIdByRootBlockId,
+        stoppingWorkflowRunIds,
         launchCommandEditRequest,
         editingTerminalGroupId,
         selectedTerminalBlockIds,
@@ -318,8 +318,8 @@ export function useWorkbenchFlowNodes({
     graph,
     handlers,
     hoveredTerminalBlockId,
-    activeWorkflowRootBlockIds,
-    isStoppingWorkflow,
+    activeWorkflowRunIdByRootBlockId,
+    stoppingWorkflowRunIds,
     launchCommandEditRequest,
     selectedAgentId,
     editingTerminalGroupId,

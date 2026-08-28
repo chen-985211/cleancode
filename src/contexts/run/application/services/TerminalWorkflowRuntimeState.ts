@@ -19,32 +19,54 @@ export interface ActiveWorkflowRun {
 }
 
 export class ActiveWorkflowRunRegistry {
-  private readonly runsByProject = new Map<string, Map<string, ActiveWorkflowRun>>()
+  private readonly runsByProject = new Map<string, Map<string, Map<string, ActiveWorkflowRun>>>()
 
-  find(scope: { readonly projectDirectory: string; readonly workspaceId: string }) {
-    return this.runsByProject.get(scope.projectDirectory)?.get(scope.workspaceId)
+  find(scope: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+    readonly runId: string
+  }): ActiveWorkflowRun | undefined {
+    return this.runsByProject.get(scope.projectDirectory)?.get(scope.workspaceId)?.get(scope.runId)
+  }
+
+  listScope(scope: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+  }): readonly ActiveWorkflowRun[] {
+    return [
+      ...(this.runsByProject.get(scope.projectDirectory)?.get(scope.workspaceId)?.values() ?? [])
+    ]
   }
 
   store(activeRun: ActiveWorkflowRun): void {
     const { projectDirectory, workspaceId } = activeRun.command
-    let projectRuns = this.runsByProject.get(projectDirectory)
-    if (!projectRuns) {
-      projectRuns = new Map()
-      this.runsByProject.set(projectDirectory, projectRuns)
+    let workspaceRuns = this.runsByProject.get(projectDirectory)
+    if (!workspaceRuns) {
+      workspaceRuns = new Map()
+      this.runsByProject.set(projectDirectory, workspaceRuns)
     }
-    projectRuns.set(workspaceId, activeRun)
+    let activeRuns = workspaceRuns.get(workspaceId)
+    if (!activeRuns) {
+      activeRuns = new Map()
+      workspaceRuns.set(workspaceId, activeRuns)
+    }
+    activeRuns.set(activeRun.run.id, activeRun)
   }
 
   remove(activeRun: ActiveWorkflowRun): void {
     const { projectDirectory, workspaceId } = activeRun.command
-    const projectRuns = this.runsByProject.get(projectDirectory)
-    if (projectRuns?.get(workspaceId) !== activeRun) return
-    projectRuns.delete(workspaceId)
-    if (projectRuns.size === 0) this.runsByProject.delete(projectDirectory)
+    const workspaceRuns = this.runsByProject.get(projectDirectory)
+    const activeRuns = workspaceRuns?.get(workspaceId)
+    if (activeRuns?.get(activeRun.run.id) !== activeRun) return
+    activeRuns.delete(activeRun.run.id)
+    if (activeRuns.size === 0) workspaceRuns?.delete(workspaceId)
+    if (workspaceRuns?.size === 0) this.runsByProject.delete(projectDirectory)
   }
 
   list(): readonly ActiveWorkflowRun[] {
-    return [...this.runsByProject.values()].flatMap((projectRuns) => [...projectRuns.values()])
+    return [...this.runsByProject.values()].flatMap((workspaceRuns) =>
+      [...workspaceRuns.values()].flatMap((activeRuns) => [...activeRuns.values()])
+    )
   }
 }
 

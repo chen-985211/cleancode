@@ -611,17 +611,16 @@ const reviewerAgent = {
 
 function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof useTerminalWorkflow> {
   return {
-    activeRootBlockIds: [],
+    activeRunIdByRootBlockId: {},
     connect: vi.fn(async () => undefined),
     deleteEdges: vi.fn(async () => undefined),
     edges: createTerminalWorkflowEdges(graph, {}),
-    isActive: false,
-    isStopping: false,
     nodeStatuses: {},
-    run: null,
+    runs: [],
     start: vi.fn(async () => undefined),
     startScope: vi.fn(async () => undefined),
     startTerminalCombination: vi.fn(async () => undefined),
+    stoppingRunIds: [],
     stop: vi.fn(async () => undefined),
     updateExecutionConfig: vi.fn(async () => undefined)
   }

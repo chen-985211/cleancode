@@ -49,7 +49,7 @@ describe('terminal workflow service', () => {
     runtime.exit('build', 0)
 
     await vi.waitFor(() =>
-      expect(service.getActiveRun(createWorkflowScope())?.status).toBe('succeeded')
+      expect(onlyRun(service, createWorkflowScope())?.status).toBe('succeeded')
     )
     await Promise.resolve()
     await Promise.resolve()
@@ -107,7 +107,7 @@ describe('terminal workflow service', () => {
     await vi.waitFor(() =>
       expect(runtime.commandStarts.map((start) => start.blockId)).toContain('browser')
     )
-    expect(service.getActiveRun(createWorkflowScope())?.nodes[0]?.status).toBe('ready')
+    expect(onlyRun(service, createWorkflowScope())?.nodes[0]?.status).toBe('ready')
   })
 
   it('fails timed-out tasks, blocks descendants, and lets independent branches finish', async () => {
@@ -126,7 +126,7 @@ describe('terminal workflow service', () => {
       blockId: 'slow',
       exit: expect.objectContaining({ sessionId: 'slow-session', exitCode: null })
     })
-    expect(service.getActiveRun(createWorkflowScope())).toMatchObject({
+    expect(onlyRun(service, createWorkflowScope())).toMatchObject({
       nodes: [
         { blockId: 'slow', status: 'failed' },
         { blockId: 'after-slow', status: 'blocked' },
@@ -136,7 +136,7 @@ describe('terminal workflow service', () => {
 
     runtime.exit('independent', 0)
     await vi.runAllTimersAsync()
-    expect(service.getActiveRun(createWorkflowScope())?.status).toBe('failed')
+    expect(onlyRun(service, createWorkflowScope())?.status).toBe('failed')
     vi.useRealTimers()
   })
 
@@ -149,22 +149,22 @@ describe('terminal workflow service', () => {
       new RecordingPublisher()
     )
 
-    await service.start(createStartCommand('/first-project'))
+    const firstRun = await service.start(createStartCommand('/first-project'))
     await service.start(createStartCommand('/second-project'))
 
     expect(runtime.stops).toEqual([])
-    expect(service.getActiveRun(createWorkflowScope('/first-project'))?.graphId).toBe(
+    expect(onlyRun(service, createWorkflowScope('/first-project'))?.graphId).toBe(
       'graph-first-project'
     )
-    expect(service.getActiveRun(createWorkflowScope('/second-project'))?.graphId).toBe(
+    expect(onlyRun(service, createWorkflowScope('/second-project'))?.graphId).toBe(
       'graph-second-project'
     )
 
-    await service.stop(createWorkflowScope('/first-project'))
+    await service.stop({ ...createWorkflowScope('/first-project'), runId: firstRun.id })
 
     expect(runtime.historyPreservingStops).toEqual(['first-project-task-session'])
     expect(runtime.stops).toEqual([])
-    expect(service.getActiveRun(createWorkflowScope('/second-project'))?.status).toBe('running')
+    expect(onlyRun(service, createWorkflowScope('/second-project'))?.status).toBe('running')
   })
 
   it('uses the shared managed launcher for port services and publishes the actual endpoint', async () => {
@@ -206,7 +206,7 @@ describe('terminal workflow service', () => {
         endpoint: expect.objectContaining({ port: 41_001 })
       })
     ])
-    expect(service.getActiveRun(createWorkflowScope())?.nodes[0]).toMatchObject({
+    expect(onlyRun(service, createWorkflowScope())?.nodes[0]).toMatchObject({
       status: 'ready',
       endpoint: { port: 41_001 },
       error: null
@@ -225,8 +225,8 @@ describe('terminal workflow service', () => {
       managed as unknown as ManagedServiceLauncher
     )
 
-    await service.start(createStartCommand())
-    await service.stop(createWorkflowScope())
+    const run = await service.start(createStartCommand())
+    await service.stop({ ...createWorkflowScope(), runId: run.id })
 
     expect(managed.historyPreservingStops).toEqual(['api-managed'])
     expect(runtime.historyPreservingStops).toEqual(['browser-session'])
@@ -294,7 +294,7 @@ describe('terminal workflow service', () => {
     })
 
     expect(runtime.stops).toEqual(expect.arrayContaining(['slow-session', 'independent-session']))
-    expect(service.getActiveRun(createWorkflowScope())).toBeNull()
+    expect(service.getRuns(createWorkflowScope())).toEqual([])
     const eventCount = publisher.events.length
 
     await vi.advanceTimersByTimeAsync(1_000)
@@ -338,7 +338,7 @@ describe('terminal workflow service', () => {
     const lease = await disposing
     await Promise.allSettled([starting])
     expect(runtime.stops).toEqual(['api-session'])
-    expect(service.getActiveRun(createWorkflowScope())).toBeNull()
+    expect(service.getRuns(createWorkflowScope())).toEqual([])
     lease.release()
   })
 })
@@ -473,6 +473,10 @@ function createManagedServicePlan(): WorkflowRunPlanSnapshot {
 
 function createWorkflowScope(projectDirectory = '/project') {
   return { projectDirectory, workspaceId: 'main' }
+}
+
+function onlyRun(service: TerminalWorkflowService, scope: ReturnType<typeof createWorkflowScope>) {
+  return service.getRuns(scope)[0] ?? null
 }
 
 function createTaskPlan(): WorkflowRunPlanSnapshot {

@@ -486,8 +486,8 @@ export function AppShell({
     onAgentGraphUpdated,
     setNodes: nodeStore.setNodes,
     terminalStateStore: terminalStateProjection.store,
-    activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
-    isStoppingWorkflow: terminalWorkflow.isStopping,
+    activeWorkflowRunIdByRootBlockId: terminalWorkflow.activeRunIdByRootBlockId,
+    stoppingWorkflowRunIds: terminalWorkflow.stoppingRunIds,
     launchCommandEditRequest:
       launchCommandEditRequest?.workspaceId === currentWorkspace?.workspaceId
         ? launchCommandEditRequest

@@ -7,12 +7,12 @@ import { createWorkflowRunNotification } from './terminalWorkflowNotifications'
 import { useI18n } from './i18n/useI18n'
 
 interface UseTerminalWorkflowNotificationsInput {
-  readonly isStopping: boolean
   readonly notifications: AppNotificationController
   readonly onNavigateToTarget: (target: CanvasObjectIdentity) => Promise<void> | void
-  readonly onStop: () => Promise<void> | void
+  readonly onStop: (runId: string) => Promise<void> | void
   readonly projectId: string | null
-  readonly run: WorkflowRunSnapshot | null
+  readonly runs: readonly WorkflowRunSnapshot[]
+  readonly stoppingRunIds: readonly string[]
   readonly workspaceId: string | null
 }
 
@@ -20,20 +20,21 @@ interface PublishedWorkflowNotification {
   hiddenByScopeChange: boolean
   notificationId: string
   runId: string
+  scopeKey: string
   terminalStatusPublished: boolean
 }
 
 export function useTerminalWorkflowNotifications({
-  isStopping,
   notifications,
   onNavigateToTarget,
   onStop,
   projectId,
-  run,
+  runs,
+  stoppingRunIds,
   workspaceId
 }: UseTerminalWorkflowNotificationsInput): void {
   const { t } = useI18n()
-  const publishedByScope = useRef(new Map<string, PublishedWorkflowNotification>())
+  const publishedByRun = useRef(new Map<string, PublishedWorkflowNotification>())
   const navigateToTargetRef = useRef(onNavigateToTarget)
   navigateToTargetRef.current = onNavigateToTarget
   const navigateToTarget = useCallback(
@@ -49,8 +50,8 @@ export function useTerminalWorkflowNotifications({
         return
       }
 
-      const published = publishedByScope.current.get(scopeKey)
-      if (published) {
+      for (const published of publishedByRun.current.values()) {
+        if (published.scopeKey !== scopeKey) continue
         dismiss(published.notificationId)
         published.hiddenByScopeChange = true
       }
@@ -59,62 +60,65 @@ export function useTerminalWorkflowNotifications({
   )
 
   useEffect(() => {
-    if (
-      !run ||
-      !scopeKey ||
-      !projectId ||
-      !workspaceId ||
-      run.projectId !== projectId ||
-      run.workspaceId !== workspaceId
-    ) {
-      return
+    if (!scopeKey || !projectId || !workspaceId) return
+    const stoppingIds = new Set(stoppingRunIds)
+
+    for (const run of runs) {
+      if (run.projectId !== projectId || run.workspaceId !== workspaceId) continue
+      const publicationKey = createWorkflowPublicationKey(scopeKey, run.id)
+      const existing = publishedByRun.current.get(publicationKey)
+      if (existing?.terminalStatusPublished) continue
+
+      const notification = createWorkflowRunNotification(
+        run,
+        {
+          isStopping: stoppingIds.has(run.id),
+          onNavigateToTarget: navigateToTarget,
+          onStop: () => onStop(run.id)
+        },
+        t
+      )
+      const isTerminalStatus =
+        run.status === 'failed' || run.status === 'succeeded' || run.status === 'stopped'
+
+      if (!existing) {
+        publishedByRun.current.set(publicationKey, {
+          hiddenByScopeChange: false,
+          notificationId: notify(notification),
+          runId: run.id,
+          scopeKey,
+          terminalStatusPublished: isTerminalStatus
+        })
+        continue
+      }
+
+      const isVisible = update(existing.notificationId, notification)
+      existing.terminalStatusPublished = isTerminalStatus
+
+      if (
+        !isVisible &&
+        (run.status === 'failed' || (!isTerminalStatus && existing.hiddenByScopeChange))
+      ) {
+        existing.notificationId = notify(notification)
+      }
+      existing.hiddenByScopeChange = false
     }
-
-    const existing = publishedByScope.current.get(scopeKey)
-    if (existing?.runId === run.id && existing.terminalStatusPublished) {
-      return
-    }
-
-    const notification = createWorkflowRunNotification(
-      run,
-      { isStopping, onNavigateToTarget: navigateToTarget, onStop },
-      t
-    )
-    const isTerminalStatus =
-      run.status === 'failed' || run.status === 'succeeded' || run.status === 'stopped'
-
-    if (!existing || existing.runId !== run.id) {
-      publishedByScope.current.set(scopeKey, {
-        hiddenByScopeChange: false,
-        notificationId: notify(notification),
-        runId: run.id,
-        terminalStatusPublished: isTerminalStatus
-      })
-      return
-    }
-
-    const isVisible = update(existing.notificationId, notification)
-    existing.terminalStatusPublished = isTerminalStatus
-
-    if (
-      !isVisible &&
-      (run.status === 'failed' || (!isTerminalStatus && existing.hiddenByScopeChange))
-    ) {
-      existing.notificationId = notify(notification)
-    }
-    existing.hiddenByScopeChange = false
   }, [
-    isStopping,
     navigateToTarget,
     notify,
     onStop,
     projectId,
-    run,
+    runs,
     scopeKey,
+    stoppingRunIds,
     t,
     update,
     workspaceId
   ])
+}
+
+function createWorkflowPublicationKey(scopeKey: string, runId: string): string {
+  return JSON.stringify([scopeKey, runId])
 }
 
 function createWorkflowScopeKey(

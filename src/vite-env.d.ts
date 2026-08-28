@@ -506,11 +506,12 @@ declare global {
       stopTerminalWorkflow(command: {
         readonly projectDirectory: string
         readonly workspaceId: string
+        readonly runId: string
       }): Promise<WorkflowRunSnapshot | null>
-      getTerminalWorkflow(command: {
+      getTerminalWorkflows(command: {
         readonly projectDirectory: string
         readonly workspaceId: string
-      }): Promise<WorkflowRunSnapshot | null>
+      }): Promise<readonly WorkflowRunSnapshot[]>
       onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void
       onTerminalRunEvent(listener: (event: TerminalRunEvent) => void): () => void
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
