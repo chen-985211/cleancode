@@ -17,6 +17,10 @@ import {
 
 const providerRequestDeadlineGraceMs = 100
 
+interface TerminalProviderRpcRequestOptions {
+  readonly disconnectOnTimeout?: boolean
+}
+
 export class TerminalProviderRpcConnection {
   instanceId = ''
   private controllerLeaseId: string | undefined
@@ -76,7 +80,11 @@ export class TerminalProviderRpcConnection {
     )
   }
 
-  request<T = void>(method: string, params?: unknown): Promise<T> {
+  request<T = void>(
+    method: string,
+    params?: unknown,
+    options: TerminalProviderRpcRequestOptions = {}
+  ): Promise<T> {
     const requestId = randomUUID()
     const request: TerminalProviderRequest = {
       type: 'request',
@@ -91,9 +99,15 @@ export class TerminalProviderRpcConnection {
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(requestId)
-        const error = providerUnavailable(`Terminal provider request timed out: ${method}`)
+        const error =
+          options.disconnectOnTimeout === false
+            ? createExpectedAppError(
+                'COMMAND_TIMED_OUT',
+                `Terminal provider request timed out: ${method}`
+              )
+            : providerUnavailable(`Terminal provider request timed out: ${method}`)
         reject(error)
-        this.socket.destroy()
+        if (options.disconnectOnTimeout !== false) this.socket.destroy()
       }, this.requestDeadlineMs + providerRequestDeadlineGraceMs)
       this.pending.set(requestId, {
         resolve: (value) => resolve(value as T),

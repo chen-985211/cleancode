@@ -54,6 +54,7 @@ import {
   listTerminalSessionSnapshots,
   observeTerminalEnded,
   prepareTerminalSessionLaunch,
+  readBestEffortWorkingDirectory,
   readTerminalModelDiagnostics,
   requireTerminalModelPort,
   settleTerminalViewRelease,
@@ -454,10 +455,7 @@ export class TerminalSessionService {
   async attachView(command: AttachTerminalViewCommand): Promise<TerminalSnapshot> {
     const session = this.requireRestorableSession(command)
     const terminalModelPort = requireTerminalModelPort(this.terminalModelPort)
-    const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(session.id)
-    if (workingDirectory) {
-      terminalModelPort.updateWorkingDirectory(session.scope, workingDirectory)
-    }
+    await readBestEffortWorkingDirectory(session, this.terminalProcessPort, this.terminalModelPort)
     return terminalModelPort.attachView({
       identity: session.scope,
       viewId: command.viewId,
@@ -491,13 +489,14 @@ export class TerminalSessionService {
       )
     }
 
-    let workingDirectory =
-      this.terminalModelPort?.readWorkingDirectory(session.scope) ?? session.workingDirectory
-    if (session.status === 'running') {
-      workingDirectory =
-        (await this.terminalProcessPort.readWorkingDirectory(session.id)) ?? workingDirectory
-      this.terminalModelPort?.updateWorkingDirectory(session.scope, workingDirectory)
-    }
+    const workingDirectory =
+      session.status === 'running'
+        ? await readBestEffortWorkingDirectory(
+            session,
+            this.terminalProcessPort,
+            this.terminalModelPort
+          )
+        : (this.terminalModelPort?.readWorkingDirectory(session.scope) ?? session.workingDirectory)
     return { workingDirectory, workspaceDirectory: session.scope.workspaceDirectory }
   }
 
@@ -515,23 +514,20 @@ export class TerminalSessionService {
     if (this.isApplicationShuttingDown()) return []
     const workingDirectories: TerminalWorkingDirectorySnapshot[] = []
 
-    try {
-      for (const sessionId of sessionIds) {
-        if (this.isApplicationShuttingDown()) return []
-        const session = this.sessions.get(sessionId)
-
-        if (!session || session.status !== 'running') continue
-
-        const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(sessionId)
-        if (this.isApplicationShuttingDown()) return []
-
-        if (!workingDirectory) continue
-
-        workingDirectories.push({ sessionId, workingDirectory })
-      }
-    } catch (error) {
+    for (const sessionId of sessionIds) {
       if (this.isApplicationShuttingDown()) return []
-      throw error
+      const session = this.sessions.get(sessionId)
+
+      if (!session || session.status !== 'running') continue
+
+      const workingDirectory = await readBestEffortWorkingDirectory(
+        session,
+        this.terminalProcessPort,
+        this.terminalModelPort
+      )
+      if (this.isApplicationShuttingDown()) return []
+
+      workingDirectories.push({ sessionId, workingDirectory })
     }
 
     return workingDirectories

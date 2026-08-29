@@ -21,7 +21,8 @@ import type {
   TerminalExitEvent,
   TerminalProcessHandle,
   TerminalProcessOutputEvent,
-  TerminalProcessPort
+  TerminalProcessPort,
+  TerminalWorkingDirectoryChangedEvent
 } from '../../application/ports/TerminalProcessPort'
 import type {
   TerminalRuntimeProviderPort,
@@ -49,7 +50,6 @@ import {
   isApplicationDetachReceipt,
   isProviderProcessAlive,
   isRuntimeInvalidatingProviderError,
-  matchesForegroundJob,
   providerEndpointAcceptsConnections,
   readProviderMetadata,
   removeStaleProviderMetadata,
@@ -67,8 +67,11 @@ import {
   type TerminalProviderProcessLaunchOptions
 } from './TerminalProviderProcessLauncher'
 import { observeTerminalProviderLiveness } from './TerminalProviderHeartbeat'
+import { TerminalProviderForegroundJobEventBridge } from './TerminalProviderForegroundJobEventBridge'
+import { TerminalProviderProcessCallbacks } from './TerminalProviderProcessCallbacks'
 import { TerminalProviderProcessEventGate } from './TerminalProviderProcessEventGate'
 import { TerminalProviderTitleEventBridge } from './TerminalProviderTitleEventBridge'
+import { TerminalProviderWorkingDirectoryCache } from './TerminalProviderWorkingDirectoryCache'
 
 export interface PersistentTerminalProviderClientOptions {
   readonly stateDirectory: string
@@ -79,26 +82,26 @@ export interface PersistentTerminalProviderClientOptions {
   readonly onBackgroundError?: (error: unknown) => void
   readonly onRuntimeUnavailable?: (error: unknown) => void
   readonly onOutput?: (event: TerminalProcessOutputEvent) => void
+  readonly onWorkingDirectoryChanged?: (event: TerminalWorkingDirectoryChangedEvent) => void
   readonly requestDeadlineMs?: number
+}
+
+interface ProviderClientRequestOptions {
+  readonly disconnectOnTimeout?: boolean
+  readonly timeoutInvalidatesRuntime?: boolean
 }
 
 export class PersistentTerminalProviderClient
   implements TerminalProcessPort, TerminalModelPort, TerminalRuntimeProviderPort
 {
   private connection: TerminalProviderRpcConnection | null = null
-  private readonly processCallbacks = new Map<
-    string,
-    {
-      readonly onOutput: (event: TerminalProcessOutputEvent) => void
-      readonly onExit: (event: TerminalExitEvent) => void
-    }
-  >()
-  private readonly foregroundJobCallbacks = new Map<string, LaunchForegroundJobProcessCommand>()
+  private readonly processCallbacks = new TerminalProviderProcessCallbacks()
+  private readonly foregroundJobs = new TerminalProviderForegroundJobEventBridge()
   private readonly viewCallbacks = new Map<string, AttachTerminalViewCommand>()
   private readonly titleEvents = new TerminalProviderTitleEventBridge()
   private readonly pendingModelCreates = new Map<string, Promise<unknown>>()
   private readonly processEventGate = new TerminalProviderProcessEventGate()
-  private readonly workingDirectories = new Map<string, string>()
+  private readonly workingDirectories = new TerminalProviderWorkingDirectoryCache()
   private readonly identities = new Map<string, TerminalRunScope>()
   private connectionAttempt: Promise<TerminalProviderMetadata> | null = null
   private connectedMetadata: TerminalProviderMetadata | null = null
@@ -115,7 +118,7 @@ export class PersistentTerminalProviderClient
     const result = await connection.request<TerminalRuntimeRecoveryResult>('listSessions')
     for (const session of result.sessions) {
       this.identities.set(session.sessionId, session)
-      this.workingDirectories.set(session.sessionId, session.workingDirectory)
+      this.workingDirectories.remember(session.sessionId, session.workingDirectory)
     }
     if (metadata.instanceId !== connection.instanceId) {
       throw providerUnavailable(
@@ -133,7 +136,8 @@ export class PersistentTerminalProviderClient
     }
   ): void {
     this.identities.set(identity.sessionId, identity)
-    this.processCallbacks.set(identity.sessionId, callbacks)
+    this.workingDirectories.resetRevision(identity.sessionId)
+    this.processCallbacks.bind(identity.sessionId, callbacks)
   }
 
   bindRecoveryIssueHandler(handler: (issue: TerminalRuntimeRecoveryIssue) => void): void {
@@ -142,7 +146,7 @@ export class PersistentTerminalProviderClient
 
   create(command: CreateTerminalModelCommand): void {
     this.identities.set(command.identity.sessionId, command.identity)
-    this.workingDirectories.set(command.identity.sessionId, command.workingDirectory)
+    this.workingDirectories.remember(command.identity.sessionId, command.workingDirectory)
     this.titleEvents.bind(command.identity.sessionId, command.onTitleChanged)
     const request = this.request('createModel', {
       command: {
@@ -175,7 +179,7 @@ export class PersistentTerminalProviderClient
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     await this.pendingModelCreates.get(command.scope.sessionId)
     const sessionId = command.scope.sessionId
-    this.processCallbacks.set(sessionId, {
+    this.processCallbacks.bind(sessionId, {
       onOutput: command.onOutput,
       onExit: command.onExit
     })
@@ -203,7 +207,7 @@ export class PersistentTerminalProviderClient
       return handle
     } catch (error) {
       this.processEventGate.forget(sessionId)
-      this.processCallbacks.delete(sessionId)
+      this.processCallbacks.forget(sessionId)
       throw error
     }
   }
@@ -211,9 +215,8 @@ export class PersistentTerminalProviderClient
   write(sessionId: string, input: string): void {
     this.backgroundRequest('write', { sessionId, input })
   }
-
   launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
-    this.foregroundJobCallbacks.set(command.sessionId, command)
+    this.foregroundJobs.bind(command)
     void this.request('launchForegroundJob', {
       foregroundJob: {
         args: command.args,
@@ -224,34 +227,25 @@ export class PersistentTerminalProviderClient
         sessionId: command.sessionId
       }
     }).catch((error) => {
-      if (this.foregroundJobCallbacks.get(command.sessionId) !== command) return
-      this.foregroundJobCallbacks.delete(command.sessionId)
+      if (!this.foregroundJobs.failLaunch(command)) return
       this.options.onBackgroundError?.(error)
-      command.onExit({
-        generation: command.generation,
-        launchId: command.launchId,
-        sessionId: command.sessionId,
-        exitCode: null
-      })
     })
   }
 
   pauseOutput(sessionId: string): void {
     this.backgroundRequest('pauseOutput', { sessionId })
   }
-
   resumeOutput(sessionId: string): void {
     this.backgroundRequest('resumeOutput', { sessionId })
   }
 
   async stop(sessionId: string): Promise<void> {
     await this.request('stopProcess', { sessionId })
-    this.foregroundJobCallbacks.delete(sessionId)
+    this.foregroundJobs.forget(sessionId)
   }
-
   async disposeAll(): Promise<void> {
     await this.request('disposeProcesses')
-    this.foregroundJobCallbacks.clear()
+    this.foregroundJobs.clear()
     await this.request('disposeModels')
   }
 
@@ -262,7 +256,7 @@ export class PersistentTerminalProviderClient
         identity: command.identity,
         viewId: command.viewId
       })
-      this.workingDirectories.set(command.identity.sessionId, snapshot.workingDirectory)
+      this.workingDirectories.update(command.identity.sessionId, snapshot.workingDirectory)
       return snapshot
     } catch (error) {
       this.viewCallbacks.delete(command.identity.sessionId)
@@ -280,19 +274,15 @@ export class PersistentTerminalProviderClient
   async flush(identity: TerminalRunScope): Promise<void> {
     await this.request('flushModel', { identity })
   }
-
   readWorkingDirectory(identity: TerminalRunScope): string
   readWorkingDirectory(sessionId: string): Promise<string | null>
   readWorkingDirectory(
     identityOrSessionId: TerminalRunScope | string
   ): string | Promise<string | null> {
     if (typeof identityOrSessionId === 'string') {
-      return this.request('readWorkingDirectory', { sessionId: identityOrSessionId })
+      return this.readObservedWorkingDirectory(identityOrSessionId)
     }
-    return (
-      this.workingDirectories.get(identityOrSessionId.sessionId) ??
-      identityOrSessionId.workspaceDirectory
-    )
+    return this.workingDirectories.read(identityOrSessionId)
   }
 
   resize(identity: TerminalRunScope, columns: number, rows: number): void
@@ -310,38 +300,36 @@ export class PersistentTerminalProviderClient
     if (!this.connection) return
     this.backgroundRequest('setScrollbackRows', { rows })
   }
-
   updateWorkingDirectory(identity: TerminalRunScope, workingDirectory: string): void {
-    this.workingDirectories.set(identity.sessionId, workingDirectory)
+    this.workingDirectories.update(identity.sessionId, workingDirectory)
     this.backgroundRequest('updateWorkingDirectory', { identity, workingDirectory })
   }
 
   retire(identity: TerminalRunScope): void {
     this.viewCallbacks.delete(identity.sessionId)
-    this.processCallbacks.delete(identity.sessionId)
-    this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.processCallbacks.forget(identity.sessionId)
+    this.foregroundJobs.forget(identity.sessionId)
     this.titleEvents.forget(identity.sessionId)
     this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
-    this.workingDirectories.delete(identity.sessionId)
+    this.workingDirectories.forget(identity.sessionId)
     this.backgroundRequest('retireModel', { identity })
   }
 
   async retireSession(identity: TerminalRunScope): Promise<void> {
     this.viewCallbacks.delete(identity.sessionId)
-    this.processCallbacks.delete(identity.sessionId)
-    this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.processCallbacks.forget(identity.sessionId)
+    this.foregroundJobs.forget(identity.sessionId)
     this.titleEvents.forget(identity.sessionId)
     this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
-    this.workingDirectories.delete(identity.sessionId)
+    this.workingDirectories.forget(identity.sessionId)
     await this.request('retireModel', { identity })
   }
 
   getDiagnostics(): TerminalModelDiagnosticsSnapshot {
     return createProviderDiagnostics(this.identities.size, this.viewCallbacks.size)
   }
-
   setRetentionPolicy(sessionId: string, retentionPolicy: TerminalRetentionPolicy): Promise<void> {
     return this.request('setRetention', { sessionId, retentionPolicy })
   }
@@ -349,7 +337,6 @@ export class PersistentTerminalProviderClient
   recordManagedServiceEndpoint(sessionId: string, endpoint: ActualServiceEndpoint): Promise<void> {
     return this.request('recordManagedServiceEndpoint', { sessionId, endpoint })
   }
-
   async detachApplication(): Promise<void> {
     this.isDetaching = true
     await this.connectionAttempt?.catch(() => undefined)
@@ -379,7 +366,6 @@ export class PersistentTerminalProviderClient
       this.clearApplicationReferences()
     }
   }
-
   private ensureProviderConnection(): Promise<TerminalProviderMetadata> {
     if (this.connection && this.connectedMetadata) return Promise.resolve(this.connectedMetadata)
     if (this.connectionAttempt) return this.connectionAttempt
@@ -569,7 +555,7 @@ export class PersistentTerminalProviderClient
       const output = event.payload as TerminalProcessOutputEvent & { readonly sequence: number }
       this.titleEvents.acceptOutput(output.sessionId, output.data)
       if (isBlockTerminalOwner(output.scope)) this.options.onOutput?.(output)
-      this.processCallbacks.get(output.sessionId)?.onOutput(output)
+      this.processCallbacks.acceptOutput(output)
       const view = this.viewCallbacks.get(output.sessionId)
       if (view) {
         view.onOutput({
@@ -589,25 +575,23 @@ export class PersistentTerminalProviderClient
       this.titleEvents.acceptTitle(update.sessionId, update.title)
       return
     }
+    if (event.event === 'terminal-working-directory') {
+      this.acceptWorkingDirectoryEvent(event.payload as TerminalWorkingDirectoryChangedEvent)
+      return
+    }
     if (event.event === 'terminal-exit') {
       const exit = event.payload as TerminalExitEvent
-      this.processCallbacks.get(exit.sessionId)?.onExit(exit)
+      this.processCallbacks.acceptExit(exit)
       return
     }
     if (event.event === 'foreground-job-started') {
-      const started = event.payload as ForegroundJobProcessIdentity
-      const callbacks = this.foregroundJobCallbacks.get(started.sessionId)
-      if (callbacks && matchesForegroundJob(callbacks, started)) callbacks.onStarted(started)
+      this.foregroundJobs.acceptStarted(event.payload as ForegroundJobProcessIdentity)
       return
     }
     if (event.event === 'foreground-job-exited') {
-      const exit = event.payload as ForegroundJobProcessIdentity & {
-        readonly exitCode: number | null
-      }
-      const callbacks = this.foregroundJobCallbacks.get(exit.sessionId)
-      if (!callbacks || !matchesForegroundJob(callbacks, exit)) return
-      this.foregroundJobCallbacks.delete(exit.sessionId)
-      callbacks.onExit(exit)
+      this.foregroundJobs.acceptExited(
+        event.payload as ForegroundJobProcessIdentity & { readonly exitCode: number | null }
+      )
       return
     }
     if (event.event === 'recovery-issue') {
@@ -626,14 +610,21 @@ export class PersistentTerminalProviderClient
     }
   }
 
-  private async request<T = void>(method: string, params?: unknown): Promise<T> {
+  private async request<T = void>(
+    method: string,
+    params?: unknown,
+    options: ProviderClientRequestOptions = {}
+  ): Promise<T> {
     let connection: TerminalProviderRpcConnection | null = null
     try {
       if (!this.connection) await this.ensureProviderConnection()
       connection = this.requireConnection()
-      return await connection.request<T>(method, params)
+      return await connection.request<T>(method, params, options)
     } catch (error) {
-      if (isRuntimeInvalidatingProviderError(error)) {
+      if (
+        isRuntimeInvalidatingProviderError(error) &&
+        (error.code !== 'COMMAND_TIMED_OUT' || options.timeoutInvalidatesRuntime !== false)
+      ) {
         if (connection && error.code === 'TERMINAL_PROVIDER_UNAVAILABLE') {
           this.invalidateConnection(connection)
         }
@@ -641,6 +632,25 @@ export class PersistentTerminalProviderClient
       }
       throw error
     }
+  }
+
+  private async readObservedWorkingDirectory(sessionId: string): Promise<string | null> {
+    return this.workingDirectories.observe(sessionId, () =>
+      this.request<string | null>(
+        'readWorkingDirectory',
+        { sessionId },
+        {
+          disconnectOnTimeout: false,
+          timeoutInvalidatesRuntime: false
+        }
+      )
+    )
+  }
+
+  private acceptWorkingDirectoryEvent(event: TerminalWorkingDirectoryChangedEvent): void {
+    const identity = this.identities.get(event.sessionId)
+    if (!this.workingDirectories.acceptEvent(identity, event)) return
+    this.options.onWorkingDirectoryChanged?.(event)
   }
 
   private backgroundRequest(method: string, params?: unknown): void {
@@ -677,7 +687,7 @@ export class PersistentTerminalProviderClient
   }
   private clearApplicationReferences(): void {
     this.processCallbacks.clear()
-    this.foregroundJobCallbacks.clear()
+    this.foregroundJobs.clear()
     this.viewCallbacks.clear()
     this.titleEvents.clear()
     this.pendingModelCreates.clear()

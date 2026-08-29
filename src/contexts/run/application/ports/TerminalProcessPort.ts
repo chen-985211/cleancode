@@ -27,6 +27,11 @@ export interface TerminalWorkingDirectorySnapshot {
   readonly workingDirectory: string
 }
 
+export interface TerminalWorkingDirectoryChangedEvent extends TerminalWorkingDirectorySnapshot {
+  readonly scope: TerminalRunScope
+  readonly revision: number
+}
+
 export interface StartTerminalProcessCommand {
   readonly scope: TerminalRunScope
   readonly workingDirectory: string

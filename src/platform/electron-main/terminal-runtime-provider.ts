@@ -14,6 +14,8 @@ import {
   type TerminalProviderLivenessReference
 } from '../../contexts/run/infrastructure/provider/TerminalProviderHeartbeat'
 import { createTerminalProcessEnvironment } from '../../contexts/run/infrastructure/pty/TerminalProcessEnvironment'
+import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import { installTerminalShellIntegration } from '../../contexts/run/infrastructure/pty/TerminalShellIntegration'
 import { resolveTerminalShellExecutable } from '../../contexts/run/infrastructure/pty/TerminalShellExecutableResolver'
 import { WindowsConptyWarmup } from '../../contexts/run/infrastructure/pty/WindowsConptyWarmup'
 
@@ -49,6 +51,14 @@ async function startProvider(): Promise<void> {
     expectedHeartbeatId
   )
   const stateDirectory = dirname(metadataPath)
+  const shellIntegration = await installTerminalShellIntegration(
+    join(stateDirectory, 'shell-integration')
+  ).catch(async (error) => {
+    await writeProviderDiagnostic('shell-integration-install-failed', {
+      message: error instanceof Error ? error.message : String(error)
+    })
+    return undefined
+  })
   const conptyWarmup = new WindowsConptyWarmup({
     environment: createTerminalProcessEnvironment({
       explicit: undefined,
@@ -106,6 +116,7 @@ async function startProvider(): Promise<void> {
       endpoint: metadata.endpoint,
       authToken: metadata.authToken,
       instanceId: metadata.instanceId,
+      processes: new NodePtyTerminalProcessAdapter({ shellIntegration }),
       recoveryDirectory: join(stateDirectory, 'recovery'),
       log: (message, details) => void writeProviderDiagnostic(message, details),
       onExitRequested: () => close(),

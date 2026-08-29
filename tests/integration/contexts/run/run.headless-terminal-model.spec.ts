@@ -1,6 +1,32 @@
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 
 describe('headless terminal model', () => {
+  it('publishes only valid changed OSC 7 working directories for the current run', async () => {
+    const workingDirectoryChanges: string[] = []
+    const adapter = new HeadlessTerminalModelAdapter()
+    const identity = createIdentity()
+
+    adapter.create({
+      identity,
+      columns: 80,
+      rows: 24,
+      workingDirectory: '/work/app',
+      onQueryResponse: () => undefined,
+      onFlowControlChange: () => undefined,
+      onWorkingDirectoryChanged: (workingDirectory) =>
+        workingDirectoryChanges.push(workingDirectory)
+    })
+
+    adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/src\u0007')
+    adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/src\u001b\\')
+    adapter.acceptOutput(identity, '\u001b]7;https://localhost/ignored\u0007')
+    adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/%E4%B8%AD%E6%96%87\u0007')
+    await adapter.flush(identity)
+
+    expect(workingDirectoryChanges).toEqual(['/work/app/src', '/work/app/中文'])
+    expect(adapter.readWorkingDirectory(identity)).toBe('/work/app/中文')
+  })
+
   it('restores screen state, alternate buffer, modes and monotonic output sequence', async () => {
     const queryResponses: string[] = []
     const flowControl: boolean[] = []

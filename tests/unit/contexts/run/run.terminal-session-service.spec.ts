@@ -313,7 +313,7 @@ describe('terminal session service', () => {
     await expect(query).resolves.toEqual([])
   })
 
-  it('preserves working directory failures while the terminal runtime is active', async () => {
+  it('falls back to the cached directory when auxiliary inspection fails', async () => {
     const terminalProcessPort = new RecordingTerminalProcessPort()
     const lifecycle = new RunLifecycleService()
     const service = new TerminalSessionService(terminalProcessPort, undefined, lifecycle)
@@ -332,7 +332,9 @@ describe('terminal session service', () => {
     )
     vi.spyOn(terminalProcessPort, 'readWorkingDirectory').mockRejectedValue(providerFailure)
 
-    await expect(service.listWorkingDirectories([session.id])).rejects.toBe(providerFailure)
+    await expect(service.listWorkingDirectories([session.id])).resolves.toEqual([
+      { sessionId: session.id, workingDirectory: '/work/app' }
+    ])
   })
 
   it('returns authoritative snapshots without forwarding stale actions after a session exits', async () => {

@@ -12,6 +12,7 @@ export class TerminalProviderProcessEventGate {
     if (
       event.event !== 'terminal-output' &&
       event.event !== 'terminal-title' &&
+      event.event !== 'terminal-working-directory' &&
       event.event !== 'terminal-exit'
     ) {
       return false

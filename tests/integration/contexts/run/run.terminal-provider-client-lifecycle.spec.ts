@@ -1,5 +1,4 @@
 import { mkdtemp, rm } from 'node:fs/promises'
-import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -12,20 +11,18 @@ import {
   createProviderEndpoint
 } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
 import {
-  encodeTerminalProviderFrame,
-  TerminalProviderFrameDecoder,
-  type TerminalProviderRequest,
   terminalProviderMinimumCompatibleProtocolVersion,
   terminalProviderProtocolVersion
 } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
+import { ControllableTerminalProvider } from '../../../support/controllableTerminalProvider'
 
 describe('persistent terminal provider client lifecycle', () => {
   let rootDirectory = ''
-  let provider: ControllableProvider
+  let provider: ControllableTerminalProvider
 
   beforeEach(async () => {
     rootDirectory = await mkdtemp(join(tmpdir(), 'cc-provider-client-'))
-    provider = new ControllableProvider(createProviderEndpoint(rootDirectory))
+    provider = new ControllableTerminalProvider(createProviderEndpoint(rootDirectory))
     await provider.start()
     await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
       schemaVersion: 1,
@@ -87,7 +84,7 @@ describe('persistent terminal provider client lifecycle', () => {
 
   it('refuses to reuse a Provider from before the terminal environment boundary', async () => {
     await provider.close()
-    provider = new ControllableProvider(
+    provider = new ControllableTerminalProvider(
       createProviderEndpoint(rootDirectory),
       terminalProviderMinimumCompatibleProtocolVersion - 1
     )
@@ -209,6 +206,75 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
+  it('keeps working-directory query timeouts auxiliary and reuses the healthy connection', async () => {
+    const runtimeUnavailable = vi.fn()
+    const client = createClient(rootDirectory, undefined, runtimeUnavailable, undefined, 25)
+    await client.initialize()
+    provider.pauseMethodResponses('readWorkingDirectory')
+
+    await expect(client.readWorkingDirectory('session-1')).rejects.toMatchObject({
+      code: 'COMMAND_TIMED_OUT'
+    })
+    expect(runtimeUnavailable).not.toHaveBeenCalled()
+
+    provider.resumeMethodResponses('readWorkingDirectory')
+    await expect(client.readWorkingDirectory('session-1')).resolves.toBeNull()
+    expect(provider.connectionCount).toBe(1)
+    await client.detachApplication()
+  })
+
+  it('accepts only newer working-directory events for the current terminal generation', async () => {
+    const onWorkingDirectoryChanged = vi.fn()
+    const client = createClient(
+      rootDirectory,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onWorkingDirectoryChanged
+    )
+    const scope = outputIdentity('block')
+    await client.initialize()
+    client.create({
+      identity: scope,
+      columns: 80,
+      rows: 24,
+      workingDirectory: scope.workspaceDirectory,
+      onFlowControlChange: () => undefined,
+      onQueryResponse: () => undefined
+    })
+    await provider.waitForRequests('createModel', 1)
+
+    provider.emitEvent('terminal-working-directory', {
+      revision: 2,
+      scope,
+      sessionId: scope.sessionId,
+      workingDirectory: '/work/app/packages/ui'
+    })
+    provider.emitEvent('terminal-working-directory', {
+      revision: 1,
+      scope,
+      sessionId: scope.sessionId,
+      workingDirectory: '/work/app/stale'
+    })
+    provider.emitEvent('terminal-working-directory', {
+      revision: 3,
+      scope: { ...scope, generation: 2 },
+      sessionId: scope.sessionId,
+      workingDirectory: '/work/app/other-generation'
+    })
+
+    await vi.waitFor(() => expect(onWorkingDirectoryChanged).toHaveBeenCalledOnce())
+    expect(onWorkingDirectoryChanged).toHaveBeenCalledWith({
+      revision: 2,
+      scope,
+      sessionId: scope.sessionId,
+      workingDirectory: '/work/app/packages/ui'
+    })
+    expect(client.readWorkingDirectory(scope)).toBe('/work/app/packages/ui')
+    await client.detachApplication()
+  })
+
   it('routes only matching foreground job lifecycle events to the launch callback', async () => {
     const client = createClient(rootDirectory)
     const onStarted = vi.fn()
@@ -284,7 +350,7 @@ describe('persistent terminal provider client lifecycle', () => {
 
   it('routes terminal title metadata to the model callback without treating it as output', async () => {
     await provider.close()
-    provider = new ControllableProvider(
+    provider = new ControllableTerminalProvider(
       createProviderEndpoint(rootDirectory),
       terminalProviderProtocolVersion - 1
     )
@@ -405,7 +471,8 @@ function createClient(
   onBackgroundError?: (error: unknown) => void,
   onRuntimeUnavailable?: (error: unknown) => void,
   onOutput?: PersistentTerminalProviderClientOptions['onOutput'],
-  requestDeadlineMs?: number
+  requestDeadlineMs?: number,
+  onWorkingDirectoryChanged?: PersistentTerminalProviderClientOptions['onWorkingDirectoryChanged']
 ) {
   return new PersistentTerminalProviderClient({
     stateDirectory: rootDirectory,
@@ -413,6 +480,7 @@ function createClient(
     onBackgroundError,
     onRuntimeUnavailable,
     onOutput,
+    onWorkingDirectoryChanged,
     requestDeadlineMs
   })
 }
@@ -434,7 +502,7 @@ function outputIdentity(ownerKind: 'agent' | 'block') {
 }
 
 async function expectNoAdditionalConnections(
-  provider: ControllableProvider,
+  provider: ControllableTerminalProvider,
   expectedCount: number,
   observationMs: number
 ): Promise<void> {
@@ -456,220 +524,4 @@ async function expectNoAdditionalConnections(
     timeout.unref()
     interval.unref()
   })
-}
-
-class ControllableProvider {
-  readonly authToken = 'provider-client-secret'
-  readonly instanceId = 'provider-client-instance'
-  readonly requests: TerminalProviderRequest[] = []
-  connectionCount = 0
-  private readonly sockets = new Set<Socket>()
-  private server: Server | null = null
-  private healthResponses: Deferred | null = null
-  private applicationDetachCompletion: Deferred | null = null
-  private readonly pausedMethodResponses = new Map<string, Deferred>()
-  private readonly methodFailures = new Map<string, unknown>()
-  private rejectedControllerClaims = 0
-  private processLifecycleBeforeStartResponse: ReturnType<typeof outputIdentity> | null = null
-
-  constructor(
-    readonly endpoint: string,
-    readonly protocolVersion: number = terminalProviderProtocolVersion
-  ) {}
-
-  async start(): Promise<void> {
-    await rm(this.endpoint, { force: true })
-    await new Promise<void>((resolve, reject) => {
-      this.server = createServer((socket) => this.accept(socket))
-      this.server.once('error', reject)
-      this.server.listen(this.endpoint, () => {
-        this.server?.off('error', reject)
-        resolve()
-      })
-    })
-  }
-
-  async close(): Promise<void> {
-    this.resumeHealthResponses()
-    for (const socket of this.sockets) socket.destroy()
-    await new Promise<void>((resolve) => {
-      if (!this.server) return resolve()
-      this.server.close(() => resolve())
-    })
-    await rm(this.endpoint, { force: true })
-  }
-
-  pauseHealthResponses(): void {
-    this.healthResponses = createDeferred()
-  }
-
-  pauseApplicationDetachCompletion(): void {
-    this.applicationDetachCompletion = createDeferred()
-  }
-
-  pauseMethodResponses(method: string): void {
-    this.pausedMethodResponses.set(method, createDeferred())
-  }
-
-  failMethod(method: string, error: unknown): void {
-    this.methodFailures.set(method, error)
-  }
-
-  resumeApplicationDetachCompletion(): void {
-    this.applicationDetachCompletion?.resolve()
-    this.applicationDetachCompletion = null
-  }
-
-  resumeHealthResponses(): void {
-    this.healthResponses?.resolve()
-    this.healthResponses = null
-  }
-
-  rejectControllerClaims(count: number): void {
-    this.rejectedControllerClaims = count
-  }
-
-  disconnectClients(): void {
-    for (const socket of this.sockets) socket.destroy()
-  }
-
-  emitEvent(event: string, payload: unknown): void {
-    for (const socket of this.sockets) {
-      socket.write(encodeTerminalProviderFrame({ event, payload, type: 'event' }))
-    }
-  }
-
-  emitProcessLifecycleBeforeStartResponse(scope: ReturnType<typeof outputIdentity>): void {
-    this.processLifecycleBeforeStartResponse = scope
-  }
-
-  async waitForRequests(method: string, count: number): Promise<void> {
-    await vi.waitFor(() => {
-      expect(
-        this.requests.filter((request) => request.method === method).length
-      ).toBeGreaterThanOrEqual(count)
-    })
-  }
-
-  private accept(socket: Socket): void {
-    this.connectionCount += 1
-    this.sockets.add(socket)
-    const decoder = new TerminalProviderFrameDecoder()
-    let requestTail = Promise.resolve()
-    socket.on('data', (chunk) => {
-      for (const value of decoder.push(chunk)) {
-        requestTail = requestTail.then(() => this.respond(socket, value as TerminalProviderRequest))
-      }
-    })
-    socket.on('close', () => this.sockets.delete(socket))
-  }
-
-  private async respond(socket: Socket, request: TerminalProviderRequest): Promise<void> {
-    this.requests.push(request)
-    await this.pausedMethodResponses.get(request.method)?.promise
-    const failure = this.methodFailures.get(request.method)
-    if (failure) {
-      this.methodFailures.delete(request.method)
-      socket.write(
-        encodeTerminalProviderFrame({
-          type: 'response',
-          requestId: request.requestId,
-          ok: false,
-          error: failure
-        })
-      )
-      return
-    }
-    if (request.method === 'health') await this.healthResponses?.promise
-    if (request.method === 'awaitApplicationDetach') {
-      await this.applicationDetachCompletion?.promise
-    }
-    if (request.method === 'claimController' && this.rejectedControllerClaims > 0) {
-      this.rejectedControllerClaims -= 1
-      socket.write(
-        encodeTerminalProviderFrame({
-          type: 'response',
-          requestId: request.requestId,
-          ok: false,
-          error: {
-            code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY',
-            isExpected: true,
-            message: 'Terminal provider controller is releasing.',
-            details: { retryAfterMs: 1 }
-          }
-        })
-      )
-      return
-    }
-    if (request.method === 'startProcess' && this.processLifecycleBeforeStartResponse) {
-      const scope = this.processLifecycleBeforeStartResponse
-      this.processLifecycleBeforeStartResponse = null
-      socket.write(
-        encodeTerminalProviderFrame({
-          event: 'terminal-output',
-          payload: {
-            data: 'fast-output',
-            scope,
-            sequence: 1,
-            sessionId: scope.sessionId
-          },
-          type: 'event'
-        })
-      )
-      socket.write(
-        encodeTerminalProviderFrame({
-          event: 'terminal-exit',
-          payload: {
-            exitCode: 0,
-            scope,
-            sessionId: scope.sessionId
-          },
-          type: 'event'
-        })
-      )
-    }
-    const result = this.resultFor(request.method, socket)
-    socket.write(
-      encodeTerminalProviderFrame({
-        type: 'response',
-        requestId: request.requestId,
-        ok: true,
-        result
-      })
-    )
-  }
-
-  private resultFor(method: string, socket: Socket): unknown {
-    if (method === 'health') {
-      return {
-        instanceId: this.instanceId,
-        protocolVersion: this.protocolVersion,
-        controllerState: 'unclaimed'
-      }
-    }
-    if (method === 'claimController') return { controllerLeaseId: 'controller-lease-1' }
-    if (method === 'listSessions') {
-      return { sessions: [], issues: [], managedServiceEndpoints: [] }
-    }
-    if (method === 'beginApplicationDetach') {
-      return { releaseId: 'application-release-1' }
-    }
-    if (method === 'startProcess') return { processId: 4242 }
-    if (method === 'awaitApplicationDetach') setTimeout(() => socket.end(), 0)
-    if (method === 'detachApplication') setTimeout(() => socket.end(), 0)
-    return undefined
-  }
-}
-
-interface Deferred {
-  readonly promise: Promise<void>
-  resolve(): void
-}
-
-function createDeferred(): Deferred {
-  let resolve!: () => void
-  const promise = new Promise<void>((complete) => {
-    resolve = complete
-  })
-  return { promise, resolve }
 }

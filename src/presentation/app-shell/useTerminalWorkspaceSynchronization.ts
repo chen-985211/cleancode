@@ -4,11 +4,13 @@ import {
   defaultTerminalExecutionConfig,
   type TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalWorkingDirectoryChangedEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import { findWorkspaceByDirectory } from './workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from './types'
 
-const terminalWorkspaceSynchronizationIntervalMs = 1500
+export const terminalWorkspaceFallbackIntervalMs = 15_000
+export const terminalWorkspaceEventFreshnessMs = 45_000
 export const manualWorkspaceSelectionBrowserEventName = 'cleancode-manual-workspace-selection'
 
 interface UseTerminalWorkspaceSynchronizationInput {
@@ -38,6 +40,7 @@ export function useTerminalWorkspaceSynchronization({
   const manualWorkspaceSelectionRevisionRef = useRef(0)
   const observedManualWorkspaceSelectionRevisionRef = useRef(0)
   const suppressedWorkingDirectoriesRef = useRef<Map<string, string>>(new Map())
+  const workingDirectoryEventTimesRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const markManualWorkspaceSelection = (): void => {
@@ -74,8 +77,17 @@ export function useTerminalWorkspaceSynchronization({
 
     let isDisposed = false
     let isSynchronizing = false
+    let isQuerying = false
+    const runningSessionIdSet = new Set(runningSessionIds)
+    for (const sessionId of workingDirectoryEventTimesRef.current.keys()) {
+      if (!runningSessionIdSet.has(sessionId)) {
+        workingDirectoryEventTimesRef.current.delete(sessionId)
+      }
+    }
 
-    const synchronizeTerminalWorkspace = async (): Promise<void> => {
+    const synchronizeTerminalWorkspace = async (
+      workingDirectories: readonly TerminalWorkingDirectoryEntry[]
+    ): Promise<void> => {
       if (isSynchronizing) {
         return
       }
@@ -83,9 +95,6 @@ export function useTerminalWorkspaceSynchronization({
       isSynchronizing = true
 
       try {
-        const workingDirectories = await api.listTerminalWorkingDirectories({
-          sessionIds: runningSessionIds
-        })
         forgetChangedSuppressedWorkingDirectories(
           suppressedWorkingDirectoriesRef.current,
           workingDirectories
@@ -158,14 +167,54 @@ export function useTerminalWorkspaceSynchronization({
       }
     }
 
-    void synchronizeTerminalWorkspace()
+    const synchronizeFallback = async (includeFreshSessions = false): Promise<void> => {
+      if (isQuerying || document.visibilityState === 'hidden') return
+      const now = Date.now()
+      const sessionIds = includeFreshSessions
+        ? runningSessionIds
+        : runningSessionIds.filter(
+            (sessionId) =>
+              now - (workingDirectoryEventTimesRef.current.get(sessionId) ?? 0) >=
+              terminalWorkspaceEventFreshnessMs
+          )
+      if (sessionIds.length === 0) return
+
+      isQuerying = true
+      try {
+        const workingDirectories = await api.listTerminalWorkingDirectories({ sessionIds })
+        if (!isDisposed) await synchronizeTerminalWorkspace(workingDirectories)
+      } catch {
+        // A working-directory observation is best effort and must not affect terminal readiness.
+      } finally {
+        isQuerying = false
+      }
+    }
+
+    const unsubscribeWorkingDirectory =
+      typeof api.onTerminalWorkingDirectoryChanged === 'function'
+        ? api.onTerminalWorkingDirectoryChanged(
+            (event: TerminalWorkingDirectoryChangedEvent): void => {
+              if (!runningSessionIdSet.has(event.sessionId)) return
+              workingDirectoryEventTimesRef.current.set(event.sessionId, Date.now())
+              void synchronizeTerminalWorkspace([event])
+            }
+          )
+        : () => undefined
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState !== 'hidden') void synchronizeFallback()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    void synchronizeFallback(true)
     const intervalId = window.setInterval(
-      () => void synchronizeTerminalWorkspace(),
-      terminalWorkspaceSynchronizationIntervalMs
+      () => void synchronizeFallback(),
+      terminalWorkspaceFallbackIntervalMs
     )
 
     return () => {
       isDisposed = true
+      unsubscribeWorkingDirectory()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(intervalId)
     }
   }, [

@@ -88,6 +88,20 @@ describe('terminal shell command', () => {
     )
     expect(decodePowerShellStartupCommand(script)).toBe(windowsAgentShellReadyCommand)
   })
+
+  it('reuses shell-integration arguments when an interactive command falls back to its shell', () => {
+    const launch = createTerminalProcessLaunch(
+      '/bin/bash',
+      'printf ready',
+      'interactive',
+      'darwin',
+      ['--init-file', '/state/shell integration/bash.sh']
+    )
+    const wrapper = launch.arguments.at(-1) ?? ''
+
+    expect(wrapper).toContain("exec '/bin/bash' '--init-file' '/state/shell integration/bash.sh'")
+    expect(wrapper).toContain("exec '/bin/bash' '-lc' 'printf ready'")
+  })
 })
 
 function decodePowerShellCommand(arguments_: readonly string[]): string {

@@ -191,6 +191,8 @@ const cleancodeApi = {
     subscribeRendererEvent('cleancode:terminal-view-output', listener),
   onTerminalSessionUpdated: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:terminal-session-updated', listener),
+  onTerminalWorkingDirectoryChanged: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:terminal-working-directory-changed', listener),
   onTerminalRuntimeAvailability: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:terminal-runtime-availability', listener),
   onTerminalExit: (listener: (event: unknown) => void) => {

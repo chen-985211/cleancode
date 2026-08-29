@@ -59,7 +59,9 @@ export function createRunRuntime(input: {
     onBackgroundError: logProviderError,
     onRuntimeUnavailable: () =>
       lifecycle.markRuntimeUnavailable('TERMINAL_PROVIDER_UNAVAILABLE', true),
-    onOutput: (event) => broadcastRendererEvent('cleancode:terminal-output', event)
+    onOutput: (event) => broadcastRendererEvent('cleancode:terminal-output', event),
+    onWorkingDirectoryChanged: (event) =>
+      broadcastRendererEvent('cleancode:terminal-working-directory-changed', event)
   })
   const sessions = new TerminalSessionService(
     terminalProvider,
