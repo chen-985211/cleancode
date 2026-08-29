@@ -1,6 +1,7 @@
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type {
   StartTerminalWorkflowCommand,
+  StopTerminalWorkflowCommand,
   TerminalWorkflowService,
   TerminalWorkflowScopeCommand
 } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
@@ -13,7 +14,7 @@ import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/T
 export interface TerminalWorkflowIpcHandlersInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
-  readonly workflowService: Pick<TerminalWorkflowService, 'getActiveRun' | 'start' | 'stop'>
+  readonly workflowService: Pick<TerminalWorkflowService, 'getRuns' | 'start' | 'stop'>
 }
 
 type StartTerminalWorkflowIpcCommand = Omit<StartTerminalWorkflowCommand, 'workingDirectory'>
@@ -35,9 +36,9 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<TerminalWorkflowScopeCommand, WorkflowRunSnapshot | null>({
+  registerIpcHandler<StopTerminalWorkflowCommand, WorkflowRunSnapshot | null>({
     channel: 'cleancode:stop-terminal-workflow',
-    handler: (command) => input.workflowService.stop(command),
+    handler: (command) => input.workflowService.stop(readStopWorkflowCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'stopTerminalWorkflow',
@@ -45,14 +46,33 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<TerminalWorkflowScopeCommand, WorkflowRunSnapshot | null>({
-    channel: 'cleancode:get-terminal-workflow',
-    handler: (command) => input.workflowService.getActiveRun(command),
+  registerIpcHandler<TerminalWorkflowScopeCommand, readonly WorkflowRunSnapshot[]>({
+    channel: 'cleancode:get-terminal-workflows',
+    handler: (command) => input.workflowService.getRuns(readWorkflowScopeCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
-    operation: 'getTerminalWorkflow',
+    operation: 'getTerminalWorkflows',
     scope: 'run.terminal-workflow'
   })
+}
+
+function readStopWorkflowCommand(command: unknown): StopTerminalWorkflowCommand {
+  const scope = readWorkflowScopeCommand(command)
+  if (!isRecord(command) || !isNonEmptyString(command.runId)) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow stop command.')
+  }
+  return { ...scope, runId: command.runId }
+}
+
+function readWorkflowScopeCommand(command: unknown): TerminalWorkflowScopeCommand {
+  if (
+    !isRecord(command) ||
+    !isNonEmptyString(command.projectDirectory) ||
+    !isNonEmptyString(command.workspaceId)
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow scope.')
+  }
+  return { projectDirectory: command.projectDirectory, workspaceId: command.workspaceId }
 }
 
 function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCommand {

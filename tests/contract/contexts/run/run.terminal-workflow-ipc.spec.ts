@@ -10,7 +10,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
     const command = {
       projectId: 'project-1',
@@ -34,7 +34,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
 
     await expect(
@@ -58,7 +58,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
 
     await expect(
@@ -84,7 +84,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
     const command = {
       projectId: 'project-1',
@@ -113,7 +113,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
 
     await expect(
@@ -139,7 +139,7 @@ describe('terminal workflow IPC contract', () => {
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+      workflowService: { start, stop: vi.fn(), getRuns: vi.fn() }
     })
     const command = {
       projectId: 'project-1',
@@ -169,34 +169,49 @@ describe('terminal workflow IPC contract', () => {
     })
   })
 
-  it('passes project-workspace-scoped stop commands', async () => {
+  it('passes run-scoped stop commands and rejects missing run identities', async () => {
     const ipcMain = new FakeIpcMain()
     const stop = vi.fn(async () => createRun())
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start: vi.fn(), stop, getActiveRun: vi.fn() }
+      workflowService: { start: vi.fn(), stop, getRuns: vi.fn() }
     })
 
-    const command = { projectDirectory: '/project', workspaceId: 'main' }
+    const command = { projectDirectory: '/project', workspaceId: 'main', runId: 'run-1' }
     await ipcMain.invoke('cleancode:stop-terminal-workflow', command)
+    await expect(
+      ipcMain.invoke('cleancode:stop-terminal-workflow', {
+        projectDirectory: '/project',
+        workspaceId: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND' },
+      ok: false
+    })
 
     expect(stop).toHaveBeenCalledWith(command)
+    expect(stop).toHaveBeenCalledTimes(1)
   })
 
-  it('passes project-workspace-scoped workflow queries', async () => {
+  it('returns all project-workspace-scoped workflow projections', async () => {
     const ipcMain = new FakeIpcMain()
-    const getActiveRun = vi.fn(() => createRun())
+    const getRuns = vi.fn(() => [createRun(), { ...createRun(), id: 'run-2' }])
     registerTerminalWorkflowIpcHandlers({
       ipcMain,
       logger: silentLogger,
-      workflowService: { start: vi.fn(), stop: vi.fn(), getActiveRun }
+      workflowService: { start: vi.fn(), stop: vi.fn(), getRuns }
     })
     const command = { projectDirectory: '/project', workspaceId: 'main' }
 
-    await ipcMain.invoke('cleancode:get-terminal-workflow', command)
+    await expect(
+      ipcMain.invoke<readonly WorkflowRunSnapshot[]>('cleancode:get-terminal-workflows', command)
+    ).resolves.toEqual({
+      ok: true,
+      value: [createRun(), { ...createRun(), id: 'run-2' }]
+    })
 
-    expect(getActiveRun).toHaveBeenCalledWith(command)
+    expect(getRuns).toHaveBeenCalledWith(command)
   })
 })
 

@@ -36,9 +36,9 @@ export function useTerminalWorkflow({
   setCurrentGraph
 }: UseTerminalWorkflowInput) {
   const { t } = useI18n()
-  const [run, setRun] = useState<WorkflowRunSnapshot | null>(null)
-  const [isStopping, setIsStopping] = useState(false)
-  const isStoppingRef = useRef(false)
+  const [runs, setRuns] = useState<readonly WorkflowRunSnapshot[]>([])
+  const [stoppingRunIds, setStoppingRunIds] = useState<readonly string[]>([])
+  const stoppingRunIdsRef = useRef(new Set<string>())
   const graphId = currentWorkbench?.graph.id ?? null
   const projectId = currentWorkbench?.project.id ?? null
   const projectDirectory = currentWorkbench?.project.directory ?? null
@@ -48,8 +48,8 @@ export function useTerminalWorkflow({
 
   useEffect(() => {
     const api = window.cleancode
-    isStoppingRef.current = false
-    setIsStopping(false)
+    stoppingRunIdsRef.current.clear()
+    setStoppingRunIds([])
 
     if (
       !api ||
@@ -57,26 +57,35 @@ export function useTerminalWorkflow({
       !projectDirectory ||
       !workspaceId ||
       typeof api.onTerminalWorkflowEvent !== 'function' ||
-      typeof api.getTerminalWorkflow !== 'function'
+      typeof api.getTerminalWorkflows !== 'function'
     ) {
-      setRun(null)
+      setRuns([])
       return undefined
     }
 
     let isActive = true
+    const liveRuns = new Map<string, WorkflowRunSnapshot>()
+    setRuns([])
     const unsubscribe = api.onTerminalWorkflowEvent((event) => {
       if (
         event.type === 'run-updated' &&
         event.run.graphId === graphId &&
+        event.run.projectId === projectId &&
         event.run.workspaceId === workspaceId
       ) {
-        setRun(event.run)
+        liveRuns.set(event.run.id, event.run)
+        setRuns((current) => upsertWorkflowRun(current, event.run))
       }
     })
 
-    void api.getTerminalWorkflow({ projectDirectory, workspaceId }).then((activeRun) => {
+    void api.getTerminalWorkflows({ projectDirectory, workspaceId }).then((workspaceRuns) => {
       if (isActive) {
-        setRun(activeRun)
+        setRuns(
+          [...liveRuns.values()].reduce<readonly WorkflowRunSnapshot[]>(
+            (current, liveRun) => upsertWorkflowRun(current, liveRun),
+            workspaceRuns
+          )
+        )
       }
     })
 
@@ -84,15 +93,14 @@ export function useTerminalWorkflow({
       isActive = false
       unsubscribe()
     }
-  }, [graphId, projectDirectory, workspaceId])
+  }, [graphId, projectDirectory, projectId, workspaceId])
 
   const nodeStatuses = useMemo(
     () =>
-      Object.fromEntries((run?.nodes ?? []).map((node) => [node.blockId, node.status])) as Record<
-        string,
-        WorkflowRunSnapshot['nodes'][number]['status']
-      >,
-    [run]
+      Object.fromEntries(
+        runs.flatMap((run) => run.nodes.map((node) => [node.blockId, node.status]))
+      ) as Record<string, WorkflowRunSnapshot['nodes'][number]['status']>,
+    [runs]
   )
   const edges = useMemo(
     () => createTerminalWorkflowEdges(currentWorkbench?.graph ?? null, nodeStatuses),
@@ -178,7 +186,7 @@ export function useTerminalWorkflow({
           scope
         })
 
-        if (nextRun) setRun(nextRun)
+        if (nextRun) setRuns((current) => upsertWorkflowRun(current, nextRun))
       })
     },
     [currentWorkbench, currentWorkspace, notify, t]
@@ -192,57 +200,93 @@ export function useTerminalWorkflow({
     [startScope]
   )
 
-  const stop = useCallback(async () => {
-    if (!projectDirectory || !workspaceId || isStoppingRef.current) return
+  const stop = useCallback(
+    async (runId: string) => {
+      if (!projectDirectory || !workspaceId || stoppingRunIdsRef.current.has(runId)) return
 
-    isStoppingRef.current = true
-    setIsStopping(true)
-    try {
-      await performAction(notify, t, async () => {
-        setRun(
-          (await window.cleancode?.stopTerminalWorkflow({
+      stoppingRunIdsRef.current.add(runId)
+      setStoppingRunIds([...stoppingRunIdsRef.current])
+      try {
+        await performAction(notify, t, async () => {
+          const stoppedRun = await window.cleancode?.stopTerminalWorkflow({
             projectDirectory,
-            workspaceId
-          })) ?? null
-        )
-      })
-    } finally {
-      isStoppingRef.current = false
-      setIsStopping(false)
-    }
-  }, [notify, projectDirectory, t, workspaceId])
+            workspaceId,
+            runId
+          })
+          setRuns((current) =>
+            stoppedRun
+              ? upsertWorkflowRun(current, stoppedRun)
+              : current.filter((run) => run.id !== runId)
+          )
+        })
+      } finally {
+        stoppingRunIdsRef.current.delete(runId)
+        setStoppingRunIds([...stoppingRunIdsRef.current])
+      }
+    },
+    [notify, projectDirectory, t, workspaceId]
+  )
 
   useTerminalWorkflowNotifications({
-    isStopping,
     notifications,
     onNavigateToTarget: focusWorkflowNode,
     onStop: stop,
     projectId,
-    run,
+    runs,
+    stoppingRunIds,
     workspaceId
   })
 
-  const isActive = run?.status === 'running' || run?.status === 'ready'
-  const activeRootBlockIds = useMemo(
-    () => (isActive && run ? getWorkflowRunRootBlockIds(run) : []),
-    [isActive, run]
+  const activeRunIdByRootBlockId = useMemo(
+    () =>
+      Object.fromEntries(
+        runs
+          .filter(isActiveWorkflowRun)
+          .flatMap((run) => getWorkflowRunRootBlockIds(run).map((blockId) => [blockId, run.id]))
+      ) as Record<string, string>,
+    [runs]
   )
-
   return {
-    activeRootBlockIds,
+    activeRunIdByRootBlockId,
     connect,
     deleteEdges,
     edges,
-    isActive,
-    isStopping,
     nodeStatuses,
-    run,
+    runs,
     start,
     startScope,
     startTerminalCombination,
+    stoppingRunIds,
     stop,
     updateExecutionConfig
   }
+}
+
+function upsertWorkflowRun(
+  current: readonly WorkflowRunSnapshot[],
+  incoming: WorkflowRunSnapshot
+): readonly WorkflowRunSnapshot[] {
+  const sameRunIndex = current.findIndex((run) => run.id === incoming.id)
+  if (sameRunIndex >= 0) {
+    return current.map((run, index) => (index === sameRunIndex ? incoming : run))
+  }
+
+  const incomingBlockIds = new Set(incoming.nodes.map((node) => node.blockId))
+  const overlappingRuns = current.filter((run) =>
+    run.nodes.some((node) => incomingBlockIds.has(node.blockId))
+  )
+  if (!isActiveWorkflowRun(incoming) && overlappingRuns.some(isActiveWorkflowRun)) {
+    return current
+  }
+
+  return [
+    ...current.filter((run) => !run.nodes.some((node) => incomingBlockIds.has(node.blockId))),
+    incoming
+  ]
+}
+
+function isActiveWorkflowRun(run: WorkflowRunSnapshot): boolean {
+  return run.status === 'running' || run.status === 'ready'
 }
 
 async function performAction(

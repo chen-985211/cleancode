@@ -649,6 +649,7 @@ export const zhCNMessages = {
   'error.TERMINAL_WORKFLOW_COMMAND_MISSING': '流程中的每个终端都需要配置启动命令。',
   'error.TERMINAL_WORKFLOW_CYCLE': '这条依赖会形成环路，无法连接。',
   'error.TERMINAL_WORKFLOW_EMPTY': '没有可运行的终端命令。',
+  'error.TERMINAL_WORKFLOW_SCOPE_CONFLICT': '部分终端已属于正在运行的流程，请先停止该流程。',
   'error.UNEXPECTED_ERROR': '操作失败，请稍后重试。'
 } as const
 

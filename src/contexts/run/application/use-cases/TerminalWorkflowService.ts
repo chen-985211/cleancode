@@ -7,6 +7,7 @@ import type {
 } from '../dto/WorkflowRunSnapshot'
 import type {
   StartTerminalWorkflowCommand,
+  StopTerminalWorkflowCommand,
   TerminalWorkflowScopeCommand
 } from '../dto/TerminalWorkflowCommand'
 import type { TerminalExitEvent, TerminalOutputEvent } from '../ports/TerminalProcessPort'
@@ -31,6 +32,7 @@ import type { RunLifecycleService } from './RunLifecycleService'
 
 export type {
   StartTerminalWorkflowCommand,
+  StopTerminalWorkflowCommand,
   TerminalWorkflowScopeCommand
 } from '../dto/TerminalWorkflowCommand'
 
@@ -52,11 +54,6 @@ export class TerminalWorkflowService {
   }
 
   private async startWorkflow(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
-    const existing = this.findActiveRun(command)
-    if (existing) {
-      await beginWorkflowHardDispose(existing, () => this.performHardDispose(existing))
-    }
-
     const plan = await this.planPort.buildPlan({
       projectDirectory: command.projectDirectory,
       workspaceId: command.workspaceId,
@@ -90,6 +87,28 @@ export class TerminalWorkflowService {
       hardDisposePromise: null
     }
     const register = async (): Promise<void> => {
+      const overlappingRuns = this.findOverlappingRuns(
+        command,
+        plan.nodes.map((node) => node.blockId)
+      )
+      const conflictingRun = overlappingRuns.find((candidate) =>
+        isWorkflowRunActive(candidate.run.toSnapshot())
+      )
+      if (conflictingRun) {
+        const conflictingBlockIds = findSharedBlockIds(activeRun, conflictingRun)
+        throw createExpectedAppError(
+          'TERMINAL_WORKFLOW_SCOPE_CONFLICT',
+          'Terminal workflow overlaps an active run.',
+          {
+            conflictingBlockCount: conflictingBlockIds.length,
+            conflictingBlockId: conflictingBlockIds[0] ?? null,
+            conflictingRunId: conflictingRun.run.id
+          }
+        )
+      }
+      for (const terminalRun of overlappingRuns) {
+        await beginWorkflowHardDispose(terminalRun, () => this.performHardDispose(terminalRun))
+      }
       this.activeRuns.store(activeRun)
       trackWorkflowRun(this.lifecycle, activeRun, () =>
         beginWorkflowHardDispose(activeRun, () => this.performHardDispose(activeRun))
@@ -106,12 +125,12 @@ export class TerminalWorkflowService {
     return activeRun.run.toSnapshot()
   }
 
-  getActiveRun(scope: TerminalWorkflowScopeCommand): WorkflowRunSnapshot | null {
-    return this.findActiveRun(scope)?.run.toSnapshot() ?? null
+  getRuns(scope: TerminalWorkflowScopeCommand): readonly WorkflowRunSnapshot[] {
+    return this.activeRuns.listScope(scope).map((activeRun) => activeRun.run.toSnapshot())
   }
 
-  async stop(scope: TerminalWorkflowScopeCommand): Promise<WorkflowRunSnapshot | null> {
-    const activeRun = this.findActiveRun(scope)
+  async stop(command: StopTerminalWorkflowCommand): Promise<WorkflowRunSnapshot | null> {
+    const activeRun = this.findRun(command)
 
     if (!activeRun) {
       return null
@@ -477,7 +496,7 @@ export class TerminalWorkflowService {
     return (
       !this.applicationShutdown.isShuttingDown &&
       !activeRun.hardDisposing &&
-      this.findActiveRun(activeRun.command) === activeRun
+      this.findRun({ ...activeRun.command, runId: activeRun.run.id }) === activeRun
     )
   }
 
@@ -541,7 +560,30 @@ export class TerminalWorkflowService {
     }
   }
 
-  private findActiveRun(scope: TerminalWorkflowScopeCommand): ActiveWorkflowRun | undefined {
+  private findRun(
+    scope: TerminalWorkflowScopeCommand & { readonly runId: string }
+  ): ActiveWorkflowRun | undefined {
     return this.activeRuns.find(scope)
   }
+
+  private findOverlappingRuns(
+    scope: TerminalWorkflowScopeCommand,
+    blockIds: readonly string[]
+  ): readonly ActiveWorkflowRun[] {
+    const requestedBlockIds = new Set(blockIds)
+    return this.activeRuns
+      .listScope(scope)
+      .filter((activeRun) =>
+        activeRun.plan.nodes.some((node) => requestedBlockIds.has(node.blockId))
+      )
+  }
+}
+
+function isWorkflowRunActive(run: WorkflowRunSnapshot): boolean {
+  return run.status === 'running' || run.status === 'ready'
+}
+
+function findSharedBlockIds(left: ActiveWorkflowRun, right: ActiveWorkflowRun): readonly string[] {
+  const rightBlockIds = new Set(right.plan.nodes.map((node) => node.blockId))
+  return left.plan.nodes.map((node) => node.blockId).filter((blockId) => rightBlockIds.has(blockId))
 }

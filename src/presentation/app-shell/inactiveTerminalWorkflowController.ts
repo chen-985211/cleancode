@@ -1,17 +1,16 @@
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 
 export const inactiveTerminalWorkflowController = {
-  activeRootBlockIds: [],
+  activeRunIdByRootBlockId: {},
   connect: async () => undefined,
   deleteEdges: async () => undefined,
   edges: [],
-  isActive: false,
-  isStopping: false,
   nodeStatuses: {},
-  run: null,
+  runs: [],
   start: async () => undefined,
   startScope: async () => undefined,
   startTerminalCombination: async () => undefined,
+  stoppingRunIds: [],
   stop: async () => undefined,
   updateExecutionConfig: async () => undefined
 } satisfies ReturnType<typeof useTerminalWorkflow>

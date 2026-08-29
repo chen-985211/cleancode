@@ -172,8 +172,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:start-terminal-workflow', command),
   stopTerminalWorkflow: (command: unknown) =>
     invokeCleancode('cleancode:stop-terminal-workflow', command),
-  getTerminalWorkflow: (command: unknown) =>
-    invokeCleancode('cleancode:get-terminal-workflow', command),
+  getTerminalWorkflows: (command: unknown) =>
+    invokeCleancode('cleancode:get-terminal-workflows', command),
   onTerminalWorkflowEvent: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:terminal-workflow-event', listener),
   onTerminalRunEvent: (listener: (event: unknown) => void) =>

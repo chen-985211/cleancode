@@ -94,7 +94,7 @@ describe('app shell terminal group actions', () => {
       writeTerminal
     })
     Object.assign(runtimeApi, {
-      getTerminalWorkflow: vi.fn(async () => null),
+      getTerminalWorkflows: vi.fn(async () => []),
       launchTerminal,
       onTerminalWorkflowEvent: vi.fn(() => vi.fn()),
       startTerminalWorkflow,

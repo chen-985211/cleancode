@@ -33,18 +33,21 @@ describe('terminal flow nodes', () => {
     const onStopWorkflow = vi.fn()
     const nodes = createTerminalFlowNodes({
       graph: createGraph(),
-      activeWorkflowRootBlockIds: ['terminal-1'],
-      isStoppingWorkflow: true,
+      activeWorkflowRunIdByRootBlockId: { 'terminal-1': 'run-1' },
+      stoppingWorkflowRunIds: ['run-1'],
       hoveredTerminalBlockId: null,
       terminalStates: createTerminalStates(),
       handlers: { ...createHandlers(), onStopWorkflow }
     })
 
-    expect(nodes[0]?.data).toMatchObject({
+    const node = nodes[0]
+    expect(node?.data).toMatchObject({
       isActiveWorkflowRoot: true,
-      isStoppingWorkflow: true,
-      onStopWorkflow
+      isStoppingWorkflow: true
     })
+    if (node?.type !== 'terminal') throw new Error('Expected a terminal node.')
+    node.data.onStopWorkflow?.()
+    expect(onStopWorkflow).toHaveBeenCalledWith('run-1')
   })
 })
 
