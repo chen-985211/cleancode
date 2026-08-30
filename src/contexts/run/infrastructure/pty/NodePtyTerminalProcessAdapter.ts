@@ -23,6 +23,10 @@ import {
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalProcessLaunch } from './TerminalShellCommand'
 import {
+  decorateTerminalShellIntegration,
+  type TerminalShellIntegrationFiles
+} from './TerminalShellIntegration'
+import {
   acceptForegroundJobFinalOutput,
   acceptForegroundJobOutput,
   createForegroundJobProbe,
@@ -69,6 +73,7 @@ export interface NodePtyTerminalProcessAdapterOptions {
     options?: TerminalShellExecutableResolutionOptions
   ) => Promise<string>
   readonly runtimePlatform?: NodeJS.Platform
+  readonly shellIntegration?: TerminalShellIntegrationFiles
   readonly spawnPty?: typeof spawnPtyProcess
 }
 
@@ -79,12 +84,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     options?: TerminalShellExecutableResolutionOptions
   ) => Promise<string>
   private readonly runtimePlatform: NodeJS.Platform
+  private readonly shellIntegration: TerminalShellIntegrationFiles | undefined
   private readonly spawnPty: typeof spawnPtyProcess
 
   constructor(options: NodePtyTerminalProcessAdapterOptions = {}) {
     this.environment = options.environment
     this.resolveShellExecutable = options.resolveShellExecutable ?? resolveTerminalShellExecutable
     this.runtimePlatform = options.runtimePlatform ?? platform()
+    this.shellIntegration = options.shellIntegration
     this.spawnPty = options.spawnPty ?? spawnPtyProcess
   }
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
@@ -340,19 +347,6 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         command.scope.owner?.kind === 'agent' &&
         !command.launchCommand &&
         supportsForegroundJobShell('win32', shell)
-      const launch = shouldWaitForWindowsAgentShell
-        ? createTerminalProcessLaunch(
-            shell,
-            windowsAgentShellReadyCommand,
-            'interactive',
-            this.runtimePlatform
-          )
-        : createTerminalProcessLaunch(
-            shell,
-            command.launchCommand,
-            command.launchMode,
-            this.runtimePlatform
-          )
       const processEnvironment = createTerminalProcessEnvironment({
         explicit: command.environment,
         inherited: process.env,
@@ -364,6 +358,32 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         privateOutputControlLaunch,
         this.runtimePlatform
       )
+      const shellIntegration = this.shellIntegration
+        ? decorateTerminalShellIntegration({
+            environment: processEnvironment,
+            files: this.shellIntegration,
+            hasLaunchCommand: Boolean(command.launchCommand),
+            launchMode: command.launchMode ?? 'command',
+            platform: this.runtimePlatform,
+            shell
+          })
+        : { environment: {}, interactiveShellArguments: [] }
+      Object.assign(processEnvironment, shellIntegration.environment)
+      const launch = shouldWaitForWindowsAgentShell
+        ? createTerminalProcessLaunch(
+            shell,
+            windowsAgentShellReadyCommand,
+            'interactive',
+            this.runtimePlatform,
+            shellIntegration.interactiveShellArguments
+          )
+        : createTerminalProcessLaunch(
+            shell,
+            command.launchCommand,
+            command.launchMode,
+            this.runtimePlatform,
+            shellIntegration.interactiveShellArguments
+          )
       const spawnOptions = {
         name: terminalEmulationName,
         cols: command.columns,

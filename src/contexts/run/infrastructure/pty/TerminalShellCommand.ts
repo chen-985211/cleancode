@@ -13,7 +13,8 @@ export function createTerminalProcessLaunch(
   shell: string,
   launchCommand: string | undefined,
   launchMode: TerminalLaunchMode = 'command',
-  runtimePlatform: NodeJS.Platform = platform()
+  runtimePlatform: NodeJS.Platform = platform(),
+  interactiveShellArguments: readonly string[] = []
 ): TerminalProcessLaunch {
   const arguments_ = createTerminalShellCommandArguments(
     shell,
@@ -22,7 +23,10 @@ export function createTerminalProcessLaunch(
     runtimePlatform
   )
   if (!launchCommand || launchMode === 'command') {
-    return { executable: shell, arguments: arguments_ }
+    return {
+      executable: shell,
+      arguments: launchCommand ? arguments_ : [...arguments_, ...interactiveShellArguments]
+    }
   }
 
   const shellName = getShellName(shell)
@@ -31,7 +35,7 @@ export function createTerminalProcessLaunch(
     const wrapper = [
       "trap '' INT",
       `( trap - INT; exec ${commandInvocation} )`,
-      `trap - INT; exec ${quotePosixShellWord(shell)}`
+      `trap - INT; exec ${[shell, ...interactiveShellArguments].map(quotePosixShellWord).join(' ')}`
     ].join('\n')
     return { executable: '/bin/sh', arguments: ['-c', wrapper] }
   }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ComponentType, ReactNode } from 'react'
 
@@ -116,6 +116,51 @@ describe('app shell worktree directory synchronization', () => {
     )
     expect(terminateTerminal).not.toHaveBeenCalled()
     await screen.findByText('/tmp/alpha-project-worktrees/feature-sidebar')
+  })
+
+  it('switches immediately when the terminal model publishes a working-directory event', async () => {
+    const workbench = createWorkbenchWithTerminal('main')
+    const switchedWorkbench = createWorkbenchWithTerminal('feature/sidebar')
+    const startTerminal = vi.fn(async () =>
+      createTerminalSessionSnapshot('session-main', 'main', '/tmp/alpha-project')
+    )
+    let publishWorkingDirectory: ((event: unknown) => void) | undefined
+    const onTerminalWorkingDirectoryChanged = vi.fn((listener: (event: unknown) => void) => {
+      publishWorkingDirectory = listener
+      return vi.fn()
+    })
+    const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        listTerminalWorkingDirectories: vi.fn(async () => []),
+        onTerminalWorkingDirectoryChanged,
+        startTerminal,
+        switchBranchWorkspace
+      })
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    await waitFor(() => expect(onTerminalWorkingDirectoryChanged).toHaveBeenCalledOnce())
+
+    act(() => {
+      publishWorkingDirectory?.({
+        revision: 1,
+        scope: createTerminalSessionSnapshot('session-main', 'main', '/tmp/alpha-project'),
+        sessionId: 'session-main',
+        workingDirectory: '/tmp/alpha-project-worktrees/feature-sidebar/src'
+      })
+    })
+
+    await waitFor(() =>
+      expect(switchBranchWorkspace).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceId: 'feature/sidebar'
+      })
+    )
   })
 
   it('creates a terminal block in the matched worktree when the target graph has no host block', async () => {

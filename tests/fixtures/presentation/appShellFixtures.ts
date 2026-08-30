@@ -74,6 +74,7 @@ export interface RuntimeApiOverrides {
   readonly writeTerminal?: ReturnType<typeof vi.fn>
   readonly terminateTerminal?: ReturnType<typeof vi.fn>
   readonly listTerminalWorkingDirectories?: ReturnType<typeof vi.fn>
+  readonly onTerminalWorkingDirectoryChanged?: ReturnType<typeof vi.fn>
   readonly onTerminalOutput?: ReturnType<typeof vi.fn>
   readonly onTerminalExit?: ReturnType<typeof vi.fn>
 }
@@ -188,6 +189,8 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     interruptTerminal: vi.fn(),
     listTerminalWorkingDirectories:
       overrides.listTerminalWorkingDirectories ?? vi.fn(async () => []),
+    onTerminalWorkingDirectoryChanged:
+      overrides.onTerminalWorkingDirectoryChanged ?? vi.fn(() => vi.fn()),
     terminateTerminal: overrides.terminateTerminal ?? vi.fn(),
     onTerminalOutput: overrides.onTerminalOutput ?? vi.fn(() => vi.fn()),
     onTerminalExit: overrides.onTerminalExit ?? vi.fn(() => vi.fn())

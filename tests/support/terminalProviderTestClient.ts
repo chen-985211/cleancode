@@ -68,11 +68,18 @@ export class TerminalProviderTestClient {
     })
   }
 
-  async waitForEvent(event: TerminalProviderEvent['event']): Promise<TerminalProviderEvent> {
+  async waitForEvent(
+    event: TerminalProviderEvent['event'],
+    count = 1
+  ): Promise<TerminalProviderEvent> {
     await vi.waitFor(() =>
-      expect(this.events.some((candidate) => candidate.event === event)).toBe(true)
+      expect(
+        this.events.filter((candidate) => candidate.event === event).length
+      ).toBeGreaterThanOrEqual(count)
     )
-    return this.events.find((candidate) => candidate.event === event) as TerminalProviderEvent
+    return this.events.filter((candidate) => candidate.event === event)[
+      count - 1
+    ] as TerminalProviderEvent
   }
 
   close(): void {

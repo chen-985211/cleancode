@@ -141,6 +141,24 @@ describe('terminal session model lifecycle', () => {
     ])
   })
 
+  it('uses the model cache when auxiliary working-directory inspection fails', async () => {
+    const processes = new RecordingProcessPort()
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(processes, undefined, undefined, models)
+    const session = await service.start(startCommand())
+    const identity = toViewIdentity(session)
+    vi.spyOn(processes, 'readWorkingDirectory').mockRejectedValue(
+      new Error('working-directory query timed out')
+    )
+
+    await expect(
+      service.attachView({ ...identity, viewId: 'cached-view', onOutput: () => undefined })
+    ).resolves.toMatchObject({ identity })
+    await expect(
+      service.getTerminalLinkContext({ ...identity, viewId: 'cached-view' })
+    ).resolves.toEqual({ workingDirectory: '/work/app', workspaceDirectory: '/work/app' })
+  })
+
   it('reports a current view identity as not ready until its PTY finishes starting', async () => {
     const processes = new DeferredStartProcessPort()
     const models = new RecordingModelPort()

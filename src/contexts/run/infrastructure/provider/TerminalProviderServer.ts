@@ -35,6 +35,7 @@ import { launchTerminalProviderForegroundJob } from './TerminalProviderForegroun
 import { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
 import { TerminalProviderControllerLifecycle } from './TerminalProviderControllerLifecycle'
 import { TerminalProviderShutdownCoordinator } from './TerminalProviderShutdownCoordinator'
+import { TerminalProviderWorkingDirectoryEvents } from './TerminalProviderWorkingDirectoryEvents'
 import {
   attachTerminalProviderSocket,
   withTerminalProviderOperationDeadline
@@ -73,6 +74,7 @@ export class TerminalProviderServer {
   private readonly sessions = new Map<string, ProviderTerminalSession>()
   private readonly modelIdentities = new Map<string, TerminalRunScope>()
   private readonly recoveryIssues: TerminalRecoveryLoadIssue[] = []
+  private readonly workingDirectoryEvents = new TerminalProviderWorkingDirectoryEvents()
   private readonly sockets = new Set<Socket>()
   private server: Server | null = null
   private exitTimer: ReturnType<typeof setTimeout> | null = null
@@ -255,6 +257,19 @@ export class TerminalProviderServer {
                 title
               }
             })
+          },
+          onWorkingDirectoryChanged: (workingDirectory) => {
+            const event = this.workingDirectoryEvents.accept(
+              input.command.identity,
+              workingDirectory
+            )
+            if (event) {
+              this.broadcast({
+                type: 'event',
+                event: 'terminal-working-directory',
+                payload: event
+              })
+            }
           }
         })
         this.modelIdentities.set(identity.sessionId, identity)
@@ -316,6 +331,7 @@ export class TerminalProviderServer {
       case 'disposeModels':
         this.models.disposeAll()
         this.modelIdentities.clear()
+        this.workingDirectoryEvents.clear()
         return null
       case 'getDiagnostics':
         return this.models.getDiagnostics()
@@ -511,6 +527,7 @@ export class TerminalProviderServer {
     if (modelIdentity && isSameTerminalRun(modelIdentity, identity)) {
       this.models.retire(identity)
       this.modelIdentities.delete(identity.sessionId)
+      this.workingDirectoryEvents.forget(identity.sessionId)
     }
     if (!exactSession) return
     await exactSession.persistence.retire()

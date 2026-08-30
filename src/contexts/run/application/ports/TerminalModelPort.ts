@@ -28,6 +28,7 @@ export interface CreateTerminalModelCommand {
   readonly onQueryResponse: (response: string) => void
   readonly onFlowControlChange: (isPaused: boolean) => void
   readonly onTitleChanged?: (title: string) => void
+  readonly onWorkingDirectoryChanged?: (workingDirectory: string) => void
 }
 
 export interface AttachTerminalViewCommand {
@@ -41,6 +42,7 @@ export interface RestoreTerminalModelCommand {
   readonly terminalSourceTheme?: TerminalSourceTheme
   readonly onQueryResponse: (response: string) => void
   readonly onFlowControlChange: (isPaused: boolean) => void
+  readonly onWorkingDirectoryChanged?: (workingDirectory: string) => void
 }
 
 export interface TerminalModelPort {

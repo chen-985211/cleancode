@@ -4,11 +4,13 @@ import {
   defaultTerminalExecutionConfig,
   type TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalWorkingDirectoryChangedEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import { findWorkspaceByDirectory } from './workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from './types'
 
-const terminalWorkspaceSynchronizationIntervalMs = 1500
+export const terminalWorkspaceFallbackIntervalMs = 15_000
+export const terminalWorkspaceEventFreshnessMs = 45_000
 export const manualWorkspaceSelectionBrowserEventName = 'cleancode-manual-workspace-selection'
 
 interface UseTerminalWorkspaceSynchronizationInput {
@@ -38,6 +40,8 @@ export function useTerminalWorkspaceSynchronization({
   const manualWorkspaceSelectionRevisionRef = useRef(0)
   const observedManualWorkspaceSelectionRevisionRef = useRef(0)
   const suppressedWorkingDirectoriesRef = useRef<Map<string, string>>(new Map())
+  const workingDirectoryEventTimesRef = useRef<Map<string, number>>(new Map())
+  const workingDirectoryEventVersionsRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const markManualWorkspaceSelection = (): void => {
@@ -73,19 +77,23 @@ export function useTerminalWorkspaceSynchronization({
     }
 
     let isDisposed = false
-    let isSynchronizing = false
-
-    const synchronizeTerminalWorkspace = async (): Promise<void> => {
-      if (isSynchronizing) {
-        return
+    let isQuerying = false
+    let synchronizationTail = Promise.resolve()
+    let workingDirectoryEventDrain: Promise<void> | null = null
+    const pendingWorkingDirectoryEvents = new Map<string, TerminalWorkingDirectoryChangedEvent>()
+    const runningSessionIdSet = new Set(runningSessionIds)
+    for (const sessionId of workingDirectoryEventTimesRef.current.keys()) {
+      if (!runningSessionIdSet.has(sessionId)) {
+        workingDirectoryEventTimesRef.current.delete(sessionId)
+        workingDirectoryEventVersionsRef.current.delete(sessionId)
       }
+    }
 
-      isSynchronizing = true
-
+    const synchronizeTerminalWorkspace = async (
+      workingDirectories: readonly TerminalWorkingDirectoryEntry[],
+      isCompleteSnapshot: boolean
+    ): Promise<void> => {
       try {
-        const workingDirectories = await api.listTerminalWorkingDirectories({
-          sessionIds: runningSessionIds
-        })
         forgetChangedSuppressedWorkingDirectories(
           suppressedWorkingDirectoriesRef.current,
           workingDirectories
@@ -95,12 +103,14 @@ export function useTerminalWorkspaceSynchronization({
           manualWorkspaceSelectionRevisionRef.current !==
           observedManualWorkspaceSelectionRevisionRef.current
         ) {
-          observedManualWorkspaceSelectionRevisionRef.current =
-            manualWorkspaceSelectionRevisionRef.current
           rememberSuppressedWorkingDirectories(
             suppressedWorkingDirectoriesRef.current,
             workingDirectories
           )
+          if (isCompleteSnapshot) {
+            observedManualWorkspaceSelectionRevisionRef.current =
+              manualWorkspaceSelectionRevisionRef.current
+          }
           return
         }
 
@@ -153,19 +163,110 @@ export function useTerminalWorkspaceSynchronization({
         }
       } catch {
         // Keep the last visible workspace if terminal cwd inspection or switching fails.
-      } finally {
-        isSynchronizing = false
       }
     }
 
-    void synchronizeTerminalWorkspace()
+    const enqueueTerminalWorkspaceSynchronization = (
+      workingDirectories: readonly TerminalWorkingDirectoryEntry[],
+      isCompleteSnapshot: boolean
+    ): Promise<void> => {
+      const queued = synchronizationTail.then(async () => {
+        if (isDisposed) return
+        await synchronizeTerminalWorkspace(workingDirectories, isCompleteSnapshot)
+      })
+      synchronizationTail = queued.catch(() => undefined)
+      return queued
+    }
+
+    const drainWorkingDirectoryEvents = (): void => {
+      if (workingDirectoryEventDrain) return
+      workingDirectoryEventDrain = (async () => {
+        while (!isDisposed && pendingWorkingDirectoryEvents.size > 0) {
+          const nextEvent = pendingWorkingDirectoryEvents.entries().next()
+          if (nextEvent.done) break
+          const [sessionId, event] = nextEvent.value
+          pendingWorkingDirectoryEvents.delete(sessionId)
+          await enqueueTerminalWorkspaceSynchronization([event], false)
+        }
+      })().finally(() => {
+        workingDirectoryEventDrain = null
+        if (!isDisposed && pendingWorkingDirectoryEvents.size > 0) {
+          drainWorkingDirectoryEvents()
+        }
+      })
+    }
+
+    const synchronizeFallback = async (includeFreshSessions = false): Promise<void> => {
+      if (isQuerying || document.visibilityState === 'hidden') return
+      const now = Date.now()
+      const sessionIds = includeFreshSessions
+        ? runningSessionIds
+        : runningSessionIds.filter(
+            (sessionId) =>
+              now - (workingDirectoryEventTimesRef.current.get(sessionId) ?? 0) >=
+              terminalWorkspaceEventFreshnessMs
+          )
+      if (sessionIds.length === 0) return
+
+      const eventVersionsBeforeQuery = new Map(
+        sessionIds.map((sessionId) => [
+          sessionId,
+          workingDirectoryEventVersionsRef.current.get(sessionId) ?? 0
+        ])
+      )
+      isQuerying = true
+      try {
+        const workingDirectories = await api.listTerminalWorkingDirectories({ sessionIds })
+        if (!isDisposed) {
+          const supersededSessionIds = new Set(
+            sessionIds.filter(
+              (sessionId) =>
+                (workingDirectoryEventVersionsRef.current.get(sessionId) ?? 0) !==
+                eventVersionsBeforeQuery.get(sessionId)
+            )
+          )
+          await enqueueTerminalWorkspaceSynchronization(
+            workingDirectories.filter(({ sessionId }) => !supersededSessionIds.has(sessionId)),
+            sessionIds.length === runningSessionIds.length && supersededSessionIds.size === 0
+          )
+        }
+      } catch {
+        // A working-directory observation is best effort and must not affect terminal readiness.
+      } finally {
+        isQuerying = false
+      }
+    }
+
+    const unsubscribeWorkingDirectory =
+      typeof api.onTerminalWorkingDirectoryChanged === 'function'
+        ? api.onTerminalWorkingDirectoryChanged(
+            (event: TerminalWorkingDirectoryChangedEvent): void => {
+              if (!runningSessionIdSet.has(event.sessionId)) return
+              workingDirectoryEventTimesRef.current.set(event.sessionId, Date.now())
+              workingDirectoryEventVersionsRef.current.set(
+                event.sessionId,
+                (workingDirectoryEventVersionsRef.current.get(event.sessionId) ?? 0) + 1
+              )
+              pendingWorkingDirectoryEvents.set(event.sessionId, event)
+              drainWorkingDirectoryEvents()
+            }
+          )
+        : () => undefined
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState !== 'hidden') void synchronizeFallback()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    void synchronizeFallback(true)
     const intervalId = window.setInterval(
-      () => void synchronizeTerminalWorkspace(),
-      terminalWorkspaceSynchronizationIntervalMs
+      () => void synchronizeFallback(),
+      terminalWorkspaceFallbackIntervalMs
     )
 
     return () => {
       isDisposed = true
+      unsubscribeWorkingDirectory()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(intervalId)
     }
   }, [

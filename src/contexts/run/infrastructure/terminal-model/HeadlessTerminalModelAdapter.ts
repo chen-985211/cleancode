@@ -82,7 +82,8 @@ export class HeadlessTerminalModelAdapter implements TerminalModelRecoveryPort {
         workingDirectory: checkpoint.workingDirectory,
         terminalSourceTheme: command.terminalSourceTheme,
         onQueryResponse: command.onQueryResponse,
-        onFlowControlChange: command.onFlowControlChange
+        onFlowControlChange: command.onFlowControlChange,
+        onWorkingDirectoryChanged: command.onWorkingDirectoryChanged
       },
       normalizeScrollbackRows(checkpoint.scrollbackRows)
     )
@@ -180,6 +181,7 @@ class ManagedTerminalModel {
   private readonly serializeAddon: SerializeAddonInstance
   private readonly onQueryResponse: (response: string) => void
   private readonly onFlowControlChange: (isPaused: boolean) => void
+  private readonly onWorkingDirectoryChanged?: (workingDirectory: string) => void
   private readonly terminalSourceTheme: TerminalSourceTheme
   private readonly flowControlReasons = new Set<'backpressure' | 'view-handoff'>()
   private activeView: AttachTerminalViewCommand | null = null
@@ -187,14 +189,17 @@ class ManagedTerminalModel {
   private parsedSequence = 0
   private title = ''
   private workingDirectory: string
+  private lastObservedWorkingDirectory: string
   private disposed = false
   pendingOutputBytes = 0
 
   constructor(command: CreateTerminalModelCommand, scrollbackRows: TerminalScrollbackRows) {
     this.identity = command.identity
     this.workingDirectory = command.workingDirectory
+    this.lastObservedWorkingDirectory = command.workingDirectory
     this.onQueryResponse = command.onQueryResponse
     this.onFlowControlChange = command.onFlowControlChange
+    this.onWorkingDirectoryChanged = command.onWorkingDirectoryChanged
     this.terminalSourceTheme = command.terminalSourceTheme ?? 'dark'
     this.terminal = new HeadlessTerminal({
       allowProposedApi: true,
@@ -219,7 +224,8 @@ class ManagedTerminalModel {
       command.onTitleChanged?.(title)
     })
     this.terminal.parser.registerOscHandler(7, (data) => {
-      this.workingDirectory = readOscWorkingDirectory(data) ?? this.workingDirectory
+      const workingDirectory = readOscWorkingDirectory(data)
+      if (workingDirectory) this.observeWorkingDirectory(workingDirectory)
       return true
     })
     this.registerColorQueryHandler(10)
@@ -330,7 +336,17 @@ class ManagedTerminalModel {
 
   updateWorkingDirectory(workingDirectory: string): void {
     this.assertActive()
+    if (workingDirectory === this.workingDirectory) return
     this.workingDirectory = workingDirectory
+  }
+
+  private observeWorkingDirectory(workingDirectory: string): void {
+    const hasChangedSinceLastObservation =
+      workingDirectory !== this.lastObservedWorkingDirectory ||
+      workingDirectory !== this.workingDirectory
+    this.lastObservedWorkingDirectory = workingDirectory
+    this.updateWorkingDirectory(workingDirectory)
+    if (hasChangedSinceLastObservation) this.onWorkingDirectoryChanged?.(workingDirectory)
   }
 
   dispose(): void {

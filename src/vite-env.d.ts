@@ -61,6 +61,7 @@ import type { TerminalWorkflowEvent } from './contexts/run/application/ports/Ter
 import type {
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalWorkingDirectoryChangedEvent,
   TerminalWorkingDirectorySnapshot
 } from './contexts/run/application/ports/TerminalProcessPort'
 import type {
@@ -517,6 +518,9 @@ declare global {
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalViewOutput(listener: (event: TerminalViewOutputEvent) => void): () => void
       onTerminalSessionUpdated(listener: (session: TerminalSessionSnapshot) => void): () => void
+      onTerminalWorkingDirectoryChanged(
+        listener: (event: TerminalWorkingDirectoryChangedEvent) => void
+      ): () => void
       onTerminalRuntimeAvailability(
         listener: (availability: TerminalRuntimeAvailabilitySnapshot) => void
       ): () => void

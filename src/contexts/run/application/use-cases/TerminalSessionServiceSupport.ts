@@ -4,6 +4,7 @@ import {
   isAppError
 } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalModelPort } from '../ports/TerminalModelPort'
+import type { TerminalProcessPort } from '../ports/TerminalProcessPort'
 import type { TerminalModelDiagnosticsSnapshot } from '../dto/TerminalModelSnapshot'
 import type { TerminalLinkIdentity } from '../dto/TerminalLink'
 import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
@@ -60,6 +61,24 @@ export function listTerminalSessionSnapshots(
     const session = sessions.get(sessionId)
     return session ? [session.toSnapshot()] : []
   })
+}
+
+export async function readBestEffortWorkingDirectory(
+  session: TerminalSession,
+  processes: TerminalProcessPort,
+  models: TerminalModelPort | undefined
+): Promise<string> {
+  let workingDirectory = models?.readWorkingDirectory(session.scope) ?? session.workingDirectory
+  try {
+    const observed = await processes.readWorkingDirectory(session.id)
+    if (observed) {
+      workingDirectory = observed
+      models?.updateWorkingDirectory(session.scope, observed)
+    }
+  } catch {
+    // CWD inspection is auxiliary; retain the event-fed model cache on failure.
+  }
+  return workingDirectory
 }
 
 export function observeTerminalEnded(

@@ -1,4 +1,4 @@
-export const terminalProviderProtocolVersion = 9
+export const terminalProviderProtocolVersion = 10
 export const terminalProviderMinimumCompatibleProtocolVersion = 8
 export const terminalProviderApplicationDetachProtocolVersion = 5
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
@@ -43,6 +43,7 @@ export interface TerminalProviderEvent {
   readonly event:
     | 'terminal-output'
     | 'terminal-title'
+    | 'terminal-working-directory'
     | 'terminal-exit'
     | 'foreground-job-started'
     | 'foreground-job-exited'
