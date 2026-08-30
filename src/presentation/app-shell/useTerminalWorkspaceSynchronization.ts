@@ -41,6 +41,7 @@ export function useTerminalWorkspaceSynchronization({
   const observedManualWorkspaceSelectionRevisionRef = useRef(0)
   const suppressedWorkingDirectoriesRef = useRef<Map<string, string>>(new Map())
   const workingDirectoryEventTimesRef = useRef<Map<string, number>>(new Map())
+  const workingDirectoryEventVersionsRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const markManualWorkspaceSelection = (): void => {
@@ -84,6 +85,7 @@ export function useTerminalWorkspaceSynchronization({
     for (const sessionId of workingDirectoryEventTimesRef.current.keys()) {
       if (!runningSessionIdSet.has(sessionId)) {
         workingDirectoryEventTimesRef.current.delete(sessionId)
+        workingDirectoryEventVersionsRef.current.delete(sessionId)
       }
     }
 
@@ -180,9 +182,11 @@ export function useTerminalWorkspaceSynchronization({
       if (workingDirectoryEventDrain) return
       workingDirectoryEventDrain = (async () => {
         while (!isDisposed && pendingWorkingDirectoryEvents.size > 0) {
-          const events = [...pendingWorkingDirectoryEvents.values()]
-          pendingWorkingDirectoryEvents.clear()
-          await enqueueTerminalWorkspaceSynchronization(events, false)
+          const nextEvent = pendingWorkingDirectoryEvents.entries().next()
+          if (nextEvent.done) break
+          const [sessionId, event] = nextEvent.value
+          pendingWorkingDirectoryEvents.delete(sessionId)
+          await enqueueTerminalWorkspaceSynchronization([event], false)
         }
       })().finally(() => {
         workingDirectoryEventDrain = null
@@ -204,13 +208,26 @@ export function useTerminalWorkspaceSynchronization({
           )
       if (sessionIds.length === 0) return
 
+      const eventVersionsBeforeQuery = new Map(
+        sessionIds.map((sessionId) => [
+          sessionId,
+          workingDirectoryEventVersionsRef.current.get(sessionId) ?? 0
+        ])
+      )
       isQuerying = true
       try {
         const workingDirectories = await api.listTerminalWorkingDirectories({ sessionIds })
         if (!isDisposed) {
+          const supersededSessionIds = new Set(
+            sessionIds.filter(
+              (sessionId) =>
+                (workingDirectoryEventVersionsRef.current.get(sessionId) ?? 0) !==
+                eventVersionsBeforeQuery.get(sessionId)
+            )
+          )
           await enqueueTerminalWorkspaceSynchronization(
-            workingDirectories,
-            sessionIds.length === runningSessionIds.length
+            workingDirectories.filter(({ sessionId }) => !supersededSessionIds.has(sessionId)),
+            sessionIds.length === runningSessionIds.length && supersededSessionIds.size === 0
           )
         }
       } catch {
@@ -226,6 +243,10 @@ export function useTerminalWorkspaceSynchronization({
             (event: TerminalWorkingDirectoryChangedEvent): void => {
               if (!runningSessionIdSet.has(event.sessionId)) return
               workingDirectoryEventTimesRef.current.set(event.sessionId, Date.now())
+              workingDirectoryEventVersionsRef.current.set(
+                event.sessionId,
+                (workingDirectoryEventVersionsRef.current.get(event.sessionId) ?? 0) + 1
+              )
               pendingWorkingDirectoryEvents.set(event.sessionId, event)
               drainWorkingDirectoryEvents()
             }

@@ -68,6 +68,42 @@ describe('terminal workspace synchronization cadence', () => {
     unmount()
   })
 
+  it('does not apply a fallback snapshot superseded by an in-flight event', async () => {
+    const workingDirectoryQuery =
+      deferred<Array<{ readonly sessionId: string; readonly workingDirectory: string }>>()
+    const switchBranchWorkspace = vi.fn(async () => workbench())
+    let publish: ((event: TerminalWorkingDirectoryChangedEvent) => void) | undefined
+    installRuntime(
+      vi.fn(() => workingDirectoryQuery.promise),
+      vi.fn((listener: (event: TerminalWorkingDirectoryChangedEvent) => void) => {
+        publish = listener
+        return vi.fn()
+      }),
+      switchBranchWorkspace
+    )
+    const { unmount } = renderSynchronizationHook()
+    await flushEffects()
+
+    act(() => publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/other/src', 1)))
+    await flushEffects()
+    await flushEffects()
+
+    act(() =>
+      workingDirectoryQuery.resolve([
+        { sessionId: 'session-1', workingDirectory: '/work/app-worktrees/feature/src' }
+      ])
+    )
+    await flushEffects()
+    await flushEffects()
+
+    expect(switchBranchWorkspace).toHaveBeenCalledOnce()
+    expect(switchBranchWorkspace).toHaveBeenCalledWith({
+      projectDirectory: '/work/app',
+      workspaceId: 'other'
+    })
+    unmount()
+  })
+
   it('drains only the newest working-directory event after an in-flight switch fails', async () => {
     const firstSwitch = deferred<ReturnType<typeof workbench>>()
     const switchBranchWorkspace = vi
@@ -106,6 +142,47 @@ describe('terminal workspace synchronization cadence', () => {
       workspaceId: 'other'
     })
     expect(switchBranchWorkspace).toHaveBeenCalledTimes(2)
+    unmount()
+  })
+
+  it('continues draining other sessions when one queued workspace switch fails', async () => {
+    const firstSwitch = deferred<ReturnType<typeof workbench>>()
+    const switchBranchWorkspace = vi
+      .fn()
+      .mockImplementationOnce(() => firstSwitch.promise)
+      .mockRejectedValueOnce(new Error('queued switch failed'))
+      .mockResolvedValue(workbench())
+    let publish: ((event: TerminalWorkingDirectoryChangedEvent) => void) | undefined
+    installRuntime(
+      vi.fn(async () => []),
+      vi.fn((listener: (event: TerminalWorkingDirectoryChangedEvent) => void) => {
+        publish = listener
+        return vi.fn()
+      }),
+      switchBranchWorkspace
+    )
+    const { unmount } = renderSynchronizationHook(['session-1', 'session-2'])
+    await flushEffects()
+
+    act(() => publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/feature/src', 1)))
+    await flushEffects()
+
+    act(() => publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/other/src', 2)))
+    act(() => publish?.(workingDirectoryEvent('session-2', '/work/app-worktrees/feature/src', 1)))
+    firstSwitch.reject(new Error('first switch failed'))
+    await flushEffects()
+    await flushEffects()
+    await flushEffects()
+
+    expect(switchBranchWorkspace).toHaveBeenNthCalledWith(2, {
+      projectDirectory: '/work/app',
+      workspaceId: 'other'
+    })
+    expect(switchBranchWorkspace).toHaveBeenNthCalledWith(3, {
+      projectDirectory: '/work/app',
+      workspaceId: 'feature'
+    })
+    expect(switchBranchWorkspace).toHaveBeenCalledTimes(3)
     unmount()
   })
 
@@ -239,10 +316,13 @@ async function flushEffects(): Promise<void> {
 function deferred<T>(): {
   readonly promise: Promise<T>
   readonly reject: (error: unknown) => void
+  readonly resolve: (value: T) => void
 } {
   let rejectPromise: (error: unknown) => void = () => undefined
-  const promise = new Promise<T>((_resolve, reject) => {
+  let resolvePromise: (value: T) => void = () => undefined
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve
     rejectPromise = reject
   })
-  return { promise, reject: rejectPromise }
+  return { promise, reject: rejectPromise, resolve: resolvePromise }
 }
