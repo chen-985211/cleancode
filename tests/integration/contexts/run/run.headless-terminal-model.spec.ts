@@ -17,13 +17,24 @@ describe('headless terminal model', () => {
         workingDirectoryChanges.push(workingDirectory)
     })
 
+    adapter.updateWorkingDirectory(identity, '/work/app/query-fallback')
+
+    expect(workingDirectoryChanges).toEqual([])
+    expect(adapter.readWorkingDirectory(identity)).toBe('/work/app/query-fallback')
+
+    adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/query-fallback\u0007')
+    adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/query-fallback\u0007')
     adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/src\u0007')
     adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/src\u001b\\')
     adapter.acceptOutput(identity, '\u001b]7;https://localhost/ignored\u0007')
     adapter.acceptOutput(identity, '\u001b]7;file://localhost/work/app/%E4%B8%AD%E6%96%87\u0007')
     await adapter.flush(identity)
 
-    expect(workingDirectoryChanges).toEqual(['/work/app/src', '/work/app/中文'])
+    expect(workingDirectoryChanges).toEqual([
+      '/work/app/query-fallback',
+      '/work/app/src',
+      '/work/app/中文'
+    ])
     expect(adapter.readWorkingDirectory(identity)).toBe('/work/app/中文')
   })
 

@@ -189,12 +189,14 @@ class ManagedTerminalModel {
   private parsedSequence = 0
   private title = ''
   private workingDirectory: string
+  private lastObservedWorkingDirectory: string
   private disposed = false
   pendingOutputBytes = 0
 
   constructor(command: CreateTerminalModelCommand, scrollbackRows: TerminalScrollbackRows) {
     this.identity = command.identity
     this.workingDirectory = command.workingDirectory
+    this.lastObservedWorkingDirectory = command.workingDirectory
     this.onQueryResponse = command.onQueryResponse
     this.onFlowControlChange = command.onFlowControlChange
     this.onWorkingDirectoryChanged = command.onWorkingDirectoryChanged
@@ -223,7 +225,7 @@ class ManagedTerminalModel {
     })
     this.terminal.parser.registerOscHandler(7, (data) => {
       const workingDirectory = readOscWorkingDirectory(data)
-      if (workingDirectory) this.updateWorkingDirectory(workingDirectory)
+      if (workingDirectory) this.observeWorkingDirectory(workingDirectory)
       return true
     })
     this.registerColorQueryHandler(10)
@@ -336,7 +338,15 @@ class ManagedTerminalModel {
     this.assertActive()
     if (workingDirectory === this.workingDirectory) return
     this.workingDirectory = workingDirectory
-    this.onWorkingDirectoryChanged?.(workingDirectory)
+  }
+
+  private observeWorkingDirectory(workingDirectory: string): void {
+    const hasChangedSinceLastObservation =
+      workingDirectory !== this.lastObservedWorkingDirectory ||
+      workingDirectory !== this.workingDirectory
+    this.lastObservedWorkingDirectory = workingDirectory
+    this.updateWorkingDirectory(workingDirectory)
+    if (hasChangedSinceLastObservation) this.onWorkingDirectoryChanged?.(workingDirectory)
   }
 
   dispose(): void {

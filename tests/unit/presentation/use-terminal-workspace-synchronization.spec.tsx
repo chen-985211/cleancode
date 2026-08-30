@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 
 import type { TerminalWorkingDirectoryChangedEvent } from '../../../src/contexts/run/application/ports/TerminalProcessPort'
 import {
+  manualWorkspaceSelectionBrowserEventName,
   terminalWorkspaceEventFreshnessMs,
   terminalWorkspaceFallbackIntervalMs,
   useTerminalWorkspaceSynchronization
@@ -66,29 +67,107 @@ describe('terminal workspace synchronization cadence', () => {
     expect(listTerminalWorkingDirectories).toHaveBeenCalledTimes(2)
     unmount()
   })
+
+  it('drains only the newest working-directory event after an in-flight switch fails', async () => {
+    const firstSwitch = deferred<ReturnType<typeof workbench>>()
+    const switchBranchWorkspace = vi
+      .fn()
+      .mockImplementationOnce(() => firstSwitch.promise)
+      .mockResolvedValue(workbench())
+    let publish: ((event: TerminalWorkingDirectoryChangedEvent) => void) | undefined
+    installRuntime(
+      vi.fn(async () => []),
+      vi.fn((listener: (event: TerminalWorkingDirectoryChangedEvent) => void) => {
+        publish = listener
+        return vi.fn()
+      }),
+      switchBranchWorkspace
+    )
+    const { unmount } = renderSynchronizationHook()
+    await flushEffects()
+
+    act(() => publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/feature/src', 1)))
+    await flushEffects()
+    expect(switchBranchWorkspace).toHaveBeenCalledWith({
+      projectDirectory: '/work/app',
+      workspaceId: 'feature'
+    })
+
+    act(() => publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/other/src', 2)))
+    act(() =>
+      publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/other/packages', 3))
+    )
+    firstSwitch.reject(new Error('switch failed'))
+    await flushEffects()
+    await flushEffects()
+
+    expect(switchBranchWorkspace).toHaveBeenLastCalledWith({
+      projectDirectory: '/work/app',
+      workspaceId: 'other'
+    })
+    expect(switchBranchWorkspace).toHaveBeenCalledTimes(2)
+    unmount()
+  })
+
+  it('does not consume a manual selection revision from a partial event snapshot', async () => {
+    const listTerminalWorkingDirectories = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { sessionId: 'session-2', workingDirectory: '/work/app-worktrees/other/src' }
+      ])
+    const switchBranchWorkspace = vi.fn(async () => workbench())
+    let publish: ((event: TerminalWorkingDirectoryChangedEvent) => void) | undefined
+    installRuntime(
+      listTerminalWorkingDirectories,
+      vi.fn((listener: (event: TerminalWorkingDirectoryChangedEvent) => void) => {
+        publish = listener
+        return vi.fn()
+      }),
+      switchBranchWorkspace
+    )
+    const { unmount } = renderSynchronizationHook(['session-1', 'session-2'])
+    await flushEffects()
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(manualWorkspaceSelectionBrowserEventName))
+      publish?.(workingDirectoryEvent('session-1', '/work/app-worktrees/feature/src', 1))
+    })
+    await flushEffects()
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+    await flushEffects()
+
+    expect(listTerminalWorkingDirectories).toHaveBeenLastCalledWith({
+      sessionIds: ['session-2']
+    })
+    expect(switchBranchWorkspace).not.toHaveBeenCalled()
+    unmount()
+  })
 })
 
-function renderSynchronizationHook() {
+function renderSynchronizationHook(runningSessionIds: readonly string[] = ['session-1']) {
   return renderHook(() =>
     useTerminalWorkspaceSynchronization({
       currentWorkbench: workbench(),
       findTerminalBlockIdForSession: () => null,
       moveTerminalSessionToWorkspace: () => false,
       replaceWorkbench: () => undefined,
-      runningSessionIds: ['session-1']
+      runningSessionIds
     })
   )
 }
 
 function installRuntime(
   listTerminalWorkingDirectories: ReturnType<typeof vi.fn>,
-  onTerminalWorkingDirectoryChanged: ReturnType<typeof vi.fn> = vi.fn(() => vi.fn())
+  onTerminalWorkingDirectoryChanged: ReturnType<typeof vi.fn> = vi.fn(() => vi.fn()),
+  switchBranchWorkspace: ReturnType<typeof vi.fn> = vi.fn()
 ): void {
   Object.defineProperty(window, 'cleancode', {
     configurable: true,
     value: createRuntimeApi({
       listTerminalWorkingDirectories,
-      onTerminalWorkingDirectoryChanged
+      onTerminalWorkingDirectoryChanged,
+      switchBranchWorkspace
     })
   })
 }
@@ -112,14 +191,26 @@ function workbench() {
         directory: '/work/app-worktrees/feature',
         gitBranch: 'feature',
         isCurrent: false
+      },
+      {
+        workspaceId: 'other',
+        workspaceKind: 'linked-worktree',
+        displayName: 'other',
+        directory: '/work/app-worktrees/other',
+        gitBranch: 'other',
+        isCurrent: false
       }
     ]
   })
 }
 
-function workingDirectoryEvent(): TerminalWorkingDirectoryChangedEvent {
+function workingDirectoryEvent(
+  sessionId = 'session-1',
+  workingDirectory = '/work/app/src',
+  revision = 1
+): TerminalWorkingDirectoryChangedEvent {
   return {
-    revision: 1,
+    revision,
     scope: {
       blockId: 'terminal-1',
       generation: 1,
@@ -128,12 +219,12 @@ function workingDirectoryEvent(): TerminalWorkingDirectoryChangedEvent {
       projectDirectory: '/work/app',
       projectId: 'project-app',
       runId: 'run-1',
-      sessionId: 'session-1',
+      sessionId,
       workspaceDirectory: '/work/app',
       workspaceId: 'main'
     },
-    sessionId: 'session-1',
-    workingDirectory: '/work/app/src'
+    sessionId,
+    workingDirectory
   }
 }
 
@@ -143,4 +234,15 @@ function setDocumentVisibility(value: DocumentVisibilityState): void {
 
 async function flushEffects(): Promise<void> {
   await act(async () => Promise.resolve())
+}
+
+function deferred<T>(): {
+  readonly promise: Promise<T>
+  readonly reject: (error: unknown) => void
+} {
+  let rejectPromise: (error: unknown) => void = () => undefined
+  const promise = new Promise<T>((_resolve, reject) => {
+    rejectPromise = reject
+  })
+  return { promise, reject: rejectPromise }
 }

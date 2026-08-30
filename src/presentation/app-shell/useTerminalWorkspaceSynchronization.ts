@@ -76,8 +76,10 @@ export function useTerminalWorkspaceSynchronization({
     }
 
     let isDisposed = false
-    let isSynchronizing = false
     let isQuerying = false
+    let synchronizationTail = Promise.resolve()
+    let workingDirectoryEventDrain: Promise<void> | null = null
+    const pendingWorkingDirectoryEvents = new Map<string, TerminalWorkingDirectoryChangedEvent>()
     const runningSessionIdSet = new Set(runningSessionIds)
     for (const sessionId of workingDirectoryEventTimesRef.current.keys()) {
       if (!runningSessionIdSet.has(sessionId)) {
@@ -86,14 +88,9 @@ export function useTerminalWorkspaceSynchronization({
     }
 
     const synchronizeTerminalWorkspace = async (
-      workingDirectories: readonly TerminalWorkingDirectoryEntry[]
+      workingDirectories: readonly TerminalWorkingDirectoryEntry[],
+      isCompleteSnapshot: boolean
     ): Promise<void> => {
-      if (isSynchronizing) {
-        return
-      }
-
-      isSynchronizing = true
-
       try {
         forgetChangedSuppressedWorkingDirectories(
           suppressedWorkingDirectoriesRef.current,
@@ -104,12 +101,14 @@ export function useTerminalWorkspaceSynchronization({
           manualWorkspaceSelectionRevisionRef.current !==
           observedManualWorkspaceSelectionRevisionRef.current
         ) {
-          observedManualWorkspaceSelectionRevisionRef.current =
-            manualWorkspaceSelectionRevisionRef.current
           rememberSuppressedWorkingDirectories(
             suppressedWorkingDirectoriesRef.current,
             workingDirectories
           )
+          if (isCompleteSnapshot) {
+            observedManualWorkspaceSelectionRevisionRef.current =
+              manualWorkspaceSelectionRevisionRef.current
+          }
           return
         }
 
@@ -162,9 +161,35 @@ export function useTerminalWorkspaceSynchronization({
         }
       } catch {
         // Keep the last visible workspace if terminal cwd inspection or switching fails.
-      } finally {
-        isSynchronizing = false
       }
+    }
+
+    const enqueueTerminalWorkspaceSynchronization = (
+      workingDirectories: readonly TerminalWorkingDirectoryEntry[],
+      isCompleteSnapshot: boolean
+    ): Promise<void> => {
+      const queued = synchronizationTail.then(async () => {
+        if (isDisposed) return
+        await synchronizeTerminalWorkspace(workingDirectories, isCompleteSnapshot)
+      })
+      synchronizationTail = queued.catch(() => undefined)
+      return queued
+    }
+
+    const drainWorkingDirectoryEvents = (): void => {
+      if (workingDirectoryEventDrain) return
+      workingDirectoryEventDrain = (async () => {
+        while (!isDisposed && pendingWorkingDirectoryEvents.size > 0) {
+          const events = [...pendingWorkingDirectoryEvents.values()]
+          pendingWorkingDirectoryEvents.clear()
+          await enqueueTerminalWorkspaceSynchronization(events, false)
+        }
+      })().finally(() => {
+        workingDirectoryEventDrain = null
+        if (!isDisposed && pendingWorkingDirectoryEvents.size > 0) {
+          drainWorkingDirectoryEvents()
+        }
+      })
     }
 
     const synchronizeFallback = async (includeFreshSessions = false): Promise<void> => {
@@ -182,7 +207,12 @@ export function useTerminalWorkspaceSynchronization({
       isQuerying = true
       try {
         const workingDirectories = await api.listTerminalWorkingDirectories({ sessionIds })
-        if (!isDisposed) await synchronizeTerminalWorkspace(workingDirectories)
+        if (!isDisposed) {
+          await enqueueTerminalWorkspaceSynchronization(
+            workingDirectories,
+            sessionIds.length === runningSessionIds.length
+          )
+        }
       } catch {
         // A working-directory observation is best effort and must not affect terminal readiness.
       } finally {
@@ -196,7 +226,8 @@ export function useTerminalWorkspaceSynchronization({
             (event: TerminalWorkingDirectoryChangedEvent): void => {
               if (!runningSessionIdSet.has(event.sessionId)) return
               workingDirectoryEventTimesRef.current.set(event.sessionId, Date.now())
-              void synchronizeTerminalWorkspace([event])
+              pendingWorkingDirectoryEvents.set(event.sessionId, event)
+              drainWorkingDirectoryEvents()
             }
           )
         : () => undefined
