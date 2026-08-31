@@ -66,6 +66,7 @@ docs/
 - [开发协作规范](engineering/development.md)：任务分级、Spec、Plan、TDD、门禁和汇报规则。
 - [技术栈说明](engineering/tech-stack.md)：框架、运行环境、依赖和工具链选择。
 - [日志与错误规范](engineering/logging.md)：诊断日志、应用错误、IPC 错误传递和日志门禁。
+- [App Shell Presentation 归属迁移路线图](engineering/app-shell-presentation-migration-roadmap.md)：在保持现有 UI 行为不变的前提下，把上下文专属表现层从根级 App Shell 迁回所属限界上下文的分阶段计划。
 
 ## 终端文档
 
