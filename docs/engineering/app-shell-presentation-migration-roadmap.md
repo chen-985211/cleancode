@@ -113,6 +113,7 @@ src/
 
 - `i18n/**` 已从 App Shell 提升到 `src/presentation/i18n`。
 - Tooltip、Surface、outside-pointer、reduced-motion、selection motion 和 surface motion 已迁入 `src/presentation/shared`，并按 `components`、`hooks`、`motion`、`styles` 划分。
+- 中断感知的 overlay 焦点恢复、工具栏 utility button 动效及其样式已提升到 shared；上下文触发器统一使用语义中立的 `toolbar-utility-button`，不再依赖 App Shell 私有 Hook 或 class。
 - 用户可见错误解析和通知契约已迁入根级共享 Presentation；通知 Store、Provider 和 Center 仍由 App Shell 拥有。
 - `SurfaceMotion` 不再理解 Project Sidebar 或 Workbench DOM；`AppShellSurfaceMotion` 适配器显式提供 App Shell 的 isolation target。
 - 混合的 `selection-motion.css` 已迁移通用 indicator；Project 专属选择器已在 Project 批次下沉，Settings、Terminal 和 Shortcut 专属选择器继续留给后续 owner 批次。
@@ -184,6 +185,14 @@ src/
 - BlockGraph Presentation 不读取 Run session、端口租约或实际端点；App Shell `TerminalNode` 只组合定义表单与 Run runtime 子组件。
 - `TerminalDefinitionInput` 与元数据输入不再由 App Shell 重复声明，而是收窄到 BlockGraph 领域更新契约。
 - `terminalDefinitionRuntime.ts` 同时适配 BlockGraph 定义更新与 Run 实际端点打开，留待先拆端口职责后再判断归属。
+
+### BlockGraph Template Library Presentation
+
+- 模板库、保存对话框、专属样式和 owner-level Unit 已迁入 BlockGraph Presentation。
+- 上下文组件通过 `BlockTemplatePresentationActions` 消费 list/save/update/move/delete，不直接访问 preload 全局或 Platform。
+- `BlockTemplateSurfaces` 留在 App Shell，负责运行时适配，以及把模板选择交给画布放置与可选 Run 执行协调器。
+- 模板库继续复用根级共享 Surface、Tooltip、selection motion、焦点恢复和 utility button motion；搜索、作用域切换、维护动作、受控退出与可访问性结果保持不变。
+- `BlockTemplatePlacementPreview`、放置坐标策略和画布交互仍组合 React Flow/Workbench viewport，后续先拆出 BlockGraph 纯投影再判断归属。
 
 ## 剩余清单
 
@@ -277,10 +286,7 @@ src/
 
 组件：
 
-- `BlockTemplateLibraryRoot.tsx`
 - `BlockTemplatePlacementPreview.tsx`
-- `BlockTemplateSaveDialog.tsx`
-- `BlockTemplateSurfaces.tsx`
 - `QuickExecutionBar.tsx`
 - `TerminalGroupNode.tsx`
 
@@ -308,6 +314,7 @@ ViewModel、策略和交互：
 保留或先拆的混合模块：
 
 - `WorkbenchCanvas.tsx`、`WorkbenchCanvasBottomControls.tsx`：App Shell 拥有组合布局，BlockGraph 组件作为消费者嵌入。
+- `BlockTemplateSurfaces.tsx`：模板组件已经下沉；该文件保留 preload 动作适配、当前 Workbench 选择和放置/运行协调，属于 App Shell composition adapter。
 - `CanvasObjectContextMenu.tsx`、`CanvasNodeMenu.tsx`：菜单表面和互斥输入属于共享/App Shell，各对象动作与文案投影属于对应上下文。
 - `QuickExecutionBar.tsx`：绑定事实由 BlockGraph 拥有，实际启动由 Run；需要拆分展示/编辑与执行协调。
 - `useCanvasSelectionViewport.ts`、`workbenchViewportMotion.ts`：选择事实来自对象 owner，统一相机结果属于 App Shell，不迁入 BlockGraph。
@@ -435,7 +442,8 @@ ViewModel、策略和交互：
 目标：下沉图编辑、终端定义、组合、模板和快捷执行的单上下文 UI。
 
 - 已迁移终端元数据/执行配置表单、draft、输入类型、专属样式和 owner-level Unit。
-- 接下来迁移模板和图内纯策略。
+- 已迁移模板库、保存对话框、动作契约、专属样式和 owner-level Unit；App Shell 只保留 preload 与放置/运行适配。
+- 接下来迁移图内纯策略，并拆分模板放置的 BlockGraph 投影与 App Shell viewport 协调。
 - 再拆 TerminalNode、TerminalGroup、QuickExecution 的展示与 Run 执行协调。
 - 图事实和布局规则继续来自 BlockGraph 聚合/用例，不在 UI 复制。
 

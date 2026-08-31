@@ -5,17 +5,19 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent 
 import type {
   BlockGraphSnapshot,
   TerminalBlockSnapshot
-} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import { createBlockTemplate } from '../../contexts/block-graph/domain/services/BlockTemplateProjection'
-import { useI18n } from '../i18n/useI18n'
-import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
+} from '../../application/dto/BlockGraphSnapshot'
+import type { BlockTemplateSnapshot } from '../../application/dto/BlockTemplateSnapshot'
+import { createBlockTemplate } from '../../domain/services/BlockTemplateProjection'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { OverlaySurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import type { SaveBlockTemplateAction } from '../view-models/BlockTemplatePresentationActions'
 
 export function BlockTemplateSaveDialog({
   graph,
   open = true,
   onCancel,
   onExitComplete,
+  onSave,
   onSaved,
   projectDirectory,
   selectedBlockIds,
@@ -25,6 +27,7 @@ export function BlockTemplateSaveDialog({
   readonly open?: boolean
   readonly onCancel: () => void
   readonly onExitComplete?: () => void
+  readonly onSave: SaveBlockTemplateAction
   readonly onSaved: (template: BlockTemplateSnapshot) => void
   readonly projectDirectory: string
   readonly selectedBlockIds: readonly string[]
@@ -83,7 +86,7 @@ export function BlockTemplateSaveDialog({
         className="block-template-save-dialog overlay-surface-motion__content"
         onSubmit={(event) => {
           event.preventDefault()
-          void saveTemplate()
+          void submitTemplate()
         }}
       >
         <header>
@@ -150,12 +153,12 @@ export function BlockTemplateSaveDialog({
     </OverlaySurfaceMotion>
   )
 
-  async function saveTemplate(): Promise<void> {
+  async function submitTemplate(): Promise<void> {
     if (isSaving || !name.trim()) return
     setIsSaving(true)
     setErrorMessage(null)
     try {
-      const template = await window.cleancode?.saveBlockTemplate({
+      const template = await onSave({
         description: description.trim(),
         name: name.trim(),
         projectDirectory,

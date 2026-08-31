@@ -6,7 +6,7 @@ import { useI18n } from '../i18n/useI18n'
 import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { supportedLocales, type Locale } from '../i18n/locale'
-import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
+import { useToolbarUtilityButtonMotion } from '../shared/hooks/useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
@@ -45,7 +45,7 @@ export function LanguageSettingsRoot() {
       <TooltipLabel content={t('language.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="language-settings-trigger app-shell-utility-button"
+          className="language-settings-trigger toolbar-utility-button"
           type="button"
           aria-label={t('language.settings')}
           aria-controls="language-settings-menu"

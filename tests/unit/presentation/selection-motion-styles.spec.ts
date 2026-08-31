@@ -19,7 +19,10 @@ const agentSettingsStyles = readFileSync(
   resolve(process.cwd(), 'src/contexts/agent/presentation/styles/agent-settings.css'),
   'utf8'
 )
-const libraryStyles = readStyles('block-template-library.css')
+const libraryStyles = readFileSync(
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/block-template-library.css'),
+  'utf8'
+)
 const projectSidebarStyles = readFileSync(
   resolve(process.cwd(), 'src/contexts/project/presentation/styles/project-sidebar.css'),
   'utf8'

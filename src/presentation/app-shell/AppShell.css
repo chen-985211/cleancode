@@ -3,11 +3,11 @@
 @import '../shared/styles/application-settings-switch.css';
 @import './styles/base.css';
 @import './styles/theme-settings.css';
-@import './styles/block-template-library.css';
+@import '../../contexts/block-graph/presentation/styles/block-template-library.css';
 @import './styles/application-settings.css';
 @import './styles/canvas-settings.css';
 @import './styles/language-settings.css';
-@import './styles/app-shell-utility-button-motion.css';
+@import '../shared/styles/toolbar-utility-button-motion.css';
 @import './styles/notifications.css';
 @import '../../contexts/project/presentation/styles/project-sidebar.css';
 @import './styles/project-sidebar-layout.css';

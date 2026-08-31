@@ -43,12 +43,12 @@ import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreferenc
 import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
 import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
-import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useInterruptibleSurfaceFocusRestore } from '../shared/hooks/useInterruptibleSurfaceFocusRestore'
 import {
   useSelectionFeedbackMotion,
   useSelectionIndicatorMotion
 } from '../shared/hooks/useSelectionMotion'
-import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
+import { useToolbarUtilityButtonMotion } from '../shared/hooks/useToolbarUtilityButtonMotion'
 
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 
@@ -135,7 +135,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
       <TooltipLabel content={shortcutTooltips.openSettings} side="bottom">
         <button
           ref={triggerRef}
-          className="application-settings-trigger app-shell-utility-button"
+          className="application-settings-trigger toolbar-utility-button"
           type="button"
           aria-controls="application-settings-dialog"
           aria-expanded={props.isOpen}

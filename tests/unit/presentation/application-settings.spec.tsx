@@ -56,7 +56,7 @@ describe('application settings', () => {
     )
 
     const trigger = screen.getByRole('button', { name: '设置' })
-    expect(trigger).toHaveClass('app-shell-utility-button')
+    expect(trigger).toHaveClass('toolbar-utility-button')
     fireEvent.pointerDown(trigger, { pointerType: 'mouse' })
     fireEvent.click(trigger)
 

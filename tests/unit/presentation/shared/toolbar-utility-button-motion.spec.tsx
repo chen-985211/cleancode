@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useRef } from 'react'
 
-import { useToolbarUtilityButtonMotion } from '../../../src/presentation/app-shell/useToolbarUtilityButtonMotion'
+import { useToolbarUtilityButtonMotion } from '../../../../src/presentation/shared/hooks/useToolbarUtilityButtonMotion'
 
 describe('toolbar utility button motion', () => {
   it('responds on pointer down and springs back on release', () => {

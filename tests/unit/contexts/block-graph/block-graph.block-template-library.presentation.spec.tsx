@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import type { BlockTemplateSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import { BlockTemplateLibraryRoot } from '../../../src/presentation/app-shell/BlockTemplateLibraryRoot'
-import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import type { BlockTemplateSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
+import { BlockTemplateLibraryRoot } from '../../../../src/contexts/block-graph/presentation/components/BlockTemplateLibraryRoot'
+import type { BlockTemplateLibraryActions } from '../../../../src/contexts/block-graph/presentation/view-models/BlockTemplatePresentationActions'
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
+
+let libraryActions: BlockTemplateLibraryActions
 
 describe('block template library', () => {
   const projectTemplate = createTemplate({
@@ -17,24 +20,21 @@ describe('block template library', () => {
   })
 
   beforeEach(() => {
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: {
-        listBlockTemplates: vi.fn(async ({ scope }) =>
-          scope.type === 'project' ? [projectTemplate] : [globalTemplate]
-        ),
-        updateBlockTemplate: vi.fn(async (command) => ({
-          ...projectTemplate,
-          name: command.name,
-          description: command.description
-        })),
-        moveBlockTemplate: vi.fn(async (command) => ({
-          ...projectTemplate,
-          scope: command.scope
-        })),
-        deleteBlockTemplate: vi.fn(async () => undefined)
-      }
-    })
+    libraryActions = {
+      listTemplates: vi.fn(async ({ scope }) =>
+        scope.type === 'project' ? [projectTemplate] : [globalTemplate]
+      ),
+      updateTemplate: vi.fn(async (command) => ({
+        ...projectTemplate,
+        name: command.name,
+        description: command.description
+      })),
+      moveTemplate: vi.fn(async (command) => ({
+        ...projectTemplate,
+        scope: command.scope
+      })),
+      deleteTemplate: vi.fn(async () => undefined)
+    }
   })
 
   it('opens on the current project scope, supports search, and begins quiet placement', async () => {
@@ -42,14 +42,14 @@ describe('block template library', () => {
     renderLibrary(onBeginPlacement)
 
     const trigger = screen.getByRole('button', { name: '收藏模板' })
-    expect(trigger).toHaveClass('app-shell-utility-button')
+    expect(trigger).toHaveClass('toolbar-utility-button')
     fireEvent.click(trigger)
 
     const dialog = await screen.findByRole('dialog', { name: '收藏模板' })
     expect(dialog).toBeInTheDocument()
     expect(dialog).toHaveAttribute('data-surface-spring-preset', 'drawer-right')
     expect(screen.queryByText('保存并复用终端、流程和组合。')).not.toBeInTheDocument()
-    expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
+    expect(libraryActions.listTemplates).toHaveBeenCalledWith({
       scope: { type: 'project', projectId: 'project-1' }
     })
     expect(screen.getByText('本地构建')).toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('block template library', () => {
       'global'
     )
     await waitFor(() =>
-      expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
+      expect(libraryActions.listTemplates).toHaveBeenCalledWith({
         scope: { type: 'global' }
       })
     )
@@ -145,7 +145,7 @@ describe('block template library', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '保存名称' }))
     await waitFor(() =>
-      expect(window.cleancode?.updateBlockTemplate).toHaveBeenCalledWith({
+      expect(libraryActions.updateTemplate).toHaveBeenCalledWith({
         templateId: 'project-template',
         name: '本地测试',
         description: ''
@@ -154,7 +154,7 @@ describe('block template library', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '移动“本地测试”到全局收藏' }))
     await waitFor(() =>
-      expect(window.cleancode?.moveBlockTemplate).toHaveBeenCalledWith({
+      expect(libraryActions.moveTemplate).toHaveBeenCalledWith({
         templateId: 'project-template',
         scope: { type: 'global' }
       })
@@ -166,7 +166,7 @@ describe('block template library', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除“共享发布”' }))
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     await waitFor(() =>
-      expect(window.cleancode?.deleteBlockTemplate).toHaveBeenCalledWith({
+      expect(libraryActions.deleteTemplate).toHaveBeenCalledWith({
         templateId: 'global-template'
       })
     )
@@ -179,7 +179,7 @@ function renderLibrary(
   render(
     <I18nProvider initialLocale="zh-CN">
       <BlockTemplateLibraryRoot
-        isDesktopRuntime
+        actions={libraryActions}
         currentProjectId="project-1"
         onBeginPlacement={onBeginPlacement}
       />

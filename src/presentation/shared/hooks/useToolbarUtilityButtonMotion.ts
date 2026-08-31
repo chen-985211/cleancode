@@ -12,8 +12,8 @@ import {
 import {
   createSpringProgressMotionController,
   type SpringProgressMotionRoot
-} from '../shared/motion/springProgressMotion'
-import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
+} from '../motion/springProgressMotion'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 const scaleProperty = '--toolbar-utility-motion-scale'
 const translationProperty = '--toolbar-utility-motion-y'

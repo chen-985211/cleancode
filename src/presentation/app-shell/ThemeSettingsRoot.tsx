@@ -14,9 +14,9 @@ import { useI18n } from '../i18n/useI18n'
 import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { useThemePreference } from './useThemePreference'
-import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useInterruptibleSurfaceFocusRestore } from '../shared/hooks/useInterruptibleSurfaceFocusRestore'
 import { useSelectionFeedbackMotion } from '../shared/hooks/useSelectionMotion'
-import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
+import { useToolbarUtilityButtonMotion } from '../shared/hooks/useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
 
@@ -60,7 +60,7 @@ export function ThemeSettingsRoot() {
       <TooltipLabel content={t('theme.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="theme-settings-trigger app-shell-utility-button"
+          className="theme-settings-trigger toolbar-utility-button"
           type="button"
           aria-label={t('theme.settings')}
           aria-controls="theme-settings-dialog"

@@ -1,26 +1,25 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { BlockTemplateSaveDialog } from '../../../src/presentation/app-shell/BlockTemplateSaveDialog'
-import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { BlockTemplateSaveDialog } from '../../../../src/contexts/block-graph/presentation/components/BlockTemplateSaveDialog'
+import type { SaveBlockTemplateAction } from '../../../../src/contexts/block-graph/presentation/view-models/BlockTemplatePresentationActions'
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
+
+let saveTemplate: SaveBlockTemplateAction
 
 describe('block template save dialog', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: {
-        saveBlockTemplate: vi.fn(async (command) => ({
-          id: 'template-1',
-          type: 'workflow',
-          name: command.name,
-          description: command.description,
-          scope: command.scope,
-          createdAt: '2026-07-30T00:00:00.000Z',
-          updatedAt: '2026-07-30T00:00:00.000Z',
-          nodes: [],
-          connections: []
-        }))
-      }
+    const save: SaveBlockTemplateAction = async (command) => ({
+      id: 'template-1',
+      type: 'workflow',
+      name: command.name,
+      description: command.description,
+      scope: command.scope,
+      createdAt: '2026-07-30T00:00:00.000Z',
+      updatedAt: '2026-07-30T00:00:00.000Z',
+      nodes: [],
+      connections: []
     })
+    saveTemplate = vi.fn(save)
   })
 
   it('shows the automatically recognized type and saves to the current project by default', async () => {
@@ -33,6 +32,7 @@ describe('block template save dialog', () => {
           selectedBlockIds={['terminal-a', 'terminal-b']}
           workspaceId="main"
           onCancel={vi.fn()}
+          onSave={saveTemplate}
           onSaved={onSaved}
         />
       </I18nProvider>
@@ -47,7 +47,7 @@ describe('block template save dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: '收藏' }))
 
     await waitFor(() =>
-      expect(window.cleancode?.saveBlockTemplate).toHaveBeenCalledWith({
+      expect(saveTemplate).toHaveBeenCalledWith({
         projectDirectory: '/repo',
         workspaceId: 'main',
         selectedBlockIds: ['terminal-a', 'terminal-b'],
@@ -67,6 +67,7 @@ describe('block template save dialog', () => {
       selectedBlockIds: ['terminal-a', 'terminal-b'],
       workspaceId: 'main',
       onCancel: vi.fn(),
+      onSave: saveTemplate,
       onSaved: vi.fn()
     }
     const { rerender } = render(

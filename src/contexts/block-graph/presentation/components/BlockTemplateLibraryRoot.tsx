@@ -11,23 +11,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type {
   BlockTemplateScope,
   BlockTemplateSnapshot
-} from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import { useI18n } from '../i18n/useI18n'
-import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
-import { useSelectionIndicatorMotion } from '../shared/hooks/useSelectionMotion'
-import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
+} from '../../application/dto/BlockTemplateSnapshot'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { OverlaySurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useInterruptibleSurfaceFocusRestore } from '../../../../presentation/shared/hooks/useInterruptibleSurfaceFocusRestore'
+import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hooks/useSelectionMotion'
+import { useToolbarUtilityButtonMotion } from '../../../../presentation/shared/hooks/useToolbarUtilityButtonMotion'
+import type { BlockTemplateLibraryActions } from '../view-models/BlockTemplatePresentationActions'
 
 type LibraryScopeKind = BlockTemplateScope['type']
 
 export function BlockTemplateLibraryRoot({
+  actions,
   currentProjectId,
-  isDesktopRuntime,
   onBeginPlacement
 }: {
+  readonly actions: BlockTemplateLibraryActions | null
   readonly currentProjectId: string | null
-  readonly isDesktopRuntime: boolean
   readonly onBeginPlacement: (template: BlockTemplateSnapshot, runAfterPlacement: boolean) => void
 }) {
   const { t } = useI18n()
@@ -58,6 +59,7 @@ export function BlockTemplateLibraryRoot({
     () => resolveScope(scopeKind, currentProjectId),
     [currentProjectId, scopeKind]
   )
+  const listTemplates = actions?.listTemplates
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -74,11 +76,10 @@ export function BlockTemplateLibraryRoot({
   }, [closeLibrary, isOpen])
 
   useEffect(() => {
-    if (!isOpen || !scope || !window.cleancode?.listBlockTemplates) return undefined
+    if (!isOpen || !scope || !listTemplates) return undefined
 
     let active = true
-    void window.cleancode
-      .listBlockTemplates({ scope })
+    void listTemplates({ scope })
       .then((result) => {
         if (active) setTemplates(result)
       })
@@ -89,7 +90,7 @@ export function BlockTemplateLibraryRoot({
     return () => {
       active = false
     }
-  }, [isOpen, loadRevision, scope, t])
+  }, [isOpen, listTemplates, loadRevision, scope, t])
 
   const visibleTemplates = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
@@ -104,13 +105,13 @@ export function BlockTemplateLibraryRoot({
       <TooltipLabel content={t('templates.title')} side="bottom">
         <button
           ref={triggerRef}
-          className="block-template-library-trigger app-shell-utility-button"
+          className="block-template-library-trigger toolbar-utility-button"
           type="button"
           aria-label={t('templates.title')}
           aria-controls="block-template-library-dialog"
           aria-expanded={isOpen}
           aria-haspopup="dialog"
-          disabled={!isDesktopRuntime}
+          disabled={!actions}
           {...triggerMotionProps}
           onClick={() => {
             cancelFocusRestore()
@@ -253,13 +254,13 @@ export function BlockTemplateLibraryRoot({
     name: string,
     description: string
   ): Promise<void> {
+    if (!actions) return
     try {
-      const updated = await window.cleancode?.updateBlockTemplate({
+      const updated = await actions.updateTemplate({
         templateId: template.id,
         name,
         description
       })
-      if (!updated) return
       setTemplates((items) => items.map((item) => (item.id === updated.id ? updated : item)))
       setEditingTemplateId(null)
     } catch {
@@ -268,6 +269,7 @@ export function BlockTemplateLibraryRoot({
   }
 
   async function moveTemplate(template: BlockTemplateSnapshot): Promise<void> {
+    if (!actions) return
     const nextScope =
       template.scope.type === 'project'
         ? ({ type: 'global' } as const)
@@ -277,7 +279,7 @@ export function BlockTemplateLibraryRoot({
     if (!nextScope) return
 
     try {
-      await window.cleancode?.moveBlockTemplate({
+      await actions.moveTemplate({
         templateId: template.id,
         scope: nextScope
       })
@@ -288,8 +290,9 @@ export function BlockTemplateLibraryRoot({
   }
 
   async function deleteTemplate(template: BlockTemplateSnapshot): Promise<void> {
+    if (!actions) return
     try {
-      await window.cleancode?.deleteBlockTemplate({ templateId: template.id })
+      await actions.deleteTemplate({ templateId: template.id })
       setTemplates((items) => items.filter((item) => item.id !== template.id))
       setDeleteTemplateId(null)
     } catch {
