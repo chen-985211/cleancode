@@ -1,9 +1,9 @@
 import {
   applyTerminalServiceRunEvent,
   type TerminalServiceRunEvent
-} from '../../../src/presentation/app-shell/terminalServiceRunProjection'
-import { createTerminalStateKey } from '../../../src/presentation/app-shell/terminalSessionWorkspaceMigration'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/presentation/view-models/terminalServiceRunProjection'
+import { createTerminalStateKey } from '../../../../src/contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('terminal service run projection', () => {
   it('projects runtime state into an exact project, workspace, and block scope', () => {

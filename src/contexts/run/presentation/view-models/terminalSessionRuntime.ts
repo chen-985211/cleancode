@@ -1,13 +1,12 @@
-import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import type { TerminalExitEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
+import type {
+  TerminalRunIdentity,
+  TerminalServiceEndpoint
+} from '../../application/dto/TerminalRunEvent'
+import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
+import type { TerminalExitEvent } from '../../application/ports/TerminalProcessPort'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import { createIdleTerminalState, type TerminalViewState } from './TerminalPresentationTypes'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
-import {
-  createIdleTerminalState,
-  type TerminalRunIdentity,
-  type TerminalServiceEndpoint,
-  type TerminalViewState
-} from './types'
-import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 
 export interface StartTerminalRuntimeCommand {
   readonly projectId: string

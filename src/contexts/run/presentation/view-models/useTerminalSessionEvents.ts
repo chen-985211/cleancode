@@ -12,8 +12,8 @@ import {
   applyTerminalSessionStatusSnapshot
 } from './terminalSessionRuntime'
 import { applyTerminalWorkflowEventToStates } from './terminalWorkflowSessionEvents'
-import type { TerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
-import type { TerminalViewState } from './types'
+import type { TerminalSurfaceRegistry } from '../terminal-surface/terminalSurfaceRegistry'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 interface UseTerminalSessionEventsInput {
   readonly clearPendingTerminalInput: (terminalStateKey: string) => void

@@ -1,5 +1,5 @@
-import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import type { TerminalViewState } from './types'
+import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 export function shouldInheritTerminalRetention(state: TerminalViewState | undefined): boolean {
   return (

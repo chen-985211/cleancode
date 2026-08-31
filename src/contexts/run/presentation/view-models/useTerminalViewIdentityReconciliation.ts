@@ -1,7 +1,8 @@
 import { useCallback, type SetStateAction } from 'react'
 
+import type { TerminalRunIdentity } from '../../application/dto/TerminalRunEvent'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 import { reconcileStaleTerminalViewSnapshot } from './terminalSessionRuntime'
-import type { TerminalRunIdentity, TerminalViewState } from './types'
 
 export function useTerminalViewIdentityReconciliation(
   updateTerminalStates: (stateAction: SetStateAction<Record<string, TerminalViewState>>) => void

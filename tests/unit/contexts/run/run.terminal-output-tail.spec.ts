@@ -1,7 +1,7 @@
 import {
   appendTerminalOutputTail,
   terminalOutputTailMaxCharacters
-} from '../../../src/presentation/app-shell/terminalOutputTail'
+} from '../../../../src/contexts/run/presentation/view-models/terminalOutputTail'
 
 describe('terminal output tail', () => {
   it('keeps recent terminal output within a fixed character limit', () => {

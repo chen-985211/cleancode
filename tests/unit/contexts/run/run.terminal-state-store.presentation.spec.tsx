@@ -3,8 +3,8 @@ import { act, render } from '@testing-library/react'
 import {
   createTerminalStateStore,
   useTerminalState
-} from '../../../src/presentation/app-shell/terminalStateStore'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/presentation/view-models/terminalStateStore'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('Terminal state store', () => {
   it('notifies only selectors whose terminal runtime state changed', () => {

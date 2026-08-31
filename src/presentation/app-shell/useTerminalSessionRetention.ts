@@ -3,12 +3,13 @@ import { useCallback, useEffect, type SetStateAction } from 'react'
 import {
   getProjectIdFromTerminalStateKey,
   getWorkspaceIdFromTerminalStateKey
-} from './terminalSessionWorkspaceMigration'
+} from '../../contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
 import {
   reconcileTerminalStates,
   removeWorkspaceTerminalStates
-} from './terminalSessionStateRetention'
-import type { TerminalViewState, WorkbenchSnapshot } from './types'
+} from '../../contexts/run/presentation/view-models/terminalSessionStateRetention'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { WorkbenchSnapshot } from './types'
 
 interface UseTerminalSessionRetentionInput {
   readonly clearPendingTerminalInput: (terminalStateKey: string) => void

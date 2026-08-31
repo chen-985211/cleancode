@@ -1,8 +1,8 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  createIdleTerminalState,
-  type TerminalFlowNode,
-  type TerminalGroupFlowNode
+import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type {
+  TerminalFlowNode,
+  TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
 import {
   projectTerminalGroupDropAction,

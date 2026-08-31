@@ -8,7 +8,10 @@ import {
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
-import { createTerminalStateStore, type TerminalStateStore } from './terminalStateStore'
+import {
+  createTerminalStateStore,
+  type TerminalStateStore
+} from '../../contexts/run/presentation/view-models/terminalStateStore'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type {
@@ -17,11 +20,11 @@ import type {
   TerminalFlowNode,
   TerminalGroupFlowNode,
   TerminalGroupMetadataInput,
-  TerminalViewState,
   WorkbenchNodeLayoutInput,
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 const collapsedTerminalGroupWidth = 360
 const collapsedTerminalGroupIdentityHeight = 44

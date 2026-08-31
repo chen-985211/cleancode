@@ -1,5 +1,5 @@
-import type { TerminalViewState } from './types'
-import { createCanvasObjectIdentityKey } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 export interface TerminalSessionWorkspaceMigration {
   readonly sessionId: string

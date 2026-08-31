@@ -1,6 +1,6 @@
+import type { TerminalRunEvent, TerminalRunIdentity } from '../../application/dto/TerminalRunEvent'
+import { createIdleTerminalState, type TerminalViewState } from './TerminalPresentationTypes'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
-import type { TerminalRunEvent } from '../../contexts/run/application/dto/TerminalRunEvent'
-import { createIdleTerminalState, type TerminalRunIdentity, type TerminalViewState } from './types'
 
 export type TerminalServiceRunEvent = TerminalRunEvent
 

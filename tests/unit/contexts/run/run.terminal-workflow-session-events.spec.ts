@@ -1,4 +1,4 @@
-import { applyTerminalWorkflowEventToStates } from '../../../src/presentation/app-shell/terminalWorkflowSessionEvents'
+import { applyTerminalWorkflowEventToStates } from '../../../../src/contexts/run/presentation/view-models/terminalWorkflowSessionEvents'
 
 describe('terminal workflow session events', () => {
   it('clears output when a workflow command session starts', () => {

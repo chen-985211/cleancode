@@ -26,14 +26,15 @@ import {
   GroupStartIcon,
   GroupStopIcon
 } from './TerminalGroupIcons'
-import type { TerminalGroupFlowNode, TerminalViewState } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalGroupFlowNode } from './types'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from '../i18n/useI18n'
 import { useTerminalGroupDropSpring } from './useTerminalGroupDropSpring'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { useTerminalState } from './terminalStateStore'
+import { useTerminalState } from '../../contexts/run/presentation/view-models/terminalStateStore'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data

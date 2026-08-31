@@ -1,7 +1,7 @@
-import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
-import type { TerminalRunScope } from '../../contexts/run/domain/value-objects/TerminalRunScope'
+import type { TerminalOutputEvent } from '../../application/ports/TerminalProcessPort'
+import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import { appendTerminalOutputTail } from './terminalOutputTail'
-import type { TerminalViewState } from './types'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 export interface TerminalInputBuffer {
   readonly sessionId: string

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
-import type { MinimapFlowNode, TerminalViewState } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { MinimapFlowNode } from './types'
 import {
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeColor,

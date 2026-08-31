@@ -16,15 +16,18 @@ import {
   getBlockIdFromTerminalStateKey,
   getProjectIdFromTerminalStateKey,
   migrateTerminalSessionToWorkspace
-} from './terminalSessionWorkspaceMigration'
-import { updateTerminalBlockStatus } from './terminalStateUpdates'
+} from '../../contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
+import { updateTerminalBlockStatus } from '../../contexts/run/presentation/view-models/terminalStateUpdates'
 import {
   findTerminalStateKeyBySession,
   resolveCurrentTerminalStateKey
-} from './terminalSessionStateSelectors'
-import { takeTerminalStartupOutput, type TerminalInputBuffer } from './terminalSessionOutputBuffer'
-import { dismissTerminalPortConflict } from './terminalServiceRunProjection'
-import { useTerminalSessionEvents } from './useTerminalSessionEvents'
+} from '../../contexts/run/presentation/view-models/terminalSessionStateSelectors'
+import {
+  takeTerminalStartupOutput,
+  type TerminalInputBuffer
+} from '../../contexts/run/presentation/view-models/terminalSessionOutputBuffer'
+import { dismissTerminalPortConflict } from '../../contexts/run/presentation/view-models/terminalServiceRunProjection'
+import { useTerminalSessionEvents } from '../../contexts/run/presentation/view-models/useTerminalSessionEvents'
 import { useTerminalSessionRetention } from './useTerminalSessionRetention'
 import type { NotifyApp } from '../shared/notifications/appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
@@ -33,12 +36,12 @@ import { TerminalSurfaceRegistry } from '../../contexts/run/presentation/termina
 import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
 import { TerminalWorkloadScheduler } from '../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
 import { TerminalZoomRasterCoordinator } from '../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
-import { createTerminalStateStore } from './terminalStateStore'
+import { createTerminalStateStore } from '../../contexts/run/presentation/view-models/terminalStateStore'
 import { createTerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
 import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention
-} from './terminalRetentionInheritance'
+} from '../../contexts/run/presentation/view-models/terminalRetentionInheritance'
 import { useI18n } from '../i18n/useI18n'
 import {
   applyTerminalSessionSnapshot,
@@ -46,16 +49,12 @@ import {
   launchTerminalRuntimeSession,
   projectTerminalAutoStartStatus,
   reconcileTerminalSessionSnapshots
-} from './terminalSessionRuntime'
-import { useTerminalRuntimeRecovery } from './useTerminalRuntimeRecovery'
+} from '../../contexts/run/presentation/view-models/terminalSessionRuntime'
+import { useTerminalRuntimeRecovery } from '../../contexts/run/presentation/view-models/useTerminalRuntimeRecovery'
 import { useTerminalStarter } from './useTerminalStarter'
-import { useTerminalViewIdentityReconciliation } from './useTerminalViewIdentityReconciliation'
-import {
-  defaultTerminalDimensions,
-  type TerminalDimensions,
-  type TerminalViewState,
-  type WorkbenchSnapshot
-} from './types'
+import { useTerminalViewIdentityReconciliation } from '../../contexts/run/presentation/view-models/useTerminalViewIdentityReconciliation'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import { defaultTerminalDimensions, type TerminalDimensions, type WorkbenchSnapshot } from './types'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 

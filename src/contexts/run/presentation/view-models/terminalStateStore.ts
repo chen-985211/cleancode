@@ -1,8 +1,12 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-import { createIdleTerminalState, type TerminalStateStore, type TerminalViewState } from './types'
+import {
+  createIdleTerminalState,
+  type TerminalStateStore,
+  type TerminalViewState
+} from './TerminalPresentationTypes'
 
-export type { TerminalStateStore } from './types'
+export type { TerminalStateStore } from './TerminalPresentationTypes'
 
 const idleTerminalState = createIdleTerminalState()
 

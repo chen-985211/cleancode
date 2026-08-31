@@ -16,19 +16,22 @@ import { createAgentApprovalNodeIntents } from './agentApprovalPresentation'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import type {
-  TerminalViewState,
   WorkbenchFlowNode,
   WorkbenchNodeLayoutInput,
   WorkbenchObjectMotion,
   WorkbenchSnapshot
 } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
 import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
 import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
-import { createTerminalStateStore, type TerminalStateStore } from './terminalStateStore'
+import {
+  createTerminalStateStore,
+  type TerminalStateStore
+} from '../../contexts/run/presentation/view-models/terminalStateStore'
 import { reconcileWorkbenchNodeProjection } from './workbenchNodeProjectionReconciler'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']

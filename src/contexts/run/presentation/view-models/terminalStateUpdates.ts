@@ -1,5 +1,5 @@
-import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import type { TerminalViewState } from './types'
+import type { TerminalSessionStatus } from '../../application/dto/TerminalSessionSnapshot'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 export function updateTerminalBlockStatus(
   states: Record<string, TerminalViewState>,

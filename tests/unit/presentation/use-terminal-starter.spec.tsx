@@ -2,8 +2,8 @@ import { renderHook } from '@testing-library/react'
 import type { Dispatch, SetStateAction } from 'react'
 
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { useTerminalStarter } from '../../../src/presentation/app-shell/useTerminalStarter'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
 import { createDeferred } from '../../fixtures/deferred'
 import {
   createRuntimeApi,

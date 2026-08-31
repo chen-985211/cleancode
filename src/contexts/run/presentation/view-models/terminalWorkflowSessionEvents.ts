@@ -1,9 +1,9 @@
-import type { TerminalWorkflowEvent } from '../../contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
+import type { TerminalWorkflowEvent } from '../../application/ports/TerminalWorkflowEventPublisherPort'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { applyTerminalServiceRunEvent } from './terminalServiceRunProjection'
 import { applyTerminalExitEvent } from './terminalSessionRuntime'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
-import type { TerminalViewState } from './types'
 
 export function applyTerminalWorkflowEventToStates(
   states: Record<string, TerminalViewState>,

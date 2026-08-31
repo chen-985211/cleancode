@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 
-import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
+import type { TerminalRuntimeAvailabilitySnapshot } from '../../application/dto/TerminalRuntimeAvailability'
+import { createIdleTerminalState, type TerminalViewState } from './TerminalPresentationTypes'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
 import { selectTerminalStatesForWorkspace } from './terminalSessionStateSelectors'
 import { applyRecoveredTerminalSessionSnapshot } from './terminalSessionRuntime'
-import { createIdleTerminalState, type TerminalViewState } from './types'
 
 interface TerminalRuntimeRecoveryInput {
   readonly currentProjectId: string | null

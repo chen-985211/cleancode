@@ -7,8 +7,8 @@ import {
   projectTerminalAutoStartStatus,
   reconcileStaleTerminalViewSnapshot,
   reconcileTerminalSessionSnapshots
-} from '../../../src/presentation/app-shell/terminalSessionRuntime'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/presentation/view-models/terminalSessionRuntime'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('terminal session runtime reconciliation', () => {
   it('projects a real auto-start failure only for its current runtime epoch', () => {

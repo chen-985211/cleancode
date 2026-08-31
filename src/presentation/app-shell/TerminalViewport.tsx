@@ -32,8 +32,9 @@ import {
 } from '../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
 import { createTerminalXtermSurface } from '../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { useTerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/useTerminalSurfaceRegistry'
-import { appendTerminalOutputTail } from './terminalOutputTail'
-import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
+import { appendTerminalOutputTail } from '../../contexts/run/presentation/view-models/terminalOutputTail'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalDimensions, TerminalRunIdentity } from './types'
 import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 

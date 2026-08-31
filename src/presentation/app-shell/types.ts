@@ -15,17 +15,13 @@ import type { ProjectSnapshot } from '../../contexts/project/application/dto/Pro
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
-  TerminalServiceEndpoint,
-  TerminalServicePortConflict
+  TerminalServiceEndpoint
 } from '../../contexts/run/application/dto/TerminalRunEvent'
 import type {
-  TerminalRecoveryKind,
-  TerminalRetentionPolicy,
-  TerminalSessionKind,
-  TerminalSessionStatus
-} from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
-import type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+  TerminalDimensions,
+  TerminalStateStore,
+  TerminalViewState
+} from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
@@ -46,33 +42,6 @@ export interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
-}
-
-export interface TerminalViewState {
-  readonly sessionId: string | null
-  readonly status: TerminalSessionStatus
-  readonly output: string
-  readonly autoStartStatus?: 'failed' | 'idle' | 'pending' | 'succeeded'
-  readonly autoStartRuntimeEpoch?: number
-  readonly sessionKind?: TerminalSessionKind | null
-  readonly retentionPolicy?: TerminalRetentionPolicy
-  readonly recoveryKind?: TerminalRecoveryKind
-  readonly terminalSourceTheme?: TerminalSourceTheme
-  readonly isRecoveryPending?: boolean
-  readonly runIdentity?: TerminalRunIdentity | null
-  readonly actualEndpoint?: TerminalServiceEndpoint | null
-  readonly portConflict?: TerminalServicePortConflict | null
-  readonly servicePortState?: 'bound' | 'releasing' | 'quarantined' | null
-}
-
-export interface TerminalStateStore {
-  readonly getDiagnostics: () => {
-    readonly listenerCount: number
-    readonly stateCount: number
-  }
-  readonly getState: (terminalId: string) => TerminalViewState
-  readonly replaceStates: (states: Readonly<Record<string, TerminalViewState>>) => void
-  readonly subscribe: (terminalId: string, listener: () => void) => () => void
 }
 
 export interface TerminalBlockMetadataInput {
@@ -252,19 +221,3 @@ export const defaultTerminalDimensions: TerminalDimensions = {
 }
 
 export const terminalNodeMinimumSize = minimumTerminalBlockSize
-
-export function createIdleTerminalState(): TerminalViewState {
-  return {
-    sessionId: null,
-    status: 'idle',
-    output: '',
-    autoStartStatus: 'idle',
-    sessionKind: null,
-    retentionPolicy: 'terminate-on-application-exit',
-    recoveryKind: 'fresh',
-    runIdentity: null,
-    actualEndpoint: null,
-    portConflict: null,
-    servicePortState: null
-  }
-}

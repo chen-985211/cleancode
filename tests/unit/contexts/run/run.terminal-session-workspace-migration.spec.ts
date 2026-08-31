@@ -4,8 +4,8 @@ import {
   createTerminalStateKey,
   getProjectIdFromTerminalStateKey,
   migrateTerminalSessionToWorkspace
-} from '../../../src/presentation/app-shell/terminalSessionWorkspaceMigration'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('terminal session workspace migration', () => {
   it('moves a running terminal session to the matching branch workspace key', () => {

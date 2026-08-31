@@ -145,6 +145,15 @@ src/
 - Run 自有 Unit 已迁入 `tests/unit/contexts/run`；需要 DOM 的用例按 `*.presentation.spec.*` 进入 jsdom，跨上下文 viewport、Agent terminal 和 workload 协调测试继续留在根级 Presentation。
 - `TerminalViewport`、`AgentTerminalSurface`、`useAgentTerminalView` 和 `terminalRenderingWorkloadCoordinator` 继续留在 App Shell：它们分别组合 BlockGraph/Agent/全局画布与 Run surface，不是 Run 单一上下文叶子。
 
+### Run Terminal State 与 Runtime Presentation
+
+- `TerminalViewState`、`TerminalStateStore`、idle state factory 与 terminal dimensions 的定义统一归入 Run `TerminalPresentationTypes`；App Shell `types.ts` 只在复合节点契约中消费 Run state，不再导出它的 state/store 入口。
+- output tail、startup output buffer、session runtime/reconciliation、state key/selectors/retention、workspace migration 与 state update/store 已迁入 Run `presentation/view-models`。
+- service endpoint/conflict 与 workflow terminal event 的 renderer 派生投影已迁入 Run；端点与 workflow 状态仍分别来自 Run Application 的精确运行事件，不在 Presentation 产生第二事实来源。
+- runtime availability、scrollback preference、recovery、session event subscription 与 stale view identity reconciliation Hook 已迁入 Run，并继续通过注入的通知控制器或 App Shell 参数完成组合。
+- 以上 Run 自有 Unit 已迁入 `tests/unit/contexts/run`；React store 和 availability Hook 使用 `*.presentation.spec.*` 进入 jsdom，Workbench node projection 等跨上下文测试继续留在根级 Presentation。
+- `useTerminalSessionRetention`、terminal minimap、`TerminalServiceRuntimeBar` 和 workflow notifications 继续留在 App Shell，分别组合 Project 工作区、Agent/BlockGraph 节点、App Shell 图标/画布定位或全局通知导航。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -218,27 +227,11 @@ src/
 
 ### Run Presentation 候选
 
-终端 surface 与模型投影：
-
-- `terminalOutputTail.ts`
-- `terminalSessionOutputBuffer.ts`
-- `terminalSessionRuntime.ts`
-- `terminalSessionStateRetention.ts`
-- `terminalSessionStateSelectors.ts`
-- `terminalSessionWorkspaceMigration.ts`
-- `terminalStateStore.ts`
-- `terminalStateUpdates.ts`
-
 组件与 Hook：
 
 - `TerminalServiceRuntimeBar.tsx`
 - `useTerminalMinimapAppearance.ts`
-- `useTerminalRuntimeAvailability.ts`
-- `useTerminalRuntimePreference.ts`
-- `useTerminalRuntimeRecovery.ts`
-- `useTerminalSessionEvents.ts`
 - `useTerminalSessionRetention.ts`
-- `useTerminalViewIdentityReconciliation.ts`
 - `useTerminalWorkflowNotifications.ts`
 
 保留或先拆的混合模块：
@@ -392,12 +385,13 @@ ViewModel、策略和交互：
 
 ### 阶段 4：Run Presentation
 
-状态：进行中（2026-08-31 已完成 terminal surface 首批迁移）。
+状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批迁移）。
 
 目标：让 terminal surface、输出模型投影、主题、恢复和 runtime UI 归 Run Presentation。
 
 - 已迁移无跨上下文依赖的 surface 策略、registry、xterm/raster/workload 能力、主题投影及其 Provider/Hook。
-- 下一批迁移输出缓冲、session state/store、恢复和 runtime UI；混合 Hook 先拆 Run 状态机再决定 owner。
+- 已迁移输出缓冲、session state/store、恢复、runtime availability/preference、service/workflow event 投影及 Run 自有 Hook。
+- 下一批处理 `TerminalServiceRuntimeBar` 等剩余 UI 叶子；minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
 - 最后拆 TerminalViewport/TerminalNode 的 BlockGraph 定义与 Run surface 边界。
 - 不改变 xterm 生命周期、attach、恢复、resize 或滚屏行为。
 

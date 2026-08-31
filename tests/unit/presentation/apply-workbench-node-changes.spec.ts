@@ -1,12 +1,12 @@
 import type { NodeChange } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/applyWorkbenchNodeChanges'
 import {
   createIdleTerminalState,
-  type TerminalViewState,
-  type WorkbenchFlowNode
-} from '../../../src/presentation/app-shell/types'
+  type TerminalViewState
+} from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/applyWorkbenchNodeChanges'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
 
 describe('workbench node changes', () => {

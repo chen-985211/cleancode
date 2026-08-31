@@ -6,10 +6,10 @@ import {
 } from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
 import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
-import {
-  createIdleTerminalState,
-  type TerminalFlowNode,
-  type TerminalGroupFlowNode
+import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type {
+  TerminalFlowNode,
+  TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
 
 describe('canvas minimap', () => {

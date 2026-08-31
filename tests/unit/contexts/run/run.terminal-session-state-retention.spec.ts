@@ -1,9 +1,9 @@
 import {
   reconcileTerminalStates,
   removeWorkspaceTerminalStates
-} from '../../../src/presentation/app-shell/terminalSessionStateRetention'
-import { createTerminalStateKey } from '../../../src/presentation/app-shell/terminalSessionWorkspaceMigration'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/presentation/view-models/terminalSessionStateRetention'
+import { createTerminalStateKey } from '../../../../src/contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('terminal session state retention', () => {
   it('removes only the terminal surfaces owned by the selected workspace', () => {

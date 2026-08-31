@@ -5,7 +5,7 @@ import type {
 import {
   createIdleTerminalState,
   type TerminalViewState
-} from '../../../src/presentation/app-shell/types'
+} from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
 
 describe('terminal flow nodes for terminal groups', () => {

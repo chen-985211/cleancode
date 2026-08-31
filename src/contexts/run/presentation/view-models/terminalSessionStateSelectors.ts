@@ -4,7 +4,7 @@ import {
   getProjectIdFromTerminalStateKey,
   getWorkspaceIdFromTerminalStateKey
 } from './terminalSessionWorkspaceMigration'
-import type { TerminalViewState } from './types'
+import type { TerminalViewState } from './TerminalPresentationTypes'
 
 export function resolveCurrentTerminalStateKey(
   projectId: string | null,

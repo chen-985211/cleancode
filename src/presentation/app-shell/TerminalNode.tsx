@@ -20,13 +20,13 @@ import {
   type TerminalDimensions,
   type TerminalBlockMetadataInput,
   type TerminalFlowNode,
-  type TerminalViewState,
   type WorkbenchNodeLayoutInput
 } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { useTerminalState } from './terminalStateStore'
+import { useTerminalState } from '../../contexts/run/presentation/view-models/terminalStateStore'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block

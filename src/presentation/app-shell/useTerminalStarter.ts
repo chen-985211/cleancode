@@ -10,14 +10,15 @@ import {
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
+import { createTerminalStateKey } from '../../contexts/run/presentation/view-models/terminalSessionWorkspaceMigration'
 import {
   beginTerminalAutoStart,
   failTerminalAutoStart,
   startTerminalRuntimeSession
-} from './terminalSessionRuntime'
+} from '../../contexts/run/presentation/view-models/terminalSessionRuntime'
 import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
-import type { TerminalDimensions, TerminalViewState, WorkbenchSnapshot } from './types'
+import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalDimensions, WorkbenchSnapshot } from './types'
 
 type CurrentProject = WorkbenchSnapshot['project']
 type CurrentWorkspace = CurrentProject['workspaces'][number]

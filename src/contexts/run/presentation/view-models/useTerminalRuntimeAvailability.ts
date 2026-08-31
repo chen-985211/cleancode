@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
+import type { TerminalRuntimeAvailabilitySnapshot } from '../../application/dto/TerminalRuntimeAvailability'
 import {
   createExpectedAppError,
   getAppErrorCode
-} from '../../shared-kernel/application/errors/AppError'
+} from '../../../../shared-kernel/application/errors/AppError'
+import { resolveUserFacingErrorMessage } from '../../../../presentation/shared/errors/appErrorMessages'
 import type {
   AppNotificationController,
   AppNotificationInput
-} from '../shared/notifications/appNotifications'
-import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
-import { useI18n } from '../i18n/useI18n'
+} from '../../../../presentation/shared/notifications/appNotifications'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 const readyFallback: TerminalRuntimeAvailabilitySnapshot = {
   phase: 'ready',

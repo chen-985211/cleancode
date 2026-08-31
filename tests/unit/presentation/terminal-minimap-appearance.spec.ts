@@ -4,10 +4,10 @@ import {
   getTerminalMiniMapNodeStrokeColor
 } from '../../../src/presentation/app-shell/terminalMinimapAppearance'
 import { getTerminalStatusColor } from '../../../src/presentation/app-shell/minimapInteraction'
-import {
-  type AgentConsoleFlowNode,
-  createIdleTerminalState,
-  type TerminalFlowNode
+import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type {
+  AgentConsoleFlowNode,
+  TerminalFlowNode
 } from '../../../src/presentation/app-shell/types'
 
 describe('terminal minimap appearance', () => {

@@ -1,11 +1,9 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
-import { createTerminalStateStore } from '../../../src/presentation/app-shell/terminalStateStore'
-import type {
-  TerminalViewState,
-  WorkbenchFlowNode
-} from '../../../src/presentation/app-shell/types'
+import { createTerminalStateStore } from '../../../src/contexts/run/presentation/view-models/terminalStateStore'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { reconcileWorkbenchNodeProjection } from '../../../src/presentation/app-shell/workbenchNodeProjectionReconciler'
 
 describe('Workbench node projection reconciler', () => {

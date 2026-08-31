@@ -1,5 +1,5 @@
-import { appendTerminalOutput } from '../../../src/presentation/app-shell/terminalSessionOutputBuffer'
-import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
+import { appendTerminalOutput } from '../../../../src/contexts/run/presentation/view-models/terminalSessionOutputBuffer'
+import type { TerminalViewState } from '../../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 describe('terminal session output buffer', () => {
   it('preserves the state identity when output belongs to no block terminal', () => {
