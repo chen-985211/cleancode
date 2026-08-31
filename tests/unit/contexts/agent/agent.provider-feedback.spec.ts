@@ -1,5 +1,5 @@
-import type { AgentRuntimeSnapshot } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
-import { deriveAgentProviderFeedback } from '../../../src/presentation/app-shell/agentProviderFeedback'
+import type { AgentRuntimeSnapshot } from '../../../../src/contexts/agent/application/dto/AgentSessionProtocol'
+import { deriveAgentProviderFeedback } from '../../../../src/contexts/agent/presentation/view-models/agentProviderFeedback'
 
 describe('Agent Provider feedback policy', () => {
   it.each([

@@ -1,7 +1,7 @@
 import type {
   AgentRuntimeChangedEvent,
   AgentSessionSnapshot
-} from '../../contexts/agent/application/dto/AgentSessionProtocol'
+} from '../../application/dto/AgentSessionProtocol'
 
 export const maxPendingAgentRuntimeEvents = 16
 

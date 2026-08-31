@@ -1,6 +1,6 @@
 import { createContext, useContext, useSyncExternalStore } from 'react'
 
-import type { TerminalAgentActivitySnapshot } from '../../contexts/agent/application/dto/AgentActivityProtocol'
+import type { TerminalAgentActivitySnapshot } from '../../application/dto/AgentActivityProtocol'
 import type { AgentActivityStore } from './agentActivityStore'
 
 export const AgentActivityStoreContext = createContext<AgentActivityStore | null>(null)

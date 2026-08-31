@@ -1,17 +1,19 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 import type {
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
 } from '../../../src/contexts/agent/application/dto/AgentActivityProtocol'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
-import { AgentActivityObserver } from '../../../src/presentation/app-shell/AgentActivityObserver'
-import type { AgentActivityNavigationTarget } from '../../../src/presentation/app-shell/agentActivityNavigation'
+import { AgentActivityObserver } from '../../../src/contexts/agent/presentation/components/AgentActivityObserver'
+import type { AgentActivityNavigationTarget } from '../../../src/contexts/agent/presentation/view-models/AgentActivityNavigationTarget'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 import { translate } from '../../../src/presentation/i18n/messages'
 import { useI18n } from '../../../src/presentation/i18n/useI18n'
 import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import { useAgentActivitySnapshots } from '../../../src/presentation/app-shell/useAgentActivitySnapshots'
+import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import { useAgentActivitySnapshots } from '../../../src/contexts/agent/presentation/view-models/useAgentActivitySnapshots'
 
 describe('Agent activity notifications', () => {
   beforeEach(() => {
@@ -352,15 +354,36 @@ function renderObserver(
   return render(
     <I18nProvider initialLocale="zh-CN">
       <NotificationProvider>
-        <AgentActivityObserver
+        <AgentActivityObserverHarness
           onNavigate={onNavigate}
           waitForCompletionPresentation={waitForCompletionPresentation}
         >
           <LocaleSwitcher />
           <AgentActivityProbe />
-        </AgentActivityObserver>
+        </AgentActivityObserverHarness>
       </NotificationProvider>
     </I18nProvider>
+  )
+}
+
+function AgentActivityObserverHarness({
+  children,
+  onNavigate,
+  waitForCompletionPresentation
+}: {
+  readonly children: ReactNode
+  readonly onNavigate: (target: AgentActivityNavigationTarget) => void
+  readonly waitForCompletionPresentation: (completion: AgentTurnCompletedEvent) => Promise<void>
+}) {
+  const notifications = useNotifications()
+  return (
+    <AgentActivityObserver
+      notifications={notifications}
+      onNavigate={onNavigate}
+      waitForCompletionPresentation={waitForCompletionPresentation}
+    >
+      {children}
+    </AgentActivityObserver>
   )
 }
 

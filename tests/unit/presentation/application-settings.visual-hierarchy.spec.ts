@@ -6,7 +6,7 @@ const applicationSettingsStyles = readFileSync(
   'utf8'
 )
 const agentSettingsStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-settings.css'),
+  resolve(process.cwd(), 'src/contexts/agent/presentation/styles/agent-settings.css'),
   'utf8'
 )
 

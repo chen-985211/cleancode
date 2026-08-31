@@ -1,8 +1,8 @@
 import type {
   AgentMcpRuntimeStatus,
   AgentRuntimeSnapshot
-} from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import type { AgentAttachOperation } from './useAgentSessionAttachment'
+} from '../../application/dto/AgentSessionProtocol'
+import type { AgentAttachOperation } from './AgentAttachmentPresentation'
 import type { AgentProviderPanelState } from './useAgentProviderState'
 
 export type AgentMcpPresentationStatus = 'connecting' | 'degraded' | 'ready' | 'unavailable'

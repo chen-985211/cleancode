@@ -32,48 +32,6 @@
   content: '';
 }
 
-.application-settings-switch {
-  position: relative;
-  width: 34px;
-  height: 19px;
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 999px;
-  background: var(--cc-border-strong);
-  overflow: hidden;
-  padding: 2px;
-  isolation: isolate;
-  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-}
-
-.application-settings-switch::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--cc-primary);
-  content: '';
-  opacity: var(--cc-selection-motion-progress, 0);
-  pointer-events: none;
-}
-
-.application-settings-switch span {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--cc-primary-contrast);
-  box-shadow: var(--cc-shadow-sm);
-  transform: translate3d(calc(var(--cc-selection-motion-progress, 0) * 15px), 0, 0);
-}
-
-.application-settings-switch:focus-visible {
-  outline: 2px solid var(--cc-ring);
-  outline-offset: 3px;
-}
-
 .terminal-settings-options__selection {
   z-index: 0;
   border: 1px solid var(--cc-primary-border);

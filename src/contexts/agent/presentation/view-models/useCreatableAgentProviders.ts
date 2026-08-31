@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
+import type { CreatableAgentProviderSnapshot } from '../../application/dto/AgentProviderDiscoverySnapshot'
 
 export type CreatableAgentProvidersState =
   | { readonly status: 'loading'; readonly providers: readonly [] }

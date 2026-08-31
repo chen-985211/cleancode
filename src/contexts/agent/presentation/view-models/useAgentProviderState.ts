@@ -7,7 +7,7 @@ import {
   useSyncExternalStore
 } from 'react'
 
-import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderAvailability } from '../../application/ports/AgentProviderContribution'
 
 export type AgentProviderPanelState =
   | { readonly status: 'unavailable' }

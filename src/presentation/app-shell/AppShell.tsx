@@ -46,7 +46,7 @@ import { useCanvasVisualNoisePreference } from './useCanvasVisualNoisePreference
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
-import { useAgentCreationProviders } from './useAgentCreationProviders'
+import { useAgentCreationProviders } from '../../contexts/agent/presentation/view-models/useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
 import { useBlockTemplateActions } from './useBlockTemplateActions'

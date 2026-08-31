@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { AgentMcpCapabilityToggle } from '../../../src/presentation/app-shell/AgentMcpCapabilityToggle'
+import { AgentMcpCapabilityToggle } from '../../../../src/contexts/agent/presentation/components/AgentMcpCapabilityToggle'
 
 describe('Agent CleanCode MCP capability toggle', () => {
   it('shows the named MCP capability as an accessible switch with complete scope guidance', async () => {

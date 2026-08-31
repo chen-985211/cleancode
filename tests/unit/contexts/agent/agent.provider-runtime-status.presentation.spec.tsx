@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import {
   AgentProviderBlockingState,
   AgentProviderStatusControl
-} from '../../../src/presentation/app-shell/AgentProviderStatusView'
+} from '../../../../src/contexts/agent/presentation/components/AgentProviderStatusView'
 
 describe('Agent Provider runtime status', () => {
   it('keeps the header quiet when no persistent Agent issue exists', () => {

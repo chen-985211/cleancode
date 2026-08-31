@@ -12,22 +12,18 @@ import type {
   AgentSessionSnapshot
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type {
+  AgentAttachMode,
+  AgentAttachOperation
+} from '../../contexts/agent/presentation/view-models/AgentAttachmentPresentation'
 import {
   applyAgentRuntimeEvent,
   rememberLatestAgentRuntimeEvent
-} from './agentRuntimeReconciliation'
+} from '../../contexts/agent/presentation/view-models/agentRuntimeReconciliation'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import { isTestRuntime } from './agentConsoleModel'
 import { readTerminalSourceTheme } from './terminalTheme'
 import { defaultTerminalDimensions, type WorkbenchSnapshot } from './types'
-
-export type AgentAttachMode = 'initial' | 'new' | 'retry'
-
-export type AgentAttachOperation =
-  | { readonly status: 'idle' }
-  | { readonly status: 'measuring' }
-  | { readonly mode: AgentAttachMode; readonly status: 'pending' }
-  | { readonly mode: AgentAttachMode; readonly status: 'failed' }
 
 interface AgentSessionBinding {
   readonly agentName: string

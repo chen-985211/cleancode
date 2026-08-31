@@ -9,9 +9,16 @@ const sharedSelectionStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/shared/styles/selection-motion.css'),
   'utf8'
 )
+const applicationSwitchStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/shared/styles/application-settings-switch.css'),
+  'utf8'
+)
 const selectionStyles = readStyles('selection-motion.css')
 const settingsStyles = readStyles('application-settings.css')
-const agentSettingsStyles = readStyles('agent-settings.css')
+const agentSettingsStyles = readFileSync(
+  resolve(process.cwd(), 'src/contexts/agent/presentation/styles/agent-settings.css'),
+  'utf8'
+)
 const libraryStyles = readStyles('block-template-library.css')
 const projectSidebarStyles = readFileSync(
   resolve(process.cwd(), 'src/contexts/project/presentation/styles/project-sidebar.css'),
@@ -55,7 +62,8 @@ describe('selection motion styles', () => {
   })
 
   it('drives settings switches and stateful choices from shared spring progress', () => {
-    const switchThumbRule = readRule(selectionStyles, '.application-settings-switch span')
+    expect(appShellStyles).toContain("@import '../shared/styles/application-settings-switch.css';")
+    const switchThumbRule = readRule(applicationSwitchStyles, '.application-settings-switch span')
 
     expect(switchThumbRule).toContain('var(--cc-selection-motion-progress, 0)')
     expect(switchThumbRule).not.toContain('transition: transform')

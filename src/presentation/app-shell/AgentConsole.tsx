@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import { AgentMcpCapabilityToggle } from '../../contexts/agent/presentation/components/AgentMcpCapabilityToggle'
+import { AgentProviderIcon } from '../../contexts/agent/presentation/components/AgentProviderIcon'
+import {
+  AgentProviderBlockingState,
+  AgentProviderStatusControl
+} from '../../contexts/agent/presentation/components/AgentProviderStatusView'
 import { AgentConsoleActions } from './AgentConsoleActions'
-import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
-import { AgentProviderIcon } from './AgentProviderIcon'
-import { AgentProviderBlockingState, AgentProviderStatusControl } from './AgentProviderStatusView'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
 import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
-import { deriveAgentProviderFeedback } from './agentProviderFeedback'
+import { deriveAgentProviderFeedback } from '../../contexts/agent/presentation/view-models/agentProviderFeedback'
 import {
   createFallbackAgent,
   createWorkspaceKey,
@@ -17,9 +20,12 @@ import {
   type AgentConsoleProps,
   type AgentTerminalMeasurement
 } from './agentConsoleModel'
-import { formatProviderDisplayName, useAgentProviderDescriptor } from './useAgentProviderCatalog'
-import { useAgentProviderState } from './useAgentProviderState'
-import { useAgentProviderNotifications } from './useAgentProviderNotifications'
+import {
+  formatProviderDisplayName,
+  useAgentProviderDescriptor
+} from '../../contexts/agent/presentation/view-models/useAgentProviderCatalog'
+import { useAgentProviderState } from '../../contexts/agent/presentation/view-models/useAgentProviderState'
+import { useAgentProviderNotifications } from '../../contexts/agent/presentation/view-models/useAgentProviderNotifications'
 import { useAgentSessionAttachment } from './useAgentSessionAttachment'
 import { useAgentTerminalView } from './useAgentTerminalView'
 import { useI18n } from '../i18n/useI18n'
@@ -91,6 +97,7 @@ export function AgentConsole({
   })
   useAgentProviderNotifications({
     events: providerFeedback.events,
+    notifications,
     scopeKey: currentWorkspaceKey
   })
   useAgentTerminalView({

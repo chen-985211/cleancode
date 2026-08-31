@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react'
 
-import { useSelectionFeedbackMotion } from '../shared/hooks/useSelectionMotion'
+import { useSelectionFeedbackMotion } from '../hooks/useSelectionMotion'
 
 interface ApplicationSettingsSwitchProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,

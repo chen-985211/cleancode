@@ -1,18 +1,19 @@
 import { useEffect, useRef } from 'react'
 
+import type { AppNotificationController } from '../../../../presentation/shared/notifications/appNotifications'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
 import type { AgentFeedbackEvent } from './agentProviderFeedback'
-import { useI18n } from '../i18n/useI18n'
-import { useOptionalNotifications } from './useNotifications'
 
 export function useAgentProviderNotifications({
   events,
+  notifications,
   scopeKey
 }: {
   readonly events: readonly AgentFeedbackEvent[]
+  readonly notifications: AppNotificationController
   readonly scopeKey: string | null
 }): void {
   const { t } = useI18n()
-  const notifications = useOptionalNotifications()
   const baselineRef = useRef({
     events: new Set(events),
     scopeKey

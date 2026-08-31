@@ -127,6 +127,15 @@ src/
 - 需要 DOM 的上下文表现层 Unit 使用 `tests/unit/contexts/**/*.presentation.spec.ts(x)` 命名并由 jsdom project 执行；Project 自有测试已按该约定迁移。
 - `ProjectSidebarToggle`、`projectSidebarMotion`、`useProjectSidebarMotion`、`useProjectSidebarVisibility` 以及 Project/Run/BlockGraph 跨上下文动作协调器保留在 App Shell。
 
+### Agent Provider 与 Activity Presentation
+
+- Provider catalog、可创建 Provider、应用级 Provider 偏好、创建选择、运行时对账和反馈投影已迁入 `src/contexts/agent/presentation/view-models`。
+- `AgentProviderIcon`、Provider 状态面板、MCP capability 开关、Agent 设置页和 Provider Store Provider 已迁入 `src/contexts/agent/presentation/components`。
+- Agent activity Store、快照 Hook、Activity Observer 与导航目标契约已迁入 Agent Presentation；通知控制器和 Run 终端输出完成屏障由 App Shell 显式注入。
+- `ApplicationSettingsSwitch` 已提升到根级共享 Presentation，Agent 与 Canvas 设置共同复用，不再由 App Shell 私有拥有。
+- Agent Provider、设置和 Activity 专属样式与 Unit 已跟随 owner 迁移；NotificationProvider、画布导航和终端屏障的组合测试继续留在根级 Presentation。
+- `AgentConsole`、Agent terminal surface、Agent 节点、创建入口、工具审批卡片与审批连线继续保留在 App Shell，因为它们分别组合 Agent 与 Run、Project、BlockGraph/React Flow 或全局工作台动作，不是可由 Agent 单一上下文完整解释的叶子组件。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -137,7 +146,6 @@ src/
 
 - `Tooltip.tsx`
 - `SurfaceMotion.tsx`
-- `ApplicationSettingsSwitch.tsx`
 - `useOutsidePointerDismiss.ts`
 - `usePrefersReducedMotion.ts`
 
@@ -188,45 +196,16 @@ src/
 
 这些模块负责全局快捷键入口、侧边栏与画布布局，或同时协调 Project、Run、BlockGraph 和工作台状态，不属于 Project Presentation。除非后续先拆出单一上下文事实，否则不应仅凭 Project 命名继续下沉。
 
-### Agent Presentation 候选
+### Agent App Shell 保留项
 
-组件：
+- `AgentConsole.tsx`、`AgentTerminalSurface.tsx`、`useAgentTerminalView.ts`、`useAgentSessionAttachment.ts`：组合 Agent 会话事实与 Run terminal view/surface 生命周期。
+- `AgentNode.tsx`、`agentConsoleFlowNode.ts`：组合工作台节点、Agent 布局与运行 surface。
+- `AgentConsoleActions.tsx`、`AgentCreateSplitButton.tsx`、`useWorkspaceAgentActions.ts`：组合 Agent 动作与 App Shell 菜单、Project 工作区和全局创建入口。
+- `AgentToolApprovalCard.tsx`、`AgentApprovalIntentEdge.tsx`、`agentApprovalConnectionProjection.ts`、`agentApprovalPresentation.ts`、`useAgentToolApprovals.ts`：审批事实属于 Agent，但卡片定位、连线几何和 React Flow 投影属于 App Shell/BlockGraph 组合层。
+- `focusAgentConsoleInCanvas.ts`、`useAgentLayoutCoordination.ts`、`useAgentActivityNotificationNavigation.ts`、`agentActivityNavigation.ts`：Agent 提供目标事实，App Shell 拥有跨对象相机、工作台导航与 request id 协调。
+- `AppShellProviders.tsx`：继续作为 Agent Provider Store、Agent Activity、通知系统与 Run terminal surface registry 的应用级装配入口。
 
-- `AgentActivityObserver.tsx`
-- `AgentConsole.tsx`
-- `AgentConsoleActions.tsx`
-- `AgentCreateSplitButton.tsx`
-- `AgentMcpCapabilityToggle.tsx`
-- `AgentProviderIcon.tsx`
-- `AgentProviderStatusView.tsx`
-- `AgentSettingsPane.tsx`
-- `AgentToolApprovalCard.tsx`
-
-ViewModel、状态和表现策略：
-
-- `agentActivityStore.ts`
-- `agentConsoleModel.ts`
-- `agentProviderFeedback.ts`
-- `agentProviderPreference.ts`
-- `agentRuntimeReconciliation.ts`
-- `agentToolApprovalTypes.ts`
-- `useAgentActivitySnapshots.ts`
-- `useAgentCreationProviders.ts`
-- `useAgentProviderCatalog.ts`
-- `useAgentProviderNotifications.ts`
-- `useAgentProviderPreferences.ts`
-- `useAgentProviderState.ts`
-- `useAgentSessionAttachment.ts`
-- `useCreatableAgentProviders.ts`
-- `useWorkspaceAgentActions.ts`
-
-保留或先拆的混合模块：
-
-- `AgentNode.tsx`：同时承担工作台节点外壳、Agent 布局和运行 surface 组合。
-- `AgentTerminalSurface.tsx`、`useAgentTerminalView.ts`：Agent 状态属于 Agent，终端 view identity 和 surface 生命周期属于 Run；需要通过组件 props/ViewModel 边界拆分。
-- `AgentApprovalIntentEdge.tsx`、`agentApprovalConnectionProjection.ts`、`agentApprovalPresentation.ts`：工具审批属于 Agent，但连线几何和 React Flow 投影属于 App Shell/BlockGraph 组合层。
-- `focusAgentConsoleInCanvas.ts`、`useAgentLayoutCoordination.ts`：Agent 提供目标事实，App Shell 拥有跨对象相机与布局协调。
-- `AppShellProviders.tsx`、`AgentProviderStateProvider.tsx`：Provider 状态实现可下沉，应用级 Provider 装配入口留在 App Shell。
+这些文件不是待原样下沉清单。只有后续能先拆出不理解 Run、Project、BlockGraph、React Flow 或 App Shell 全局状态的 Agent 子组件时，子组件才进入 Agent Presentation。
 
 ### Run Presentation 候选
 
@@ -408,11 +387,14 @@ ViewModel、策略和交互：
 
 ### 阶段 3：Agent Presentation
 
+状态：已完成（2026-08-31）。
+
 目标：下沉 Provider、Agent 设置、控制台状态与工具审批的单上下文 UI。
 
-- 先迁移纯 Agent ViewModel、Provider catalog 状态和设置组件。
-- 再拆 AgentNode、AgentTerminalSurface 和审批连线中的 App Shell/Run 投影。
-- Provider-neutral 和审批语义保持不变。
+- 已迁移纯 Agent ViewModel、Provider catalog 状态、设置组件、Provider 状态反馈与 Agent activity 投影。
+- 已把通知发布和 Run terminal 完成屏障改为 App Shell 注入，Agent Presentation 不反向依赖 App Shell。
+- AgentNode、AgentTerminalSurface、AgentConsole、创建入口和审批连线经 owner 检查确认属于跨上下文组合，保留在 App Shell；阶段 7 只在存在清晰叶子边界时继续拆分，不做按文件名迁移。
+- Provider-neutral、审批、终端 attach、焦点、动效和可访问性语义保持不变。
 
 最低验证：Agent Presentation Unit、Provider boundary、Agent Unit/Contract、typecheck、dependency-cruiser、完整 `pre-commit`。
 

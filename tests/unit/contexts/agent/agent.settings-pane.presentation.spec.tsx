@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
-import { AgentProviderStateProvider } from '../../../src/presentation/app-shell/AgentProviderStateProvider'
-import { AgentSettingsPane } from '../../../src/presentation/app-shell/AgentSettingsPane'
-import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
-import type { AgentProviderPreferencesSnapshot } from '../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
-import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
+import { AgentProviderStateProvider } from '../../../../src/contexts/agent/presentation/components/AgentProviderStateProvider'
+import { AgentSettingsPane } from '../../../../src/contexts/agent/presentation/components/AgentSettingsPane'
+import type { AgentProviderDescriptor } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderPreferencesSnapshot } from '../../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
+import { createRuntimeApi } from '../../../fixtures/presentation/appShellFixtures'
 
 const codex = createProvider('codex', 'Codex')
 const claude = createProvider('claude-code', 'Claude Code')

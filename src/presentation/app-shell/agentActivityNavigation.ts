@@ -1,8 +1,6 @@
-import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+import type { AgentActivityNavigationTarget } from '../../contexts/agent/presentation/view-models/AgentActivityNavigationTarget'
 
-export interface AgentActivityNavigationTarget {
-  readonly target: CanvasObjectIdentity
-}
+export type { AgentActivityNavigationTarget }
 
 export interface AgentActivityNavigationRequest extends AgentActivityNavigationTarget {
   readonly requestId: number

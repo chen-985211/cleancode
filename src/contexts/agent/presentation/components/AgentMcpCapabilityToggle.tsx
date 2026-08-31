@@ -1,9 +1,9 @@
+import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { useId } from 'react'
 
-import type { AgentMcpPresentationStatus } from './agentProviderFeedback'
-import { useI18n } from '../i18n/useI18n'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import type { AgentMcpPresentationStatus } from '../view-models/agentProviderFeedback'
 
 export function AgentMcpCapabilityToggle({
   enabled,
@@ -76,7 +76,15 @@ export function AgentMcpCapabilityToggle({
               onReconnect()
             }}
           >
-            <WorkbenchIcon role="restart" size={13} />
+            <ArrowClockwiseIcon
+              aria-hidden="true"
+              data-icon-glyph="arrow-clockwise"
+              data-icon-role="restart"
+              data-icon-weight="bold"
+              focusable="false"
+              size={13}
+              weight="bold"
+            />
           </button>
         </TooltipLabel>
       ) : null}

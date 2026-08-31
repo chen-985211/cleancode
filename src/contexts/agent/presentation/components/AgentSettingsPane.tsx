@@ -9,20 +9,20 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type {
   AgentProviderAvailability,
   AgentProviderDescriptor
-} from '../../contexts/agent/application/ports/AgentProviderContribution'
-import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
+} from '../../application/ports/AgentProviderContribution'
+import type { UpdateAgentProviderPreferencesCommand } from '../../application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type {
   AgentProviderOverrideSnapshot,
   AgentProviderPreferencesSnapshot
-} from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
-import { AgentProviderIcon } from './AgentProviderIcon'
-import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
-import { useAgentProviderCatalog } from './useAgentProviderCatalog'
-import { useI18n } from '../i18n/useI18n'
+} from '../../domain/aggregates/AgentProviderPreferences'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { ApplicationSettingsSwitch } from '../../../../presentation/shared/components/ApplicationSettingsSwitch'
 import {
   useSelectionFeedbackMotion,
   useSelectionIndicatorMotion
-} from '../shared/hooks/useSelectionMotion'
+} from '../../../../presentation/shared/hooks/useSelectionMotion'
+import { AgentProviderIcon } from './AgentProviderIcon'
+import { useAgentProviderCatalog } from '../view-models/useAgentProviderCatalog'
 
 const defaultPreferences: AgentProviderPreferencesSnapshot = {
   defaultCleancodeMcpEnabled: true,

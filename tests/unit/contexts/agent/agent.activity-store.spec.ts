@@ -2,8 +2,8 @@ import type {
   AgentActivityTerminalScope,
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
-} from '../../../src/contexts/agent/application/dto/AgentActivityProtocol'
-import { AgentActivityStore } from '../../../src/presentation/app-shell/agentActivityStore'
+} from '../../../../src/contexts/agent/application/dto/AgentActivityProtocol'
+import { AgentActivityStore } from '../../../../src/contexts/agent/presentation/view-models/agentActivityStore'
 
 describe('AgentActivityStore', () => {
   it('establishes a quiet baseline and only projects a new attention transition', () => {

@@ -1,13 +1,25 @@
+import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
+import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy'
+import { DesktopTowerIcon } from '@phosphor-icons/react/dist/csr/DesktopTower'
+import { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple'
+import { PauseCircleIcon } from '@phosphor-icons/react/dist/csr/PauseCircle'
+import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
+import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 
-import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
-import type { AgentBlockingFeedback, AgentFeedbackIssue } from './agentProviderFeedback'
-import type { AgentProviderPanelState } from './useAgentProviderState'
-import { useI18n } from '../i18n/useI18n'
-import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
-import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
+import type { AgentProviderAvailability } from '../../application/ports/AgentProviderContribution'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
+import type {
+  AgentBlockingFeedback,
+  AgentFeedbackIssue
+} from '../view-models/agentProviderFeedback'
+import type { AgentProviderPanelState } from '../view-models/useAgentProviderState'
 
 interface PanelPosition {
   readonly left: number
@@ -109,7 +121,7 @@ export function AgentProviderStatusControl({
 
   if (issues.length === 0) return null
   const isNeutral = issues.every((issue) => issue === 'session_ended')
-  const iconRole: WorkbenchIconRole = isNeutral ? 'paused' : 'error'
+  const iconRole: AgentStatusIconRole = isNeutral ? 'paused' : 'error'
   const controlLabel = t('agent.statusCount', { agentName, count: issues.length })
 
   const runAction = (action: () => void): void => {
@@ -135,7 +147,7 @@ export function AgentProviderStatusControl({
           }}
           ref={triggerRef}
         >
-          <WorkbenchIcon role={iconRole} size={15} />
+          <AgentStatusIcon role={iconRole} size={15} />
           {issues.length > 1 ? (
             <span className="agent-provider-status-control__count" aria-hidden="true">
               {issues.length}
@@ -170,7 +182,7 @@ export function AgentProviderStatusControl({
                 triggerRef.current?.focus()
               }}
             >
-              <WorkbenchIcon role="close" size={14} />
+              <AgentStatusIcon role="close" size={14} />
             </button>
           </TooltipLabel>
         </div>
@@ -209,7 +221,7 @@ function StatusIssue({
 }) {
   const { t } = useI18n()
   const isNeutral = issue === 'session_ended'
-  const iconRole: WorkbenchIconRole = isNeutral ? 'paused' : 'error'
+  const iconRole: AgentStatusIconRole = isNeutral ? 'paused' : 'error'
   const actions: Array<{ readonly label: string; readonly onClick: () => void }> = []
   if (issue === 'attachment_failed' && onRetryAttachment) {
     actions.push({ label: t('provider.retry'), onClick: onRetryAttachment })
@@ -242,7 +254,7 @@ function StatusIssue({
       className="agent-provider-status-panel__issue"
       data-tone={isNeutral ? 'neutral' : 'warning'}
     >
-      <WorkbenchIcon role={iconRole} size={15} />
+      <AgentStatusIcon role={iconRole} size={15} />
       <div>
         <p>{feedbackIssueLabel(issue, providerName, state, t)}</p>
         {actions.length > 0 ? (
@@ -277,7 +289,7 @@ export function AgentProviderBlockingState({
   const [isCopied, setIsCopied] = useState(false)
   const availability = installableAvailability(state)
   const isChecking = blocking === 'checking_provider'
-  const iconRole: WorkbenchIconRole = isChecking
+  const iconRole: AgentStatusIconRole = isChecking
     ? 'loading'
     : blocking === 'runtime_unavailable'
       ? 'runtime-unavailable'
@@ -307,7 +319,7 @@ export function AgentProviderBlockingState({
       data-tone={isChecking ? 'neutral' : 'warning'}
     >
       <span className="agent-provider-empty-state__icon" aria-hidden="true">
-        <WorkbenchIcon
+        <AgentStatusIcon
           className={isChecking ? 'agent-provider-empty-state__spinner' : undefined}
           role={iconRole}
           size={18}
@@ -322,7 +334,7 @@ export function AgentProviderBlockingState({
               aria-label={t('provider.retryAttach', { provider: providerName })}
               onClick={onRetryAttachment}
             >
-              <WorkbenchIcon role="restart" size={13} />
+              <AgentStatusIcon role="restart" size={13} />
               {t('provider.retry')}
             </button>
           ) : null}
@@ -332,7 +344,7 @@ export function AgentProviderBlockingState({
               aria-label={t('provider.recheck', { provider: providerName })}
               onClick={onRetryInspection}
             >
-              <WorkbenchIcon role="restart" size={13} />
+              <AgentStatusIcon role="restart" size={13} />
               {t('provider.recheckShort')}
             </button>
           ) : null}
@@ -356,9 +368,9 @@ export function AgentProviderBlockingState({
             onClick={() => void copyInstallCommand()}
           >
             {isCopied ? (
-              <WorkbenchIcon role="confirm" size={13} />
+              <AgentStatusIcon role="confirm" size={13} />
             ) : (
-              <WorkbenchIcon role="copy" size={13} />
+              <AgentStatusIcon role="copy" size={13} />
             )}
             {isCopied ? t('provider.copied') : t('provider.copy')}
           </button>
@@ -442,4 +454,40 @@ function installableAvailability(
     return state.availability
   }
   return null
+}
+
+type AgentStatusIconRole = keyof typeof agentStatusIconDefinitions
+
+type AgentStatusIconDefinition = readonly [Icon, string, IconWeight]
+
+const agentStatusIconDefinitions = {
+  close: [XIcon, 'x', 'bold'],
+  confirm: [CheckIcon, 'check', 'bold'],
+  copy: [CopyIcon, 'copy', 'bold'],
+  download: [DownloadSimpleIcon, 'download-simple', 'bold'],
+  error: [WarningCircleIcon, 'warning-circle', 'fill'],
+  loading: [CircleNotchIcon, 'circle-notch', 'bold'],
+  paused: [PauseCircleIcon, 'pause-circle', 'fill'],
+  restart: [ArrowClockwiseIcon, 'arrow-clockwise', 'bold'],
+  'runtime-unavailable': [DesktopTowerIcon, 'desktop-tower', 'regular']
+} satisfies Record<string, AgentStatusIconDefinition>
+
+function AgentStatusIcon({
+  role,
+  ...props
+}: Omit<IconProps, 'weight'> & { readonly role: AgentStatusIconRole }) {
+  const [IconComponent, glyph, weight] = agentStatusIconDefinitions[
+    role
+  ] as AgentStatusIconDefinition
+  return (
+    <IconComponent
+      {...props}
+      aria-hidden="true"
+      data-icon-glyph={glyph}
+      data-icon-role={role}
+      data-icon-weight={weight}
+      focusable="false"
+      weight={weight}
+    />
+  )
 }

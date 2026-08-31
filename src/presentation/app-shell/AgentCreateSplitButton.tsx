@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom'
 
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import { createAgentCreateMenuHighlightMotionController } from './agentCreateMenuHighlightMotion'
-import { AgentProviderIcon } from './AgentProviderIcon'
+import { AgentProviderIcon } from '../../contexts/agent/presentation/components/AgentProviderIcon'
 import { CanvasMenuSurface } from './CanvasMenuMotionProvider'
 import { useI18n } from '../i18n/useI18n'
 import { TooltipLabel } from '../shared/components/Tooltip'

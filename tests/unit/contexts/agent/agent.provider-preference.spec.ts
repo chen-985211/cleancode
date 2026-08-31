@@ -3,7 +3,7 @@ import {
   readAgentProviderPreference,
   resolveEffectiveAgentProviderId,
   writeAgentProviderPreference
-} from '../../../src/presentation/app-shell/agentProviderPreference'
+} from '../../../../src/contexts/agent/presentation/view-models/agentProviderPreference'
 
 describe('Agent Provider preference', () => {
   it('persists one application-level default Provider', () => {

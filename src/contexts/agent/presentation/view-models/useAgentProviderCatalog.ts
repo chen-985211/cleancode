@@ -7,7 +7,7 @@ import {
   useSyncExternalStore
 } from 'react'
 
-import type { AgentProviderDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderDescriptor } from '../../application/ports/AgentProviderContribution'
 
 export type AgentProviderCatalogState =
   | { readonly status: 'loading' }

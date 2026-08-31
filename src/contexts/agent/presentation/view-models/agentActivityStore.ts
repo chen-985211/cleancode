@@ -2,12 +2,12 @@ import type {
   AgentActivityTerminalScope,
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
-} from '../../contexts/agent/application/dto/AgentActivityProtocol'
-import type { AppNotificationIdentity } from '../shared/notifications/appNotifications'
+} from '../../application/dto/AgentActivityProtocol'
+import type { AppNotificationIdentity } from '../../../../presentation/shared/notifications/appNotifications'
 import {
   createCanvasObjectIdentity,
   type CanvasObjectIdentity
-} from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+} from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export type AgentActivityNotificationProjection =
   | {

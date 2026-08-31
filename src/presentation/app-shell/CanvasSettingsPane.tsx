@@ -1,5 +1,5 @@
 import { useI18n } from '../i18n/useI18n'
-import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
+import { ApplicationSettingsSwitch } from '../shared/components/ApplicationSettingsSwitch'
 
 export function CanvasSettingsPane({
   followQuickExecutionTarget,

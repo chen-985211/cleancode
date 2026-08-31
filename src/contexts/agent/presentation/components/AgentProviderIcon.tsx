@@ -1,13 +1,23 @@
 import { useId } from 'react'
+import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 
-import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../application/ports/AgentProviderContribution'
 
 export function AgentProviderIcon({ icon }: { readonly icon: AgentProviderIconDescriptor | null }) {
   const definitionPrefix = useId().replaceAll(':', '')
 
   if (!icon) {
-    return <WorkbenchIcon className="agent-provider-icon" role="agent" />
+    return (
+      <RobotIcon
+        aria-hidden="true"
+        className="agent-provider-icon"
+        data-icon-glyph="robot"
+        data-icon-role="agent"
+        data-icon-weight="regular"
+        focusable="false"
+        weight="regular"
+      />
+    )
   }
 
   if ('imageDataUrl' in icon) {

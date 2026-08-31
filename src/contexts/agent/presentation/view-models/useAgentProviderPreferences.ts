@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
-import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
+import type { UpdateAgentProviderPreferencesCommand } from '../../application/use-cases/UpdateAgentProviderPreferencesUseCase'
+import type { AgentProviderPreferencesSnapshot } from '../../domain/aggregates/AgentProviderPreferences'
 import {
   agentProviderPreferenceStorageKey,
   readAgentProviderPreference

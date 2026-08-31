@@ -1,5 +1,6 @@
 @import './styles/theme.css';
 @import '../shared/styles/surface-motion.css';
+@import '../shared/styles/application-settings-switch.css';
 @import './styles/base.css';
 @import './styles/theme-settings.css';
 @import './styles/block-template-library.css';
@@ -31,11 +32,12 @@
 @import './styles/terminal-service-runtime.css';
 @import './styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';
+@import '../../contexts/agent/presentation/styles/agent-provider.css';
 @import './styles/agent-create.css';
-@import './styles/agent-settings.css';
+@import '../../contexts/agent/presentation/styles/agent-settings.css';
 @import './styles/agent-tool-approval.css';
 @import './styles/agent-tool-approval-connection.css';
-@import './styles/agent-mcp-capability.css';
+@import '../../contexts/agent/presentation/styles/agent-mcp-capability.css';
 @import './styles/terminal-surface-visibility.css';
 @import './styles/workbench-object-motion.css';
 @import '../shared/styles/selection-motion.css';

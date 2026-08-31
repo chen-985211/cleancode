@@ -1,9 +1,9 @@
 import { useCallback, type ReactNode } from 'react'
 
 import type { AgentTurnCompletedEvent } from '../../contexts/agent/application/dto/AgentActivityProtocol'
-import { AgentActivityObserver } from './AgentActivityObserver'
-import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
-import { AgentProviderStateProvider } from './AgentProviderStateProvider'
+import { AgentActivityObserver } from '../../contexts/agent/presentation/components/AgentActivityObserver'
+import type { AgentActivityNavigationTarget } from '../../contexts/agent/presentation/view-models/AgentActivityNavigationTarget'
+import { AgentProviderStateProvider } from '../../contexts/agent/presentation/components/AgentProviderStateProvider'
 import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'

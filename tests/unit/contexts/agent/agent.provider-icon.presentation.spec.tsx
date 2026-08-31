@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 
-import { AgentProviderIcon } from '../../../src/presentation/app-shell/AgentProviderIcon'
-import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
+import { AgentProviderIcon } from '../../../../src/contexts/agent/presentation/components/AgentProviderIcon'
+import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 
 describe('Agent Provider icon', () => {
   it('renders a bundled raster brand asset without converting it into a generic glyph', () => {

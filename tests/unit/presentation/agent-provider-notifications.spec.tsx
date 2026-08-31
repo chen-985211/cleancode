@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
 
 import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import type { AgentFeedbackEvent } from '../../../src/presentation/app-shell/agentProviderFeedback'
-import { useAgentProviderNotifications } from '../../../src/presentation/app-shell/useAgentProviderNotifications'
+import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import type { AgentFeedbackEvent } from '../../../src/contexts/agent/presentation/view-models/agentProviderFeedback'
+import { useAgentProviderNotifications } from '../../../src/contexts/agent/presentation/view-models/useAgentProviderNotifications'
 
 describe('Agent Provider notifications', () => {
   it('notifies a newly observed binding issue once and resets the baseline when scope changes', () => {
@@ -73,6 +74,7 @@ function NotificationHarness({
   readonly events: readonly AgentFeedbackEvent[]
   readonly scopeKey: string
 }) {
-  useAgentProviderNotifications({ events, scopeKey })
+  const notifications = useNotifications()
+  useAgentProviderNotifications({ events, notifications, scopeKey })
   return null
 }

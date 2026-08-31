@@ -1,12 +1,12 @@
 import type {
   AgentRuntimeChangedEvent,
   AgentSessionSnapshot
-} from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
+} from '../../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import {
   applyAgentRuntimeEvent,
   maxPendingAgentRuntimeEvents,
   rememberLatestAgentRuntimeEvent
-} from '../../../src/presentation/app-shell/agentRuntimeReconciliation'
+} from '../../../../src/contexts/agent/presentation/view-models/agentRuntimeReconciliation'
 
 describe('Agent runtime reconciliation', () => {
   it('rejects an older launch generation even when its event has a higher revision', () => {

@@ -4,19 +4,21 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
-} from '../../contexts/agent/application/dto/AgentActivityProtocol'
+} from '../../application/dto/AgentActivityProtocol'
+import type { AppNotificationController } from '../../../../presentation/shared/notifications/appNotifications'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { AgentProviderIcon } from './AgentProviderIcon'
-import { AgentActivityStore, type AgentActivityNotificationProjection } from './agentActivityStore'
-import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
-import type { AppNotificationController } from '../shared/notifications/appNotifications'
-import { useI18n } from '../i18n/useI18n'
-import { AgentActivityStoreContext } from './useAgentActivitySnapshots'
-import { useOptionalNotifications } from './useNotifications'
+import type { AgentActivityNavigationTarget } from '../view-models/AgentActivityNavigationTarget'
+import {
+  AgentActivityStore,
+  type AgentActivityNotificationProjection
+} from '../view-models/agentActivityStore'
+import { AgentActivityStoreContext } from '../view-models/useAgentActivitySnapshots'
 import {
   formatProviderDisplayName,
   useAgentProviderCatalog,
   type AgentProviderCatalogState
-} from './useAgentProviderCatalog'
+} from '../view-models/useAgentProviderCatalog'
 
 type AgentActivityRendererApi = Pick<
   NonNullable<Window['cleancode']>,
@@ -36,20 +38,18 @@ const publishedNotificationLimit = 256
 
 interface AgentActivityObserverProps {
   readonly children: ReactNode
-  readonly notifications?: AppNotificationController
+  readonly notifications: AppNotificationController
   readonly onNavigate: (target: AgentActivityNavigationTarget) => void
   readonly waitForCompletionPresentation: (completion: AgentTurnCompletedEvent) => Promise<void>
 }
 
 export function AgentActivityObserver({
   children,
-  notifications: providedNotifications,
+  notifications,
   onNavigate,
   waitForCompletionPresentation
 }: AgentActivityObserverProps) {
   const [store] = useState(() => new AgentActivityStore())
-  const contextualNotifications = useOptionalNotifications()
-  const notifications = providedNotifications ?? contextualNotifications
   const { t } = useI18n()
   const providerCatalog = useAgentProviderCatalog()
   const notificationsRef = useRef(notifications)
