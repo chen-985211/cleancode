@@ -1,13 +1,20 @@
+import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
+import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy'
+import { CrosshairIcon } from '@phosphor-icons/react/dist/csr/Crosshair'
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple'
+import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
+import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
+
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
   TerminalServiceEndpoint,
   TerminalServicePortConflict
-} from './types'
-import { useI18n } from '../i18n/useI18n'
-import type { Translate } from '../i18n/messages'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { WorkbenchIcon } from './WorkbenchIcons'
+} from '../../application/dto/TerminalRunEvent'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import type { Translate } from '../../../../presentation/i18n/messages'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
 
 interface TerminalServiceRuntimeBarProps {
   readonly identity: TerminalRunIdentity | null
@@ -105,7 +112,7 @@ function EndpointRow({
           tooltip={t('service.copyAddress')}
           onClick={() => void onCopyEndpoint(endpoint)}
         >
-          <WorkbenchIcon role="copy" size={13} />
+          <TerminalServiceRuntimeIcon role="copy" size={13} />
         </RuntimeIconButton>
         {canOpen && identity ? (
           <RuntimeIconButton
@@ -113,7 +120,7 @@ function EndpointRow({
             tooltip={t('service.openAddress')}
             onClick={() => void onOpenEndpoint(identity)}
           >
-            <WorkbenchIcon role="open-external" size={13} />
+            <TerminalServiceRuntimeIcon role="open-external" size={13} />
           </RuntimeIconButton>
         ) : null}
       </div>
@@ -141,7 +148,7 @@ function ConflictRow({
       role="status"
       aria-label={t('service.portConflict')}
     >
-      <WorkbenchIcon role="warning" size={14} />
+      <TerminalServiceRuntimeIcon role="warning" size={14} />
       <span className="terminal-service-runtime__conflict-message">
         {createConflictMessage(conflict, owner, t)}
       </span>
@@ -153,7 +160,7 @@ function ConflictRow({
               tooltip={t('service.locateOwner')}
               onClick={() => void onLocateOwner(owner)}
             >
-              <WorkbenchIcon role="locate" size={13} />
+              <TerminalServiceRuntimeIcon role="locate" size={13} />
             </RuntimeIconButton>
             {canOpenOwner ? (
               <RuntimeIconButton
@@ -161,7 +168,7 @@ function ConflictRow({
                 tooltip={t('service.openOwner')}
                 onClick={() => void onOpenEndpoint(owner.identity)}
               >
-                <WorkbenchIcon role="open-external" size={13} />
+                <TerminalServiceRuntimeIcon role="open-external" size={13} />
               </RuntimeIconButton>
             ) : null}
           </>
@@ -171,14 +178,14 @@ function ConflictRow({
           tooltip={t('service.editPort')}
           onClick={onEditPortConfiguration}
         >
-          <WorkbenchIcon role="edit" size={13} />
+          <TerminalServiceRuntimeIcon role="edit" size={13} />
         </RuntimeIconButton>
         <RuntimeIconButton
           label={t('service.dismissConflict')}
           tooltip={t('service.dismiss')}
           onClick={onDismissConflict}
         >
-          <WorkbenchIcon role="close" size={13} />
+          <TerminalServiceRuntimeIcon role="close" size={13} />
         </RuntimeIconButton>
       </div>
     </div>
@@ -248,5 +255,38 @@ function RuntimeIconButton({
         {children}
       </button>
     </TooltipLabel>
+  )
+}
+
+type TerminalServiceRuntimeIconDefinition = readonly [Icon, string, IconWeight]
+
+const terminalServiceRuntimeIconDefinitions = {
+  close: [XIcon, 'x', 'bold'],
+  copy: [CopyIcon, 'copy', 'bold'],
+  edit: [PencilSimpleIcon, 'pencil-simple', 'bold'],
+  locate: [CrosshairIcon, 'crosshair', 'bold'],
+  'open-external': [ArrowSquareOutIcon, 'arrow-square-out', 'bold'],
+  warning: [WarningIcon, 'warning', 'fill']
+} satisfies Record<string, TerminalServiceRuntimeIconDefinition>
+
+type TerminalServiceRuntimeIconRole = keyof typeof terminalServiceRuntimeIconDefinitions
+
+interface TerminalServiceRuntimeIconProps extends Omit<IconProps, 'alt' | 'mirrored' | 'weight'> {
+  readonly role: TerminalServiceRuntimeIconRole
+}
+
+function TerminalServiceRuntimeIcon({ role, ...props }: TerminalServiceRuntimeIconProps) {
+  const [IconComponent, glyph, weight] = terminalServiceRuntimeIconDefinitions[role]
+
+  return (
+    <IconComponent
+      {...props}
+      aria-hidden="true"
+      data-icon-glyph={glyph}
+      data-icon-role={role}
+      data-icon-weight={weight}
+      focusable="false"
+      weight={weight}
+    />
   )
 }

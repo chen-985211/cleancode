@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { TerminalServiceRuntimeBar } from '../../../src/presentation/app-shell/TerminalServiceRuntimeBar'
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
   TerminalServiceEndpoint,
   TerminalServicePortConflict
-} from '../../../src/presentation/app-shell/types'
+} from '../../../../src/contexts/run/application/dto/TerminalRunEvent'
+import { TerminalServiceRuntimeBar } from '../../../../src/contexts/run/presentation/components/TerminalServiceRuntimeBar'
 
 describe('terminal service runtime bar', () => {
   it('shows the authoritative address, copies it, opens HTTP, and explains fallback', async () => {

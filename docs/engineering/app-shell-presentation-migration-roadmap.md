@@ -152,7 +152,14 @@ src/
 - service endpoint/conflict 与 workflow terminal event 的 renderer 派生投影已迁入 Run；端点与 workflow 状态仍分别来自 Run Application 的精确运行事件，不在 Presentation 产生第二事实来源。
 - runtime availability、scrollback preference、recovery、session event subscription 与 stale view identity reconciliation Hook 已迁入 Run，并继续通过注入的通知控制器或 App Shell 参数完成组合。
 - 以上 Run 自有 Unit 已迁入 `tests/unit/contexts/run`；React store 和 availability Hook 使用 `*.presentation.spec.*` 进入 jsdom，Workbench node projection 等跨上下文测试继续留在根级 Presentation。
-- `useTerminalSessionRetention`、terminal minimap、`TerminalServiceRuntimeBar` 和 workflow notifications 继续留在 App Shell，分别组合 Project 工作区、Agent/BlockGraph 节点、App Shell 图标/画布定位或全局通知导航。
+- `useTerminalSessionRetention`、terminal minimap 和 workflow notifications 继续留在 App Shell，分别组合 Project 工作区、Agent/BlockGraph 节点或全局通知导航。
+
+### Run Service Runtime UI Presentation
+
+- `TerminalServiceRuntimeBar` 及其专属样式已迁入 Run `presentation/components` 与 `styles`，直接消费 Run Application 的精确运行 identity、实际端点和端口冲突 DTO。
+- 服务状态条自有复制、外部打开、定位、编辑、关闭和警告的语义图标，继续使用相同 Phosphor glyph、weight、Tooltip、可访问名称和 `data-icon-*` 标记，不再依赖 App Shell `WorkbenchIcon`。
+- `TerminalNode` 继续作为组合 wrapper，负责注入剪贴板、外部打开、画布定位、元数据编辑和冲突消除动作；Run 组件不理解 React Flow、BlockGraph 节点或 App Shell 导航状态。
+- 组件 Unit 与 owner 一同迁入 `tests/unit/contexts/run`，端点可打开条件、fallback、租约清理状态、managed/external/unknown 冲突和安全动作保持不变。
 
 ## 剩余清单
 
@@ -229,7 +236,6 @@ src/
 
 组件与 Hook：
 
-- `TerminalServiceRuntimeBar.tsx`
 - `useTerminalMinimapAppearance.ts`
 - `useTerminalSessionRetention.ts`
 - `useTerminalWorkflowNotifications.ts`
@@ -385,13 +391,14 @@ ViewModel、策略和交互：
 
 ### 阶段 4：Run Presentation
 
-状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批迁移）。
+状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批与 service runtime UI 第三批迁移）。
 
 目标：让 terminal surface、输出模型投影、主题、恢复和 runtime UI 归 Run Presentation。
 
 - 已迁移无跨上下文依赖的 surface 策略、registry、xterm/raster/workload 能力、主题投影及其 Provider/Hook。
 - 已迁移输出缓冲、session state/store、恢复、runtime availability/preference、service/workflow event 投影及 Run 自有 Hook。
-- 下一批处理 `TerminalServiceRuntimeBar` 等剩余 UI 叶子；minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
+- 已迁移 `TerminalServiceRuntimeBar`、专属样式和 Unit；App Shell 只保留剪贴板、外部打开、画布定位和编辑入口的动作装配。
+- 下一批拆分 `TerminalSettingsPane` 的 Run 滚屏设置 section；minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
 - 最后拆 TerminalViewport/TerminalNode 的 BlockGraph 定义与 Run surface 边界。
 - 不改变 xterm 生命周期、attach、恢复、resize 或滚屏行为。
 

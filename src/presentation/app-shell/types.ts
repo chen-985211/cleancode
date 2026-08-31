@@ -30,8 +30,7 @@ import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangemen
 export type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
-  TerminalServiceEndpoint,
-  TerminalServicePortConflict
+  TerminalServiceEndpoint
 } from '../../contexts/run/application/dto/TerminalRunEvent'
 export type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
