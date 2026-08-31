@@ -152,6 +152,7 @@ BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力
 
 - Run 上下文拥有 `TerminalWorkflowPlanPort`，其 BlockGraph 适配器调用 `BuildTerminalWorkflowPlanUseCase` 获得单流程或组合作用域 DTO；Run 不读取聚合内部状态。
 - Run 上下文拥有 `TerminalLaunchPlanPort`，其 BlockGraph 适配器调用 `GetTerminalLaunchPlanUseCase` 获得单终端不可变启动计划；直接启动和组合启动不从表现层拼接命令或端口配置。
+- 普通终端节点由 App Shell 组合 BlockGraph 定义与 Run runtime。BlockGraph snapshot 只在 adapter 中提供当前终端显示名和 block-scoped 动作绑定；Run 的 `TerminalRuntimeViewport` 不接收 BlockGraph snapshot，也不拥有节点、位置、尺寸或定义事实。
 - BlockGraph 拥有 `TerminalRunLifecyclePort`，删除单个终端、完整流程或组合时由 Platform 把一个精确终端集合适配到 Run 的公开 lifecycle 服务；BlockGraph 不读取或操作 Run 内部进程和租约。
 - Agent 上下文拥有 `AgentBlockGraphToolPort`，其 BlockGraph 适配器把原生 MCP 工具转换为本上下文用例；Agent 不直接写 JSON 或调用聚合。
 - CanvasArrangement 只引用 BlockGraph DTO 中的规范终端、完整流程与终端组合身份；对象位置、依赖、组合成员和模板仍由 BlockGraph 拥有。

@@ -1,9 +1,8 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
-import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
-import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
-import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { TerminalRuntimeViewport } from '../../../../src/contexts/run/presentation/components/TerminalRuntimeViewport'
+import { TerminalSurfaceRegistryProvider } from '../../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
+import { TerminalSurfaceRegistry } from '../../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 interface FakeSearchAddon {
   readonly clearDecorations: ReturnType<typeof vi.fn>
@@ -274,14 +273,14 @@ describe('terminal viewport daily interactions', () => {
     const shell = workspace.container.querySelector<HTMLElement>('.terminal-output-shell')!
 
     fireEvent.paste(shell, { clipboardData: { files: [], getData: () => 'first\nsecond' } })
-    await waitFor(() => expect(onPaste).toHaveBeenCalledWith(expect.any(Object), 'first\rsecond'))
+    await waitFor(() => expect(onPaste).toHaveBeenCalledWith('first\rsecond'))
     onPaste.mockClear()
     fireEvent.paste(shell, { clipboardData: { files: [], getData: () => 'unsafe\u001b[2J' } })
     expect(await workspace.findByRole('alertdialog')).toBeInTheDocument()
     expect(onPaste).not.toHaveBeenCalled()
 
     fireEvent.click(workspace.getByRole('button', { name: '继续粘贴' }))
-    await waitFor(() => expect(onPaste).toHaveBeenCalledWith(expect.any(Object), 'unsafe\u001b[2J'))
+    await waitFor(() => expect(onPaste).toHaveBeenCalledWith('unsafe\u001b[2J'))
     const image = new File(['bytes'], 'shot.png', { type: 'image/png' })
     fireEvent.paste(shell, { clipboardData: { files: [image], getData: () => '' } })
     expect(await workspace.findByRole('status')).toHaveTextContent('终端不接受图片数据')
@@ -329,8 +328,8 @@ function renderViewport(
 ) {
   return render(
     <TerminalSurfaceRegistryProvider registry={new TerminalSurfaceRegistry()}>
-      <TerminalViewport
-        block={terminalBlock()}
+      <TerminalRuntimeViewport
+        blockName="Terminal 1"
         session={runningState()}
         focusRequestId={0}
         onViewIdentityStale={onViewIdentityStale}
@@ -346,18 +345,6 @@ function renderViewport(
 async function installedTerminal(): Promise<FakeTerminal> {
   await waitFor(() => expect(phaseTwoMockState.terminals).toHaveLength(1))
   return phaseTwoMockState.terminals[0]!
-}
-
-function terminalBlock(): TerminalBlockSnapshot {
-  return {
-    id: 'terminal-1',
-    type: 'terminal',
-    name: 'Terminal 1',
-    description: 'Local terminal',
-    launchCommand: '',
-    position: { x: 0, y: 0 },
-    size: { width: 600, height: 320 }
-  }
 }
 
 function runningState() {

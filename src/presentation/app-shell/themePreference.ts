@@ -2,7 +2,7 @@ export type ThemePreference = 'system' | 'light' | 'dark'
 export type EffectiveTheme = 'light' | 'dark'
 
 export const themePreferenceStorageKey = 'cleancode:theme-preference'
-export const effectiveThemeChangeEventName = 'cleancode-effective-theme-change'
+const effectiveThemeChangeEventName = 'cleancode-effective-theme-change'
 export const systemDarkThemeQuery = '(prefers-color-scheme: dark)'
 
 interface InitialThemePreferenceInput {

@@ -1,13 +1,12 @@
 import { render, waitFor } from '@testing-library/react'
 
-import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
+import { TerminalRuntimeViewport } from '../../../../src/contexts/run/presentation/components/TerminalRuntimeViewport'
 
 const attachmentIdentityMockState = vi.hoisted(() => ({
   detach: vi.fn()
 }))
 
-vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
+vi.mock('../../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
   createTerminalXtermSurface: vi.fn(() => ({
     attach: vi.fn(),
     clearSearch: vi.fn(),
@@ -47,8 +46,8 @@ describe('terminal surface attachment identity', () => {
 
   it('owns the attached session marker for the lifetime of the ordinary terminal surface', async () => {
     const workspace = render(
-      <TerminalViewport
-        block={createTerminalBlock()}
+      <TerminalRuntimeViewport
+        blockName="Terminal 1"
         focusRequestId={0}
         onDimensionsChange={vi.fn()}
         onInput={vi.fn()}
@@ -71,15 +70,3 @@ describe('terminal surface attachment identity', () => {
     expect(attachmentIdentityMockState.detach).toHaveBeenCalledWith(viewport)
   })
 })
-
-function createTerminalBlock(): TerminalBlockSnapshot {
-  return {
-    description: '本地终端',
-    id: 'terminal-1',
-    launchCommand: '',
-    name: 'Terminal 1',
-    position: { x: 120, y: 80 },
-    size: { height: 360, width: 640 },
-    type: 'terminal'
-  }
-}

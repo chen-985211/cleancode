@@ -1,11 +1,9 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
-import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { canonicalTerminalPalettes } from '../../../src/contexts/run/application/dto/TerminalPalette.generated'
-import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
-import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
-import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
-import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
+import { TerminalRuntimeViewport } from '../../../../src/contexts/run/presentation/components/TerminalRuntimeViewport'
+import { TerminalSurfaceRegistryProvider } from '../../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
+import { TerminalSurfaceRegistry } from '../../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 interface FakeTerminalInstance {
   buffer: {
@@ -331,7 +329,7 @@ describe('terminal viewport interaction', () => {
     expect(viewport?.dataset.terminalSourceTheme).toBe('dark')
 
     document.documentElement.dataset.theme = 'light'
-    window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
+    window.dispatchEvent(new CustomEvent('cleancode-effective-theme-change'))
 
     expect(terminal.options.theme?.background).toBe(canonicalTerminalPalettes.dark.background)
     expect(xtermMockState.terminals).toHaveLength(1)
@@ -552,13 +550,13 @@ function renderTerminalViewport({
     readonly columns: number
     readonly rows: number
   }) => void
-  readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
+  readonly onPaste?: (input: string) => Promise<void>
   readonly output?: string
 } = {}) {
   return render(
     <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-      <TerminalViewport
-        block={createTerminalBlock()}
+      <TerminalRuntimeViewport
+        blockName="Terminal 1"
         session={createRunningTerminalState(output)}
         focusRequestId={0}
         isResizeSuspended={isResizeSuspended}
@@ -586,8 +584,8 @@ function rerenderTerminalViewport(
 ) {
   rerender(
     <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-      <TerminalViewport
-        block={createTerminalBlock()}
+      <TerminalRuntimeViewport
+        blockName="Terminal 1"
         session={createRunningTerminalState()}
         focusRequestId={0}
         isResizeSuspended={isResizeSuspended}
@@ -685,16 +683,4 @@ async function waitForInstalledTerminal(): Promise<FakeTerminalInstance> {
   await waitFor(() => expect(xtermMockState.terminals).toHaveLength(1))
 
   return xtermMockState.terminals[0]
-}
-
-function createTerminalBlock(): TerminalBlockSnapshot {
-  return {
-    id: 'terminal-1',
-    type: 'terminal',
-    name: 'Terminal 1',
-    description: '本地终端',
-    launchCommand: '',
-    position: { x: 120, y: 80 },
-    size: { width: 640, height: 360 }
-  }
 }
