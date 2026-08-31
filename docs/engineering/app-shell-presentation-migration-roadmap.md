@@ -162,6 +162,14 @@ src/
 - `TerminalNode` 继续作为组合 wrapper，负责注入剪贴板、外部打开、画布定位、元数据编辑和冲突消除动作；Run 组件不理解 React Flow、BlockGraph 节点或 App Shell 导航状态。
 - 组件 Unit 与 owner 一同迁入 `tests/unit/contexts/run`，端点可打开条件、fallback、租约清理状态、managed/external/unknown 冲突和安全动作保持不变。
 
+### Run Terminal Node Runtime Header Presentation
+
+- `TerminalRuntimeActions` 与 `TerminalWorkflowStatusBadge` 已从混合的 `TerminalNode` 提取到 Run `presentation/components`，只消费 Run 状态、已投影的启动可用性、显示名和窄回调。
+- 流程运行/停止、启动、停止当前命令、退出保留和重开的专属状态样式已迁入 Run；动作轨基础布局、编辑、删除与组合候选样式继续由 App Shell/BlockGraph 组合层拥有。
+- Run 组件自有 Phosphor glyph、weight、Tooltip、可访问名称和 `data-icon-*` 标记，不再依赖 App Shell `WorkbenchIcon`。
+- `TerminalNode` 继续负责 React Flow、BlockGraph 定义、组合候选、编辑/删除以及 Run viewport、service bar 和 runtime header 的最终排列与回调绑定。
+- owner-level Unit 证明 workflow badge、五个 Run 动作、active run 停止态和 workflow 保留限制；根级组合测试继续证明七动作整体顺序与 block-scoped 回调。
+
 ### Run Terminal Settings Presentation
 
 - `TerminalScrollbackSettingsSection` 已从混合的 `TerminalSettingsPane` 提取到 Run `presentation/components`，只消费 Run 的滚屏预算类型、preset 与变更回调。
@@ -251,7 +259,7 @@ src/
 保留或先拆的混合模块：
 
 - `TerminalViewport.tsx`：已拆为 Run-owned `TerminalRuntimeViewport` 与 App Shell adapter；后者仅收窄 BlockGraph 显示名并重绑 block-scoped 回调，不再拥有 xterm 生命周期。
-- `TerminalNode.tsx`、`terminalFlowNodes.ts`：BlockGraph 拥有节点和图，Run 提供运行状态，继续由 App Shell 组合或拆出两个上下文子组件。
+- `TerminalNode.tsx`、`terminalFlowNodes.ts`：Run viewport、service runtime bar、workflow badge 和 runtime actions 已拆出；剩余模块组合 BlockGraph 节点/定义、React Flow、自动启动与 Run 子组件，继续留在 App Shell，后续只下沉可由 BlockGraph 独立解释的叶子。
 - `terminalRenderingWorkloadCoordinator.ts`：把全局画布、侧边栏和交互抑制状态投影到 Run workload/raster owner，继续由 App Shell 组合。
 - `useTerminalSessions.ts`、`useTerminalStarter.ts`、`useTerminalWorkspaceSynchronization.ts`：同时协调 BlockGraph 与 Run，留在 App Shell coordinator，或只把 Run 侧状态机下沉。
 - `terminalWorkflowEdges.ts`、`terminalWorkflowBuildEdgePresentation.ts`：工作流定义来自 BlockGraph，运行/搭建状态来自 Run 或 Agent，React Flow 投影属于 App Shell。
@@ -399,7 +407,7 @@ ViewModel、策略和交互：
 
 ### 阶段 4：Run Presentation
 
-状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批、service runtime UI 第三批、scrollback settings 第四批与 runtime viewport 第五批迁移）。
+状态：已完成（2026-09-01）。
 
 目标：让 terminal surface、输出模型投影、主题、恢复和 runtime UI 归 Run Presentation。
 
@@ -407,7 +415,8 @@ ViewModel、策略和交互：
 - 已迁移输出缓冲、session state/store、恢复、runtime availability/preference、service/workflow event 投影及 Run 自有 Hook。
 - 已迁移 `TerminalServiceRuntimeBar`、专属样式和 Unit；App Shell 只保留剪贴板、外部打开、画布定位和编辑入口的动作装配。
 - 已从 `TerminalSettingsPane` 提取 Run 滚屏设置 section；App Shell 保留设置页组合与 workflow build 偏好。
-- 已把普通终端 viewport 主体迁入 Run，并以 App Shell adapter 隔离 BlockGraph snapshot；下一批继续拆 `TerminalNode` 的 BlockGraph 定义展示与 Run runtime UI 边界。
+- 已把普通终端 viewport 主体迁入 Run，并以 App Shell adapter 隔离 BlockGraph snapshot。
+- 已把 `TerminalNode` 的 workflow badge、流程/终端运行控制与退出保留 UI 迁入 Run；App Shell 只传递显示名、启动可用性和窄回调。
 - minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
 - 不改变 xterm 生命周期、attach、恢复、resize 或滚屏行为。
 

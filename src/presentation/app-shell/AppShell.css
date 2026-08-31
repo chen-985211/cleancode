@@ -27,6 +27,7 @@
 @import './styles/terminal-group-toolbar.css';
 @import '../../contexts/run/presentation/styles/terminal-theme-projection.css';
 @import './styles/terminal-node.css';
+@import '../../contexts/run/presentation/styles/terminal-runtime-header.css';
 @import './styles/canvas-object-context-menu.css';
 @import './styles/quick-execution.css';
 @import '../../contexts/run/presentation/styles/terminal-service-runtime.css';

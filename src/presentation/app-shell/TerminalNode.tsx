@@ -10,6 +10,11 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { TerminalMetadataForm } from './TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
+import {
+  TerminalRuntimeActions,
+  TerminalWorkflowStatusBadge,
+  type TerminalRuntimeActionsProps
+} from '../../contexts/run/presentation/components/TerminalRuntimeHeader'
 import { TerminalServiceRuntimeBar } from '../../contexts/run/presentation/components/TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
 import { TooltipLabel } from '../shared/components/Tooltip'
@@ -22,7 +27,6 @@ import {
   type TerminalFlowNode,
   type WorkbenchNodeLayoutInput
 } from './types'
-import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
@@ -253,7 +257,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         <TerminalHeader
           blockName={block.name}
           blockDescription={block.description}
-          blockLaunchCommand={block.launchCommand}
+          canQuickLaunch={block.launchCommand.trim().length > 0}
           metadataFormId={metadataFormId}
           isEditingMetadata={isEditingMetadata}
           isRunning={isRunning}
@@ -345,7 +349,7 @@ function toWorkbenchNodeLayoutInput(layout: ResizeParams): WorkbenchNodeLayoutIn
 interface TerminalHeaderProps {
   readonly blockName: string
   readonly blockDescription: string
-  readonly blockLaunchCommand: string
+  readonly canQuickLaunch: boolean
   readonly metadataFormId: string
   readonly isEditingMetadata: boolean
   readonly isRunning: boolean
@@ -353,8 +357,8 @@ interface TerminalHeaderProps {
   readonly isTerminalGroupSelectionMode: boolean
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
-  readonly sessionKind: TerminalViewState['sessionKind']
-  readonly retentionPolicy: NonNullable<TerminalViewState['retentionPolicy']>
+  readonly sessionKind: TerminalRuntimeActionsProps['sessionKind']
+  readonly retentionPolicy: TerminalRuntimeActionsProps['retentionPolicy']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
@@ -373,7 +377,7 @@ interface TerminalHeaderProps {
 function TerminalHeader({
   blockName,
   blockDescription,
-  blockLaunchCommand,
+  canQuickLaunch,
   metadataFormId,
   isEditingMetadata,
   isRunning,
@@ -398,26 +402,9 @@ function TerminalHeader({
   onDelete
 }: TerminalHeaderProps) {
   const { t } = useI18n()
-  const canQuickLaunch = blockLaunchCommand.trim().length > 0
-  const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
-  const launchCommandTooltip = canQuickLaunch
-    ? t('terminal.action.launch')
-    : t('terminal.action.configureLaunch')
   const terminalGroupSelectionLabel = isSelectedForTerminalGroup
     ? t('terminal.action.selected')
     : t('terminal.action.select')
-  const workflowActionLabel = isActiveWorkflowRoot
-    ? isStoppingWorkflow
-      ? t('terminal.action.stoppingWorkflow')
-      : t('terminal.action.stopWorkflow')
-    : t('terminal.action.runWorkflow')
-  const isRetained = retentionPolicy === 'keep-after-application-exit'
-  const isWorkflowRetentionUnavailable = sessionKind === 'workflow'
-  const retentionActionLabel = isWorkflowRetentionUnavailable
-    ? t('terminal.retention.workflowUnavailable')
-    : isRetained
-      ? t('terminal.retention.disable')
-      : t('terminal.retention.enable')
   return (
     <div className="terminal-node__header" onClick={() => onSelect()}>
       <span className="terminal-node__icon">
@@ -456,11 +443,7 @@ function TerminalHeader({
         <strong>{blockName}</strong>
         <div className="terminal-node__meta">
           <span className="terminal-node__description">{blockDescription}</span>
-          {workflowStatus ? (
-            <span className={`workflow-state workflow-state--${workflowStatus}`}>
-              {t(`workflow.status.${workflowStatus}`)}
-            </span>
-          ) : null}
+          <TerminalWorkflowStatusBadge status={workflowStatus} />
         </div>
       </div>
       <div
@@ -468,93 +451,22 @@ function TerminalHeader({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <TooltipLabel content={workflowActionLabel}>
-          <button
-            className={`terminal-node__action terminal-node__action--workflow${isActiveWorkflowRoot ? ' terminal-node__action--workflow-stop' : ''}`}
-            type="button"
-            aria-label={t('terminal.namedAction', {
-              blockName,
-              action: isActiveWorkflowRoot
-                ? workflowActionLabel
-                : t('terminal.action.runTerminalWorkflow')
-            })}
-            disabled={
-              isActiveWorkflowRoot ? isStoppingWorkflow : isRecoveryPending || !canQuickLaunch
-            }
-            onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
-          >
-            {isActiveWorkflowRoot ? (
-              <WorkbenchIcon size={15} data-icon="terminal-workflow-stop" role="stop" />
-            ) : (
-              <WorkbenchIcon size={15} data-icon="terminal-workflow-run" role="workflow" />
-            )}
-          </button>
-        </TooltipLabel>
-        <TooltipLabel content={launchCommandTooltip}>
-          <button
-            className={[
-              'terminal-node__action',
-              'terminal-node__action--launch',
-              `terminal-node__action--launch-${launchCommandState}`
-            ].join(' ')}
-            type="button"
-            aria-label={t('terminal.namedAction', {
-              blockName,
-              action: t('terminal.action.launch')
-            })}
-            data-launch-command-state={launchCommandState}
-            disabled={isRecoveryPending && canQuickLaunch}
-            onClick={onQuickLaunch}
-          >
-            <WorkbenchIcon size={15} data-icon="terminal-launch" role="launch" />
-          </button>
-        </TooltipLabel>
-        <TooltipLabel content={t('terminal.action.stopCommand')}>
-          <button
-            className="terminal-node__action"
-            type="button"
-            aria-label={t('terminal.namedAction', {
-              blockName,
-              action: t('terminal.action.stopCommand')
-            })}
-            disabled={!isRunning || isRecoveryPending}
-            onClick={onStop}
-          >
-            <WorkbenchIcon size={14} data-icon="terminal-stop-command" role="stop" />
-          </button>
-        </TooltipLabel>
-        <TooltipLabel content={retentionActionLabel}>
-          <button
-            className={`terminal-node__action terminal-node__action--retention${isRetained ? ' terminal-node__action--retention-active' : ''}`}
-            type="button"
-            aria-label={t('terminal.namedAction', { blockName, action: retentionActionLabel })}
-            aria-pressed={isRetained}
-            aria-disabled={isWorkflowRetentionUnavailable || undefined}
-            disabled={!isRunning || isRecoveryPending}
-            onClick={isWorkflowRetentionUnavailable ? undefined : onToggleRetention}
-          >
-            <WorkbenchIcon
-              active={isRetained}
-              size={14}
-              data-icon="terminal-retention"
-              role="retention"
-            />
-          </button>
-        </TooltipLabel>
-        <TooltipLabel content={t('terminal.action.restartEmptyDescription')}>
-          <button
-            className="terminal-node__action"
-            type="button"
-            aria-label={t('terminal.namedAction', {
-              blockName,
-              action: t('terminal.action.restartEmpty')
-            })}
-            disabled={isRecoveryPending}
-            onClick={onRestart}
-          >
-            <WorkbenchIcon data-icon="terminal-restart" role="restart" size={16} />
-          </button>
-        </TooltipLabel>
+        <TerminalRuntimeActions
+          terminalName={blockName}
+          canQuickLaunch={canQuickLaunch}
+          isRunning={isRunning}
+          isRecoveryPending={isRecoveryPending}
+          sessionKind={sessionKind}
+          retentionPolicy={retentionPolicy}
+          isActiveWorkflowRoot={isActiveWorkflowRoot}
+          isStoppingWorkflow={isStoppingWorkflow}
+          onRunFromHere={onRunFromHere}
+          onStopWorkflow={onStopWorkflow}
+          onQuickLaunch={onQuickLaunch}
+          onStop={onStop}
+          onToggleRetention={onToggleRetention}
+          onRestart={onRestart}
+        />
         <span className="terminal-node__action-divider" aria-hidden="true" />
         <TooltipLabel content={t('terminal.action.edit')}>
           <button

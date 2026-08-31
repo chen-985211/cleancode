@@ -276,28 +276,6 @@
   box-shadow: 0 0 0 2px var(--cc-primary-ring);
 }
 
-.terminal-node__action--launch-configured {
-  border-color: var(--cc-success-border);
-  background: var(--cc-success-soft);
-  color: var(--cc-success);
-}
-
-.terminal-node__action--launch-configured:hover:not(:disabled) {
-  background: var(--cc-success-soft);
-  color: var(--cc-success-strong);
-}
-
-.terminal-node__action--launch-unconfigured {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
-}
-
-.terminal-node__action--launch-unconfigured:hover:not(:disabled) {
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary-hover);
-}
-
 .terminal-node__action--danger {
   color: var(--cc-muted);
 }
@@ -306,66 +284,6 @@
   border-color: var(--cc-danger-border);
   background: var(--cc-danger-soft);
   color: var(--cc-danger);
-}
-
-.terminal-node__action--retention-active {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
-}
-
-.terminal-node__action--retention-active:hover:not(:disabled) {
-  border-color: var(--cc-primary);
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary-hover);
-}
-
-.workflow-state {
-  display: inline-flex;
-  height: 16px;
-  flex: 0 0 auto;
-  align-items: center;
-  border-radius: 5px;
-  background: var(--cc-surface-subtle);
-  padding: 0 5px;
-  color: var(--cc-muted-strong);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.workflow-state--running,
-.workflow-state--waiting {
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
-}
-
-.workflow-state--ready,
-.workflow-state--succeeded {
-  background: var(--cc-success-soft);
-  color: var(--cc-success-strong);
-}
-
-.workflow-state--failed,
-.workflow-state--blocked {
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
-}
-
-.terminal-node__action--workflow {
-  color: var(--cc-primary);
-}
-
-.terminal-node__action--workflow-stop {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
-}
-
-.terminal-node__action--workflow-stop:hover:not(:disabled) {
-  border-color: var(--cc-danger);
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
 }
 
 .terminal-frame {
