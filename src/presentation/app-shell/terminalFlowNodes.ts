@@ -15,7 +15,6 @@ import {
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type {
-  TerminalDefinitionInput,
   TerminalDimensions,
   TerminalFlowNode,
   TerminalGroupFlowNode,
@@ -24,6 +23,7 @@ import type {
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
+import type { TerminalDefinitionInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 const collapsedTerminalGroupWidth = 360

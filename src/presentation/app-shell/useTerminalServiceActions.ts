@@ -1,10 +1,10 @@
 import { useCallback } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalDefinitionInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import type {
   ManagedTerminalServiceOwner,
-  TerminalDefinitionInput,
   TerminalRunIdentity,
   TerminalServiceEndpoint,
   WorkbenchSnapshot

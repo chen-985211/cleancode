@@ -10,6 +10,7 @@ import {
   type TerminalBlockSnapshot,
   type TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalDefinitionInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type {
@@ -23,7 +24,6 @@ import type {
   TerminalViewState
 } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
-import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 
@@ -41,16 +41,6 @@ export interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
-}
-
-export interface TerminalBlockMetadataInput {
-  readonly name: string
-  readonly description: string
-  readonly launchCommand: string
-}
-
-export interface TerminalDefinitionInput extends TerminalBlockMetadataInput {
-  readonly executionConfig: TerminalExecutionConfigSnapshot
 }
 
 export interface TerminalGroupMetadataInput {

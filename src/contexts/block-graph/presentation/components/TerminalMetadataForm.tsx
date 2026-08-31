@@ -1,18 +1,22 @@
-import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
+import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
+import type { Icon, IconWeight } from '@phosphor-icons/react'
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import {
   defaultTerminalExecutionConfig,
   type TerminalBlockSnapshot,
   type TerminalExecutionConfigSnapshot
-} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+} from '../../application/dto/BlockGraphSnapshot'
 import {
   createExecutionConfigDraft,
   validateExecutionConfigDraft,
   type ExecutionConfigDraft
-} from './terminalExecutionConfigDraft'
-import type { TerminalBlockMetadataInput } from './types'
-import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from './WorkbenchIcons'
+} from '../view-models/terminalExecutionConfigDraft'
+import type { TerminalBlockMetadataInput } from '../view-models/TerminalDefinitionPresentationTypes'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 interface TerminalMetadataFormProps {
   readonly block: TerminalBlockSnapshot
@@ -107,7 +111,13 @@ export function TerminalMetadataForm({
       <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>
         <header className="terminal-metadata-form__header">
           <span className="terminal-metadata-form__header-icon" aria-hidden="true">
-            <WorkbenchIcon role="terminal" size={16} />
+            <TerminalMetadataIcon
+              IconComponent={TerminalWindowIcon}
+              glyph="terminal-window"
+              role="terminal"
+              size={16}
+              weight="regular"
+            />
           </span>
           <span className="terminal-metadata-form__heading">
             <strong>{t('terminalForm.edit')}</strong>
@@ -195,7 +205,13 @@ export function TerminalMetadataForm({
             aria-label={t('terminalForm.cancel')}
             onClick={onCancel}
           >
-            <WorkbenchIcon role="close" size={14} />
+            <TerminalMetadataIcon
+              IconComponent={XIcon}
+              glyph="x"
+              role="close"
+              size={14}
+              weight="bold"
+            />
             <span>{t('terminalForm.cancelShort')}</span>
           </button>
           <button
@@ -205,11 +221,24 @@ export function TerminalMetadataForm({
             aria-busy={isSaving}
             disabled={!canSave}
           >
-            <WorkbenchIcon
-              className={isSaving ? 'terminal-metadata-form__saving-indicator' : undefined}
-              role={isSaving ? 'loading' : 'confirm'}
-              size={14}
-            />
+            {isSaving ? (
+              <TerminalMetadataIcon
+                IconComponent={CircleNotchIcon}
+                className="terminal-metadata-form__saving-indicator"
+                glyph="circle-notch"
+                role="loading"
+                size={14}
+                weight="bold"
+              />
+            ) : (
+              <TerminalMetadataIcon
+                IconComponent={CheckIcon}
+                glyph="check"
+                role="confirm"
+                size={14}
+                weight="bold"
+              />
+            )}
             <span>{isSaving ? t('terminalForm.saving') : t('terminalForm.save')}</span>
           </button>
         </div>
@@ -433,12 +462,43 @@ function MetadataField({
   children
 }: {
   readonly label: string
-  readonly children: React.ReactNode
+  readonly children: ReactNode
 }) {
   return (
     <label className="terminal-metadata-field">
       <span>{label}</span>
       {children}
     </label>
+  )
+}
+
+interface TerminalMetadataIconProps {
+  readonly IconComponent: Icon
+  readonly className?: string
+  readonly glyph: string
+  readonly role: string
+  readonly size: number
+  readonly weight: IconWeight
+}
+
+function TerminalMetadataIcon({
+  IconComponent,
+  className,
+  glyph,
+  role,
+  size,
+  weight
+}: TerminalMetadataIconProps) {
+  return (
+    <IconComponent
+      aria-hidden="true"
+      className={className}
+      data-icon-glyph={glyph}
+      data-icon-role={role}
+      data-icon-weight={weight}
+      focusable="false"
+      size={size}
+      weight={weight}
+    />
   )
 }

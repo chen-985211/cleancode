@@ -7,8 +7,9 @@ import {
 } from '@xyflow/react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
-import { TerminalMetadataForm } from './TerminalMetadataForm'
+import { TerminalMetadataForm } from '../../contexts/block-graph/presentation/components/TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalBlockMetadataInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
 import {
   TerminalRuntimeActions,
@@ -23,7 +24,6 @@ import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import {
   terminalNodeMinimumSize,
   type TerminalDimensions,
-  type TerminalBlockMetadataInput,
   type TerminalFlowNode,
   type WorkbenchNodeLayoutInput
 } from './types'

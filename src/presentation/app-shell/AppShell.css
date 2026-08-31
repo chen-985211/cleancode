@@ -31,7 +31,7 @@
 @import './styles/canvas-object-context-menu.css';
 @import './styles/quick-execution.css';
 @import '../../contexts/run/presentation/styles/terminal-service-runtime.css';
-@import './styles/terminal-metadata-form.css';
+@import '../../contexts/block-graph/presentation/styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';
 @import '../../contexts/agent/presentation/styles/agent-provider.css';
 @import './styles/agent-create.css';

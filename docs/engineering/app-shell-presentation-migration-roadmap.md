@@ -177,6 +177,14 @@ src/
 - `application-settings.css` 中的 settings group/options 布局继续归 App Shell，因为同一结构同时服务 Run 滚屏 section 与尚未确认 owner 的 workflow build section；本批不复制或倒置 CSS owner。
 - 独立 Run Presentation Unit 证明三个受限预算、当前 motion target 和变更发布；Application Settings 组合测试继续证明导航、页面布局和 workflow 选项未受影响。
 
+### BlockGraph Terminal Definition Presentation
+
+- `TerminalMetadataForm`、执行配置 draft、专属样式与 Unit 已迁入 BlockGraph Presentation，直接消费 BlockGraph snapshot 和领域更新输入。
+- 名称、描述、启动命令、任务/服务模式、就绪配置及端口意图继续作为一个终端定义提交；迁移不改变校验、焦点、文案或保存行为。
+- BlockGraph Presentation 不读取 Run session、端口租约或实际端点；App Shell `TerminalNode` 只组合定义表单与 Run runtime 子组件。
+- `TerminalDefinitionInput` 与元数据输入不再由 App Shell 重复声明，而是收窄到 BlockGraph 领域更新契约。
+- `terminalDefinitionRuntime.ts` 同时适配 BlockGraph 定义更新与 Run 实际端点打开，留待先拆端口职责后再判断归属。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -275,7 +283,6 @@ src/
 - `BlockTemplateSurfaces.tsx`
 - `QuickExecutionBar.tsx`
 - `TerminalGroupNode.tsx`
-- `TerminalMetadataForm.tsx`
 
 ViewModel、策略和交互：
 
@@ -286,7 +293,6 @@ ViewModel、策略和交互：
 - `resizeTerminalBlockInWorkbench.ts`
 - `terminalConnectionScope.ts`
 - `terminalDefinitionRuntime.ts`
-- `terminalExecutionConfigDraft.ts`
 - `terminalGroupDropSpring.ts`
 - `terminalGroupDropTarget.ts`
 - `updateGraphViewportInWorkbench.ts`
@@ -424,9 +430,12 @@ ViewModel、策略和交互：
 
 ### 阶段 5：BlockGraph Presentation
 
+状态：进行中（2026-09-01）。
+
 目标：下沉图编辑、终端定义、组合、模板和快捷执行的单上下文 UI。
 
-- 先迁移模板、元数据表单和图内纯策略。
+- 已迁移终端元数据/执行配置表单、draft、输入类型、专属样式和 owner-level Unit。
+- 接下来迁移模板和图内纯策略。
 - 再拆 TerminalNode、TerminalGroup、QuickExecution 的展示与 Run 执行协调。
 - 图事实和布局规则继续来自 BlockGraph 聚合/用例，不在 UI 复制。
 

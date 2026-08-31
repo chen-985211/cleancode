@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-import { TerminalMetadataForm } from '../../../src/presentation/app-shell/TerminalMetadataForm'
-import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalBlockSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { TerminalMetadataForm } from '../../../../src/contexts/block-graph/presentation/components/TerminalMetadataForm'
 
 describe('terminal workflow advanced configuration', () => {
   it('opens with a visible editing context, focuses the intended field, and cancels with Escape', () => {
