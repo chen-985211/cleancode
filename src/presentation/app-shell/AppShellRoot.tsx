@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
 import { AppShell } from './AppShell'
-import { AgentActivityObserver } from './AgentActivityObserver'
 import type {
   AgentActivityNavigationRequest,
   AgentActivityNavigationTarget
@@ -30,12 +29,11 @@ export function AppShellRoot() {
       <ApplicationQuitConfirmationBridge />
       <TooltipProvider>
         <NotificationProvider>
-          <AgentActivityObserver onNavigate={navigateToAgentActivity}>
-            <NotifiedAppShell
-              navigationRequest={navigationRequest}
-              onNavigationHandled={handleAgentActivityNavigation}
-            />
-          </AgentActivityObserver>
+          <NotifiedAppShell
+            navigationRequest={navigationRequest}
+            onAgentActivityNavigate={navigateToAgentActivity}
+            onNavigationHandled={handleAgentActivityNavigation}
+          />
         </NotificationProvider>
       </TooltipProvider>
     </I18nProvider>
@@ -44,9 +42,11 @@ export function AppShellRoot() {
 
 function NotifiedAppShell({
   navigationRequest,
+  onAgentActivityNavigate,
   onNavigationHandled
 }: {
   readonly navigationRequest: AgentActivityNavigationRequest | null
+  readonly onAgentActivityNavigate: (target: AgentActivityNavigationTarget) => void
   readonly onNavigationHandled: (requestId: number) => void
 }) {
   const notifications = useNotifications()
@@ -55,6 +55,7 @@ function NotifiedAppShell({
     <AppShell
       agentActivityNavigationRequest={navigationRequest}
       notifications={notifications}
+      onAgentActivityNavigate={onAgentActivityNavigate}
       onAgentActivityNavigationHandled={onNavigationHandled}
     />
   )

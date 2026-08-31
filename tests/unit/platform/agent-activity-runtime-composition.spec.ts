@@ -6,9 +6,26 @@ import {
   createAgentActivityRuntime,
   waitForOptionalAgentActivityInitialization
 } from '../../../src/platform/electron-main/agentActivityRuntimeComposition'
+import { createMainAgentActivityRuntime } from '../../../src/platform/electron-main/mainAgentActivityRuntime'
 import type { Logger } from '../../../src/platform/logging/Logger'
 
+vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: vi.fn(() => []) } }))
+
 describe('Agent activity runtime composition', () => {
+  it('projects accepted Run output into the shared Agent activity Registry', async () => {
+    const runtime = createMainAgentActivityRuntime({
+      appStateDirectory: '/tmp/cleancode-agent-activity-composition',
+      logger: createLogger(),
+      runtimeExecutable: process.execPath
+    })
+    const recordTerminalOutput = vi.spyOn(runtime.registry, 'recordTerminalOutput')
+
+    runtime.terminalSessionLifecycleObserver.terminalOutputAccepted?.(runCommand.scope, 7)
+
+    expect(recordTerminalOutput).toHaveBeenCalledWith(runCommand.scope, 7)
+    await runtime.dispose()
+  })
+
   it('bounds optional initialization without canceling a later successful result', async () => {
     vi.useFakeTimers()
     try {

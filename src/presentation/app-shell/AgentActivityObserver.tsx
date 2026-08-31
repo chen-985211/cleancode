@@ -8,9 +8,10 @@ import type {
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { AgentActivityStore, type AgentActivityNotificationProjection } from './agentActivityStore'
 import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
+import type { AppNotificationController } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
 import { AgentActivityStoreContext } from './useAgentActivitySnapshots'
-import { useNotifications } from './useNotifications'
+import { useOptionalNotifications } from './useNotifications'
 import {
   formatProviderDisplayName,
   useAgentProviderCatalog,
@@ -35,12 +36,20 @@ const publishedNotificationLimit = 256
 
 interface AgentActivityObserverProps {
   readonly children: ReactNode
+  readonly notifications?: AppNotificationController
   readonly onNavigate: (target: AgentActivityNavigationTarget) => void
+  readonly waitForCompletionPresentation: (completion: AgentTurnCompletedEvent) => Promise<void>
 }
 
-export function AgentActivityObserver({ children, onNavigate }: AgentActivityObserverProps) {
+export function AgentActivityObserver({
+  children,
+  notifications: providedNotifications,
+  onNavigate,
+  waitForCompletionPresentation
+}: AgentActivityObserverProps) {
   const [store] = useState(() => new AgentActivityStore())
-  const notifications = useNotifications()
+  const contextualNotifications = useOptionalNotifications()
+  const notifications = providedNotifications ?? contextualNotifications
   const { t } = useI18n()
   const providerCatalog = useAgentProviderCatalog()
   const notificationsRef = useRef(notifications)
@@ -48,13 +57,15 @@ export function AgentActivityObserver({ children, onNavigate }: AgentActivityObs
   const providerCatalogRef = useRef(providerCatalog)
   const navigateRef = useRef(onNavigate)
   const translateRef = useRef(t)
+  const waitForCompletionPresentationRef = useRef(waitForCompletionPresentation)
 
   useEffect(() => {
     notificationsRef.current = notifications
     navigateRef.current = onNavigate
     providerCatalogRef.current = providerCatalog
     translateRef.current = t
-  }, [notifications, onNavigate, providerCatalog, t])
+    waitForCompletionPresentationRef.current = waitForCompletionPresentation
+  }, [notifications, onNavigate, providerCatalog, t, waitForCompletionPresentation])
 
   useEffect(() => {
     for (const [messageKey, published] of publishedNotificationsRef.current) {
@@ -77,12 +88,30 @@ export function AgentActivityObserver({ children, onNavigate }: AgentActivityObs
     let baselineEstablished = false
     const pendingEvents: PendingAgentActivityEvent[] = []
     const projectEvent = (event: PendingAgentActivityEvent, isLiveReplay = false): void => {
-      const projection =
-        event.type === 'activity_changed'
-          ? isLiveReplay
-            ? store.recordLiveActivity(event.snapshot)
-            : store.recordActivity(event.snapshot)
-          : store.recordCompletion(event.completion)
+      if (event.type === 'turn_completed') {
+        void waitForCompletionPresentationFailOpen(
+          waitForCompletionPresentationRef.current,
+          event.completion
+        ).then(() => {
+          if (!active) return
+          const projection = store.recordCompletion(event.completion)
+          if (projection) {
+            projectNotification(
+              projection,
+              notificationsRef.current,
+              publishedNotificationsRef.current,
+              translateRef.current,
+              providerCatalogRef.current,
+              navigateRef.current
+            )
+          }
+        })
+        return
+      }
+
+      const projection = isLiveReplay
+        ? store.recordLiveActivity(event.snapshot)
+        : store.recordActivity(event.snapshot)
       if (projection) {
         projectNotification(
           projection,
@@ -140,7 +169,7 @@ export function AgentActivityObserver({ children, onNavigate }: AgentActivityObs
 }
 
 type Translate = ReturnType<typeof useI18n>['t']
-type Notifications = ReturnType<typeof useNotifications>
+type Notifications = AppNotificationController
 
 function projectNotification(
   projection: AgentActivityNotificationProjection,
@@ -273,6 +302,17 @@ async function readBaseline(
     return await api.listAgentActivities()
   } catch {
     return []
+  }
+}
+
+async function waitForCompletionPresentationFailOpen(
+  waitForCompletionPresentation: AgentActivityObserverProps['waitForCompletionPresentation'],
+  completion: AgentTurnCompletedEvent
+): Promise<void> {
+  try {
+    await waitForCompletionPresentation(completion)
+  } catch {
+    // A renderer presentation barrier cannot suppress an accepted completion forever.
   }
 }
 

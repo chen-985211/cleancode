@@ -73,6 +73,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private readonly pendingOutputs: MeasuredTerminalOutput[] = []
   private readonly idleResolvers = new Set<() => void>()
   private readonly nonCriticalWorkListeners = new Set<() => void>()
+  private readonly outputSettledListeners = new Set<() => void>()
   private readonly pendingOutputListeners = new Set<() => void>()
   private readonly terminalInputListeners = new Set<() => void>()
   private element: HTMLDivElement | null = null
@@ -91,6 +92,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private isRestoring = true
   private isWriteInFlight = false
   private lastPublishedHasPendingOutput = false
+  private lastPublishedIsOutputSettled = false
   private hasSnapshot = false
   private restoreRequired = false
   private expectedSequence = 0
@@ -224,10 +226,23 @@ class XtermTerminalSurface implements TerminalSurface {
     return this.terminal.modes.bracketedPasteMode
   }
 
+  isOutputSettled(): boolean {
+    return (
+      this.isDisposed ||
+      (!this.isRestoring && !this.isWriteInFlight && this.pendingOutputs.length === 0)
+    )
+  }
+
+  onOutputSettled(listener: () => void): () => void {
+    this.outputSettledListeners.add(listener)
+    return () => this.outputSettledListeners.delete(listener)
+  }
+
   async restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult> {
     if (this.isDisposed) return 'retry'
     this.isRestoring = true
     this.notifyPendingOutputChange()
+    this.notifyOutputSettledChange()
     await this.waitForIdle()
     if (this.isDisposed) return 'retry'
 
@@ -248,6 +263,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.hasSnapshot = true
     this.isRestoring = false
     this.notifyPendingOutputChange()
+    this.notifyOutputSettledChange()
     this.fitAndReportDimensions()
     if (this.searchQuery) this.find(this.searchQuery, 'incremental')
     return 'ready'
@@ -292,6 +308,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.pendingOutputBytes += measuredOutput.byteLength
     this.lastQueuedSequence = output.sequence
     this.notifyPendingOutputChange()
+    this.notifyOutputSettledChange()
   }
 
   dispose(): void {
@@ -303,6 +320,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.notifyPendingOutputChange()
     this.notifyNonCriticalWorkChange()
     this.resolveIdleWaiters()
+    this.notifyOutputSettledChange()
     this.dataSubscription?.dispose()
     this.searchSubscription?.dispose()
     this.fileLinkProviderSubscription?.dispose()
@@ -327,6 +345,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.pendingOutputBytes = Math.max(0, this.pendingOutputBytes - consumedBytes)
     this.isWriteInFlight = true
     this.notifyPendingOutputChange()
+    this.notifyOutputSettledChange()
     const startedAt = performance.now()
 
     return new Promise((resolve) => {
@@ -339,6 +358,7 @@ class XtermTerminalSurface implements TerminalSurface {
           this.find(this.searchQuery, 'incremental')
         }
         this.notifyPendingOutputChange()
+        this.notifyOutputSettledChange()
         resolve({ bytesWritten: batch.byteLength, durationMs })
       })
     })
@@ -391,10 +411,11 @@ class XtermTerminalSurface implements TerminalSurface {
 
   private requestRestore(): void {
     if (this.isRestoring) return
+    this.isRestoring = true
     this.clearPendingOutputs(this.expectedSequence)
     this.hasSnapshot = false
-    this.isRestoring = true
     this.notifyPendingOutputChange()
+    this.notifyOutputSettledChange()
     this.onRestoreRequired()
   }
 
@@ -449,6 +470,14 @@ class XtermTerminalSurface implements TerminalSurface {
     if (hasPendingOutput === this.lastPublishedHasPendingOutput) return
     this.lastPublishedHasPendingOutput = hasPendingOutput
     for (const listener of this.pendingOutputListeners) listener()
+  }
+
+  private notifyOutputSettledChange(): void {
+    const isOutputSettled = this.isOutputSettled()
+    if (isOutputSettled === this.lastPublishedIsOutputSettled) return
+    this.lastPublishedIsOutputSettled = isOutputSettled
+    if (!isOutputSettled) return
+    for (const listener of this.outputSettledListeners) listener()
   }
 
   private notifyNonCriticalWorkChange(): void {

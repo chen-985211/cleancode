@@ -3,6 +3,50 @@ import type { TerminalSessionLifecycleObserverPort } from '../../../../src/conte
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 
 describe('terminal session lifecycle observer', () => {
+  it('reports accepted terminal output sequence without changing output delivery', async () => {
+    const terminalProcessPort = new LifecycleTerminalProcessPort()
+    const onOutput = vi.fn()
+    const terminalOutputAccepted = vi.fn<
+      NonNullable<TerminalSessionLifecycleObserverPort['terminalOutputAccepted']>
+    >(() => {
+      throw new Error('observer failure')
+    })
+    const service = new TerminalSessionService(
+      terminalProcessPort,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { terminalEnded: vi.fn(), terminalOutputAccepted }
+    )
+    const session = await service.start({
+      projectDirectory: '/project',
+      projectId: 'project-1',
+      workspaceDirectory: '/project',
+      workspaceId: 'main',
+      gitBranch: 'main',
+      terminalBlockId: 'block-1',
+      workingDirectory: '/project',
+      onOutput,
+      onExit: () => undefined
+    })
+
+    terminalProcessPort.emitOutput(session.id, 'tail')
+
+    expect(terminalOutputAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation: session.generation,
+        runId: session.runId,
+        sessionId: session.sessionId
+      }),
+      1
+    )
+    expect(onOutput).toHaveBeenCalledWith(
+      expect.objectContaining({ data: 'tail', sequence: 1, sessionId: session.sessionId })
+    )
+  })
+
   it('reports a terminal generation exactly once when its runtime ends', async () => {
     const terminalProcessPort = new LifecycleTerminalProcessPort()
     const terminalEnded = vi.fn<TerminalSessionLifecycleObserverPort['terminalEnded']>()
@@ -67,6 +111,13 @@ class LifecycleTerminalProcessPort implements TerminalProcessPort {
     const command = this.startCommand
     if (command?.scope.sessionId === sessionId) {
       command.onExit({ exitCode, scope: command.scope, sessionId })
+    }
+  }
+
+  emitOutput(sessionId: string, data: string): void {
+    const command = this.startCommand
+    if (command?.scope.sessionId === sessionId) {
+      command.onOutput({ data, scope: command.scope, sessionId })
     }
   }
 }

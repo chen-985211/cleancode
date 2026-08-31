@@ -37,6 +37,7 @@ interface TerminalActivityState {
   active: boolean
   readonly exitedInvocationKeys: Set<string>
   readonly invocations: Map<string, InvocationState>
+  lastOutputSequence: number
   readonly pendingCompletions: Map<string, PendingCompletion>
   revision: number
   readonly terminal: AgentActivityTerminalScope
@@ -75,6 +76,7 @@ export class AgentActivityRegistry {
       active: true,
       exitedInvocationKeys: new Set(),
       invocations: new Map(),
+      lastOutputSequence: 0,
       pendingCompletions: new Map(),
       revision: 0,
       terminal: normalizedTerminal
@@ -118,6 +120,19 @@ export class AgentActivityRegistry {
     }
 
     this.recordInvocationExit(terminal, invocation, invocationWasCreated)
+    return true
+  }
+
+  recordTerminalOutput(terminal: AgentActivityTerminalScope, sequence: number): boolean {
+    if (!isOutputSequence(sequence)) return false
+    const current = this.findActiveTerminal(terminal)
+    if (!current || sequence <= current.lastOutputSequence) return false
+
+    current.lastOutputSequence = sequence
+    for (const [invocationKey, pending] of current.pendingCompletions) {
+      pending.task?.cancel()
+      this.schedulePendingCompletion(current, invocationKey, pending)
+    }
     return true
   }
 
@@ -261,6 +276,14 @@ export class AgentActivityRegistry {
     }
     const pending: PendingCompletion = { completion, task: null }
     terminal.pendingCompletions.set(invocationKey, pending)
+    this.schedulePendingCompletion(terminal, invocationKey, pending)
+  }
+
+  private schedulePendingCompletion(
+    terminal: TerminalActivityState,
+    invocationKey: string,
+    pending: PendingCompletion
+  ): void {
     pending.task = this.clock.schedule(() => {
       if (!terminal.active || terminal.pendingCompletions.get(invocationKey) !== pending) return
       terminal.pendingCompletions.delete(invocationKey)
@@ -366,6 +389,10 @@ const activityPriority: Readonly<Record<AgentActivityStatus, number>> = {
 
 function isActiveStatus(status: AgentActivityStatus): boolean {
   return status === 'working' || status === 'waiting_input' || status === 'waiting_approval'
+}
+
+function isOutputSequence(sequence: number): boolean {
+  return Number.isSafeInteger(sequence) && sequence >= 0
 }
 
 function createTerminalSlotKey(terminal: AgentActivityTerminalScope): string {

@@ -28,13 +28,11 @@ import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { useI18n } from './i18n/useI18n'
-import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications } from './appNotifications'
-import { AgentProviderStateProvider } from './AgentProviderStateProvider'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
@@ -53,6 +51,7 @@ import { useApplicationSettingsNavigation } from './useApplicationSettingsNaviga
 import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
 import { useBlockTemplateActions } from './useBlockTemplateActions'
 import { AppShellSettings } from './AppShellSettings'
+import { AppShellProviders } from './AppShellProviders'
 import { useQuickExecutionActions } from './useQuickExecutionActions'
 import { useAppShellBlockActions } from './useAppShellBlockActions'
 import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
@@ -74,6 +73,7 @@ import {
 export function AppShell({
   agentActivityNavigationRequest = null,
   notifications = ignoreAppNotifications,
+  onAgentActivityNavigate,
   onAgentActivityNavigationHandled = ignoreAgentActivityNavigationHandled
 }: AppShellProps = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
@@ -561,8 +561,8 @@ export function AppShell({
     onNodeDragStop
   })
   return (
-    <AgentProviderStateProvider>
-      <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
+    <AppShellProviders {...{ notifications, onAgentActivityNavigate, terminalSurfaceRegistry }}>
+      <>
         <main
           className={[
             'app-shell',
@@ -694,7 +694,7 @@ export function AppShell({
             getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
           />
         </main>
-      </TerminalSurfaceRegistryProvider>
-    </AgentProviderStateProvider>
+      </>
+    </AppShellProviders>
   )
 }

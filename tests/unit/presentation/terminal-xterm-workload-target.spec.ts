@@ -160,6 +160,31 @@ describe('terminal xterm workload target', () => {
     surface.dispose()
   })
 
+  it('reports output as settled only after xterm consumes the final queued write', async () => {
+    const surface = createTerminalXtermSurface('dark')
+    await surface.restore(createSnapshot())
+    const terminal = xtermState.terminals[0]!
+    const onOutputSettled = vi.fn()
+    const unsubscribe = surface.onOutputSettled(onOutputSettled)
+    let completeWrite: (() => void) | undefined
+    terminal.write.mockImplementationOnce((_output: string, callback?: () => void) => {
+      completeWrite = callback
+    })
+
+    surface.write({ sequence: 1, data: 'tail' })
+    expect(surface.isOutputSettled()).toBe(false)
+    const drain = surface.workloadTarget?.drainOutput(Number.POSITIVE_INFINITY)
+    expect(surface.isOutputSettled()).toBe(false)
+
+    completeWrite?.()
+    await drain
+    expect(surface.isOutputSettled()).toBe(true)
+    expect(onOutputSettled).toHaveBeenCalledOnce()
+
+    unsubscribe()
+    surface.dispose()
+  })
+
   it('consumes renderer OSC color queries without forwarding a second terminal response', () => {
     const onInput = vi.fn()
     const surface = createTerminalXtermSurface('light')

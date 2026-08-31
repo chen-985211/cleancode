@@ -26,6 +26,8 @@ vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
       focus: vi.fn(),
       getDiagnostics: vi.fn(() => ({ pendingOutputBytes: 0, rendererState: 'dom' })),
       isBracketedPasteMode: vi.fn(() => false),
+      isOutputSettled: vi.fn(() => true),
+      onOutputSettled: vi.fn(() => () => undefined),
       restore: vi.fn(async () => 'ready'),
       setResizeSuspended: vi.fn(),
       setScrollbackRows: vi.fn(),
