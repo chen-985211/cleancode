@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 export function TerminalThemeProjection({
   children,

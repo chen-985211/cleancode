@@ -22,7 +22,7 @@ import {
 } from '../../contexts/agent/presentation/view-models/agentRuntimeReconciliation'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import { isTestRuntime } from './agentConsoleModel'
-import { readTerminalSourceTheme } from './terminalTheme'
+import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
 import { defaultTerminalDimensions, type WorkbenchSnapshot } from './types'
 
 interface AgentSessionBinding {

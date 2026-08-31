@@ -1,11 +1,11 @@
-import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
-import type { TerminalRunIdentity } from '../../contexts/run/application/dto/TerminalRunEvent'
+import type { TerminalSnapshot } from '../../application/dto/TerminalModelSnapshot'
+import type { TerminalRunIdentity } from '../../application/dto/TerminalRunEvent'
 import type {
   SequencedTerminalOutput,
   TerminalViewOutputEvent
-} from '../../contexts/run/application/ports/TerminalModelPort'
-import type { TerminalDimensions } from './types'
-import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
+} from '../../application/ports/TerminalModelPort'
+import type { TerminalScrollbackRows } from '../../application/dto/TerminalRuntimeSettings'
+import type { TerminalDimensions } from '../view-models/TerminalPresentationTypes'
 import type { TerminalRendererState } from './terminalRendererController'
 import type {
   TerminalZoomRasterCoordinator,

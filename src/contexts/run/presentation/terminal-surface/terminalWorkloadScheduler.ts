@@ -1,4 +1,4 @@
-import type { SequencedTerminalOutput } from '../../contexts/run/application/ports/TerminalModelPort'
+import type { SequencedTerminalOutput } from '../../application/ports/TerminalModelPort'
 
 export type TerminalWorkloadPriority = 'focused' | 'hidden' | 'visible'
 

@@ -1,5 +1,5 @@
-import type { TerminalSnapshot } from '../../../src/contexts/run/application/dto/TerminalModelSnapshot'
-import { createTerminalXtermSurface } from '../../../src/presentation/app-shell/terminalXtermSurface'
+import type { TerminalSnapshot } from '../../../../src/contexts/run/application/dto/TerminalModelSnapshot'
+import { createTerminalXtermSurface } from '../../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
 
 const xtermState = vi.hoisted(() => ({
   fitDimensions: [] as Array<{ readonly columns: number; readonly rows: number }>,

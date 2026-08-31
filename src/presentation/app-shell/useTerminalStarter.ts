@@ -16,7 +16,7 @@ import {
   failTerminalAutoStart,
   startTerminalRuntimeSession
 } from './terminalSessionRuntime'
-import { readTerminalSourceTheme } from './terminalTheme'
+import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
 import type { TerminalDimensions, TerminalViewState, WorkbenchSnapshot } from './types'
 
 type CurrentProject = WorkbenchSnapshot['project']

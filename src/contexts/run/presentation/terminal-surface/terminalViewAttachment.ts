@@ -1,4 +1,4 @@
-import { getAppErrorCode } from '../../shared-kernel/application/errors/AppError'
+import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 
 const terminalViewAttachRetryDelaysMs = [50, 100, 250, 500] as const
 const terminalViewRestoreRetryDelaysMs = [0, 25, 50, 100, 250, 500, 1_000] as const

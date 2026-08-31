@@ -1,7 +1,7 @@
 import {
   attachTerminalViewWithRetry,
   restoreTerminalViewWithRetry
-} from '../../../src/presentation/app-shell/terminalViewAttachment'
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalViewAttachment'
 
 describe('terminal view attachment', () => {
   it('abandons a stale identity without retrying it', async () => {

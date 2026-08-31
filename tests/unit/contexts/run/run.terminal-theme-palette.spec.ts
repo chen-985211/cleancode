@@ -1,5 +1,5 @@
-import { canonicalTerminalPalettes } from '../../../src/contexts/run/application/dto/TerminalPalette.generated'
-import { readCanonicalTerminalTheme } from '../../../src/presentation/app-shell/terminalTheme'
+import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
+import { readCanonicalTerminalTheme } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
 describe('terminal theme palette', () => {
   it.each(['light', 'dark'] as const)(

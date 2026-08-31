@@ -1,9 +1,9 @@
-import type { TerminalViewOutputEvent } from '../../../src/contexts/run/application/ports/TerminalModelPort'
+import type { TerminalViewOutputEvent } from '../../../../src/contexts/run/application/ports/TerminalModelPort'
 import type { Mock } from 'vitest'
 import {
   TerminalSurfaceRegistry,
   type TerminalSurface
-} from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 describe('terminal surface registry disposable views', () => {
   it('creates a fresh disposable surface whenever the same run becomes visible again', () => {

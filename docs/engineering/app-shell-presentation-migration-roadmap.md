@@ -136,6 +136,15 @@ src/
 - Agent Provider、设置和 Activity 专属样式与 Unit 已跟随 owner 迁移；NotificationProvider、画布导航和终端屏障的组合测试继续留在根级 Presentation。
 - `AgentConsole`、Agent terminal surface、Agent 节点、创建入口、工具审批卡片与审批连线继续保留在 App Shell，因为它们分别组合 Agent 与 Run、Project、BlockGraph/React Flow 或全局工作台动作，不是可由 Agent 单一上下文完整解释的叶子组件。
 
+### Run Terminal Surface Presentation
+
+- terminal surface registry、context、Provider、Hook、view attachment 与 attachment identity 已迁入 `src/contexts/run/presentation`。
+- xterm surface、renderer controller、paste/file-link/selection 策略、workload scheduler、raster target/observer 与 zoom raster 协调已迁入 Run 的 `terminal-surface`。
+- terminal source theme 投影、canonical palette 选择和专属样式已迁入 Run；Agent 与普通终端继续消费同一个 Run Presentation 实现。
+- `TerminalDimensions` 已成为 Run Presentation 的窄视图类型，Run surface 不再为了行列尺寸依赖 App Shell 的聚合类型文件。
+- Run 自有 Unit 已迁入 `tests/unit/contexts/run`；需要 DOM 的用例按 `*.presentation.spec.*` 进入 jsdom，跨上下文 viewport、Agent terminal 和 workload 协调测试继续留在根级 Presentation。
+- `TerminalViewport`、`AgentTerminalSurface`、`useAgentTerminalView` 和 `terminalRenderingWorkloadCoordinator` 继续留在 App Shell：它们分别组合 BlockGraph/Agent/全局画布与 Run surface，不是 Run 单一上下文叶子。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -212,11 +221,6 @@ src/
 终端 surface 与模型投影：
 
 - `terminalOutputTail.ts`
-- `terminalPaste.ts`
-- `terminalRasterObserverHub.ts`
-- `terminalRendererController.ts`
-- `terminalRenderingWorkloadCoordinator.ts`
-- `terminalSelectionCopy.ts`
 - `terminalSessionOutputBuffer.ts`
 - `terminalSessionRuntime.ts`
 - `terminalSessionStateRetention.ts`
@@ -224,29 +228,16 @@ src/
 - `terminalSessionWorkspaceMigration.ts`
 - `terminalStateStore.ts`
 - `terminalStateUpdates.ts`
-- `terminalSurfaceAttachmentIdentity.ts`
-- `terminalSurfaceRegistry.ts`
-- `terminalSurfaceRegistryContext.ts`
-- `terminalTheme.ts`
-- `terminalViewAttachment.ts`
-- `terminalWorkloadScheduler.ts`
-- `terminalXtermRasterTarget.ts`
-- `terminalXtermSurface.ts`
-- `terminalZoomRasterCoordinator.ts`
-- `terminalZoomRasterPolicy.ts`
 
 组件与 Hook：
 
 - `TerminalServiceRuntimeBar.tsx`
-- `TerminalSurfaceRegistryProvider.tsx`
-- `TerminalThemeProjection.tsx`
 - `useTerminalMinimapAppearance.ts`
 - `useTerminalRuntimeAvailability.ts`
 - `useTerminalRuntimePreference.ts`
 - `useTerminalRuntimeRecovery.ts`
 - `useTerminalSessionEvents.ts`
 - `useTerminalSessionRetention.ts`
-- `useTerminalSurfaceRegistry.ts`
 - `useTerminalViewIdentityReconciliation.ts`
 - `useTerminalWorkflowNotifications.ts`
 
@@ -254,6 +245,7 @@ src/
 
 - `TerminalViewport.tsx`：BlockGraph 提供终端定义，Run 提供 terminal model/view；目标是 Run surface 组件只接收 Run ViewModel，App Shell wrapper 负责组合 BlockGraph 元数据。
 - `TerminalNode.tsx`、`terminalFlowNodes.ts`：BlockGraph 拥有节点和图，Run 提供运行状态，继续由 App Shell 组合或拆出两个上下文子组件。
+- `terminalRenderingWorkloadCoordinator.ts`：把全局画布、侧边栏和交互抑制状态投影到 Run workload/raster owner，继续由 App Shell 组合。
 - `useTerminalSessions.ts`、`useTerminalStarter.ts`、`useTerminalWorkspaceSynchronization.ts`：同时协调 BlockGraph 与 Run，留在 App Shell coordinator，或只把 Run 侧状态机下沉。
 - `terminalWorkflowEdges.ts`、`terminalWorkflowBuildEdgePresentation.ts`：工作流定义来自 BlockGraph，运行/搭建状态来自 Run 或 Agent，React Flow 投影属于 App Shell。
 - `TerminalSettingsPane.tsx`：拆成 Run 的滚屏设置 section 与 App Shell 的设置页组合；流程搭建偏好另行确认 owner。
@@ -400,10 +392,12 @@ ViewModel、策略和交互：
 
 ### 阶段 4：Run Presentation
 
+状态：进行中（2026-08-31 已完成 terminal surface 首批迁移）。
+
 目标：让 terminal surface、输出模型投影、主题、恢复和 runtime UI 归 Run Presentation。
 
-- 先迁移无跨上下文依赖的纯策略、store 和 registry。
-- 再迁移依赖这些能力的 Hook 和组件。
+- 已迁移无跨上下文依赖的 surface 策略、registry、xterm/raster/workload 能力、主题投影及其 Provider/Hook。
+- 下一批迁移输出缓冲、session state/store、恢复和 runtime UI；混合 Hook 先拆 Run 状态机再决定 owner。
 - 最后拆 TerminalViewport/TerminalNode 的 BlockGraph 定义与 Run surface 边界。
 - 不改变 xterm 生命周期、attach、恢复、resize 或滚屏行为。
 

@@ -1,4 +1,4 @@
-import { TerminalXtermRasterTarget } from '../../../src/presentation/app-shell/terminalXtermRasterTarget'
+import { TerminalXtermRasterTarget } from '../../../../src/contexts/run/presentation/terminal-surface/terminalXtermRasterTarget'
 
 describe('terminal xterm raster target', () => {
   let intersectionObservers: FakeIntersectionObserver[]

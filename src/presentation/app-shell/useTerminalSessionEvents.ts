@@ -12,7 +12,7 @@ import {
   applyTerminalSessionStatusSnapshot
 } from './terminalSessionRuntime'
 import { applyTerminalWorkflowEventToStates } from './terminalWorkflowSessionEvents'
-import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import type { TerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import type { TerminalViewState } from './types'
 
 interface UseTerminalSessionEventsInput {

@@ -2,7 +2,7 @@ import type { KeyboardEvent, MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { useI18n } from '../i18n/useI18n'
-import { TerminalThemeProjection } from './TerminalThemeProjection'
+import { TerminalThemeProjection } from '../../contexts/run/presentation/components/TerminalThemeProjection'
 
 export function AgentTerminalSurface({
   activeOutput,

@@ -3,7 +3,7 @@ import { useEffect, type MutableRefObject } from 'react'
 
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { restoreCanvasViewport } from './workbenchCanvasViewport'
-import type { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
+import type { TerminalZoomRasterCoordinator } from '../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 
 export type TerminalZoomRasterCanvasCoordinator = Pick<
   TerminalZoomRasterCoordinator,

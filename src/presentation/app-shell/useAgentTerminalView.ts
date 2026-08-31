@@ -1,12 +1,15 @@
 import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import { createTerminalXtermSurface } from './terminalXtermSurface'
-import { bindTerminalSurfaceAttachmentIdentity } from './terminalSurfaceAttachmentIdentity'
-import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
+import { bindTerminalSurfaceAttachmentIdentity } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceAttachmentIdentity'
+import {
+  attachTerminalViewWithRetry,
+  restoreTerminalViewWithRetry
+} from '../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
+import { createTerminalXtermSurface } from '../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
+import { useTerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/useTerminalSurfaceRegistry'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import type { TerminalDimensions } from './types'
-import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
 
 const terminalInputBatchWindowMs = 16
 

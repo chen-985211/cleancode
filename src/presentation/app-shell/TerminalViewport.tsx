@@ -12,26 +12,29 @@ import {
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
-import { appendTerminalOutputTail } from './terminalOutputTail'
-import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
-import {
-  createTerminalSurfaceKey,
-  type TerminalSearchResults,
-  type TerminalSurface
-} from './terminalSurfaceRegistry'
-import { createTerminalXtermSurface } from './terminalXtermSurface'
-import { bindTerminalSurfaceAttachmentIdentity } from './terminalSurfaceAttachmentIdentity'
-import { readTerminalSourceTheme } from './terminalTheme'
-import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
-import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
-import { useI18n } from '../i18n/useI18n'
+import { TerminalThemeProjection } from '../../contexts/run/presentation/components/TerminalThemeProjection'
 import {
   TerminalPasteController,
   analyzeTerminalPaste,
   quoteTerminalFilePaths,
   type TerminalPasteState
-} from './terminalPaste'
-import { TerminalThemeProjection } from './TerminalThemeProjection'
+} from '../../contexts/run/presentation/terminal-surface/terminalPaste'
+import { bindTerminalSurfaceAttachmentIdentity } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceAttachmentIdentity'
+import {
+  createTerminalSurfaceKey,
+  type TerminalSearchResults,
+  type TerminalSurface
+} from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
+import {
+  attachTerminalViewWithRetry,
+  restoreTerminalViewWithRetry
+} from '../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
+import { createTerminalXtermSurface } from '../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
+import { useTerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/useTerminalSurfaceRegistry'
+import { appendTerminalOutputTail } from './terminalOutputTail'
+import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
+import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalViewportProps {

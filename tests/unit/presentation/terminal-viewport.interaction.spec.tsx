@@ -3,9 +3,9 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { canonicalTerminalPalettes } from '../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
-import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
+import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
 import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
-import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 interface FakeTerminalInstance {
   buffer: {

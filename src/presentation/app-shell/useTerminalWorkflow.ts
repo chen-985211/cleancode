@@ -16,7 +16,7 @@ import { getWorkflowRunRootBlockIds } from './terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from './types'
 import { useTerminalWorkflowNotifications } from './useTerminalWorkflowNotifications'
 import { useWorkflowNotificationNavigation } from './useWorkflowNotificationNavigation'
-import { readTerminalSourceTheme } from './terminalTheme'
+import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 

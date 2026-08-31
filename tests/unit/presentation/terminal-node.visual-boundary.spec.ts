@@ -7,7 +7,7 @@ const terminalNodeStyles = readFileSync(
   'utf8'
 )
 const terminalThemeProjectionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-theme-projection.css'),
+  resolve(process.cwd(), 'src/contexts/run/presentation/styles/terminal-theme-projection.css'),
   'utf8'
 )
 

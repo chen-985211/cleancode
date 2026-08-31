@@ -25,6 +25,7 @@ import type {
   TerminalSessionStatus
 } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
+import type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
@@ -36,6 +37,7 @@ export type {
   TerminalServiceEndpoint,
   TerminalServicePortConflict
 } from '../../contexts/run/application/dto/TerminalRunEvent'
+export type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 export interface WorkbenchSnapshot {
   readonly agents?: readonly WorkspaceAgentSnapshot[]
@@ -71,11 +73,6 @@ export interface TerminalStateStore {
   readonly getState: (terminalId: string) => TerminalViewState
   readonly replaceStates: (states: Readonly<Record<string, TerminalViewState>>) => void
   readonly subscribe: (terminalId: string, listener: () => void) => () => void
-}
-
-export interface TerminalDimensions {
-  readonly columns: number
-  readonly rows: number
 }
 
 export interface TerminalBlockMetadataInput {

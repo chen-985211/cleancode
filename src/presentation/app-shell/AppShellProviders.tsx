@@ -4,9 +4,9 @@ import type { AgentTurnCompletedEvent } from '../../contexts/agent/application/d
 import { AgentActivityObserver } from '../../contexts/agent/presentation/components/AgentActivityObserver'
 import type { AgentActivityNavigationTarget } from '../../contexts/agent/presentation/view-models/AgentActivityNavigationTarget'
 import { AgentProviderStateProvider } from '../../contexts/agent/presentation/components/AgentProviderStateProvider'
+import { TerminalSurfaceRegistryProvider } from '../../contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
+import type { TerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import type { AppNotificationController } from '../shared/notifications/appNotifications'
-import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
-import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 
 export function AppShellProviders({
   children,

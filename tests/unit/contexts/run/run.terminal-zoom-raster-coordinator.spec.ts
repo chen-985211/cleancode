@@ -4,8 +4,8 @@ import {
   type TerminalZoomRasterPriority,
   type TerminalZoomRasterScheduler,
   type TerminalZoomRasterTarget
-} from '../../../src/presentation/app-shell/terminalZoomRasterCoordinator'
-import type { TerminalRasterScale } from '../../../src/presentation/app-shell/terminalZoomRasterPolicy'
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
+import type { TerminalRasterScale } from '../../../../src/contexts/run/presentation/terminal-surface/terminalZoomRasterPolicy'
 
 describe('terminal zoom raster coordinator', () => {
   afterEach(() => vi.useRealTimers())

@@ -1,4 +1,4 @@
-import { TerminalRendererController } from '../../../src/presentation/app-shell/terminalRendererController'
+import { TerminalRendererController } from '../../../../src/contexts/run/presentation/terminal-surface/terminalRendererController'
 
 describe('terminal renderer controller', () => {
   it('activates high-performance rendering and falls back after context loss', async () => {

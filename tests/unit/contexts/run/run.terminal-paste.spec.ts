@@ -3,7 +3,7 @@ import {
   analyzeTerminalPaste,
   quoteTerminalFilePaths,
   splitTerminalPasteChunks
-} from '../../../src/presentation/app-shell/terminalPaste'
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalPaste'
 
 describe('terminal paste', () => {
   it('splits on Unicode boundaries without exceeding the UTF-8 chunk budget', () => {

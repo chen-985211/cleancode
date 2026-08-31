@@ -1,5 +1,5 @@
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
-import { terminalSurfaceAttachedSessionIdAttribute } from './terminalSurfaceAttachmentIdentity'
+import { terminalSurfaceAttachedSessionIdAttribute } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceAttachmentIdentity'
 import type { WorkbenchFlowNode } from './types'
 
 export function activateWorkbenchNodeInput(node: WorkbenchFlowNode): boolean {

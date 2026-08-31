@@ -7,7 +7,7 @@ const attachmentIdentityMockState = vi.hoisted(() => ({
   detach: vi.fn()
 }))
 
-vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
+vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
   createTerminalXtermSurface: vi.fn(() => ({
     attach: vi.fn(),
     clearSearch: vi.fn(),

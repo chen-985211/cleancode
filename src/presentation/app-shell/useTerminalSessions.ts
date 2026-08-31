@@ -29,9 +29,10 @@ import { useTerminalSessionRetention } from './useTerminalSessionRetention'
 import type { NotifyApp } from '../shared/notifications/appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
-import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
-import { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
-import { TerminalWorkloadScheduler } from './terminalWorkloadScheduler'
+import { TerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { readTerminalSourceTheme } from '../../contexts/run/presentation/terminal-surface/terminalTheme'
+import { TerminalWorkloadScheduler } from '../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
+import { TerminalZoomRasterCoordinator } from '../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 import { createTerminalStateStore } from './terminalStateStore'
 import { createTerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
 import {
@@ -46,7 +47,6 @@ import {
   projectTerminalAutoStartStatus,
   reconcileTerminalSessionSnapshots
 } from './terminalSessionRuntime'
-import { readTerminalSourceTheme } from './terminalTheme'
 import { useTerminalRuntimeRecovery } from './useTerminalRuntimeRecovery'
 import { useTerminalStarter } from './useTerminalStarter'
 import { useTerminalViewIdentityReconciliation } from './useTerminalViewIdentityReconciliation'

@@ -10,7 +10,7 @@ const terminalSurfaceState = vi.hoisted(() => ({
   onOpenSearch: null as (() => void) | null
 }))
 
-vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
+vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
   createTerminalXtermSurface: vi.fn(() => ({
     attach: vi.fn((attachment: { readonly onOpenSearch: () => void }) => {
       terminalSurfaceState.onOpenSearch = attachment.onOpenSearch

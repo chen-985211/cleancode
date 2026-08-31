@@ -1,9 +1,9 @@
 import type { ITheme } from '@xterm/xterm'
 
-import { canonicalTerminalPalettes } from '../../contexts/run/application/dto/TerminalPalette.generated'
-import type { EffectiveTheme } from './themePreference'
+import { canonicalTerminalPalettes } from '../../application/dto/TerminalPalette.generated'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
-export function readCanonicalTerminalSearchTheme(theme: EffectiveTheme): {
+export function readCanonicalTerminalSearchTheme(theme: TerminalSourceTheme): {
   readonly active: string
   readonly border: string
   readonly match: string
@@ -29,12 +29,12 @@ function readTerminalSearchThemeVariables(
   }
 }
 
-export function readCanonicalTerminalTheme(theme: EffectiveTheme): ITheme {
+export function readCanonicalTerminalTheme(theme: TerminalSourceTheme): ITheme {
   return canonicalTerminalPalettes[theme]
 }
 
 export function readTerminalSourceTheme(
   root: HTMLElement = document.documentElement
-): EffectiveTheme {
+): TerminalSourceTheme {
   return root.dataset.theme === 'light' ? 'light' : 'dark'
 }

@@ -5,7 +5,7 @@ import {
   readTerminalRuntimePreference,
   writeTerminalRuntimePreference
 } from '../../contexts/run/presentation/view-models/terminalRuntimePreference'
-import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import type { TerminalSurfaceRegistry } from '../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 export function useTerminalRuntimePreference(surfaceRegistry: TerminalSurfaceRegistry) {
   const [preference, setPreference] = useState(readTerminalRuntimePreference)

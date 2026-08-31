@@ -1,4 +1,4 @@
-import { findTerminalFileLinkCandidates } from '../../../src/presentation/app-shell/terminalFileLinks'
+import { findTerminalFileLinkCandidates } from '../../../../src/contexts/run/presentation/terminal-surface/terminalFileLinks'
 
 describe('terminal file link recognition', () => {
   it('recognizes workspace-style paths with optional line and column suffixes', () => {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
-import { TerminalSurfaceRegistryContext } from './terminalSurfaceRegistryContext'
-import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import { TerminalSurfaceRegistryContext } from '../terminal-surface/terminalSurfaceRegistryContext'
+import type { TerminalSurfaceRegistry } from '../terminal-surface/terminalSurfaceRegistry'
 
 export function TerminalSurfaceRegistryProvider({
   children,

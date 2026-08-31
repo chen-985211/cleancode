@@ -4,9 +4,11 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal as XTerm, type IDisposable } from '@xterm/xterm'
 
-import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
-import type { SequencedTerminalOutput } from '../../contexts/run/application/ports/TerminalModelPort'
-import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
+import type { TerminalSnapshot } from '../../application/dto/TerminalModelSnapshot'
+import type { TerminalScrollbackRows } from '../../application/dto/TerminalRuntimeSettings'
+import type { SequencedTerminalOutput } from '../../application/ports/TerminalModelPort'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import type { TerminalDimensions } from '../view-models/TerminalPresentationTypes'
 import { installTerminalSelectionCopy } from './terminalSelectionCopy'
 import type {
   TerminalRestoreResult,
@@ -21,8 +23,6 @@ import {
   readCanonicalTerminalTheme,
   readTerminalSourceTheme
 } from './terminalTheme'
-import type { TerminalDimensions } from './types'
-import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'

@@ -2,8 +2,8 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
-import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
-import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
+import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 interface FakeSearchAddon {
   readonly clearDecorations: ReturnType<typeof vi.fn>

@@ -1,5 +1,5 @@
-import type { TerminalWorkloadScheduler } from './terminalWorkloadScheduler'
-import type { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
+import type { TerminalWorkloadScheduler } from '../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
+import type { TerminalZoomRasterCoordinator } from '../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 
 export interface TerminalRenderingWorkloadCoordinator {
   beginInteraction(): void

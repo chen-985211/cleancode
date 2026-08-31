@@ -1,7 +1,7 @@
 import {
   resolveTerminalRasterScale,
   terminalRasterScaleLevels
-} from '../../../src/presentation/app-shell/terminalZoomRasterPolicy'
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalZoomRasterPolicy'
 
 describe('terminal zoom raster policy', () => {
   it('selects the smallest bounded raster level that covers the canvas zoom', () => {
