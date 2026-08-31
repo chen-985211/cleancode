@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
-import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import {
   readTerminalRuntimePreference,
   writeTerminalRuntimePreference
-} from './terminalRuntimePreference'
+} from '../../contexts/run/presentation/view-models/terminalRuntimePreference'
+import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 
 export function useTerminalRuntimePreference(surfaceRegistry: TerminalSurfaceRegistry) {
   const [preference, setPreference] = useState(readTerminalRuntimePreference)

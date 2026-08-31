@@ -3,7 +3,7 @@ import {
   readTerminalRuntimePreference,
   terminalScrollbackOptions,
   writeTerminalRuntimePreference
-} from '../../../src/presentation/app-shell/terminalRuntimePreference'
+} from '../../../../src/contexts/run/presentation/view-models/terminalRuntimePreference'
 
 describe('terminal runtime preference', () => {
   it('uses the default for missing, malformed and unsupported stored values', () => {

@@ -3,7 +3,7 @@ import {
   isTerminalScrollbackRows,
   terminalScrollbackOptions,
   type TerminalScrollbackRows
-} from '../../contexts/run/application/dto/TerminalRuntimeSettings'
+} from '../../application/dto/TerminalRuntimeSettings'
 
 const terminalRuntimePreferenceStorageKey = 'cleancode.terminal-runtime-preference'
 
