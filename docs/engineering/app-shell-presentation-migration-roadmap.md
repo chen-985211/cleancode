@@ -161,6 +161,13 @@ src/
 - `TerminalNode` 继续作为组合 wrapper，负责注入剪贴板、外部打开、画布定位、元数据编辑和冲突消除动作；Run 组件不理解 React Flow、BlockGraph 节点或 App Shell 导航状态。
 - 组件 Unit 与 owner 一同迁入 `tests/unit/contexts/run`，端点可打开条件、fallback、租约清理状态、managed/external/unknown 冲突和安全动作保持不变。
 
+### Run Terminal Settings Presentation
+
+- `TerminalScrollbackSettingsSection` 已从混合的 `TerminalSettingsPane` 提取到 Run `presentation/components`，只消费 Run 的滚屏预算类型、preset 与变更回调。
+- 滚屏 section 自有选项投影、当前选择和 selection motion Hook；`TerminalSettingsPane` 继续作为 App Shell 组合壳，拥有终端设置页标题并组合流程搭建偏好。
+- `application-settings.css` 中的 settings group/options 布局继续归 App Shell，因为同一结构同时服务 Run 滚屏 section 与尚未确认 owner 的 workflow build section；本批不复制或倒置 CSS owner。
+- 独立 Run Presentation Unit 证明三个受限预算、当前 motion target 和变更发布；Application Settings 组合测试继续证明导航、页面布局和 workflow 选项未受影响。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -247,7 +254,7 @@ src/
 - `terminalRenderingWorkloadCoordinator.ts`：把全局画布、侧边栏和交互抑制状态投影到 Run workload/raster owner，继续由 App Shell 组合。
 - `useTerminalSessions.ts`、`useTerminalStarter.ts`、`useTerminalWorkspaceSynchronization.ts`：同时协调 BlockGraph 与 Run，留在 App Shell coordinator，或只把 Run 侧状态机下沉。
 - `terminalWorkflowEdges.ts`、`terminalWorkflowBuildEdgePresentation.ts`：工作流定义来自 BlockGraph，运行/搭建状态来自 Run 或 Agent，React Flow 投影属于 App Shell。
-- `TerminalSettingsPane.tsx`：拆成 Run 的滚屏设置 section 与 App Shell 的设置页组合；流程搭建偏好另行确认 owner。
+- `TerminalSettingsPane.tsx`：Run 滚屏设置 section 已拆出；App Shell wrapper 继续组合设置页标题与流程搭建偏好，后者需另行确认 owner。
 
 ### BlockGraph Presentation 候选
 
@@ -391,15 +398,15 @@ ViewModel、策略和交互：
 
 ### 阶段 4：Run Presentation
 
-状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批与 service runtime UI 第三批迁移）。
+状态：进行中（2026-08-31 完成 terminal surface 首批迁移；2026-09-01 完成 state/runtime 第二批、service runtime UI 第三批与 scrollback settings 第四批迁移）。
 
 目标：让 terminal surface、输出模型投影、主题、恢复和 runtime UI 归 Run Presentation。
 
 - 已迁移无跨上下文依赖的 surface 策略、registry、xterm/raster/workload 能力、主题投影及其 Provider/Hook。
 - 已迁移输出缓冲、session state/store、恢复、runtime availability/preference、service/workflow event 投影及 Run 自有 Hook。
 - 已迁移 `TerminalServiceRuntimeBar`、专属样式和 Unit；App Shell 只保留剪贴板、外部打开、画布定位和编辑入口的动作装配。
-- 下一批拆分 `TerminalSettingsPane` 的 Run 滚屏设置 section；minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
-- 最后拆 TerminalViewport/TerminalNode 的 BlockGraph 定义与 Run surface 边界。
+- 已从 `TerminalSettingsPane` 提取 Run 滚屏设置 section；App Shell 保留设置页组合与 workflow build 偏好。
+- 下一批拆 TerminalViewport/TerminalNode 的 BlockGraph 定义与 Run surface 边界；minimap、Project session retention 和 workflow notification 只有先拆出单一 owner 后才能下沉。
 - 不改变 xterm 生命周期、attach、恢复、resize 或滚屏行为。
 
 最低验证：Run Presentation Unit、终端相关 Integration/Contract、终端关键 E2E、typecheck、dependency-cruiser、完整 `pre-commit`。

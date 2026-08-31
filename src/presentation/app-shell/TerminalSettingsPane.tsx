@@ -1,5 +1,5 @@
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
-import { terminalScrollbackOptions } from '../../contexts/run/presentation/view-models/terminalRuntimePreference'
+import { TerminalScrollbackSettingsSection } from '../../contexts/run/presentation/components/TerminalScrollbackSettingsSection'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { useI18n } from '../i18n/useI18n'
 import { useSelectionIndicatorMotion } from '../shared/hooks/useSelectionMotion'
@@ -18,8 +18,6 @@ export function TerminalSettingsPane({
   onTerminalWorkflowBuildModeChange
 }: TerminalSettingsPaneProps) {
   const { t } = useI18n()
-  const [scrollbackSelectionContainerRef, scrollbackSelectionIndicatorRef] =
-    useSelectionIndicatorMotion(`${scrollbackRows}`)
   const [workflowSelectionContainerRef, workflowSelectionIndicatorRef] =
     useSelectionIndicatorMotion(terminalWorkflowBuildMode)
 
@@ -28,33 +26,10 @@ export function TerminalSettingsPane({
       <header className="terminal-settings-pane__header">
         <h2>{t('settings.terminal.title')}</h2>
       </header>
-      <section className="terminal-settings-group" aria-labelledby="terminal-scrollback-title">
-        <h3 id="terminal-scrollback-title">{t('settings.terminal.scrollback')}</h3>
-        <div
-          ref={scrollbackSelectionContainerRef}
-          className="terminal-settings-options"
-          role="radiogroup"
-          aria-labelledby="terminal-scrollback-title"
-        >
-          <span
-            ref={scrollbackSelectionIndicatorRef}
-            className="selection-motion-indicator terminal-settings-options__selection"
-            data-selection-motion-target={scrollbackRows}
-            aria-hidden="true"
-          />
-          {terminalScrollbackOptions.map((rows) => (
-            <label data-selection-motion-option={rows} key={rows}>
-              <input
-                type="radio"
-                name="terminal-scrollback"
-                checked={scrollbackRows === rows}
-                onChange={() => onScrollbackChange(rows)}
-              />
-              <span>{t('settings.terminal.scrollbackRows', { rows: rows.toLocaleString() })}</span>
-            </label>
-          ))}
-        </div>
-      </section>
+      <TerminalScrollbackSettingsSection
+        scrollbackRows={scrollbackRows}
+        onScrollbackChange={onScrollbackChange}
+      />
       <section className="terminal-settings-group" aria-labelledby="terminal-workflow-build-title">
         <h3 id="terminal-workflow-build-title">{t('settings.terminal.workflowBuild')}</h3>
         <div
