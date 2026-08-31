@@ -17,8 +17,8 @@ import {
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
 import type { MinimapFlowNode } from './types'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
-import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { useMinimapPanelMotion } from './useMinimapPanelMotion'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import {

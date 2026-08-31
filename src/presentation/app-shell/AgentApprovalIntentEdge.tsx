@@ -8,7 +8,7 @@ import {
 import { memo } from 'react'
 
 import type { AgentApprovalIntentEdgeData } from './agentApprovalPresentation'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 type ApprovalIntentEdge = Edge<AgentApprovalIntentEdgeData, 'approvalIntent'>
 

@@ -5,6 +5,10 @@ const appShellStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/AppShell.css'),
   'utf8'
 )
+const sharedSelectionStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/shared/styles/selection-motion.css'),
+  'utf8'
+)
 const selectionStyles = readStyles('selection-motion.css')
 const settingsStyles = readStyles('application-settings.css')
 const agentSettingsStyles = readStyles('agent-settings.css')
@@ -14,8 +18,8 @@ const themeStyles = readStyles('theme-settings.css')
 
 describe('selection motion styles', () => {
   it('projects the shared moving material with compositor-only translation', () => {
-    expect(appShellStyles).toContain("@import './styles/selection-motion.css';")
-    const indicatorRule = readRule(selectionStyles, '.selection-motion-indicator')
+    expect(appShellStyles).toContain("@import '../shared/styles/selection-motion.css';")
+    const indicatorRule = readRule(sharedSelectionStyles, '.selection-motion-indicator')
 
     expect(indicatorRule).toContain('var(--cc-selection-motion-width, 0px)')
     expect(indicatorRule).toContain('var(--cc-selection-motion-height, 0px)')

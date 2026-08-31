@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { InstantiateBlockTemplateResult } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
-import type { AppNotificationController } from './appNotifications'
-import { useI18n } from './i18n/useI18n'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
+import { useI18n } from '../i18n/useI18n'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import {

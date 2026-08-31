@@ -5,9 +5,12 @@ import {
   createExpectedAppError,
   getAppErrorCode
 } from '../../shared-kernel/application/errors/AppError'
-import type { AppNotificationController, AppNotificationInput } from './appNotifications'
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
-import { useI18n } from './i18n/useI18n'
+import type {
+  AppNotificationController,
+  AppNotificationInput
+} from '../shared/notifications/appNotifications'
+import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
+import { useI18n } from '../i18n/useI18n'
 
 const readyFallback: TerminalRuntimeAvailabilitySnapshot = {
   phase: 'ready',

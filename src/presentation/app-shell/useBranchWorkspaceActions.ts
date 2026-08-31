@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
-import type { AppNotificationController, AppNotificationInput } from './appNotifications'
-import type { Translate } from './i18n/messages'
-import { useI18n } from './i18n/useI18n'
+import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
+import type {
+  AppNotificationController,
+  AppNotificationInput
+} from '../shared/notifications/appNotifications'
+import type { Translate } from '../i18n/messages'
+import { useI18n } from '../i18n/useI18n'
 import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
 import type { WorkbenchSnapshot } from './types'
 

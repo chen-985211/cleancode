@@ -1,6 +1,6 @@
 import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import type { FormEvent, RefObject } from 'react'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { useBranchWorkspaceFormSpring } from './useBranchWorkspaceFormSpring'
 
 interface ProjectSidebarBranchWorkspaceFormProps {

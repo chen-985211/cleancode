@@ -11,8 +11,8 @@ import { createPortal } from 'react-dom'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
-import { TooltipLabel } from './Tooltip'
-import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
+import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface MenuPosition {

@@ -4,7 +4,7 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from './motionSpring'
+} from '../shared/motion/motionSpring'
 
 export interface TerminalGroupDropSpringSurface {
   readonly classList: Pick<DOMTokenList, 'add' | 'remove'>

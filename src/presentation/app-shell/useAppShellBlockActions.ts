@@ -4,9 +4,9 @@ import type {
   BatchTerminalRemovalTargetSnapshot,
   TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { AppNotificationController } from './appNotifications'
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
-import { useI18n } from './i18n/useI18n'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
+import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
+import { useI18n } from '../i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseAppShellBlockActionsInput {

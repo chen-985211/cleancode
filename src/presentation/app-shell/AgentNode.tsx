@@ -8,7 +8,7 @@ import type { AgentConsoleFlowNode } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 
 export const AgentNode = memo(function AgentNode({

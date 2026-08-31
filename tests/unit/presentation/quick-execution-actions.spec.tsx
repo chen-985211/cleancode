@@ -6,7 +6,7 @@ import type {
   QuickExecutionTargetSnapshot,
   TerminalBlockSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
+import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
 import { writeCanvasQuickExecutionFollowPreference } from '../../../src/presentation/app-shell/canvasQuickExecutionFollowPreference'
 import type {
   WorkbenchFlowNode,

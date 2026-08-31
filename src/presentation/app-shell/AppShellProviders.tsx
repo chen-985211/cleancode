@@ -4,7 +4,7 @@ import type { AgentTurnCompletedEvent } from '../../contexts/agent/application/d
 import { AgentActivityObserver } from './AgentActivityObserver'
 import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
 import { AgentProviderStateProvider } from './AgentProviderStateProvider'
-import type { AppNotificationController } from './appNotifications'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 

@@ -18,8 +18,11 @@ import type {
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
 import { useAgentProviderCatalog } from './useAgentProviderCatalog'
-import { useI18n } from './i18n/useI18n'
-import { useSelectionFeedbackMotion, useSelectionIndicatorMotion } from './useSelectionMotion'
+import { useI18n } from '../i18n/useI18n'
+import {
+  useSelectionFeedbackMotion,
+  useSelectionIndicatorMotion
+} from '../shared/hooks/useSelectionMotion'
 
 const defaultPreferences: AgentProviderPreferencesSnapshot = {
   defaultCleancodeMcpEnabled: true,

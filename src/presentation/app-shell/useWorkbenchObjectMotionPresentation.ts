@@ -12,7 +12,7 @@ import {
 
 import type { WorkbenchObjectMotion } from './types'
 import { createWorkbenchObjectSpringController } from './workbenchObjectSpring'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 interface WorkbenchObjectMotionPresentation {
   readonly className: string

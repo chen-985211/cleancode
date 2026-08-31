@@ -10,7 +10,7 @@ import { createDeferred } from '../../fixtures/deferred'
 import type { TerminalRunEvent } from '../../../src/contexts/run/application/dto/TerminalRunEvent'
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
+import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 
 vi.mock('@xyflow/react', async (importOriginal) => {

@@ -13,7 +13,7 @@ import type {
   CanvasArrangementSelection,
   CanvasArrangementSelectionItem
 } from './canvasArrangementSelection'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { QuickExecutionBar } from './QuickExecutionBar'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'

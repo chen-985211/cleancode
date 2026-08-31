@@ -1,7 +1,7 @@
 import type { AgentApprovalPresentation } from './agentApprovalPresentation'
-import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
-import type { Translate } from './i18n/messages'
+import { useI18n } from '../i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
+import type { Translate } from '../i18n/messages'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface AgentToolApprovalCardProps {

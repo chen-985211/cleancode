@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-import { motionPreferenceStore, type MotionPreferenceStore } from './motionPreference'
+import { motionPreferenceStore, type MotionPreferenceStore } from '../motion/motionPreference'
 
 export function usePrefersReducedMotion(
   store: MotionPreferenceStore = motionPreferenceStore

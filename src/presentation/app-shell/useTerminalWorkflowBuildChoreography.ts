@@ -8,7 +8,10 @@ import {
 } from './terminalWorkflowBuildChoreography'
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
-import { prefersReducedMotion, subscribeReducedMotionPreference } from './motionPreference'
+import {
+  prefersReducedMotion,
+  subscribeReducedMotionPreference
+} from '../shared/motion/motionPreference'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export interface TerminalWorkflowBuildPresentation {

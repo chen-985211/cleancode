@@ -3,11 +3,11 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentBlockingFeedback, AgentFeedbackIssue } from './agentProviderFeedback'
 import type { AgentProviderPanelState } from './useAgentProviderState'
-import { useI18n } from './i18n/useI18n'
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
-import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
 
 interface PanelPosition {
   readonly left: number

@@ -1,8 +1,8 @@
 import { useId } from 'react'
 
 import type { AgentMcpPresentationStatus } from './agentProviderFeedback'
-import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 export function AgentMcpCapabilityToggle({

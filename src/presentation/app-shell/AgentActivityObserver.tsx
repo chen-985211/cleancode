@@ -8,8 +8,8 @@ import type {
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { AgentActivityStore, type AgentActivityNotificationProjection } from './agentActivityStore'
 import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
-import type { AppNotificationController } from './appNotifications'
-import { useI18n } from './i18n/useI18n'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
+import { useI18n } from '../i18n/useI18n'
 import { AgentActivityStoreContext } from './useAgentActivitySnapshots'
 import { useOptionalNotifications } from './useNotifications'
 import {

@@ -6,8 +6,8 @@ import {
   type SelectionIndicatorAnimationFrame,
   type SelectionIndicatorMotionRoot,
   type SelectionMotionTarget
-} from '../../../src/presentation/app-shell/selectionMotion'
-import type { SpringProgressMotionFrameScheduler } from '../../../src/presentation/app-shell/springProgressMotion'
+} from '../../../../src/presentation/shared/motion/selectionMotion'
+import type { SpringProgressMotionFrameScheduler } from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('selection motion', () => {
   it('projects the initial selection without an entrance animation', () => {

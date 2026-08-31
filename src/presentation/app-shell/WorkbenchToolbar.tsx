@@ -1,7 +1,7 @@
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import { AgentCreateSplitButton } from './AgentCreateSplitButton'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface WorkbenchToolbarProps {

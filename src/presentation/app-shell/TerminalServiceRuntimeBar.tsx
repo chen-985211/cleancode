@@ -4,9 +4,9 @@ import type {
   TerminalServiceEndpoint,
   TerminalServicePortConflict
 } from './types'
-import { useI18n } from './i18n/useI18n'
-import type { Translate } from './i18n/messages'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import type { Translate } from '../i18n/messages'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalServiceRuntimeBarProps {

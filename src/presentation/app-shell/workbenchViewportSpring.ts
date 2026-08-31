@@ -3,7 +3,7 @@ import {
   isSpringAxisSettled,
   type SpringAxis,
   type SpringSettlementThresholds
-} from './motionSpring'
+} from '../shared/motion/motionSpring'
 
 export type CriticalSpringAxis = SpringAxis
 

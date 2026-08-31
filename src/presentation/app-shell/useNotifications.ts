@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
-import type { AppNotificationController } from './appNotifications'
-import { ignoreAppNotifications } from './appNotifications'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
+import { ignoreAppNotifications } from '../shared/notifications/appNotifications'
 
 export type NotificationContextValue = AppNotificationController
 

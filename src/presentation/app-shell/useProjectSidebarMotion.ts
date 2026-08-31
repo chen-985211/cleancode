@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'rea
 
 import { createProjectSidebarMotionController } from './projectSidebarMotion'
 import type { TerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 const fallbackExpandedWidth = 280
 

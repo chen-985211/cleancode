@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   createSpringProgressMotionController,
   type SpringProgressMotionRoot
-} from './springProgressMotion'
+} from '../shared/motion/springProgressMotion'
 
 const opacityProperty = '--notification-icon-motion-opacity'
 const translationProperty = '--notification-icon-motion-y'

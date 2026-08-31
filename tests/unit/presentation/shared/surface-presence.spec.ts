@@ -2,7 +2,7 @@ import {
   completeSurfacePresenceMotion,
   createSurfacePresenceState,
   synchronizeSurfacePresence
-} from '../../../src/presentation/app-shell/surfacePresence'
+} from '../../../../src/presentation/shared/motion/surfacePresence'
 
 describe('surface presence state', () => {
   it('reuses one motion identity while redirecting between opening and closing', () => {

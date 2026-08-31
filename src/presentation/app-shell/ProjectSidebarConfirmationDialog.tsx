@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react'
-import { OverlaySurfaceMotion } from './SurfaceMotion'
-import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
+import { useI18n } from '../i18n/useI18n'
 
 interface ProjectSidebarConfirmationDialogProps {
   readonly ariaLabel: string

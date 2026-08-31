@@ -38,12 +38,12 @@ import {
 } from './applicationShortcuts'
 import blackHoleMotionUrl from './assets/quick-execution-black-hole-motion.webm'
 import blackHoleAssetUrl from './assets/quick-execution-black-hole.png'
-import { useI18n } from './i18n/useI18n'
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
 
 type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
 

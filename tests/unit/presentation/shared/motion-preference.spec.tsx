@@ -3,8 +3,8 @@ import { act, render, screen } from '@testing-library/react'
 import {
   createMotionPreferenceStore,
   type MotionPreferenceStore
-} from '../../../src/presentation/app-shell/motionPreference'
-import { usePrefersReducedMotion } from '../../../src/presentation/app-shell/usePrefersReducedMotion'
+} from '../../../../src/presentation/shared/motion/motionPreference'
+import { usePrefersReducedMotion } from '../../../../src/presentation/shared/hooks/usePrefersReducedMotion'
 
 describe('motion preference', () => {
   it('shares one media listener and releases it after the final subscriber leaves', () => {

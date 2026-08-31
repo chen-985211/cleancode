@@ -12,11 +12,11 @@ import type {
   BlockTemplateScope,
   BlockTemplateSnapshot
 } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import { useI18n } from './i18n/useI18n'
-import { OverlaySurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
-import { useSelectionIndicatorMotion } from './useSelectionMotion'
+import { useSelectionIndicatorMotion } from '../shared/hooks/useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 type LibraryScopeKind = BlockTemplateScope['type']

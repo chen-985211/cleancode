@@ -9,12 +9,15 @@ import {
   type TransitionEventHandler
 } from 'react'
 
-import { acquireSurfaceIsolationLease } from './surfaceIsolation'
-import type { SurfaceSpringPreset } from './surfaceSpringMotion'
-import { useSurfaceSpringMotion } from './useSurfaceSpringMotion'
-import { useSurfaceMotionPresence, type SurfaceMotionPreference } from './useSurfaceMotionPresence'
+import {
+  useSurfaceMotionPresence,
+  type SurfaceMotionPreference
+} from '../hooks/useSurfaceMotionPresence'
+import { useSurfaceSpringMotion } from '../hooks/useSurfaceSpringMotion'
+import { acquireSurfaceIsolationLease } from '../motion/surfaceIsolation'
+import type { SurfaceSpringPreset } from '../motion/surfaceSpringMotion'
 
-export type { SurfaceMotionPreferenceSource } from './useSurfaceMotionPresence'
+export type { SurfaceMotionPreferenceSource } from '../hooks/useSurfaceMotionPresence'
 
 type SurfaceMotionDivProps = Omit<
   HTMLAttributes<HTMLDivElement>,
@@ -138,8 +141,5 @@ function resolveSurfaceIsolationTargets(
   if (typeof isolationTargets === 'function') return isolationTargets()
   if (isolationTargets) return isolationTargets
   const root = document.getElementById('root')
-  if (root) return [root]
-  return Array.from(
-    document.querySelectorAll<HTMLElement>('.project-sidebar, .app-shell__workspace')
-  )
+  return root ? [root] : []
 }

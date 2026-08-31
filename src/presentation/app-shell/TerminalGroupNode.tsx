@@ -27,9 +27,9 @@ import {
   GroupStopIcon
 } from './TerminalGroupIcons'
 import type { TerminalGroupFlowNode, TerminalViewState } from './types'
-import { TooltipLabel } from './Tooltip'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { useTerminalGroupDropSpring } from './useTerminalGroupDropSpring'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'

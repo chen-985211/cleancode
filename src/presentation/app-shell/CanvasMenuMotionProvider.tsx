@@ -20,7 +20,7 @@ import {
   type CanvasMenuMotionPresentation
 } from './canvasMenuMotion'
 import { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 export interface CanvasMenuAnchor {
   readonly x: number

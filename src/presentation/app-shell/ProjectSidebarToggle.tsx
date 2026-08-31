@@ -1,8 +1,8 @@
 import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple'
 import type { Ref } from 'react'
 
-import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
 
 export function ProjectSidebarToggle({
   buttonRef,

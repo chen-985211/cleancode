@@ -14,10 +14,10 @@ import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
 } from '../../application/dto/WorkspaceExternalOpen'
-import { AnchoredSurfaceMotion } from '../../../../presentation/app-shell/SurfaceMotion'
-import { TooltipLabel } from '../../../../presentation/app-shell/Tooltip'
-import { useI18n } from '../../../../presentation/app-shell/i18n/useI18n'
-import { useOutsidePointerDismiss } from '../../../../presentation/app-shell/useOutsidePointerDismiss'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 interface WorkspaceExternalOpenControlProps {
   readonly capabilities: WorkspaceExternalOpenCapabilitiesSnapshot

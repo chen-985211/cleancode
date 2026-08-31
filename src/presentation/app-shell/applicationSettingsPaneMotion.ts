@@ -3,8 +3,8 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from './motionSpring'
-import type { SpringProgressMotionFrameScheduler } from './springProgressMotion'
+} from '../shared/motion/motionSpring'
+import type { SpringProgressMotionFrameScheduler } from '../shared/motion/springProgressMotion'
 
 export type ApplicationSettingsPane = 'agents' | 'canvas' | 'shortcuts' | 'terminal'
 export type ApplicationSettingsPaneDirection = 'backward' | 'forward' | 'none'

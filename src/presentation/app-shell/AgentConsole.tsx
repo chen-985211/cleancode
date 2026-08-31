@@ -22,7 +22,7 @@ import { useAgentProviderState } from './useAgentProviderState'
 import { useAgentProviderNotifications } from './useAgentProviderNotifications'
 import { useAgentSessionAttachment } from './useAgentSessionAttachment'
 import { useAgentTerminalView } from './useAgentTerminalView'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { useOptionalNotifications } from './useNotifications'
 
 export function AgentConsole({

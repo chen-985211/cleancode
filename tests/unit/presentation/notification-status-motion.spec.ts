@@ -1,4 +1,4 @@
-import type { AppNotification } from '../../../src/presentation/app-shell/appNotifications'
+import type { AppNotification } from '../../../src/presentation/shared/notifications/appNotifications'
 import {
   completeNotificationStatusMotion,
   createNotificationStatusMotionState,

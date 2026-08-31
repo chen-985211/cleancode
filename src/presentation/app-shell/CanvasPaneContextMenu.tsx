@@ -11,7 +11,7 @@ import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTool
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface CanvasPaneContextMenuProps {

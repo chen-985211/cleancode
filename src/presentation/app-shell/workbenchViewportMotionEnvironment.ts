@@ -14,4 +14,4 @@ export const browserViewportMotionFrameScheduler: WorkbenchViewportMotionFrameSc
   requestTimeout: (callback, delayMilliseconds) => window.setTimeout(callback, delayMilliseconds)
 }
 
-export { prefersReducedMotion } from './motionPreference'
+export { prefersReducedMotion } from '../shared/motion/motionPreference'

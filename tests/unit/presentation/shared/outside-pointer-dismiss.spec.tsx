@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useCallback, useRef, useState } from 'react'
 
-import { useOutsidePointerDismiss } from '../../../src/presentation/app-shell/useOutsidePointerDismiss'
+import { useOutsidePointerDismiss } from '../../../../src/presentation/shared/hooks/useOutsidePointerDismiss'
 
 describe('outside pointer dismiss', () => {
   it('commits the closing state before passing the pointer to its target', () => {

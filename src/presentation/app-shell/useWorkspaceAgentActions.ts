@@ -8,8 +8,8 @@ import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
-import { useI18n } from './i18n/useI18n'
-import type { NotifyApp } from './appNotifications'
+import { useI18n } from '../i18n/useI18n'
+import type { NotifyApp } from '../shared/notifications/appNotifications'
 import type {
   WorkbenchNodeCreationCoordinator,
   WorkbenchNodeCreationReservation

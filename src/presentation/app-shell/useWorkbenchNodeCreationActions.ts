@@ -6,7 +6,7 @@ import {
   type BlockGraphSnapshot,
   type TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewport'
 import {

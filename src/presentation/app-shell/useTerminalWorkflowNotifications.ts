@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import type { AppNotificationController } from './appNotifications'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { createWorkflowRunNotification } from './terminalWorkflowNotifications'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 interface UseTerminalWorkflowNotificationsInput {
   readonly notifications: AppNotificationController

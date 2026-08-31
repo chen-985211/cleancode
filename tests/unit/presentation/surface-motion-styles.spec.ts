@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const surfaceMotionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/surface-motion.css'),
+  resolve(process.cwd(), 'src/presentation/shared/styles/surface-motion.css'),
   'utf8'
 )
 const languageSettingsStyles = readFileSync(

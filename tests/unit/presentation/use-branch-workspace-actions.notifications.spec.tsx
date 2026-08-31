@@ -4,10 +4,10 @@ import type { ReactNode } from 'react'
 import type {
   AppNotificationController,
   AppNotificationInput
-} from '../../../src/presentation/app-shell/appNotifications'
+} from '../../../src/presentation/shared/notifications/appNotifications'
 import { createExpectedAppError } from '../../../src/shared-kernel/application/errors/AppError'
-import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
-import { useI18n } from '../../../src/presentation/app-shell/i18n/useI18n'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { useI18n } from '../../../src/presentation/i18n/useI18n'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 import { useBranchWorkspaceActions } from '../../../src/presentation/app-shell/useBranchWorkspaceActions'
 import {

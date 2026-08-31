@@ -2,7 +2,7 @@ import {
   createSpringProgressMotionController,
   type SpringProgressMotionFrameScheduler,
   type SpringProgressMotionRoot
-} from '../../../src/presentation/app-shell/springProgressMotion'
+} from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('spring progress motion', () => {
   it('advances a visible surface with a critically damped spring without overshooting', () => {

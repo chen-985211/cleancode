@@ -1,8 +1,8 @@
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { terminalScrollbackOptions } from '../../contexts/run/presentation/view-models/terminalRuntimePreference'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
-import { useI18n } from './i18n/useI18n'
-import { useSelectionIndicatorMotion } from './useSelectionMotion'
+import { useI18n } from '../i18n/useI18n'
+import { useSelectionIndicatorMotion } from '../shared/hooks/useSelectionMotion'
 
 interface TerminalSettingsPaneProps {
   readonly scrollbackRows: TerminalScrollbackRows

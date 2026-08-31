@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import type { AppNotificationInput } from './appNotifications'
+import type { AppNotificationInput } from '../shared/notifications/appNotifications'
 import {
   completeAppMessageExit,
   createAppMessageStore,

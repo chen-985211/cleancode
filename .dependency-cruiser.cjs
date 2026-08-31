@@ -71,6 +71,14 @@ module.exports = {
         'UI depends on application contracts and view models, not infrastructure adapters directly.',
       from: { path: '^src/presentation/' },
       to: { path: '^src/contexts/[^/]+/infrastructure' }
+    },
+    {
+      name: 'context-presentation-must-not-depend-on-app-shell',
+      severity: 'error',
+      comment:
+        'Context-owned UI may depend on shared presentation, but not on App Shell internals.',
+      from: { path: '^src/contexts/[^/]+/presentation' },
+      to: { path: '^src/presentation/app-shell' }
     }
   ],
   options: {

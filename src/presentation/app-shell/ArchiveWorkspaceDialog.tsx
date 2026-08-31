@@ -1,7 +1,7 @@
 import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive'
 
 import { ProjectSidebarConfirmationDialog } from './ProjectSidebarConfirmationDialog'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 interface ArchiveWorkspaceDialogProps {
   readonly isCurrentWorkspace: boolean

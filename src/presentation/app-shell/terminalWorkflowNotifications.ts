@@ -3,8 +3,8 @@ import {
   createCanvasObjectIdentity,
   type CanvasObjectIdentity
 } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import type { AppNotificationInput } from './appNotifications'
-import { translate, type Translate } from './i18n/messages'
+import type { AppNotificationInput } from '../shared/notifications/appNotifications'
+import { translate, type Translate } from '../i18n/messages'
 
 export function createWorkflowFailureNotification(
   run: WorkflowRunSnapshot,

@@ -2,7 +2,7 @@ import type {
   AppNotification,
   AppNotificationIdentity,
   AppNotificationInput
-} from './appNotifications'
+} from '../shared/notifications/appNotifications'
 
 type AppMessagePhase = 'open' | 'closing' | 'hidden'
 

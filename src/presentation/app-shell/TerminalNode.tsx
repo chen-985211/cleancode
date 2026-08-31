@@ -12,7 +12,7 @@ import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
 import { TerminalServiceRuntimeBar } from './TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
-import { TooltipLabel } from './Tooltip'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import {
@@ -23,7 +23,7 @@ import {
   type TerminalViewState,
   type WorkbenchNodeLayoutInput
 } from './types'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { useTerminalState } from './terminalStateStore'

@@ -1,7 +1,7 @@
 import { memo, useContext, type KeyboardEvent, type MouseEvent, type SyntheticEvent } from 'react'
 
 import { MinimapNodeInteractionContext } from './minimapInteraction'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 interface MinimapWorkbenchNodeProps {
   readonly id: string

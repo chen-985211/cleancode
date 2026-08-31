@@ -9,7 +9,7 @@ import {
   type TransitionEventHandler
 } from 'react'
 
-import { motionPreferenceStore } from './motionPreference'
+import { motionPreferenceStore } from '../motion/motionPreference'
 import {
   completeSurfacePresenceMotion,
   createSurfacePresenceState,
@@ -17,7 +17,7 @@ import {
   type SurfaceMotionPhase,
   type SurfacePresenceInput,
   type SurfacePresenceState
-} from './surfacePresence'
+} from '../motion/surfacePresence'
 
 export interface SurfaceMotionPreferenceSource {
   readonly getSnapshot: () => boolean

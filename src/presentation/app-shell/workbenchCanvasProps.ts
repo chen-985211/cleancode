@@ -9,7 +9,7 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
-import type { AppNotificationController } from './appNotifications'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import type { ShortcutPlatform } from './applicationShortcuts'

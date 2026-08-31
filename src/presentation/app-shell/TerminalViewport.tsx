@@ -24,7 +24,7 @@ import { bindTerminalSurfaceAttachmentIdentity } from './terminalSurfaceAttachme
 import { readTerminalSourceTheme } from './terminalTheme'
 import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
 import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import {
   TerminalPasteController,
   analyzeTerminalPaste,

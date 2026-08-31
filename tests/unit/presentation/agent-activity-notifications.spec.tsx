@@ -7,9 +7,9 @@ import type {
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { AgentActivityObserver } from '../../../src/presentation/app-shell/AgentActivityObserver'
 import type { AgentActivityNavigationTarget } from '../../../src/presentation/app-shell/agentActivityNavigation'
-import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
-import { translate } from '../../../src/presentation/app-shell/i18n/messages'
-import { useI18n } from '../../../src/presentation/app-shell/i18n/useI18n'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { translate } from '../../../src/presentation/i18n/messages'
+import { useI18n } from '../../../src/presentation/i18n/useI18n'
 import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
 import { useAgentActivitySnapshots } from '../../../src/presentation/app-shell/useAgentActivitySnapshots'
 

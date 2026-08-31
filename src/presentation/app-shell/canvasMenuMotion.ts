@@ -3,7 +3,7 @@ import {
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
 } from './workbenchViewportSpring'
-import { retargetSpringAxis } from './motionSpring'
+import { retargetSpringAxis } from '../shared/motion/motionSpring'
 
 type CanvasMenuMotionPhase = 'closed' | 'closing' | 'open' | 'opening'
 

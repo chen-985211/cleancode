@@ -1,8 +1,8 @@
 import {
   createSurfaceSpringMotionController,
   type SurfaceSpringMotionRoot
-} from '../../../src/presentation/app-shell/surfaceSpringMotion'
-import type { SpringProgressMotionFrameScheduler } from '../../../src/presentation/app-shell/springProgressMotion'
+} from '../../../../src/presentation/shared/motion/surfaceSpringMotion'
+import type { SpringProgressMotionFrameScheduler } from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('surface spring motion', () => {
   it.each([

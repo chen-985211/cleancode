@@ -1,4 +1,4 @@
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
 
 export function CanvasSettingsPane({

@@ -6,13 +6,13 @@ import type {
 } from '../../application/dto/WorkspaceExternalOpen'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
-import { resolveUserFacingErrorMessage } from '../../../../presentation/app-shell/appErrorMessages'
+import { resolveUserFacingErrorMessage } from '../../../../presentation/shared/errors/appErrorMessages'
 import type {
   AppNotificationController,
   AppNotificationInput
-} from '../../../../presentation/app-shell/appNotifications'
-import type { Translate } from '../../../../presentation/app-shell/i18n/messages'
-import { useI18n } from '../../../../presentation/app-shell/i18n/useI18n'
+} from '../../../../presentation/shared/notifications/appNotifications'
+import type { Translate } from '../../../../presentation/i18n/messages'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 type CurrentWorkspace = ProjectSnapshot['workspaces'][number]
 

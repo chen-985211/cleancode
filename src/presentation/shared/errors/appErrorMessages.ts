@@ -1,5 +1,8 @@
-import { getAppErrorCode, type AppErrorCode } from '../../shared-kernel/application/errors/AppError'
-import { translate, type MessageKey, type Translate } from './i18n/messages'
+import {
+  getAppErrorCode,
+  type AppErrorCode
+} from '../../../shared-kernel/application/errors/AppError'
+import { translate, type MessageKey, type Translate } from '../../i18n/messages'
 
 const userFacingMessageKeys: Partial<Record<AppErrorCode, MessageKey>> = {
   BLOCK_GRAPH_SNAPSHOT_CORRUPTED: 'error.BLOCK_GRAPH_SNAPSHOT_CORRUPTED',

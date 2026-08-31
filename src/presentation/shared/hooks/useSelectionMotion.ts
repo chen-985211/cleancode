@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   createSelectionFeedbackMotionController,
   createSelectionIndicatorMotionController
-} from './selectionMotion'
+} from '../motion/selectionMotion'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 type ElementRefCallback = (element: HTMLElement | null) => void

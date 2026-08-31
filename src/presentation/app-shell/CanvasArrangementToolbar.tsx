@@ -1,6 +1,6 @@
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
+import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { TooltipLabel } from './Tooltip'
+import { TooltipLabel } from '../shared/components/Tooltip'
 
 export function CanvasArrangementToolbar({
   canArrange,

@@ -8,8 +8,8 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import { createBlockTemplate } from '../../contexts/block-graph/domain/services/BlockTemplateProjection'
-import { useI18n } from './i18n/useI18n'
-import { OverlaySurfaceMotion } from './SurfaceMotion'
+import { useI18n } from '../i18n/useI18n'
+import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
 
 export function BlockTemplateSaveDialog({
   graph,

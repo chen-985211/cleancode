@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
-import { localePreferenceStorageKey } from '../../../src/presentation/app-shell/i18n/localePreference'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { localePreferenceStorageKey } from '../../../src/presentation/i18n/localePreference'
 import { LanguageSettingsRoot } from '../../../src/presentation/app-shell/LanguageSettingsRoot'
 import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/ThemeSettingsRoot'
 import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'

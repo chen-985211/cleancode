@@ -1,6 +1,6 @@
-import type { NotifyApp } from './appNotifications'
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
-import { translate, type Translate } from './i18n/messages'
+import type { NotifyApp } from '../shared/notifications/appNotifications'
+import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
+import { translate, type Translate } from '../i18n/messages'
 
 export function notifyTerminalLaunchFailure(
   notify: NotifyApp,

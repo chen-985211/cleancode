@@ -31,9 +31,9 @@ import {
   applicationShortcutCommandMessageKeys,
   createApplicationShortcutTooltipLabels
 } from './applicationShortcutTooltips'
-import { useI18n } from './i18n/useI18n'
-import { OverlaySurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalSettingsPane } from './TerminalSettingsPane'
 import { AgentSettingsPane } from './AgentSettingsPane'
@@ -44,7 +44,10 @@ import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
 import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
-import { useSelectionFeedbackMotion, useSelectionIndicatorMotion } from './useSelectionMotion'
+import {
+  useSelectionFeedbackMotion,
+  useSelectionIndicatorMotion
+} from '../shared/hooks/useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'

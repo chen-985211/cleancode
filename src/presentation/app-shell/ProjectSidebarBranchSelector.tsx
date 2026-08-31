@@ -4,9 +4,9 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGl
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { useLayoutEffect, useState, type RefObject } from 'react'
 
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
+import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
 import type { WorkbenchSnapshot } from './types'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 type GitBranchNavigationItem = WorkbenchSnapshot['gitBranches'][number]
 

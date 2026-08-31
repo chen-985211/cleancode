@@ -12,7 +12,7 @@ import type {
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
 } from './agentToolApprovalTypes'
-import { translate, type Translate } from './i18n/messages'
+import { translate, type Translate } from '../i18n/messages'
 
 interface AgentApprovalPresentationBase {
   readonly agentNodeId: string

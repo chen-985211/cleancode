@@ -11,7 +11,7 @@ import {
   type ExecutionConfigDraft
 } from './terminalExecutionConfigDraft'
 import type { TerminalBlockMetadataInput } from './types'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalMetadataFormProps {

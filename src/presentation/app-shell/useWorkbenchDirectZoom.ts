@@ -11,7 +11,7 @@ import {
   cancelWorkbenchViewportMotion,
   setWorkbenchViewportReducedMotion
 } from './workbenchViewportMotion'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 interface WorkbenchWheelZoomInput {
   readonly ctrlKey: boolean

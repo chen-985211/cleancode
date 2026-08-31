@@ -22,7 +22,7 @@ import { WorkbenchToolbar } from './WorkbenchToolbar'
 import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import { createWorkbenchObjectMotionEdgeProjector } from './workbenchObjectMotion'
 import { useWorkbenchNodes } from './workbenchNodeStore'
 import { LiveBlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
@@ -59,7 +59,7 @@ import {
 } from './workbenchCanvasInteractionTargets'
 import { useWorkbenchCanvasViewportRestoration } from './useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchCanvasProps } from './workbenchCanvasProps'
-import { ignoreAppNotifications } from './appNotifications'
+import { ignoreAppNotifications } from '../shared/notifications/appNotifications'
 import {
   createWorkbenchCanvasViewportStore,
   useWorkbenchCanvasDetailLevel

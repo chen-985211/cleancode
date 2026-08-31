@@ -4,7 +4,7 @@ import {
   retargetSpringAxis,
   type SpringAxis,
   type SpringDynamics
-} from '../../../src/presentation/app-shell/motionSpring'
+} from '../../../../src/presentation/shared/motion/motionSpring'
 
 describe('presentation spring motion', () => {
   it.each([

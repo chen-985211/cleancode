@@ -1,5 +1,5 @@
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { translate, type Translate } from './i18n/messages'
+import { translate, type Translate } from '../i18n/messages'
 
 type TerminalServicePortPolicy = NonNullable<
   Extract<TerminalExecutionConfigSnapshot, { mode: 'service' }>['port']

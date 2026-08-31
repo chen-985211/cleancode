@@ -26,9 +26,9 @@ import { takeTerminalStartupOutput, type TerminalInputBuffer } from './terminalS
 import { dismissTerminalPortConflict } from './terminalServiceRunProjection'
 import { useTerminalSessionEvents } from './useTerminalSessionEvents'
 import { useTerminalSessionRetention } from './useTerminalSessionRetention'
-import type { NotifyApp } from './appNotifications'
+import type { NotifyApp } from '../shared/notifications/appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
-import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
 import { TerminalWorkloadScheduler } from './terminalWorkloadScheduler'
@@ -38,7 +38,7 @@ import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention
 } from './terminalRetentionInheritance'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import {
   applyTerminalSessionSnapshot,
   applyTerminalSessionStatusSnapshot,

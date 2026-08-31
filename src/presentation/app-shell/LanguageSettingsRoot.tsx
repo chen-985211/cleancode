@@ -2,10 +2,10 @@ import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
-import { useI18n } from './i18n/useI18n'
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
-import { supportedLocales, type Locale } from './i18n/locale'
+import { useI18n } from '../i18n/useI18n'
+import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
+import { supportedLocales, type Locale } from '../i18n/locale'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {

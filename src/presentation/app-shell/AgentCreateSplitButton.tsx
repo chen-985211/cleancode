@@ -14,9 +14,9 @@ import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/applic
 import { createAgentCreateMenuHighlightMotionController } from './agentCreateMenuHighlightMotion'
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { CanvasMenuSurface } from './CanvasMenuMotionProvider'
-import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { useI18n } from '../i18n/useI18n'
+import { TooltipLabel } from '../shared/components/Tooltip'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface AgentCreateSplitButtonProps {

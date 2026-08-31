@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { createMinimapPanelMotionController } from './minimapPanelMotion'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
-import { useSurfaceMotionPresence } from './useSurfaceMotionPresence'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
+import { useSurfaceMotionPresence } from '../shared/hooks/useSurfaceMotionPresence'
 
 export function useMinimapPanelMotion(expanded: boolean) {
   const rootRef = useRef<HTMLDivElement | null>(null)

@@ -10,12 +10,12 @@ import {
 } from 'react'
 
 import type { ThemePreference } from './themePreference'
-import { useI18n } from './i18n/useI18n'
-import { OverlaySurfaceMotion } from './SurfaceMotion'
-import { TooltipLabel } from './Tooltip'
+import { useI18n } from '../i18n/useI18n'
+import { OverlaySurfaceMotion } from './AppShellSurfaceMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
 import { useThemePreference } from './useThemePreference'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
-import { useSelectionFeedbackMotion } from './useSelectionMotion'
+import { useSelectionFeedbackMotion } from '../shared/hooks/useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']

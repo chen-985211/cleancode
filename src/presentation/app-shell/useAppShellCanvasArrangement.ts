@@ -2,7 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import { useCanvasArrangementActions } from './useCanvasArrangementActions'
 

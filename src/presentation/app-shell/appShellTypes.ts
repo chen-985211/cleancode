@@ -2,7 +2,7 @@ import type {
   AgentActivityNavigationRequest,
   AgentActivityNavigationTarget
 } from './agentActivityNavigation'
-import type { AppNotificationController } from './appNotifications'
+import type { AppNotificationController } from '../shared/notifications/appNotifications'
 
 export interface AppShellProps {
   readonly agentActivityNavigationRequest?: AgentActivityNavigationRequest | null

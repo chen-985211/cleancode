@@ -3,7 +3,7 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from './motionSpring'
+} from '../shared/motion/motionSpring'
 
 export interface MinimapPanelMotionRoot {
   readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>

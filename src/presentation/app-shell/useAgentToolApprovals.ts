@@ -19,8 +19,8 @@ import type {
 } from './agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from './types'
 import { transitionWorkbenchViewport } from './workbenchViewportMotion'
-import { useI18n } from './i18n/useI18n'
-import type { Translate } from './i18n/messages'
+import { useI18n } from '../i18n/useI18n'
+import type { Translate } from '../i18n/messages'
 
 interface UseAgentToolApprovalsInput {
   readonly graph: BlockGraphSnapshot | null

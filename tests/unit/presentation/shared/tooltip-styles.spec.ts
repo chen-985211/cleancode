@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const tooltipStyles = readFileSync(
-  join(process.cwd(), 'src/presentation/app-shell/styles/tooltips.css'),
+  join(process.cwd(), 'src/presentation/shared/styles/tooltips.css'),
   'utf8'
 )
 

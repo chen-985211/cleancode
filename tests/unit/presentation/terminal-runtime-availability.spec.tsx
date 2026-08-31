@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../../src/contexts/run/application/dto/TerminalRuntimeAvailability'
-import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
+import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
 import { useTerminalRuntimeAvailability } from '../../../src/presentation/app-shell/useTerminalRuntimeAvailability'
 
 describe('terminal runtime availability', () => {

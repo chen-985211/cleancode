@@ -14,7 +14,7 @@ import {
   resolveDirectProjectOffset,
   resolveProjectReorderPreviewOffsets
 } from './projectReorderMotion'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 const projectDragThreshold = 4
 

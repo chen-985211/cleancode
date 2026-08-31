@@ -6,7 +6,7 @@ import {
   TooltipLabel,
   TooltipProvider,
   TooltipTrigger
-} from '../../../src/presentation/app-shell/Tooltip'
+} from '../../../../src/presentation/shared/components/Tooltip'
 
 describe('tooltip', () => {
   it('portals a non-interactive label while preserving the trigger semantics', async () => {

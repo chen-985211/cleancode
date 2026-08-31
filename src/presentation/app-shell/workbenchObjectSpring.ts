@@ -3,7 +3,7 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from './motionSpring'
+} from '../shared/motion/motionSpring'
 import type { WorkbenchObjectMotion } from './types'
 
 export interface WorkbenchObjectSpringSurface {

@@ -1,4 +1,4 @@
-import type { AppNotification } from './appNotifications'
+import type { AppNotification } from '../shared/notifications/appNotifications'
 
 export interface NotificationStatusMotionInput {
   readonly notification: AppNotification

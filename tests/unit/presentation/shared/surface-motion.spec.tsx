@@ -4,8 +4,8 @@ import {
   AnchoredSurfaceMotion,
   OverlaySurfaceMotion,
   type SurfaceMotionPreferenceSource
-} from '../../../src/presentation/app-shell/SurfaceMotion'
-import { useSurfaceMotionPresence } from '../../../src/presentation/app-shell/useSurfaceMotionPresence'
+} from '../../../../src/presentation/shared/components/SurfaceMotion'
+import { useSurfaceMotionPresence } from '../../../../src/presentation/shared/hooks/useSurfaceMotionPresence'
 
 describe('surface motion', () => {
   it('keeps one anchored DOM surface through close and reverse, then removes it after exit', () => {

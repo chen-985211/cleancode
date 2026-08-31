@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
-import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
 
 export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: string) => void) {
   const [isOpen, setIsOpen] = useState(false)

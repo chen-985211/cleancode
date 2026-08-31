@@ -8,7 +8,7 @@ import type { useAgentCreationProviders } from './useAgentCreationProviders'
 import type { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 import type { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
 import type { useBlockTemplateActions } from './useBlockTemplateActions'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export function AppShellSettings({

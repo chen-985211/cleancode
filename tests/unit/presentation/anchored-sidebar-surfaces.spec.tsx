@@ -3,7 +3,7 @@ import { useRef } from 'react'
 
 import { BranchSelectorPopover } from '../../../src/presentation/app-shell/ProjectSidebarBranchSelector'
 import { ProjectSidebarProjectRemovalPopover } from '../../../src/presentation/app-shell/ProjectSidebarProjectRemovalPopover'
-import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 
 describe('anchored sidebar surfaces', () => {
   it('retains the branch selector as an inert closing surface', () => {

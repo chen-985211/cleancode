@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 import { isApplicationQuitRequest } from '../../platform/ipc/applicationQuitChannels'
-import { useI18n } from './i18n/useI18n'
+import { useI18n } from '../i18n/useI18n'
 
 export function ApplicationQuitConfirmationBridge() {
   const { t } = useI18n()

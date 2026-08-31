@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { CanvasArrangementToolbar } from '../../../src/presentation/app-shell/CanvasArrangementToolbar'
-import { TooltipProvider } from '../../../src/presentation/app-shell/Tooltip'
+import { TooltipProvider } from '../../../src/presentation/shared/components/Tooltip'
 
 describe('canvas arrangement toolbar', () => {
   it('keeps the arrangement surface inert through exit and reuses it when selection returns', () => {

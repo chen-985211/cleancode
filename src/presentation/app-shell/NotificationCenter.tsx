@@ -13,8 +13,8 @@ import type {
   AppNotification,
   AppNotificationKind,
   AppNotificationSource
-} from './appNotifications'
-import { useI18n } from './i18n/useI18n'
+} from '../shared/notifications/appNotifications'
+import { useI18n } from '../i18n/useI18n'
 import {
   completeNotificationStatusMotion,
   createNotificationStatusMotionState,
@@ -22,10 +22,10 @@ import {
   type NotificationStatusMotionLayer,
   type NotificationStatusMotionState
 } from './notificationStatusMotion'
-import { TooltipLabel } from './Tooltip'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { TooltipLabel } from '../shared/components/Tooltip'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 import { useNotificationStatusIconSpring } from './useNotificationStatusIconSpring'
-import { useSurfaceMotionPresence } from './useSurfaceMotionPresence'
+import { useSurfaceMotionPresence } from '../shared/hooks/useSurfaceMotionPresence'
 
 interface AppNotificationPresentation {
   readonly exitToken: number

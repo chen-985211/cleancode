@@ -7,7 +7,7 @@ import {
   type ApplicationSettingsPane,
   type ApplicationSettingsPaneDirection
 } from './applicationSettingsPaneMotion'
-import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 interface ApplicationSettingsPaneTransitionProps {
   readonly activePane: ApplicationSettingsPane

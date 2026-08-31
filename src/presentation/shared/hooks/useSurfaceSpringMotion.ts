@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, type RefObject } from 'react'
 import {
   createSurfaceSpringMotionController,
   type SurfaceSpringPreset
-} from './surfaceSpringMotion'
+} from '../motion/surfaceSpringMotion'
 import type { SurfaceMotionPresence } from './useSurfaceMotionPresence'
 
 export function useSurfaceSpringMotion(

@@ -108,6 +108,15 @@ src/
 - App Shell 继续消费 Run Presentation 暴露的偏好读写能力。
 - 完成提交：`b9e321aa refactor(run): move terminal preference into context`。
 
+### 根级共享 Presentation 基础
+
+- `i18n/**` 已从 App Shell 提升到 `src/presentation/i18n`。
+- Tooltip、Surface、outside-pointer、reduced-motion、selection motion 和 surface motion 已迁入 `src/presentation/shared`，并按 `components`、`hooks`、`motion`、`styles` 划分。
+- 用户可见错误解析和通知契约已迁入根级共享 Presentation；通知 Store、Provider 和 Center 仍由 App Shell 拥有。
+- `SurfaceMotion` 不再理解 Project Sidebar 或 Workbench DOM；`AppShellSurfaceMotion` 适配器显式提供 App Shell 的 isolation target。
+- 混合的 `selection-motion.css` 只迁移通用 indicator，Settings、Project、Terminal 和 Shortcut 专属选择器继续留给后续 owner 批次。
+- dependency-cruiser 已禁止 `src/contexts/*/presentation` 反向依赖 `src/presentation/app-shell`。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -372,12 +381,16 @@ ViewModel、策略和交互：
 
 ### 阶段 1：共享 Presentation 基础
 
+状态：已完成（2026-08-31）。
+
 目标：消除上下文 Presentation 对 `app-shell` 通用组件的反向依赖。
 
 - 建立 `src/presentation/shared/{components,hooks,motion,styles}`。
 - 迁移 Tooltip、Surface、Selection、reduced-motion 和 outside-pointer 等稳定能力。
 - 把 `i18n` 提升到 `src/presentation/i18n`。
 - 保持组件 API、CSS class、焦点和动效结果不变。
+
+实施中确认 `ApplicationSettingsSwitch`、通知 UI、Theme/Language Settings Root 和快捷键仍表达应用级设置或装配语义，因此未机械迁入 shared；它们将在对应 App Shell 收口批次重新判断。Context Presentation → App Shell 的禁止规则已经提前落地，不再等到阶段 8。
 
 最低验证：相关 Presentation Unit、样式门禁、i18n 门禁、typecheck、dependency-cruiser、完整 `pre-commit`。
 

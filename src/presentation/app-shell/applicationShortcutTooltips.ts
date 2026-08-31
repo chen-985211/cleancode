@@ -5,7 +5,7 @@ import {
   type ApplicationShortcutCommand,
   type ShortcutPlatform
 } from './applicationShortcuts'
-import type { MessageKey, Translate } from './i18n/messages'
+import type { MessageKey, Translate } from '../i18n/messages'
 
 export const applicationShortcutCommandMessageKeys: Readonly<
   Record<ApplicationShortcutCommand, MessageKey>

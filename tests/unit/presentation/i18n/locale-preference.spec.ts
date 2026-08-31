@@ -3,8 +3,8 @@ import {
   localePreferenceStorageKey,
   readLocalePreference,
   resolveInitialLocale
-} from '../../../src/presentation/app-shell/i18n/localePreference'
-import { localeCatalogs } from '../../../src/presentation/app-shell/i18n/messages'
+} from '../../../../src/presentation/i18n/localePreference'
+import { localeCatalogs } from '../../../../src/presentation/i18n/messages'
 
 describe('locale preference', () => {
   beforeEach(() => {

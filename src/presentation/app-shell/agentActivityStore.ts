@@ -3,7 +3,7 @@ import type {
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
 } from '../../contexts/agent/application/dto/AgentActivityProtocol'
-import type { AppNotificationIdentity } from './appNotifications'
+import type { AppNotificationIdentity } from '../shared/notifications/appNotifications'
 import {
   createCanvasObjectIdentity,
   type CanvasObjectIdentity
