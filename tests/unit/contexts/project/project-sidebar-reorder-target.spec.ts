@@ -1,5 +1,5 @@
-import { resolveProjectReorderTarget } from '../../../src/presentation/app-shell/useProjectSidebarReorder'
-import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
+import { resolveProjectReorderTarget } from '../../../../src/contexts/project/presentation/view-models/useProjectSidebarReorder'
+import { createWorkbenchSnapshot } from '../../../fixtures/presentation/appShellFixtures'
 
 describe('project sidebar reorder target', () => {
   const workbenches = [

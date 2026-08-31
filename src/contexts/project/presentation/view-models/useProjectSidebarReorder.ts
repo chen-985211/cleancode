@@ -8,13 +8,13 @@ import {
   type PointerEvent as ReactPointerEvent
 } from 'react'
 
-import type { WorkbenchSnapshot } from './types'
 import {
   createProjectReorderSpringController,
   resolveDirectProjectOffset,
   resolveProjectReorderPreviewOffsets
-} from './projectReorderMotion'
-import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
+} from '../motion/projectReorderMotion'
+import { usePrefersReducedMotion } from '../../../../presentation/shared/hooks/usePrefersReducedMotion'
+import type { ProjectWorkbenchViewModel } from './ProjectWorkbenchViewModel'
 
 const projectDragThreshold = 4
 
@@ -23,10 +23,10 @@ interface ProjectDragState {
   readonly dropIndicatorY: number | null
 }
 
-interface ProjectDragSession {
+interface ProjectDragSession<TWorkbench extends ProjectWorkbenchViewModel> {
   readonly pointerId: number
   readonly source: HTMLElement
-  readonly workbench: WorkbenchSnapshot
+  readonly workbench: TWorkbench
   readonly startX: number
   readonly startY: number
   readonly startCardTop: number
@@ -38,15 +38,12 @@ interface PendingProjectReorder {
   sawPending: boolean
 }
 
-interface UseProjectSidebarReorderInput {
+interface UseProjectSidebarReorderInput<TWorkbench extends ProjectWorkbenchViewModel> {
   readonly canReorder: boolean
   readonly getProjectList: () => HTMLElement | null
   readonly isReorderPending: boolean
-  readonly onReorderProject: (
-    workbench: WorkbenchSnapshot,
-    beforeProjectDirectory: string | null
-  ) => void
-  readonly workbenches: readonly WorkbenchSnapshot[]
+  readonly onReorderProject: (workbench: TWorkbench, beforeProjectDirectory: string | null) => void
+  readonly workbenches: readonly TWorkbench[]
 }
 
 interface ProjectCardRect {
@@ -55,13 +52,13 @@ interface ProjectCardRect {
   readonly bottom: number
 }
 
-export function useProjectSidebarReorder({
+export function useProjectSidebarReorder<TWorkbench extends ProjectWorkbenchViewModel>({
   canReorder,
   getProjectList,
   isReorderPending,
   onReorderProject,
   workbenches
-}: UseProjectSidebarReorderInput) {
+}: UseProjectSidebarReorderInput<TWorkbench>) {
   const [state, setState] = useState<ProjectDragState>({
     draggingProjectId: null,
     dropIndicatorY: null
@@ -69,7 +66,7 @@ export function useProjectSidebarReorder({
   const [isSessionArmed, setIsSessionArmed] = useState(false)
   const controller = useMemo(() => createProjectReorderSpringController(), [])
   const reducedMotion = usePrefersReducedMotion()
-  const sessionRef = useRef<ProjectDragSession | null>(null)
+  const sessionRef = useRef<ProjectDragSession<TWorkbench> | null>(null)
   const pendingReorderRef = useRef<PendingProjectReorder | null>(null)
   const pendingFallbackFrameRef = useRef<number | null>(null)
   const latestDropIndexRef = useRef<number | null>(null)
@@ -352,7 +349,7 @@ export function useProjectSidebarReorder({
   }, [state.draggingProjectId])
 
   const onProjectPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>, workbench: WorkbenchSnapshot) => {
+    (event: ReactPointerEvent<HTMLElement>, workbench: TWorkbench) => {
       if (!canReorder || event.button !== 0 || workbenchesRef.current.length <= 1) {
         return
       }
@@ -426,8 +423,8 @@ function resolveDropIndicatorY(
   return viewportY - listTop + projectList.scrollTop
 }
 
-export function resolveProjectReorderTarget(
-  workbenches: readonly WorkbenchSnapshot[],
+export function resolveProjectReorderTarget<TWorkbench extends ProjectWorkbenchViewModel>(
+  workbenches: readonly TWorkbench[],
   projectDirectory: string,
   dropIndex: number
 ): string | null | undefined {

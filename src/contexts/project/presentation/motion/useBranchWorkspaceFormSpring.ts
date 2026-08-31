@@ -3,9 +3,9 @@ import { useEffect, useLayoutEffect, useMemo, type RefObject } from 'react'
 import {
   createSpringProgressMotionController,
   type SpringProgressMotionRoot
-} from '../shared/motion/springProgressMotion'
-import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
-import { useSurfaceMotionPresence } from '../shared/hooks/useSurfaceMotionPresence'
+} from '../../../../presentation/shared/motion/springProgressMotion'
+import { usePrefersReducedMotion } from '../../../../presentation/shared/hooks/usePrefersReducedMotion'
+import { useSurfaceMotionPresence } from '../../../../presentation/shared/hooks/useSurfaceMotionPresence'
 
 const opacityProperty = '--branch-workspace-motion-opacity'
 const translationProperty = '--branch-workspace-motion-y'

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-import { ProjectSidebar } from '../../../src/presentation/app-shell/ProjectSidebar'
-import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
+import { ProjectSidebar } from '../../../../src/contexts/project/presentation/components/ProjectSidebar'
+import { createWorkbenchSnapshot } from '../../../fixtures/presentation/appShellFixtures'
 
 describe('project sidebar navigation semantics', () => {
   it('moves one shared selection material between workspaces while semantic selection updates immediately', () => {

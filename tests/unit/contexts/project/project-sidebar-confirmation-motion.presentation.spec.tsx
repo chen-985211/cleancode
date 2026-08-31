@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 
-import { ProjectSidebarConfirmationDialog } from '../../../src/presentation/app-shell/ProjectSidebarConfirmationDialog'
-import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { ProjectSidebarConfirmationDialog } from '../../../../src/contexts/project/presentation/components/ProjectSidebarConfirmationDialog'
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
 
 describe('project sidebar confirmation motion', () => {
   it('keeps modal content mounted and inert through the closing phase', () => {

@@ -2,14 +2,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const shellStyles = readStyle('base.css')
-const sidebarStyles = readStyle('project-sidebar.css')
+const sidebarStyles = readProjectStyle('project-sidebar.css')
+const sidebarLayoutStyles = readStyle('project-sidebar-layout.css')
 const titlebarStyles = readStyle('project-sidebar-titlebar.css')
 const canvasStyles = readStyle('workbench-canvas.css')
 
 describe('project sidebar motion styles', () => {
   it('keeps the application layout stable while motion is running on compositor surfaces', () => {
     const shellRule = readRule(shellStyles, '.app-shell')
-    const sidebarColumnRule = readRule(sidebarStyles, '.project-sidebar-column')
+    const sidebarColumnRule = readRule(sidebarLayoutStyles, '.project-sidebar-column')
     const spatialRule = readRule(canvasStyles, '.workbench-canvas__spatial-motion-surface')
     const expandedSpatialRule = readRule(
       canvasStyles,
@@ -97,6 +98,13 @@ describe('project sidebar motion styles', () => {
 
 function readStyle(fileName: string): string {
   return readFileSync(resolve(process.cwd(), 'src/presentation/app-shell/styles', fileName), 'utf8')
+}
+
+function readProjectStyle(fileName: string): string {
+  return readFileSync(
+    resolve(process.cwd(), 'src/contexts/project/presentation/styles', fileName),
+    'utf8'
+  )
 }
 
 function readRule(styles: string, selector: string): string {

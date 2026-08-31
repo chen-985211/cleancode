@@ -20,7 +20,7 @@ const reactFlowProps = vi.hoisted(() => ({
 }))
 const appShellRenderStats = vi.hoisted(() => ({ sidebarRenderCount: 0 }))
 
-vi.mock('../../../src/presentation/app-shell/ProjectSidebar', async () => {
+vi.mock('../../../src/contexts/project/presentation/components/ProjectSidebar', async () => {
   const React = await import('react')
 
   return {

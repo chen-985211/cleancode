@@ -9,15 +9,14 @@ import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
 import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspaceForm'
 import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
-import type { WorkbenchSnapshot } from './types'
-import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
-import { useI18n } from '../i18n/useI18n'
-import { useProjectSidebarReorder } from './useProjectSidebarReorder'
-import { useSelectionIndicatorMotion } from '../shared/hooks/useSelectionMotion'
-import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
-import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
-import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
+import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hooks/useSelectionMotion'
+import type { ProjectWorkbenchViewModel } from '../view-models/ProjectWorkbenchViewModel'
+import { useProjectSidebarBranchWorkspaceForm } from '../view-models/useProjectSidebarBranchWorkspaceForm'
+import { useProjectSidebarReorder } from '../view-models/useProjectSidebarReorder'
 
 export interface ProjectSidebarIntent {
   readonly id: number
@@ -25,35 +24,34 @@ export interface ProjectSidebarIntent {
   readonly type: 'createBranchWorkspace' | 'revealProject'
 }
 
-interface ProjectSidebarProps {
-  readonly workbenches: readonly WorkbenchSnapshot[]
-  readonly currentWorkbench: WorkbenchSnapshot | null
+interface ProjectSidebarShortcutTooltips {
+  readonly addProject: string
+  readonly createBranchWorkspace: string
+}
+
+interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
+  readonly workbenches: readonly TWorkbench[]
+  readonly currentWorkbench: TWorkbench | null
   readonly isCollapsed?: boolean
   readonly isDesktopRuntime: boolean
   readonly motionSurfaceRef?: Ref<HTMLDivElement>
   readonly isReorderPending?: boolean
   readonly intent?: ProjectSidebarIntent | null
-  readonly shortcutTooltips?: Pick<
-    ApplicationShortcutTooltipLabels,
-    'addProject' | 'createBranchWorkspace'
-  >
+  readonly shortcutTooltips?: ProjectSidebarShortcutTooltips
   readonly onAddProject: () => void
   readonly onArchiveBranchWorkspace: (
-    workbench: WorkbenchSnapshot,
+    workbench: TWorkbench,
     workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
-  readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
-  readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
-  readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
-  readonly onReorderProject: (
-    workbench: WorkbenchSnapshot,
-    beforeProjectDirectory: string | null
-  ) => void
-  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
+  readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
+  readonly onCreateBranchWorkspace: (workbench: TWorkbench, branchName: string) => void
+  readonly onRemoveProject: (workbench: TWorkbench) => void
+  readonly onReorderProject: (workbench: TWorkbench, beforeProjectDirectory: string | null) => void
+  readonly onSelectWorkspace: (workbench: TWorkbench, workspaceId: string) => void
 }
 
-export function ProjectSidebar({
+export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
   workbenches,
   currentWorkbench,
   isCollapsed = false,
@@ -69,7 +67,7 @@ export function ProjectSidebar({
   onRemoveProject,
   onReorderProject,
   onSelectWorkspace
-}: ProjectSidebarProps) {
+}: ProjectSidebarProps<TWorkbench>) {
   const { t } = useI18n()
   const addProjectTooltip = shortcutTooltips?.addProject ?? t('sidebar.addProject')
   const createBranchWorkspaceTooltip =
@@ -153,35 +151,35 @@ export function ProjectSidebar({
   )
 }
 
-interface ProjectCardProps {
-  readonly workbench: WorkbenchSnapshot
-  readonly currentWorkbench: WorkbenchSnapshot | null
+interface ProjectCardProps<TWorkbench extends ProjectWorkbenchViewModel> {
+  readonly workbench: TWorkbench
+  readonly currentWorkbench: TWorkbench | null
   readonly onArchiveBranchWorkspace: (
-    workbench: WorkbenchSnapshot,
+    workbench: TWorkbench,
     workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
-  readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
-  readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
-  readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
+  readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
+  readonly onCreateBranchWorkspace: (workbench: TWorkbench, branchName: string) => void
+  readonly onRemoveProject: (workbench: TWorkbench) => void
   readonly isDragging: boolean
   readonly canReorder: boolean
   readonly intent: ProjectSidebarIntent | null
   readonly createBranchWorkspaceTooltip: string
   readonly onProjectPointerDown: (
     event: React.PointerEvent<HTMLElement>,
-    workbench: WorkbenchSnapshot
+    workbench: TWorkbench
   ) => void
-  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
+  readonly onSelectWorkspace: (workbench: TWorkbench, workspaceId: string) => void
 }
 
-interface ArchiveWorkspacePresentation {
-  readonly branch: WorkbenchSnapshot['gitBranches'][number] | null
+interface ArchiveWorkspacePresentation<TWorkbench extends ProjectWorkbenchViewModel> {
+  readonly branch: TWorkbench['gitBranches'][number] | null
   readonly open: boolean
-  readonly workspace: WorkbenchSnapshot['project']['workspaces'][number]
+  readonly workspace: TWorkbench['project']['workspaces'][number]
 }
 
-function ProjectCard({
+function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
   workbench,
   currentWorkbench,
   onArchiveBranchWorkspace,
@@ -194,7 +192,7 @@ function ProjectCard({
   createBranchWorkspaceTooltip,
   onProjectPointerDown,
   onSelectWorkspace
-}: ProjectCardProps) {
+}: ProjectCardProps<TWorkbench>) {
   const { t } = useI18n()
   const isCurrentProject = currentWorkbench?.project.id === workbench.project.id
   const currentWorkspaceId = isCurrentProject
@@ -207,7 +205,7 @@ function ProjectCard({
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null)
   const [archivePresentation, setArchivePresentation] =
-    useState<ArchiveWorkspacePresentation | null>(null)
+    useState<ArchiveWorkspacePresentation<TWorkbench> | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorPopoverRef = useRef<HTMLDivElement>(null)

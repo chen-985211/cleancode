@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
-import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
-import { useI18n } from '../i18n/useI18n'
-import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 interface ProjectSidebarProjectRemovalPopoverProps {
   readonly open: boolean

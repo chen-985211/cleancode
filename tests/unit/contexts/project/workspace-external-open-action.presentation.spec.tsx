@@ -1,18 +1,18 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
-import { useWorkspaceExternalOpen } from '../../../src/contexts/project/presentation/view-models/useWorkspaceExternalOpen'
+import { useWorkspaceExternalOpen } from '../../../../src/contexts/project/presentation/view-models/useWorkspaceExternalOpen'
 import type {
   AppNotificationController,
   AppNotificationInput
-} from '../../../src/presentation/shared/notifications/appNotifications'
-import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
-import { useI18n } from '../../../src/presentation/i18n/useI18n'
-import { createExpectedAppError } from '../../../src/shared-kernel/application/errors/AppError'
+} from '../../../../src/presentation/shared/notifications/appNotifications'
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
+import { useI18n } from '../../../../src/presentation/i18n/useI18n'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
-} from '../../fixtures/presentation/appShellFixtures'
+} from '../../../fixtures/presentation/appShellFixtures'
 
 describe('workspace external open action', () => {
   it('discovers VS Code and submits workspace identity without a renderer-owned directory', async () => {

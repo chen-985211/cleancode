@@ -4,7 +4,7 @@ import {
   resolveProjectReorderPreviewOffsets,
   type ProjectReorderFrameScheduler,
   type ProjectReorderSpringSurface
-} from '../../../src/presentation/app-shell/projectReorderMotion'
+} from '../../../../src/contexts/project/presentation/motion/projectReorderMotion'
 
 describe('project reorder motion', () => {
   it('keeps the grabbed point under the pointer when the list scrolls during a drag', () => {

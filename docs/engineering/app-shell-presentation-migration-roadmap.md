@@ -51,6 +51,7 @@ src/
     project/presentation/
       components/
       view-models/
+      motion/
       styles/
       assets/
     block-graph/presentation/
@@ -114,8 +115,17 @@ src/
 - Tooltip、Surface、outside-pointer、reduced-motion、selection motion 和 surface motion 已迁入 `src/presentation/shared`，并按 `components`、`hooks`、`motion`、`styles` 划分。
 - 用户可见错误解析和通知契约已迁入根级共享 Presentation；通知 Store、Provider 和 Center 仍由 App Shell 拥有。
 - `SurfaceMotion` 不再理解 Project Sidebar 或 Workbench DOM；`AppShellSurfaceMotion` 适配器显式提供 App Shell 的 isolation target。
-- 混合的 `selection-motion.css` 只迁移通用 indicator，Settings、Project、Terminal 和 Shortcut 专属选择器继续留给后续 owner 批次。
+- 混合的 `selection-motion.css` 已迁移通用 indicator；Project 专属选择器已在 Project 批次下沉，Settings、Terminal 和 Shortcut 专属选择器继续留给后续 owner 批次。
 - dependency-cruiser 已禁止 `src/contexts/*/presentation` 反向依赖 `src/presentation/app-shell`。
+
+### Project Presentation
+
+- Project Sidebar、分支选择、分支工作区表单、归档确认、项目移除和工作区行菜单已迁入 `src/contexts/project/presentation/components`。
+- Project 排序动效和分支表单动效已迁入 `motion`，组件状态 Hook 与窄化工作台视图模型已迁入 `view-models`。
+- `ProjectSidebar` 通过泛型视图模型只依赖 Project Snapshot 与 Git 分支导航 DTO；App Shell 可以继续传递完整工作台对象，但 Project Presentation 不再知道 Agent、Run、BlockGraph 或 CanvasArrangement 字段。
+- Project 组件和交互样式已迁入 Project；`project-sidebar-layout.css`、标题栏、侧边栏开合及画布/状态栏联动仍由 App Shell 拥有。
+- 需要 DOM 的上下文表现层 Unit 使用 `tests/unit/contexts/**/*.presentation.spec.ts(x)` 命名并由 jsdom project 执行；Project 自有测试已按该约定迁移。
+- `ProjectSidebarToggle`、`projectSidebarMotion`、`useProjectSidebarMotion`、`useProjectSidebarVisibility` 以及 Project/Run/BlockGraph 跨上下文动作协调器保留在 App Shell。
 
 ## 剩余清单
 
@@ -162,32 +172,21 @@ src/
 
 这些模块先于上下文组件迁移，否则上下文 Presentation 会反向 import `app-shell`。
 
-### Project Presentation 候选
+### Project App Shell 保留项
 
-- `ArchiveWorkspaceDialog.tsx`
-- `ProjectSidebar.tsx`
-- `ProjectSidebarBranchSelector.tsx`
-- `ProjectSidebarBranchWorkspaceForm.tsx`
-- `ProjectSidebarConfirmationDialog.tsx`
-- `ProjectSidebarProjectRemovalPopover.tsx`
 - `ProjectSidebarToggle.tsx`
-- `WorkspaceRowMenu.tsx`
 - `findCurrentWorkspace.ts`
-- `projectReorderMotion.ts`
 - `projectSidebarMotion.ts`
 - `useBranchWorkspaceActions.ts`
-- `useBranchWorkspaceFormSpring.ts`
 - `useProjectActions.ts`
 - `useProjectGitStateSynchronization.ts`
-- `useProjectSidebarBranchWorkspaceForm.ts`
 - `useProjectSidebarMotion.ts`
-- `useProjectSidebarReorder.ts`
 - `useProjectSidebarVisibility.ts`
 - `workspaceDirectoryMatching.ts`
-- `styles/project-sidebar*.css`
-- `styles/project-reorder*.css`
+- `styles/project-sidebar-layout.css`
+- `styles/project-sidebar-titlebar.css`
 
-需要先拆的边界：`ProjectSidebar` 当前消费根级 `WorkbenchSnapshot` 和全局快捷键 Tooltip；Project 专属列表、分支表单和归档交互应下沉，工作台选择协调与全局快捷键注入留在 App Shell wrapper。
+这些模块负责全局快捷键入口、侧边栏与画布布局，或同时协调 Project、Run、BlockGraph 和工作台状态，不属于 Project Presentation。除非后续先拆出单一上下文事实，否则不应仅凭 Project 命名继续下沉。
 
 ### Agent Presentation 候选
 
@@ -395,6 +394,8 @@ ViewModel、策略和交互：
 最低验证：相关 Presentation Unit、样式门禁、i18n 门禁、typecheck、dependency-cruiser、完整 `pre-commit`。
 
 ### 阶段 2：Project Presentation
+
+状态：已完成（2026-08-31）。
 
 目标：以当前已存在的 `contexts/project/presentation` 为第一个完整纵向 UI 切片。
 

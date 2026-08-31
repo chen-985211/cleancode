@@ -3,7 +3,7 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from '../shared/motion/motionSpring'
+} from '../../../../presentation/shared/motion/motionSpring'
 
 export interface ProjectReorderCardRect {
   readonly projectId: string

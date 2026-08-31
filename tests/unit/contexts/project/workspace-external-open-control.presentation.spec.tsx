@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { WorkspaceExternalOpenControl } from '../../../src/contexts/project/presentation/components/WorkspaceExternalOpenControl'
-import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { WorkspaceExternalOpenControl } from '../../../../src/contexts/project/presentation/components/WorkspaceExternalOpenControl'
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
 
 describe('workspace external open control', () => {
   it('shows a VS Code primary action and a two-item menu when the protocol is available', async () => {

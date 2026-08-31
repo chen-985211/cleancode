@@ -9,10 +9,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 
-import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { useI18n } from '../i18n/useI18n'
-import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 interface WorkspaceRowMenuPosition {
   readonly left: number

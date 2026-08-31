@@ -13,7 +13,10 @@ const selectionStyles = readStyles('selection-motion.css')
 const settingsStyles = readStyles('application-settings.css')
 const agentSettingsStyles = readStyles('agent-settings.css')
 const libraryStyles = readStyles('block-template-library.css')
-const projectSidebarStyles = readStyles('project-sidebar.css')
+const projectSidebarStyles = readFileSync(
+  resolve(process.cwd(), 'src/contexts/project/presentation/styles/project-sidebar.css'),
+  'utf8'
+)
 const themeStyles = readStyles('theme-settings.css')
 
 describe('selection motion styles', () => {
@@ -31,7 +34,7 @@ describe('selection motion styles', () => {
 
   it('uses the shared material in settings navigation, workspace rows, and template scope tabs', () => {
     expect(selectionStyles).toContain('.application-settings-navigation__selection')
-    expect(selectionStyles).toContain('.workspace-list__selection')
+    expect(projectSidebarStyles).toContain('.workspace-list__selection')
     expect(libraryStyles).toContain('.block-template-library-tabs__selection')
     expect(readRule(settingsStyles, '.application-settings-navigation button')).toContain(
       'z-index: 1;'

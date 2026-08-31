@@ -15,12 +15,6 @@
   content: '';
 }
 
-.workspace-list__selection {
-  z-index: 0;
-  border-radius: 7px;
-  background: var(--cc-primary-soft);
-}
-
 .application-settings-navigation:not([data-selection-motion-ready='true'])
   button[aria-current='page'] {
   background: var(--cc-primary-wash);

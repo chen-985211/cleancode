@@ -18,7 +18,7 @@ const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
 }))
 
-vi.mock('../../../src/presentation/app-shell/ProjectSidebar', async () => {
+vi.mock('../../../src/contexts/project/presentation/components/ProjectSidebar', async () => {
   const React = await import('react')
   return { ProjectSidebar: () => React.createElement('aside') }
 })
