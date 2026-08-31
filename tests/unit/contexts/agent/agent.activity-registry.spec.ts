@@ -260,6 +260,42 @@ describe('Agent activity registry', () => {
     )
   })
 
+  it('restarts a pending completion quiet window when newer output reaches the same terminal', () => {
+    const clock = new FakeAgentActivityClock()
+    const registry = new AgentActivityRegistry({ clock, quietWindowMs: 1_500 })
+    const terminal = createTerminalScope()
+    const identity = createActivityIdentity(terminal)
+    const completions = vi.fn()
+    registry.subscribe((event) => {
+      if (event.type === 'turn_completed') completions(event)
+    })
+    registry.registerTerminal(terminal)
+
+    expect(
+      registry.record({ identity, signal: { type: 'turn_completed' }, sourceRevision: 1 })
+    ).toBe(true)
+    clock.advance(1_499)
+
+    expect(registry.recordTerminalOutput(terminal, 1)).toBe(true)
+    expect(registry.recordTerminalOutput(terminal, 1)).toBe(false)
+    expect(
+      registry.recordTerminalOutput(
+        {
+          ...terminal,
+          generation: terminal.generation + 1,
+          runId: 'terminal-run-2',
+          sessionId: 'terminal-session-2'
+        },
+        2
+      )
+    ).toBe(false)
+
+    clock.advance(1_499)
+    expect(completions).not.toHaveBeenCalled()
+    clock.advance(1)
+    expect(completions).toHaveBeenCalledOnce()
+  })
+
   it('keeps inferred completion pending when a different invocation becomes active', () => {
     const clock = new FakeAgentActivityClock()
     const registry = new AgentActivityRegistry({ clock, quietWindowMs: 1_500 })

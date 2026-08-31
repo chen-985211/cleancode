@@ -4,6 +4,7 @@ import type {
   AgentActivityRegistryEvent,
   AgentActivityTerminalScope
 } from '../../contexts/agent/application/dto/AgentActivityProtocol'
+import type { TerminalSessionLifecycleObserverPort } from '../../contexts/run/application/ports/TerminalSessionLifecycleObserverPort'
 import type { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
 import {
   createTerminalRunSlotKey,
@@ -18,9 +19,7 @@ import {
 export interface MainAgentActivityRuntime extends AgentActivityRuntime {
   bindTerminalSessions(sessions: Pick<TerminalSessionService, 'getSession'>): void
   initializeFailOpen(): void
-  readonly terminalSessionLifecycleObserver: {
-    terminalEnded(scope: AgentActivityTerminalScope): void
-  }
+  readonly terminalSessionLifecycleObserver: TerminalSessionLifecycleObserverPort
 }
 
 export function createMainAgentActivityRuntime(input: {
@@ -59,6 +58,9 @@ export function createMainAgentActivityRuntime(input: {
     terminalSessionLifecycleObserver: {
       terminalEnded: (scope: AgentActivityTerminalScope) => {
         runtime.releaseTerminal(scope)
+      },
+      terminalOutputAccepted: (scope: AgentActivityTerminalScope, sequence: number) => {
+        runtime.registry.recordTerminalOutput(scope, sequence)
       }
     }
   })

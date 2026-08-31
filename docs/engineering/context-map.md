@@ -166,6 +166,20 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 
 该协作把“哪个 CLI 需要宿主 probe”与“如何安全提供宿主 probe”分开：当前只有 Windows Codex launch spec 声明该能力，Run gate 只理解版本化 transport descriptor，不理解 Codex 或 activity。descriptor 的私有环境不并入公开 process environment；旧 Terminal Provider 或旧 NodePty adapter 忽略未知字段时不会触发 shim setter，因此保持安全降级而不是产生未过滤的 ConPTY SGR。shim 只发送显式技术控制帧，不从 Provider 正文推断 activity；绝对路径或绕过稳定 `PATH` shim 的命令继续诚实降级。
 
+## Run 到 Agent：终端生命周期与输出观察
+
+| 项目             | 说明                                                                                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Run                                                                                                                                                                  |
+| 调用方拥有的端口 | `TerminalSessionLifecycleObserverPort`                                                                                                                               |
+| 提供方           | Agent 的全局 `AgentActivityRegistry`                                                                                                                                 |
+| 适配器           | Platform 的 main Agent activity runtime                                                                                                                              |
+| 触发条件         | 当前完整 terminal generation 结束，或输出通过 Run 当前身份检查并被权威模型接纳                                                                                       |
+| 契约             | 结束事件释放精确 generation；输出事件只携带完整 scope 与单调 sequence，用于重排尚未发布的完成静默窗。观察器失败 fail-open，不能改变输出接纳、renderer 投递或生命周期 |
+| 禁止             | Run 导入 Agent 类型或解析 Provider；Agent 读取 PTY 输出正文、取得模型所有权，或从 sequence 推断新的 activity 状态                                                    |
+
+该反向观察只传递 Run 已拥有的生命周期和输出顺序事实，不把 Agent completion 变成 Run 状态，也不改变 Agent 到 Run 的 terminal/前台任务调用方向。
+
 ## Run 到 Project：终端运行作用域有效性
 
 | 项目             | 说明                                                                                                                     |

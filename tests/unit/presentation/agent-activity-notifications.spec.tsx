@@ -57,7 +57,7 @@ describe('Agent activity notifications', () => {
       )
     )
 
-    expect(screen.getAllByRole('status')).toHaveLength(2)
+    await waitFor(() => expect(screen.getAllByRole('status')).toHaveLength(2))
     const completionNotification = screen.getByLabelText('本轮已完成').closest('[role="status"]')
     expect(completionNotification).not.toBeNull()
     expect(completionNotification).not.toBe(attentionNotification)
@@ -77,7 +77,7 @@ describe('Agent activity notifications', () => {
       })
     ).toBeInTheDocument()
 
-    act(() =>
+    await act(async () => {
       runtime.emitCompletion(
         createCompletion({
           completionId: 'completion-1',
@@ -85,7 +85,8 @@ describe('Agent activity notifications', () => {
           terminalRevision: 3
         })
       )
-    )
+      await Promise.resolve()
+    })
     expect(screen.getAllByRole('status')).toHaveLength(2)
 
     act(() => runtime.emitActivity(createSnapshot({ revision: 4, status: 'idle' })))
@@ -173,6 +174,30 @@ describe('Agent activity notifications', () => {
     expect(screen.getByLabelText('本轮已完成')).toBeInTheDocument()
   })
 
+  it('waits for the visible terminal output barrier before publishing completion', async () => {
+    let releaseOutputBarrier: (() => void) | undefined
+    const outputBarrier = new Promise<void>((resolve) => {
+      releaseOutputBarrier = resolve
+    })
+    const runtime = installAgentActivityRuntime([createSnapshot({ revision: 1, status: 'idle' })])
+    renderObserver(vi.fn(), () => outputBarrier)
+
+    await waitFor(() => expect(screen.getByTestId('agent-activity')).toHaveTextContent('idle'))
+    act(() =>
+      runtime.emitCompletion(
+        createCompletion({ completionId: 'barrier-completion', terminalRevision: 1 })
+      )
+    )
+
+    expect(screen.queryByLabelText('本轮已完成')).not.toBeInTheDocument()
+
+    await act(async () => {
+      releaseOutputBarrier?.()
+      await outputBarrier
+    })
+    expect(screen.getByLabelText('本轮已完成')).toBeInTheDocument()
+  })
+
   it('identifies the Agent source and retranslates a retained notification on locale change', async () => {
     const terminal = {
       gitBranch: 'feat/notifications',
@@ -197,7 +222,7 @@ describe('Agent activity notifications', () => {
       )
     )
 
-    const notification = screen.getByRole('status')
+    const notification = await screen.findByRole('status')
     expect(notification).toHaveTextContent('Agent 6')
     expect(notification).toHaveTextContent('cleancode · feat/notifications')
     expect(notification).not.toHaveTextContent('已回复')
@@ -237,7 +262,7 @@ describe('Agent activity notifications', () => {
       )
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '定位到 Agent 6（project · main）' }))
+    fireEvent.click(await screen.findByRole('button', { name: '定位到 Agent 6（project · main）' }))
     expect(onNavigate).toHaveBeenLastCalledWith({
       target: {
         objectId: 'agent-6',
@@ -256,7 +281,7 @@ describe('Agent activity notifications', () => {
         })
       )
     )
-    fireEvent.click(screen.getByRole('button', { name: '定位到 Agent（project · main）' }))
+    fireEvent.click(await screen.findByRole('button', { name: '定位到 Agent（project · main）' }))
     expect(onNavigate).toHaveBeenLastCalledWith({
       target: {
         objectId: 'terminal-1',
@@ -318,11 +343,19 @@ describe('Agent activity notifications', () => {
   })
 })
 
-function renderObserver(onNavigate: (target: AgentActivityNavigationTarget) => void = vi.fn()) {
+function renderObserver(
+  onNavigate: (target: AgentActivityNavigationTarget) => void = vi.fn(),
+  waitForCompletionPresentation: (
+    completion: AgentTurnCompletedEvent
+  ) => Promise<void> = async () => undefined
+) {
   return render(
     <I18nProvider initialLocale="zh-CN">
       <NotificationProvider>
-        <AgentActivityObserver onNavigate={onNavigate}>
+        <AgentActivityObserver
+          onNavigate={onNavigate}
+          waitForCompletionPresentation={waitForCompletionPresentation}
+        >
           <LocaleSwitcher />
           <AgentActivityProbe />
         </AgentActivityObserver>

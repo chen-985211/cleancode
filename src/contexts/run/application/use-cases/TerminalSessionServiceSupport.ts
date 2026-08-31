@@ -1,4 +1,7 @@
-import type { TerminalRunOwner } from '../../domain/value-objects/TerminalRunScope'
+import type {
+  TerminalRunOwner,
+  TerminalRunScope
+} from '../../domain/value-objects/TerminalRunScope'
 import {
   createExpectedAppError,
   isAppError
@@ -89,6 +92,18 @@ export function observeTerminalEnded(
     observer?.terminalEnded(scope)
   } catch {
     // An optional projection cannot alter the terminal lifecycle fact it observes.
+  }
+}
+
+export function observeTerminalOutputAccepted(
+  observer: TerminalSessionLifecycleObserverPort | undefined,
+  scope: TerminalRunScope,
+  sequence: number
+): void {
+  try {
+    observer?.terminalOutputAccepted?.(scope, sequence)
+  } catch {
+    // An optional projection cannot alter accepted output or its downstream delivery.
   }
 }
 

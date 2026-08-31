@@ -79,6 +79,8 @@ export interface TerminalSurface {
   focus(): void
   getDiagnostics(): TerminalSurfaceDiagnostics
   isBracketedPasteMode(): boolean
+  isOutputSettled(): boolean
+  onOutputSettled(listener: () => void): () => void
   restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult>
   setScrollbackRows(rows: TerminalScrollbackRows): void
   setResizeSuspended(isResizeSuspended: boolean): void
@@ -99,10 +101,12 @@ export class TerminalSurfaceRegistry {
     {
       readonly identityKey: string
       readonly surface: TerminalSurface
+      readonly unregisterOutputStateObservers: () => void
       readonly unregisterWorkloadTarget: () => void
       readonly unregisterRasterTarget: () => void
     }
   >()
+  private readonly outputStateListeners = new Set<() => void>()
   private readonly workloadScheduler: Pick<TerminalWorkloadScheduler, 'getDiagnostics' | 'register'>
   private readonly ownedWorkloadScheduler: TerminalWorkloadScheduler | null
 
@@ -132,12 +136,18 @@ export class TerminalSurfaceRegistry {
       ? (this.workloadScheduler?.register({ id: viewId, ...surface.workloadTarget }) ??
         (() => undefined))
       : () => undefined
+    const unregisterOutputStateObservers = combineUnsubscribers(
+      surface.onOutputSettled(() => this.notifyOutputStateChange()),
+      surface.rasterTarget?.onRasterPriorityChange?.(() => this.notifyOutputStateChange())
+    )
     this.views.set(viewId, {
       identityKey: createTerminalSurfaceKey(identity),
       surface,
+      unregisterOutputStateObservers,
       unregisterWorkloadTarget,
       unregisterRasterTarget
     })
+    this.notifyOutputStateChange()
     return { viewId, surface }
   }
 
@@ -152,19 +162,38 @@ export class TerminalSurfaceRegistry {
     const view = this.views.get(viewId)
     if (!view) return
     this.views.delete(viewId)
+    view.unregisterOutputStateObservers()
     view.unregisterWorkloadTarget()
     view.unregisterRasterTarget()
     view.surface.dispose()
+    this.notifyOutputStateChange()
   }
 
   disposeAll(): void {
     for (const view of this.views.values()) {
+      view.unregisterOutputStateObservers()
       view.unregisterWorkloadTarget()
       view.unregisterRasterTarget()
       view.surface.dispose()
     }
     this.views.clear()
     this.ownedWorkloadScheduler?.dispose()
+    this.notifyOutputStateChange()
+  }
+
+  waitForOutputSettled(identity: TerminalRunIdentity): Promise<void> {
+    const identityKey = createTerminalSurfaceKey(identity)
+    if (!this.hasBlockingOutputSurface(identityKey)) return Promise.resolve()
+
+    return new Promise((resolve) => {
+      const settle = (): void => {
+        if (this.hasBlockingOutputSurface(identityKey)) return
+        this.outputStateListeners.delete(settle)
+        resolve()
+      }
+      this.outputStateListeners.add(settle)
+      settle()
+    })
   }
 
   setScrollbackRows(rows: TerminalScrollbackRows): void {
@@ -207,6 +236,19 @@ export class TerminalSurfaceRegistry {
     while (this.views.has(viewId)) viewId = this.createViewId()
     return viewId
   }
+
+  private hasBlockingOutputSurface(identityKey: string): boolean {
+    for (const view of this.views.values()) {
+      if (view.identityKey !== identityKey) continue
+      if (view.surface.rasterTarget?.getRasterPriority() === 'hidden') continue
+      if (!view.surface.isOutputSettled()) return true
+    }
+    return false
+  }
+
+  private notifyOutputStateChange(): void {
+    for (const listener of this.outputStateListeners) listener()
+  }
 }
 
 export function createTerminalSurfaceKey(
@@ -227,4 +269,10 @@ export function createTerminalSurfaceKey(
 
 function createDefaultViewId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `terminal-view-${Date.now()}-${Math.random()}`
+}
+
+function combineUnsubscribers(...unsubscribers: Array<(() => void) | undefined>): () => void {
+  return () => {
+    for (const unsubscribe of unsubscribers) unsubscribe?.()
+  }
 }

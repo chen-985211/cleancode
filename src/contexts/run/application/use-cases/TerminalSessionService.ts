@@ -53,6 +53,7 @@ import {
   getTerminalSessionErrorMessage,
   listTerminalSessionSnapshots,
   observeTerminalEnded,
+  observeTerminalOutputAccepted,
   prepareTerminalSessionLaunch,
   readBestEffortWorkingDirectory,
   readTerminalModelDiagnostics,
@@ -179,6 +180,7 @@ export class TerminalSessionService {
       this.runtimeProvider.bindRecoveredSession(session.scope, {
         onOutput: (event) => {
           if (!this.isCurrentSession(slotKey, session) || event.sequence === undefined) return
+          observeTerminalOutputAccepted(this.lifecycleObserver, session.scope, event.sequence)
           callbacks.onOutput({ ...event, sequence: event.sequence })
         },
         onExit: (event) => {
@@ -372,6 +374,7 @@ export class TerminalSessionService {
                       event.data
                     )
                 : { data: event.data, sequence: event.sequence }
+            observeTerminalOutputAccepted(this.lifecycleObserver, session.scope, output.sequence)
             command.onOutput({ ...event, sequence: output.sequence })
           }
         },

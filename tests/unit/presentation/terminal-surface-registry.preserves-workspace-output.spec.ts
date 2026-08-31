@@ -196,6 +196,70 @@ describe('terminal surface registry disposable views', () => {
 
     expect(unregister).toHaveBeenCalledOnce()
   })
+
+  it('waits for a visible matching surface to consume its pending output', async () => {
+    const surface = createFakeSurface()
+    let isSettled = false
+    let settleListener: (() => void) | undefined
+    surface.isOutputSettled.mockImplementation(() => isSettled)
+    surface.onOutputSettled.mockImplementation((listener) => {
+      settleListener = listener
+      return () => {
+        settleListener = undefined
+      }
+    })
+    surface.rasterTarget = {
+      getRasterCost: vi.fn(() => 96_000),
+      getRasterPriority: vi.fn(() => 'visible' as const),
+      getRasterScale: vi.fn(() => 1 as const),
+      setRasterScale: vi.fn()
+    }
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => 'view-visible'
+    )
+    const identity = createIdentity()
+    registry.create(identity)
+    let didSettle = false
+
+    const settled = registry.waitForOutputSettled(identity).then(() => {
+      didSettle = true
+    })
+    await Promise.resolve()
+    expect(didSettle).toBe(false)
+
+    isSettled = true
+    settleListener?.()
+    await settled
+    expect(didSettle).toBe(true)
+  })
+
+  it('does not block on hidden or absent surfaces and releases an in-flight waiter', async () => {
+    const surface = createFakeSurface()
+    surface.isOutputSettled.mockReturnValue(false)
+    surface.rasterTarget = {
+      getRasterCost: vi.fn(() => 96_000),
+      getRasterPriority: vi.fn(() => 'hidden' as const),
+      getRasterScale: vi.fn(() => 1 as const),
+      setRasterScale: vi.fn()
+    }
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => 'view-hidden'
+    )
+    const identity = createIdentity()
+    const lease = registry.create(identity)
+
+    await expect(registry.waitForOutputSettled(identity)).resolves.toBeUndefined()
+    await expect(
+      registry.waitForOutputSettled({ ...identity, runId: 'absent-run' })
+    ).resolves.toBeUndefined()
+
+    surface.rasterTarget.getRasterPriority = vi.fn(() => 'focused' as const)
+    const pending = registry.waitForOutputSettled(identity)
+    registry.release(lease.viewId)
+    await expect(pending).resolves.toBeUndefined()
+  })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
@@ -203,6 +267,8 @@ interface FakeTerminalSurface extends TerminalSurface {
   workloadTarget?: TerminalSurface['workloadTarget']
   readonly detach: Mock<TerminalSurface['detach']>
   readonly dispose: Mock<TerminalSurface['dispose']>
+  readonly isOutputSettled: Mock<TerminalSurface['isOutputSettled']>
+  readonly onOutputSettled: Mock<TerminalSurface['onOutputSettled']>
   readonly restore: Mock<TerminalSurface['restore']>
   readonly write: Mock<TerminalSurface['write']>
 }
@@ -220,6 +286,8 @@ function createFakeSurface(): FakeTerminalSurface {
       rendererState: 'dom'
     })),
     isBracketedPasteMode: vi.fn<TerminalSurface['isBracketedPasteMode']>(() => false),
+    isOutputSettled: vi.fn<TerminalSurface['isOutputSettled']>(() => true),
+    onOutputSettled: vi.fn<TerminalSurface['onOutputSettled']>(() => () => undefined),
     restore: vi.fn<TerminalSurface['restore']>(),
     setScrollbackRows: vi.fn<TerminalSurface['setScrollbackRows']>(),
     setResizeSuspended: vi.fn<TerminalSurface['setResizeSuspended']>(),
