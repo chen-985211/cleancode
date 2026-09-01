@@ -1,7 +1,7 @@
 import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-import { useCanvasPaneContextMenu } from '../../../src/presentation/app-shell/useCanvasPaneContextMenu'
-import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
+import { useCanvasPaneContextMenu } from '../../../src/presentation/app-shell/workbench/menus/useCanvasPaneContextMenu'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
 
 describe('canvas pane context menu', () => {
   it('exposes the existing terminal actions with their configured shortcuts', async () => {

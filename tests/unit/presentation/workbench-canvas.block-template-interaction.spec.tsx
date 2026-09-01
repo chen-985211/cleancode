@@ -7,8 +7,8 @@ import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arr
 import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { WorkbenchCanvas } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvas'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null

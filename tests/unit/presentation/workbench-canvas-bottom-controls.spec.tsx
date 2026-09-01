@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react'
 
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
-import { WorkbenchCanvasBottomControls } from '../../../src/presentation/app-shell/WorkbenchCanvasBottomControls'
+import { WorkbenchCanvasBottomControls } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvasBottomControls'
 import type { CanvasArrangementSelection } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 

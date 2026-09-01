@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 describe('workbench canvas empty state', () => {

@@ -1,4 +1,4 @@
-import { createTerminalRenderingWorkloadCoordinator } from '../../../src/presentation/app-shell/coordinators/terminalRenderingWorkloadCoordinator'
+import { createTerminalRenderingWorkloadCoordinator } from '../../../src/presentation/app-shell/context-adapters/run/terminalRenderingWorkloadCoordinator'
 
 describe('terminal rendering workload coordinator', () => {
   it('publishes canvas motion to raster and output owners while sidebar motion only affects output', () => {

@@ -5,7 +5,7 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/coordinators/useWorkbenchFlowNodes'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('workbench flow node presence lifecycle', () => {

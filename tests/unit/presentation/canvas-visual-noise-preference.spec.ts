@@ -2,7 +2,7 @@ import {
   defaultReduceCanvasVisualNoise,
   readCanvasVisualNoisePreference,
   writeCanvasVisualNoisePreference
-} from '../../../src/presentation/app-shell/canvasVisualNoisePreference'
+} from '../../../src/presentation/app-shell/app-features/settings/canvasVisualNoisePreference'
 
 describe('canvas visual noise preference', () => {
   it('defaults missing, malformed, and unsupported stored values to reducing visual noise', () => {

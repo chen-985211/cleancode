@@ -2,7 +2,7 @@ import {
   commitCompletedCanvasViewportMotion,
   persistCanvasViewportFromMoveEnd,
   synchronizeCanvasViewportFromMove
-} from '../../../src/presentation/app-shell/workbenchCanvasViewport'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasViewport'
 
 describe('workbench canvas viewport events', () => {
   it('projects programmatic spring frames without persisting and commits the settled target once', () => {

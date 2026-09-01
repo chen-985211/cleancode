@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const styles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-minimap.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/minimap/canvas-minimap.css'),
   'utf8'
 )
 

@@ -9,8 +9,8 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import type { TerminalWorkflowPlanScope } from '../../../src/contexts/run/application/ports/TerminalWorkflowPlanPort'
 import { ignoreAppNotifications } from '../../../src/presentation/shared/notifications/appNotifications'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
-import { useBlockTemplateActions } from '../../../src/presentation/app-shell/useBlockTemplateActions'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { useBlockTemplateActions } from '../../../src/presentation/app-shell/coordinators/useBlockTemplateActions'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('block template actions', () => {

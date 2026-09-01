@@ -1,8 +1,8 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import { updateGraphViewportInWorkbench } from '../updateGraphViewportInWorkbench'
-import { putWorkbenchFirst } from '../workbenchListUpdates'
+import { updateGraphViewportInWorkbench } from '../context-adapters/block-graph/updateGraphViewportInWorkbench'
+import { putWorkbenchFirst } from '../shell/workbenchListUpdates'
 
 export function useSingleTerminalBlockSelectionBridge(
   setSelectedTerminalBlockIds: Dispatch<SetStateAction<string[]>>,

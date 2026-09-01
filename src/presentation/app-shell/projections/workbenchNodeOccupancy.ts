@@ -1,6 +1,6 @@
-import { resolveWorkbenchNodeSize } from '../workbenchNodeFocusViewport'
+import { resolveWorkbenchNodeSize } from '../workbench/viewport/workbenchNodeFocusViewport'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
-import type { WorkbenchCanvasRect } from '../workbenchNodeCreationPolicy'
+import type { WorkbenchCanvasRect } from '../workbench/creation/workbenchNodeCreationPolicy'
 
 export function createWorkbenchNodeOccupancy(
   nodes: readonly WorkbenchFlowNode[]

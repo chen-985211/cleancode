@@ -4,7 +4,7 @@ import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../contexts/
 import type { AgentConsoleFlowNode } from '../types/agentConsoleFlowNode'
 import type { WorkbenchNodeLayoutInput } from '../types/workbenchNodeLayout'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import type { AgentToolApprovalController } from '../agentToolApprovalTypes'
+import type { AgentToolApprovalController } from '../workbench/nodes/agent/agentToolApprovalTypes'
 import { createCanvasObjectIdentity } from '../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export const minimumAgentConsoleSize = {

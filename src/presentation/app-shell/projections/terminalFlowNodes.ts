@@ -7,7 +7,7 @@ import {
   resolveTerminalGroupDropFeedback,
   type TerminalGroupDropAction
 } from '../../../contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
-import type { AgentApprovalNodeIntent } from '../agentToolApprovalTypes'
+import type { AgentApprovalNodeIntent } from '../workbench/nodes/agent/agentToolApprovalTypes'
 import {
   createTerminalStateStore,
   type TerminalStateStore

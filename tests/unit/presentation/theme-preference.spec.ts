@@ -3,7 +3,7 @@ import {
   readThemePreference,
   resolveEffectiveTheme,
   themePreferenceStorageKey
-} from '../../../src/presentation/app-shell/themePreference'
+} from '../../../src/presentation/app-shell/app-features/settings/themePreference'
 
 describe('theme preference', () => {
   beforeEach(() => {

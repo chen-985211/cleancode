@@ -74,7 +74,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 如果 attach Promise 尚未完成时尺寸再次变化，在 session 返回后补发最新 resize。
 - 测量结果和 session 都必须带当前 workspace key，旧工作区迟到的 Promise 不得绑定到新工作区。
 
-当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/coordinators/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
+当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/coordinators/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
 
 ### 2. 右侧 padding 把滚动条整体推向左边
 
@@ -112,7 +112,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 }
 ```
 
-左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。wrapper 留白使用当前应用主题背景并保持未过滤，只有直接子 viewport 在源主题与当前主题不一致时应用滤镜。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。共享边界实现位于 [TerminalThemeProjection.tsx](../../src/contexts/run/presentation/components/TerminalThemeProjection.tsx) 和 [terminal-theme-projection.css](../../src/contexts/run/presentation/styles/terminal-theme-projection.css)，Agent 与普通终端的局部几何分别位于 [agent-console.css](../../src/presentation/app-shell/styles/agent-console.css) 和 [terminal-node.css](../../src/presentation/app-shell/styles/terminal-node.css)。
+左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。wrapper 留白使用当前应用主题背景并保持未过滤，只有直接子 viewport 在源主题与当前主题不一致时应用滤镜。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。共享边界实现位于 [TerminalThemeProjection.tsx](../../src/contexts/run/presentation/components/TerminalThemeProjection.tsx) 和 [terminal-theme-projection.css](../../src/contexts/run/presentation/styles/terminal-theme-projection.css)，Agent 与普通终端的局部几何分别位于 [agent-console.css](../../src/presentation/app-shell/workbench/nodes/agent/agent-console.css) 和 [terminal-node.css](../../src/presentation/app-shell/workbench/nodes/terminal/terminal-node.css)。
 
 ### 3. Chromium 对连续全角标点进行上下文压缩
 

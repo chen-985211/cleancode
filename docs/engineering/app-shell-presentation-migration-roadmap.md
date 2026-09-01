@@ -2,7 +2,9 @@
 
 ## 文档地位
 
-本文规划根级 `src/presentation/app-shell` 向各限界上下文 Presentation 的行为不变迁移。
+状态：已完成并归档（2026-09-01）。
+
+本文记录根级 `src/presentation/app-shell` 向各限界上下文 Presentation 的行为不变迁移。迁移阶段与候选清单只保留为历史决策记录，不再表示待实施工作。
 
 本文不是当前产品功能或 UI 契约，不定义新的业务事实、交互结果、视觉规则或跨上下文协议。目录职责、依赖方向和上下文边界仍以[架构文档](architecture.md)为唯一事实来源；组件、状态、动效和可访问性仍以 [UI Style Guide](../product/ui-style-guide.md) 为准；测试组织和门禁仍以[测试规范](../testing/testing.md)为准。
 
@@ -73,8 +75,34 @@ src/
       styles/
   presentation/
     app-shell/
+      shell/
+        lifecycle/
+        project-sidebar/
+      workbench/
+        assets/
+        toolbar/
+        viewport/
+        nodes/
+          agent/
+          terminal/
+          terminal-group/
+        menus/
+        minimap/
+        creation/
+      app-features/
+        settings/
+          assets/
+        notifications/
+        shortcuts/
+      context-adapters/
+        project/
+        block-graph/
+        canvas-arrangement/
+        run/
       coordinators/
       projections/
+      types/
+      styles/
     shared/
       components/
       hooks/
@@ -84,6 +112,8 @@ src/
     layouts/
     routes/
 ```
+
+App Shell 各内部目录的规范职责以架构文档的 [App Shell 内部目录职责](architecture.md#app-shell-内部目录职责)为唯一事实来源。本路线图只描述迁移顺序，不重复定义这些目录的边界。
 
 `presentation/shared` 只容纳被多个上下文 Presentation 或 App Shell 共同消费的稳定表现层能力。它不是 Shared Kernel，也不得包含业务规则、上下文 DTO 聚合或跨上下文状态 owner。
 
@@ -213,9 +243,9 @@ src/
 - `useCanvasArrangementActions`、`useAppShellCanvasArrangement` 继续作为跨 owner coordinator，唯一负责 BlockGraph/Agent 位置提交、CanvasArrangement 关系提交、补偿、通知和 Workbench 状态写回。
 - `WorkbenchIcons` 与 CanvasArrangement 专属堆叠图标提升到根级共享 Presentation，使 App Shell 与上下文组件继续经过同一个画布语义图标边界，不形成第二套图标映射。
 
-## 剩余清单
+## 迁移清单（历史）
 
-以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
+以下是实施期间使用的迁移候选清单，不表示整组文件曾经或应当原样移动。实际归属已经按入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责逐项确认。
 
 ### 根级共享 Presentation 候选
 
@@ -490,12 +520,17 @@ src/
 
 ### 阶段 8：架构门禁与文档收束
 
+状态：已完成（2026-09-01）。
+
 目标：让完成后的边界可自动防回归。
 
-- 禁止 `src/contexts/*/presentation` import `src/presentation/app-shell`。
-- 禁止 Context Presentation 直接 import Infrastructure。
-- 为允许的根级共享 Presentation 依赖建立精确规则。
-- 更新架构文档中的实际目录示例；本路线图完成后标记归档状态，不把计划文本保留为当前事实。
+- `src/contexts/*/presentation` 反向依赖 `src/presentation/app-shell` 的禁止规则已保持生效。
+- dependency-cruiser 已新增 Context Presentation 直接依赖任意 Context Infrastructure 的禁止规则。
+- 根级 Shared Presentation 现在只允许依赖自身、i18n、Shared Kernel 和第三方基础能力，不得依赖 Context、Platform、App Shell、routes 或 layouts。
+- App Shell 已按 `shell/`、`workbench/`、`app-features/`、`context-adapters/`、`coordinators/`、`projections/`、`types/` 和壳级资源目录完成物理整理；根目录不再平铺生产文件。
+- 功能专属样式和资源已随 Workbench、设置、通知或侧栏 owner 就近放置；根级 `styles/` 只保留壳级基础与主题样式。
+- 已删除 42 个所在目录已有其他跟踪文件的失效 `.gitkeep`；仍用于保留空目录的占位文件没有纳入本次清理。
+- 架构文档已成为 App Shell 内部目录职责的唯一事实来源，本路线图完成后转为归档记录。
 
 最低验证：架构门禁测试、文档检查、完整 `pre-commit`。
 

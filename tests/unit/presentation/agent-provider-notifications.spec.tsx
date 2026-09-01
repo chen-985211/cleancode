@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 
-import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import { NotificationProvider } from '../../../src/presentation/app-shell/app-features/notifications/NotificationProvider'
+import { useNotifications } from '../../../src/presentation/app-shell/app-features/notifications/useNotifications'
 import type { AgentFeedbackEvent } from '../../../src/contexts/agent/presentation/view-models/agentProviderFeedback'
 import { useAgentProviderNotifications } from '../../../src/contexts/agent/presentation/view-models/useAgentProviderNotifications'
 

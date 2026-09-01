@@ -6,7 +6,7 @@ import {
 } from '../../fixtures/presentation/appShellFixtures'
 import { NotifiedAppShell } from '../../fixtures/presentation/NotifiedAppShell'
 import { createClientAppError } from '../../../src/shared-kernel/application/errors/AppError'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
 
 describe('app shell worktree archive', () => {
   beforeEach(() => {

@@ -6,7 +6,7 @@ const surfaceMotionStyles = readFileSync(
   'utf8'
 )
 const languageSettingsStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/language-settings.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/app-features/settings/language-settings.css'),
   'utf8'
 )
 const quickExecutionStyles = readFileSync(

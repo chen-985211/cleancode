@@ -5,7 +5,7 @@ import {
   type TerminalBlockSnapshot
 } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkingDirectoryChangedEvent } from '../../../contexts/run/application/ports/TerminalProcessPort'
-import { findWorkspaceByDirectory } from '../workspaceDirectoryMatching'
+import { findWorkspaceByDirectory } from '../context-adapters/project/workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 
 export const terminalWorkspaceFallbackIntervalMs = 15_000

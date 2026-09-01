@@ -7,8 +7,8 @@ import {
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 import { useTerminalGroupDragActions } from '../../../src/presentation/app-shell/coordinators/useTerminalGroupDragActions'
-import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbenchNodeLayoutCommitQueue'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeLayoutCommitQueue'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('terminal group drag actions', () => {
   it('restores authoritative terminal geometry when the layout commit fails', async () => {

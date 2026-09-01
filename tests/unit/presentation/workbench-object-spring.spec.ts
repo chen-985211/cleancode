@@ -2,7 +2,7 @@ import {
   createWorkbenchObjectSpringController,
   type WorkbenchObjectSpringFrameScheduler,
   type WorkbenchObjectSpringSurface
-} from '../../../src/presentation/app-shell/workbenchObjectSpring'
+} from '../../../src/presentation/app-shell/workbench/nodes/workbenchObjectSpring'
 import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types/workbenchObjectMotion'
 
 describe('workbench object spring', () => {

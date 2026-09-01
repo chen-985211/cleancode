@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentGraphUpdatedEvent } from '../../../contexts/agent/application/dto/AgentSessionProtocol'
-import { resolveNodeSize } from '../resolveNodeSize'
+import { resolveNodeSize } from '../workbench/nodes/resolveNodeSize'
 import {
   createTerminalWorkflowBuildChoreography,
   type TerminalWorkflowBuildChoreography
-} from '../terminalWorkflowBuildChoreography'
+} from '../projections/terminalWorkflowBuildChoreography'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
-import type { WorkbenchNodeStore } from '../workbenchNodeStore'
+import type { WorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
 import {
   prefersReducedMotion,
   subscribeReducedMotionPreference
 } from '../../shared/motion/motionPreference'
-import type { TerminalWorkflowBuildMode } from '../terminalWorkflowBuildPreference'
+import type { TerminalWorkflowBuildMode } from '../app-features/settings/terminalWorkflowBuildPreference'
 
 export interface TerminalWorkflowBuildPresentation {
   readonly enteringConnectionIds: ReadonlySet<string>

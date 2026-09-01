@@ -18,7 +18,7 @@ const ignoredDirectories = new Set([
 ])
 const legacyProviderIdAllowances = [
   {
-    filePath: 'src/presentation/app-shell/agentConsoleModel.ts',
+    filePath: 'src/presentation/app-shell/workbench/nodes/agent/agentConsoleModel.ts',
     providerId: 'codex',
     reason: 'Legacy fallback used only before a persisted Agent descriptor is available.',
     variableName: 'rendererLegacyDefaultProviderId'

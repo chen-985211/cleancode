@@ -8,7 +8,7 @@ import type {
   TerminalGroupSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { useMinimapNodeFocus } from '../../../src/presentation/app-shell/coordinators/useMinimapNodeFocus'
+import { useMinimapNodeFocus } from '../../../src/presentation/app-shell/workbench/minimap/useMinimapNodeFocus'
 
 describe('minimap node focus', () => {
   beforeEach(() => {

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 
 import { ignoreAppNotifications } from '../../../src/presentation/shared/notifications/appNotifications'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
-import { CanvasStatusbar } from '../../../src/presentation/app-shell/WorkbenchCanvasStates'
+import { CanvasStatusbar } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvasStates'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot

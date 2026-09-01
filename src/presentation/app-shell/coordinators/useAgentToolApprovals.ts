@@ -16,9 +16,9 @@ import type {
   AgentToolApprovalController,
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
-} from '../agentToolApprovalTypes'
+} from '../workbench/nodes/agent/agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
-import { transitionWorkbenchViewport } from '../workbenchViewportMotion'
+import { transitionWorkbenchViewport } from '../workbench/viewport/workbenchViewportMotion'
 import { useI18n } from '../../i18n/useI18n'
 import type { Translate } from '../../i18n/messages'
 

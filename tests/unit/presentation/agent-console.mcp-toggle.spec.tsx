@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
-import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
-import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
+import { AgentConsole } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole'
+import { NotificationProvider } from '../../../src/presentation/app-shell/app-features/notifications/NotificationProvider'
+import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
 import {
   createAgentSessionSnapshot,
   createRuntimeApi,

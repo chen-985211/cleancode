@@ -8,8 +8,8 @@ import {
 import { projectTerminalGroupDropAction } from '../projections/terminalGroupDropProjection'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import type { WorkbenchNodeLayoutCommitQueue } from '../workbenchNodeLayoutCommitQueue'
-import { restoreWorkbenchNodeLayout } from '../restoreWorkbenchNodeLayout'
+import type { WorkbenchNodeLayoutCommitQueue } from '../workbench/nodes/workbenchNodeLayoutCommitQueue'
+import { restoreWorkbenchNodeLayout } from '../workbench/nodes/restoreWorkbenchNodeLayout'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 

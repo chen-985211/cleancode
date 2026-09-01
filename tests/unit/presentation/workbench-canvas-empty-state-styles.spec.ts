@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const canvasStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
   'utf8'
 )
 const themeStyles = readFileSync(

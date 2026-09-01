@@ -5,17 +5,17 @@ import {
   type WorkspaceAgentSnapshot
 } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { toAgentFlowNodeId } from '../projections/agentConsoleFlowNode'
-import { findCurrentWorkspace } from '../findCurrentWorkspace'
+import { findCurrentWorkspace } from '../context-adapters/project/findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput } from '../types/workbenchNodeLayout'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import type { WorkbenchNodeLayoutCommitQueue } from '../workbenchNodeLayoutCommitQueue'
+import type { WorkbenchNodeLayoutCommitQueue } from '../workbench/nodes/workbenchNodeLayoutCommitQueue'
 import { useI18n } from '../../i18n/useI18n'
 import type { NotifyApp } from '../../shared/notifications/appNotifications'
 import type {
   WorkbenchNodeCreationCoordinator,
   WorkbenchNodeCreationReservation
-} from './workbenchNodeCreationCoordinator'
-import type { WorkbenchNodeSize } from '../workbenchNodeCreationPolicy'
+} from '../workbench/creation/workbenchNodeCreationCoordinator'
+import type { WorkbenchNodeSize } from '../workbench/creation/workbenchNodeCreationPolicy'
 import { scheduleWorkbenchCreatedObjectFocus } from '../projections/workbenchObjectMotion'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]

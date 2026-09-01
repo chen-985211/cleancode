@@ -1,6 +1,6 @@
 import type { Edge } from '@xyflow/react'
 
-import { resolveNodeSize } from '../resolveNodeSize'
+import { resolveNodeSize } from '../workbench/nodes/resolveNodeSize'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type {
   WorkbenchObjectMotion,

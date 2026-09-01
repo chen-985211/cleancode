@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { useCanvasObjectContextMenu } from '../../../src/presentation/app-shell/useCanvasObjectContextMenu'
+import { useCanvasObjectContextMenu } from '../../../src/presentation/app-shell/workbench/menus/useCanvasObjectContextMenu'
 
 describe('canvas object context menu lifecycle', () => {
   it('toggles closed when the same node receives a repeated secondary click', () => {

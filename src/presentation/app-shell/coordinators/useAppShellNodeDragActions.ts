@@ -1,10 +1,10 @@
 import { useCallback } from 'react'
 
 import type { QuickExecutionTargetSnapshot } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { restoreWorkbenchNodeLayout } from '../restoreWorkbenchNodeLayout'
+import { restoreWorkbenchNodeLayout } from '../workbench/nodes/restoreWorkbenchNodeLayout'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import type { WorkbenchNodeStore } from '../workbenchNodeStore'
+import type { WorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
 
 interface UseAppShellNodeDragActionsInput {
   readonly addQuickExecutionTarget: (target: QuickExecutionTargetSnapshot) => Promise<void>

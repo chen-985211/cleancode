@@ -3,7 +3,7 @@ import {
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeStrokeColor
 } from '../../../src/presentation/app-shell/projections/terminalMinimapAppearance'
-import { getTerminalStatusColor } from '../../../src/presentation/app-shell/minimapInteraction'
+import { getTerminalStatusColor } from '../../../src/presentation/app-shell/workbench/minimap/minimapInteraction'
 import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'

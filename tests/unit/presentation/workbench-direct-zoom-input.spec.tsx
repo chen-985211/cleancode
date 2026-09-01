@@ -6,9 +6,9 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import {
   resolveWorkbenchWheelZoomStops,
   useWorkbenchDirectZoom
-} from '../../../src/presentation/app-shell/useWorkbenchDirectZoom'
-import * as directZoom from '../../../src/presentation/app-shell/workbenchDirectZoom'
-import * as viewportMotion from '../../../src/presentation/app-shell/workbenchViewportMotion'
+} from '../../../src/presentation/app-shell/workbench/viewport/useWorkbenchDirectZoom'
+import * as directZoom from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
+import * as viewportMotion from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench direct zoom input', () => {
   afterEach(() => {

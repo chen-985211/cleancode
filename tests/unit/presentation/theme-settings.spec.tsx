@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/ThemeSettingsRoot'
-import { themePreferenceStorageKey } from '../../../src/presentation/app-shell/themePreference'
+import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ThemeSettingsRoot'
+import { themePreferenceStorageKey } from '../../../src/presentation/app-shell/app-features/settings/themePreference'
 
 interface MutableMediaQueryList extends MediaQueryList {
   matches: boolean

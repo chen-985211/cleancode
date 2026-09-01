@@ -13,7 +13,7 @@ import {
 import { analyzeCanvasExecutionSelection } from '../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
-import { resolveWorkbenchNodeSize } from '../workbenchNodeFocusViewport'
+import { resolveWorkbenchNodeSize } from '../workbench/viewport/workbenchNodeFocusViewport'
 
 export function resolveCanvasArrangementSelectionItems({
   arrangement,

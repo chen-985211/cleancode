@@ -8,16 +8,16 @@ import type {
   TerminalGroupSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createCanvasObjectIdentity } from '../../../src/shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import type { AgentActivityNavigationRequest } from '../../../src/presentation/app-shell/agentActivityNavigation'
+import type { AgentActivityNavigationRequest } from '../../../src/presentation/app-shell/types/agentActivityNavigation'
 import { toAgentFlowNodeId } from '../../../src/presentation/app-shell/projections/agentConsoleFlowNode'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
-import type { WorkspaceSelectionResult } from '../../../src/presentation/app-shell/useBranchWorkspaceActions'
-import { useAgentActivityNotificationNavigation } from '../../../src/presentation/app-shell/useAgentActivityNotificationNavigation'
+import type { WorkspaceSelectionResult } from '../../../src/presentation/app-shell/coordinators/useBranchWorkspaceActions'
+import { useAgentActivityNotificationNavigation } from '../../../src/presentation/app-shell/coordinators/useAgentActivityNotificationNavigation'
 import {
   createWorkbenchNodeStore,
   type WorkbenchNodeStore
-} from '../../../src/presentation/app-shell/workbenchNodeStore'
+} from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent activity notification navigation', () => {

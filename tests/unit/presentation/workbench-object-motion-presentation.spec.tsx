@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { AnimationEvent } from 'react'
 
 import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types/workbenchObjectMotion'
-import { useWorkbenchObjectMotionPresentation } from '../../../src/presentation/app-shell/useWorkbenchObjectMotionPresentation'
+import { useWorkbenchObjectMotionPresentation } from '../../../src/presentation/app-shell/workbench/nodes/useWorkbenchObjectMotionPresentation'
 
 describe('workbench object motion presentation', () => {
   it('keeps a creation presentation alive when graph projection data refreshes mid-animation', () => {

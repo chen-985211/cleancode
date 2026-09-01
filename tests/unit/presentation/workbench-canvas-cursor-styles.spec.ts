@@ -2,16 +2,16 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const canvasStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
   'utf8'
 )
 const templateStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/block-template-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/creation/block-template-canvas.css'),
   'utf8'
 )
 const cursorAssetPath = resolve(
   process.cwd(),
-  'src/presentation/app-shell/assets/canvas-pointer.svg'
+  'src/presentation/app-shell/workbench/assets/canvas-pointer.svg'
 )
 
 describe('workbench canvas cursor styles', () => {

@@ -1,5 +1,5 @@
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('workbench node store', () => {
   it('publishes only referentially new node snapshots', () => {

@@ -1,4 +1,4 @@
-import { findWorkspaceByDirectory } from '../../../src/presentation/app-shell/workspaceDirectoryMatching'
+import { findWorkspaceByDirectory } from '../../../src/presentation/app-shell/context-adapters/project/workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 describe('workspace directory matching', () => {

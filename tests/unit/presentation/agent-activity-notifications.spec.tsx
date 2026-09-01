@@ -11,8 +11,8 @@ import type { AgentActivityNavigationTarget } from '../../../src/contexts/agent/
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 import { translate } from '../../../src/presentation/i18n/messages'
 import { useI18n } from '../../../src/presentation/i18n/useI18n'
-import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import { NotificationProvider } from '../../../src/presentation/app-shell/app-features/notifications/NotificationProvider'
+import { useNotifications } from '../../../src/presentation/app-shell/app-features/notifications/useNotifications'
 import { useAgentActivitySnapshots } from '../../../src/contexts/agent/presentation/view-models/useAgentActivitySnapshots'
 
 describe('Agent activity notifications', () => {

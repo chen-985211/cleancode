@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { useCallback, useState } from 'react'
 
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
-import { useCurrentGraphState } from '../../../src/presentation/app-shell/useCurrentGraphState'
+import { useCurrentGraphState } from '../../../src/presentation/app-shell/context-adapters/block-graph/useCurrentGraphState'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Current graph state', () => {

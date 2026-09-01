@@ -1,6 +1,6 @@
 import { act, render, waitFor } from '@testing-library/react'
 
-import { ApplicationQuitConfirmationBridge } from '../../../src/presentation/app-shell/ApplicationQuitConfirmationBridge'
+import { ApplicationQuitConfirmationBridge } from '../../../src/presentation/app-shell/shell/lifecycle/ApplicationQuitConfirmationBridge'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 import type { ApplicationQuitRequest } from '../../../src/platform/ipc/applicationQuitChannels'
 

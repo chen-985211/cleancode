@@ -3,11 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import {
   defaultApplicationShortcutBindings,
   type ApplicationShortcutBindings
-} from '../../../src/presentation/app-shell/applicationShortcuts'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 import {
   useApplicationShortcuts,
   type ApplicationShortcutActions
-} from '../../../src/presentation/app-shell/useApplicationShortcuts'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/useApplicationShortcuts'
 
 describe('application shortcut dispatch', () => {
   it.each([

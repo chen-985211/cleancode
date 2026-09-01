@@ -15,7 +15,7 @@ import {
 } from '../support/e2eWorkbench'
 import { waitForCanvasViewportZoomCommit } from '../support/e2eCanvasViewport'
 import { pollUntilState } from '../support/e2ePolling'
-import { resolveWorkbenchNodeFocusZoom } from '../../src/presentation/app-shell/workbenchNodeFocusViewport'
+import { resolveWorkbenchNodeFocusZoom } from '../../src/presentation/app-shell/workbench/viewport/workbenchNodeFocusViewport'
 
 describe('canvas selection viewport e2e', () => {
   let workbench: E2eWorkbench

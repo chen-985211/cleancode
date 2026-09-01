@@ -3,7 +3,7 @@ import {
   completeNotificationStatusMotion,
   createNotificationStatusMotionState,
   synchronizeNotificationStatusMotion
-} from '../../../src/presentation/app-shell/notificationStatusMotion'
+} from '../../../src/presentation/app-shell/app-features/notifications/notificationStatusMotion'
 
 describe('notification status motion', () => {
   it('keeps the previous status visual until its icon spring settles', () => {

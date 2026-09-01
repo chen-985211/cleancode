@@ -20,8 +20,8 @@ import {
   applyAgentRuntimeEvent,
   rememberLatestAgentRuntimeEvent
 } from '../../../contexts/agent/presentation/view-models/agentRuntimeReconciliation'
-import type { AgentTerminalMeasurement } from '../agentConsoleModel'
-import { isTestRuntime } from '../agentConsoleModel'
+import type { AgentTerminalMeasurement } from '../workbench/nodes/agent/agentConsoleModel'
+import { isTestRuntime } from '../workbench/nodes/agent/agentConsoleModel'
 import { readTerminalSourceTheme } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
 import { defaultTerminalDimensions } from '../types/terminalFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'

@@ -1,7 +1,7 @@
 import type { TerminalSessionStatus } from '../../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalViewState } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { MinimapFlowNode } from '../types/workbenchFlowNode'
-import { getTerminalStatusColor } from '../minimapInteraction'
+import { getTerminalStatusColor } from '../workbench/minimap/minimapInteraction'
 
 interface TerminalMinimapAppearanceInput {
   readonly node: MinimapFlowNode

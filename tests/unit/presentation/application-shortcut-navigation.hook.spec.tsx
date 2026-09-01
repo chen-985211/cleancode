@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import { act, renderHook } from '@testing-library/react'
 
-import { useApplicationShortcutNavigation } from '../../../src/presentation/app-shell/useApplicationShortcutNavigation'
+import { useApplicationShortcutNavigation } from '../../../src/presentation/app-shell/app-features/shortcuts/useApplicationShortcutNavigation'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 

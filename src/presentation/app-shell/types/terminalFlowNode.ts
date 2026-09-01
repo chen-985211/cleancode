@@ -17,7 +17,7 @@ import type {
   TerminalViewState
 } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { CanvasObjectIdentity } from '../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import type { AgentApprovalNodeIntent } from '../agentToolApprovalTypes'
+import type { AgentApprovalNodeIntent } from '../workbench/nodes/agent/agentToolApprovalTypes'
 import type { WorkbenchNodeLayoutInput } from './workbenchNodeLayout'
 import type { WorkbenchObjectMotionNodeData } from './workbenchObjectMotion'
 

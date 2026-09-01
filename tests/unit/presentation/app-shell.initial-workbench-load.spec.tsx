@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
 import { createDeferred } from '../../fixtures/deferred'
 import {
   createRuntimeApi,

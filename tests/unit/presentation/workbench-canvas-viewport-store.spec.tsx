@@ -3,7 +3,7 @@ import { act, render, screen } from '@testing-library/react'
 import {
   createWorkbenchCanvasViewportStore,
   useWorkbenchCanvasDetailLevel
-} from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasViewportStore'
 
 describe('workbench canvas viewport store', () => {
   it('publishes only changed presentation values', () => {

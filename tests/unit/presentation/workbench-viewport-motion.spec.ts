@@ -4,7 +4,7 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import {
   resolveWorkbenchViewportCommandTarget,
   resolveWorkbenchViewportTransition
-} from '../../../src/presentation/app-shell/workbenchViewportMotion'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench viewport motion', () => {
   it.each([

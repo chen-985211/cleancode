@@ -9,7 +9,7 @@ import { createExpectedAppError } from '../../../src/shared-kernel/application/e
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 import { useI18n } from '../../../src/presentation/i18n/useI18n'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
-import { useProjectActions } from '../../../src/presentation/app-shell/useProjectActions'
+import { useProjectActions } from '../../../src/presentation/app-shell/coordinators/useProjectActions'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot

@@ -4,7 +4,7 @@ import {
   createWorkbenchNodeInputSurfaceReadiness,
   isWorkbenchNodeInputSurfaceReady,
   observeWorkbenchNodeInputSurfaceReady
-} from '../../../src/presentation/app-shell/workbenchNodeInputActivation'
+} from '../../../src/presentation/app-shell/workbench/creation/workbenchNodeInputActivation'
 
 describe('workbench node input activation', () => {
   it('activates the xterm input for a terminal node', () => {

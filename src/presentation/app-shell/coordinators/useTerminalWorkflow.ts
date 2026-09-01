@@ -15,10 +15,10 @@ import type {
 } from '../../shared/notifications/appNotifications'
 import { useI18n } from '../../i18n/useI18n'
 import type { Translate } from '../../i18n/messages'
-import { getWorkflowRunRootBlockIds } from '../terminalWorkflowNotifications'
+import { getWorkflowRunRootBlockIds } from '../context-adapters/run/terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import { useTerminalWorkflowNotifications } from '../useTerminalWorkflowNotifications'
-import { useWorkflowNotificationNavigation } from '../useWorkflowNotificationNavigation'
+import { useTerminalWorkflowNotifications } from '../context-adapters/run/useTerminalWorkflowNotifications'
+import { useWorkflowNotificationNavigation } from './useWorkflowNotificationNavigation'
 import { readTerminalSourceTheme } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]

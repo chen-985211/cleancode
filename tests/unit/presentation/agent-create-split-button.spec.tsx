@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
-import { AgentCreateSplitButton } from '../../../src/presentation/app-shell/AgentCreateSplitButton'
-import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
+import { AgentCreateSplitButton } from '../../../src/presentation/app-shell/workbench/creation/AgentCreateSplitButton'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
 import type { CreatableAgentProviderSnapshot } from '../../../src/contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 
@@ -164,11 +164,11 @@ describe('Agent create split button', () => {
       />
     )
     const styles = readFileSync(
-      resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-create.css'),
+      resolve(process.cwd(), 'src/presentation/app-shell/workbench/creation/agent-create.css'),
       'utf8'
     )
     const workbenchStyles = readFileSync(
-      resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+      resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
       'utf8'
     )
     const themeStyles = readFileSync(

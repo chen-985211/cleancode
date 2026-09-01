@@ -1,4 +1,4 @@
-import { createWorkbenchViewportFlight } from '../../../src/presentation/app-shell/workbenchViewportFlight'
+import { createWorkbenchViewportFlight } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportFlight'
 
 describe('workbench viewport flight', () => {
   it('does not widen an anchored zoom at a distant world position', () => {

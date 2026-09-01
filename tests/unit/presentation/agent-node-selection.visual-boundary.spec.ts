@@ -3,19 +3,22 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const agentConsoleStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/agent/agent-console.css'),
   'utf8'
 )
 const selectionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-node-selection.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/workbench-node-selection.css'),
   'utf8'
 )
 const canvasStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
   'utf8'
 )
 const contextMenuStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-object-context-menu.css'),
+  resolve(
+    process.cwd(),
+    'src/presentation/app-shell/workbench/menus/canvas-object-context-menu.css'
+  ),
   'utf8'
 )
 

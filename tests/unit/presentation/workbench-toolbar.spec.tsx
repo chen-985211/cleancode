@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'
+import { WorkbenchToolbar } from '../../../src/presentation/app-shell/workbench/toolbar/WorkbenchToolbar'
 
 describe('workbench toolbar', () => {
   it('keeps only Agent creation in the idle toolbar', () => {

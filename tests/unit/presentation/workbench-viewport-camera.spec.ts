@@ -3,7 +3,7 @@ import {
   resolveWorkbenchViewportCameraVelocity,
   resolveWorkbenchViewportFromCamera,
   resolveWorkbenchViewportSpatialTravel
-} from '../../../src/presentation/app-shell/workbenchViewportCamera'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportCamera'
 
 describe('workbench viewport camera', () => {
   const canvasSize = { height: 640, width: 960 }

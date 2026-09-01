@@ -5,13 +5,16 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { agentApprovalSourceHandleId, agentApprovalTargetHandleId } from '../agentApprovalHandles'
+import {
+  agentApprovalSourceHandleId,
+  agentApprovalTargetHandleId
+} from '../workbench/nodes/agent/agentApprovalHandles'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import type {
   AgentApprovalNodeIntent,
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
-} from '../agentToolApprovalTypes'
+} from '../workbench/nodes/agent/agentToolApprovalTypes'
 import { translate, type Translate } from '../../i18n/messages'
 
 interface AgentApprovalPresentationBase {

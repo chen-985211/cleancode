@@ -28,16 +28,16 @@ import {
 } from '../../../contexts/run/presentation/view-models/terminalSessionOutputBuffer'
 import { dismissTerminalPortConflict } from '../../../contexts/run/presentation/view-models/terminalServiceRunProjection'
 import { useTerminalSessionEvents } from '../../../contexts/run/presentation/view-models/useTerminalSessionEvents'
-import { useTerminalSessionRetention } from '../useTerminalSessionRetention'
+import { useTerminalSessionRetention } from '../context-adapters/run/useTerminalSessionRetention'
 import type { NotifyApp } from '../../shared/notifications/appNotifications'
-import { notifyTerminalLaunchFailure } from '../terminalSessionNotifications'
+import { notifyTerminalLaunchFailure } from '../context-adapters/run/terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from '../../shared/errors/appErrorMessages'
 import { TerminalSurfaceRegistry } from '../../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { readTerminalSourceTheme } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
 import { TerminalWorkloadScheduler } from '../../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
 import { TerminalZoomRasterCoordinator } from '../../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 import { createTerminalStateStore } from '../../../contexts/run/presentation/view-models/terminalStateStore'
-import { createTerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
+import { createTerminalRenderingWorkloadCoordinator } from '../context-adapters/run/terminalRenderingWorkloadCoordinator'
 import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention

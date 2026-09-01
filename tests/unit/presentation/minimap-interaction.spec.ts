@@ -1,4 +1,4 @@
-import { filterMinimapNodes } from '../../../src/presentation/app-shell/minimapInteraction'
+import { filterMinimapNodes } from '../../../src/presentation/app-shell/workbench/minimap/minimapInteraction'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('minimap interaction', () => {

@@ -15,10 +15,10 @@ import { executeQuickExecutionTarget } from './executeQuickExecutionTarget'
 import type { AppNotificationController } from '../../shared/notifications/appNotifications'
 import { resolveUserFacingErrorMessage } from '../../shared/errors/appErrorMessages'
 import { useI18n } from '../../i18n/useI18n'
-import { focusQuickExecutionTargetInCanvas } from '../quickExecutionFocus'
+import { focusQuickExecutionTargetInCanvas } from '../workbench/viewport/quickExecutionFocus'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-import { useCanvasQuickExecutionFollowPreference } from '../useCanvasQuickExecutionFollowPreference'
+import { useCanvasQuickExecutionFollowPreference } from '../app-features/settings/useCanvasQuickExecutionFollowPreference'
 
 export function useQuickExecutionActions({
   currentWorkbench,

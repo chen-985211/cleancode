@@ -6,7 +6,7 @@ const terminalGroupStyles = readFileSync(
   'utf8'
 )
 const workbenchCanvasStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
   'utf8'
 )
 

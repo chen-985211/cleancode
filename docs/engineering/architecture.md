@@ -426,9 +426,34 @@ src/
     config/
   presentation/
     app-shell/
+      shell/
+        lifecycle/
+        project-sidebar/
+      workbench/
+        assets/
+        toolbar/
+        viewport/
+        nodes/
+          agent/
+          terminal/
+          terminal-group/
+        menus/
+        minimap/
+        creation/
+      app-features/
+        settings/
+          assets/
+        notifications/
+        shortcuts/
+      context-adapters/
+        project/
+        block-graph/
+        canvas-arrangement/
+        run/
       coordinators/
       projections/
       types/
+      styles/
     routes/
     layouts/
 ```
@@ -448,6 +473,23 @@ Electron 主进程代码只负责应用启动、窗口生命周期、菜单、IP
 普通终端持久 Provider 以独立 Node 进程入口运行：Platform 只负责构建入口、启动参数和 Run composition，协议认证、PTY/model 所有权、checkpoint 与恢复实现位于 Run infrastructure。renderer、Electron main 与 Provider 可以分别故障；重建窗口或应用 controller 不得绕过 `TerminalSessionService` 直接读取 Provider socket 或恢复文件。
 
 `src/presentation` 只放跨上下文的应用外壳、路由和布局。上下文专属界面必须放在对应上下文的 `presentation` 目录。
+
+### App Shell 内部目录职责
+
+`src/presentation/app-shell` 是应用启动后的跨上下文 UI 组合边界，不是新的业务上下文，也不是承载无法判断 owner 的通用目录。其内部目录职责如下：
+
+| 目录                 | 准确职责                                                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shell/`             | 放置 App Shell React 根组件、Provider 装配和仅与 UI 壳相关的生命周期。`ReactDOM` 启动仍由 `src/platform/renderer-bootstrap` 负责；Electron 窗口、进程和系统生命周期仍由 Platform 负责。                        |
+| `workbench/`         | 放置工作台布局、React Flow 画布、节点 wrapper、视口与相机、选择、菜单和 Minimap。目录继续按 `nodes/`、`menus/`、`viewport/` 等稳定界面职责组织，不创建含义宽泛的 `components/`。                               |
+| `app-features/`      | 放置没有业务 Context owner 的应用级 UI 功能，例如设置入口、通知中心和快捷键界面。功能一旦形成独立业务概念、状态和不变量，必须建立或归入明确的限界上下文。                                                      |
+| `context-adapters/`  | 将单个 Context 的公开 Application 或 Presentation 契约适配为 App Shell 所需的输入、事件和操作。适配器可以理解 App Shell 组合契约，但不得依赖 Context Infrastructure、内部模型或重新实现该 Context 的业务语义。 |
+| `coordinators/`      | 协调两个以上 Context 的用户界面流程、公开命令调用、临时状态和执行顺序。协调器不得承载业务规则、事务一致性或领域事实；需要保证业务结果的编排必须进入明确的应用层用例或 Platform composition root。              |
+| `projections/`       | 无副作用地把一个或多个 Context 的公开 DTO、ViewModel 或组件输入投影成 Workbench 显示模型。投影不得执行命令、访问外部能力或成为新的事实来源。                                                                   |
+| `types/`             | 只放 App Shell 自己拥有、被多个内部区域共同使用的 UI 组合类型。不得复制 Context DTO、重新导出 Context 类型或创造跨上下文领域模型。                                                                             |
+| `styles/`、`assets/` | 只放跨区域或应用壳级资源。功能专属样式和资源必须与所属功能就近放置。                                                                                                                                           |
+
+只服务于一个功能区域的 coordinator、projection、类型、样式或资源必须下沉到该区域，根级目录只保留真正跨区域的内容。上述子目录按实际职责创建，不使用空目录或占位文件预建尚不存在的能力。
 
 目录允许随着实现演进新增子目录，但不得改变限界上下文优先、四层职责和依赖方向。
 

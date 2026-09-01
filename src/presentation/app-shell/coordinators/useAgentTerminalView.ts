@@ -8,7 +8,7 @@ import {
 } from '../../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
 import { createTerminalXtermSurface } from '../../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { useTerminalSurfaceRegistry } from '../../../contexts/run/presentation/terminal-surface/useTerminalSurfaceRegistry'
-import type { AgentTerminalMeasurement } from '../agentConsoleModel'
+import type { AgentTerminalMeasurement } from '../workbench/nodes/agent/agentConsoleModel'
 import type { TerminalDimensions } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 const terminalInputBatchWindowMs = 16

@@ -2,16 +2,16 @@ import { act, render } from '@testing-library/react'
 import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
-import type * as WorkbenchViewportMotionModule from '../../../src/presentation/app-shell/workbenchViewportMotion'
-import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
+import type * as WorkbenchViewportMotionModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
+import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
 
 import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/projections/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { WorkbenchCanvas } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvas'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null,
@@ -24,15 +24,21 @@ const directZoomSpies = vi.hoisted(() => ({
   cancel: vi.fn()
 }))
 
-vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
-  cancelWorkbenchDirectZoom: directZoomSpies.cancel
-}))
+vi.mock(
+  '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
+    cancelWorkbenchDirectZoom: directZoomSpies.cancel
+  })
+)
 
-vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkbenchViewportMotionModule>()),
-  cancelWorkbenchViewportMotion: viewportMotionSpies.cancel
-}))
+vi.mock(
+  '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof WorkbenchViewportMotionModule>()),
+    cancelWorkbenchViewportMotion: viewportMotionSpies.cancel
+  })
+)
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()

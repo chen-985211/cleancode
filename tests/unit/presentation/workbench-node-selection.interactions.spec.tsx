@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/useWorkbenchNodeSelection'
+import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/workbench/nodes/useWorkbenchNodeSelection'
 
 describe('workbench node selection', () => {
   it('clears terminal, terminal group, and Agent selection from the canvas pane', () => {

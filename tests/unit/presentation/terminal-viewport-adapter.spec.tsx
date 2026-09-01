@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalRuntimeViewportProps } from '../../../src/contexts/run/presentation/components/TerminalRuntimeViewport'
-import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
+import { TerminalViewport } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalViewport'
 
 const viewportMockState = vi.hoisted(() => ({
   props: null as TerminalRuntimeViewportProps | null

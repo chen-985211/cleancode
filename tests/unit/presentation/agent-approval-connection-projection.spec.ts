@@ -5,7 +5,7 @@ import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../../../src/p
 import type {
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
-} from '../../../src/presentation/app-shell/agentToolApprovalTypes'
+} from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
 
 describe('Agent connection approval edge projection', () => {
   it('highlights the real workflow edge without replacing its persistent identity', () => {

@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react'
 
 import type { AgentGraphUpdatedEvent } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
-import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import { AgentConsole } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot

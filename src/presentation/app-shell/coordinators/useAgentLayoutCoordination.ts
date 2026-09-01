@@ -3,23 +3,23 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 
 import type { AgentGraphUpdatedEvent } from '../../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { resolveNodeSize } from '../resolveNodeSize'
+import { resolveNodeSize } from '../workbench/nodes/resolveNodeSize'
 import { toAgentFlowNodeId } from '../projections/agentConsoleFlowNode'
-import { resolveWorkbenchLayoutFocusRequest } from '../resolveWorkbenchLayoutFocusRequest'
+import { resolveWorkbenchLayoutFocusRequest } from '../workbench/viewport/resolveWorkbenchLayoutFocusRequest'
 import type { TerminalGroupFlowNode } from '../types/terminalGroupFlowNode'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import {
   useWorkbenchLayoutFocus,
   type WorkbenchLayoutFocusRequest
-} from '../useWorkbenchLayoutFocus'
-import type { WorkbenchNodeStore } from '../workbenchNodeStore'
-import { restoreWorkbenchNodeLayout } from '../restoreWorkbenchNodeLayout'
+} from '../workbench/viewport/useWorkbenchLayoutFocus'
+import type { WorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
+import { restoreWorkbenchNodeLayout } from '../workbench/nodes/restoreWorkbenchNodeLayout'
 import { useTerminalWorkflowBuildChoreography } from './useTerminalWorkflowBuildChoreography'
 import {
   defaultTerminalWorkflowBuildMode,
   type TerminalWorkflowBuildMode
-} from '../terminalWorkflowBuildPreference'
+} from '../app-features/settings/terminalWorkflowBuildPreference'
 
 interface UseAgentLayoutCoordinationInput {
   readonly clearTerminalGroupDropPreview: () => void

@@ -9,7 +9,7 @@ import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/coord
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('Agent layout projection timing', () => {
   beforeEach(() => {

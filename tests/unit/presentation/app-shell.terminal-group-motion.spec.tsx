@@ -7,7 +7,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
 import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'

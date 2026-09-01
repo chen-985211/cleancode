@@ -7,7 +7,7 @@ import type {
   TerminalBlockSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
-import { writeCanvasQuickExecutionFollowPreference } from '../../../src/presentation/app-shell/canvasQuickExecutionFollowPreference'
+import { writeCanvasQuickExecutionFollowPreference } from '../../../src/presentation/app-shell/app-features/settings/canvasQuickExecutionFollowPreference'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import { useQuickExecutionActions } from '../../../src/presentation/app-shell/coordinators/useQuickExecutionActions'

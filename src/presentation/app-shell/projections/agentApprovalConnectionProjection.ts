@@ -8,8 +8,8 @@ import {
 import {
   agentApprovalConnectionSourceHandleId,
   agentApprovalConnectionTargetHandleId
-} from '../agentApprovalHandles'
-import type { AgentToolApprovalViewState } from '../agentToolApprovalTypes'
+} from '../workbench/nodes/agent/agentApprovalHandles'
+import type { AgentToolApprovalViewState } from '../workbench/nodes/agent/agentToolApprovalTypes'
 
 type ResolvedConnectionApproval = Extract<
   AgentApprovalPresentation,

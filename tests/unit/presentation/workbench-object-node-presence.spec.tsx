@@ -1,8 +1,8 @@
 import { render, waitFor } from '@testing-library/react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
-import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
+import { AgentNode } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentNode'
+import { TerminalNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalNode'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
@@ -20,25 +20,28 @@ interface ResizeControlProps {
   readonly style?: CSSProperties
 }
 
-vi.mock('../../../src/presentation/app-shell/AgentConsole', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole', () => ({
   AgentConsole: () => <div data-testid="agent-console" />
 }))
 
-vi.mock('../../../src/presentation/app-shell/TerminalViewport', async () => {
-  const React = await import('react')
-  return {
-    TerminalViewport: ({
-      onDimensionsChange
-    }: {
-      readonly onDimensionsChange: (dimensions: { columns: number; rows: number }) => void
-    }) => {
-      React.useEffect(() => {
-        onDimensionsChange({ columns: 80, rows: 24 })
-      }, [onDimensionsChange])
-      return <div data-testid="terminal-viewport" />
+vi.mock(
+  '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalViewport',
+  async () => {
+    const React = await import('react')
+    return {
+      TerminalViewport: ({
+        onDimensionsChange
+      }: {
+        readonly onDimensionsChange: (dimensions: { columns: number; rows: number }) => void
+      }) => {
+        React.useEffect(() => {
+          onDimensionsChange({ columns: 80, rows: 24 })
+        }, [onDimensionsChange])
+        return <div data-testid="terminal-viewport" />
+      }
     }
   }
-})
+)
 
 describe('workbench object node presence', () => {
   it('scales the complete terminal shell and suppresses auto-start while deleting', async () => {

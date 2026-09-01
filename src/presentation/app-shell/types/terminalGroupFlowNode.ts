@@ -11,7 +11,7 @@ import type {
   TerminalViewState
 } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { CanvasObjectIdentity } from '../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import type { AgentApprovalNodeIntent } from '../agentToolApprovalTypes'
+import type { AgentApprovalNodeIntent } from '../workbench/nodes/agent/agentToolApprovalTypes'
 import type { WorkbenchObjectMotionNodeData } from './workbenchObjectMotion'
 
 interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {

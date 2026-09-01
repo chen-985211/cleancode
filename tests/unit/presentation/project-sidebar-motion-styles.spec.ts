@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const shellStyles = readStyle('base.css')
+const shellStyles = readStyle('styles/base.css')
 const sidebarStyles = readProjectStyle('project-sidebar.css')
-const sidebarLayoutStyles = readStyle('project-sidebar-layout.css')
-const titlebarStyles = readStyle('project-sidebar-titlebar.css')
-const canvasStyles = readStyle('workbench-canvas.css')
+const sidebarLayoutStyles = readStyle('shell/project-sidebar/project-sidebar-layout.css')
+const titlebarStyles = readStyle('shell/project-sidebar/project-sidebar-titlebar.css')
+const canvasStyles = readStyle('workbench/workbench-canvas.css')
 
 describe('project sidebar motion styles', () => {
   it('keeps the application layout stable while motion is running on compositor surfaces', () => {
@@ -97,7 +97,7 @@ describe('project sidebar motion styles', () => {
 })
 
 function readStyle(fileName: string): string {
-  return readFileSync(resolve(process.cwd(), 'src/presentation/app-shell/styles', fileName), 'utf8')
+  return readFileSync(resolve(process.cwd(), 'src/presentation/app-shell', fileName), 'utf8')
 }
 
 function readProjectStyle(fileName: string): string {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { CSSProperties } from 'react'
 
-import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
+import { AgentNode } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentNode'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 
 vi.mock('@xyflow/react', () => ({
@@ -49,7 +49,7 @@ interface NodeResizerProps {
   readonly isVisible?: boolean
 }
 
-vi.mock('../../../src/presentation/app-shell/AgentConsole', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole', () => ({
   AgentConsole: () => null
 }))
 

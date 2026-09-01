@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import {
   collectAgentProviderBoundaryViolations,
@@ -97,7 +97,7 @@ describe('Agent Provider boundary quality gate', () => {
       )
       await writePresentationFile(
         directory,
-        'agentConsoleModel.ts',
+        'workbench/nodes/agent/agentConsoleModel.ts',
         [
           "const rendererLegacyDefaultProviderId = 'codex'",
           'export const fallbackProviderId = rendererLegacyDefaultProviderId',
@@ -109,12 +109,12 @@ describe('Agent Provider boundary quality gate', () => {
 
       await writePresentationFile(
         directory,
-        'agentConsoleModel.ts',
+        'workbench/nodes/agent/agentConsoleModel.ts',
         "const unrecordedFallback = 'codex'\n"
       )
       expect(collectAgentProviderBoundaryViolations({ cwd: directory })).toEqual([
         expect.objectContaining({
-          filePath: 'src/presentation/app-shell/agentConsoleModel.ts',
+          filePath: 'src/presentation/app-shell/workbench/nodes/agent/agentConsoleModel.ts',
           rule: 'no-provider-id-literal'
         })
       ])
@@ -187,7 +187,7 @@ async function writePresentationFile(
   fileName: string,
   content: string
 ): Promise<void> {
-  const presentationDirectory = join(directory, 'src', 'presentation', 'app-shell')
-  await mkdir(presentationDirectory, { recursive: true })
-  await writeFile(join(presentationDirectory, fileName), content)
+  const targetPath = join(directory, 'src', 'presentation', 'app-shell', fileName)
+  await mkdir(dirname(targetPath), { recursive: true })
+  await writeFile(targetPath, content)
 }

@@ -2,7 +2,7 @@ import {
   createAgentCreateMenuHighlightMotionController,
   type AgentCreateMenuHighlightMotionFrameScheduler,
   type AgentCreateMenuHighlightMotionRoot
-} from '../../../src/presentation/app-shell/agentCreateMenuHighlightMotion'
+} from '../../../src/presentation/app-shell/workbench/creation/agentCreateMenuHighlightMotion'
 
 describe('Agent create menu highlight motion', () => {
   it('lands the first highlight directly and retargets the moving spring without a jump', () => {

@@ -4,7 +4,7 @@ import type { AgentGraphUpdatedEvent } from '../../../src/contexts/agent/applica
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/coordinators/useAgentLayoutCoordination'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('terminal workflow build coordination', () => {
   let animationFrames: Map<number, FrameRequestCallback>

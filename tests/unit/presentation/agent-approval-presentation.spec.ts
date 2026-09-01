@@ -5,7 +5,7 @@ import {
   createAgentApprovalNodeIntents,
   resolveAgentApprovalPresentation
 } from '../../../src/presentation/app-shell/projections/agentApprovalPresentation'
-import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
+import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
 
 describe('Agent approval presentation', () => {
   it('uses a collapsed containing group as the visible proxy for a terminal target', () => {

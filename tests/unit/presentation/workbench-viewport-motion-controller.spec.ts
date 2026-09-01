@@ -4,7 +4,7 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import {
   createWorkbenchViewportMotionController,
   type WorkbenchViewportCommand
-} from '../../../src/presentation/app-shell/workbenchViewportMotion'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
   it('exposes the live presentation while the renderer viewport is still stale', async () => {

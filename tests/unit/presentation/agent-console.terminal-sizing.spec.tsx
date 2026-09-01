@@ -1,6 +1,6 @@
 import { act, render, waitFor } from '@testing-library/react'
 
-import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import { AgentConsole } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole'
 import type {
   TerminalSurface,
   TerminalSurfaceAttachment

@@ -1,5 +1,5 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { resolveCanvasObjectContextTarget } from '../../../src/presentation/app-shell/canvasObjectContextTarget'
+import { resolveCanvasObjectContextTarget } from '../../../src/presentation/app-shell/workbench/menus/canvasObjectContextTarget'
 
 describe('canvas object context target', () => {
   const graph = createGraph()

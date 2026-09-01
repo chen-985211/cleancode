@@ -5,7 +5,7 @@ import {
   createIdleTerminalState,
   type TerminalViewState
 } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/applyWorkbenchNodeChanges'
+import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/workbench/nodes/applyWorkbenchNodeChanges'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
