@@ -8,6 +8,7 @@ import type {
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import type { ShortcutPlatform } from './applicationShortcuts'
+import { QuickExecutionBar } from '../../contexts/block-graph/presentation/components/QuickExecutionBar'
 import { CanvasArrangementOverlay } from './CanvasArrangementOverlay'
 import type {
   CanvasArrangementSelection,
@@ -15,7 +16,6 @@ import type {
 } from './canvasArrangementSelection'
 import { useI18n } from '../i18n/useI18n'
 import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
-import { QuickExecutionBar } from './QuickExecutionBar'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
 export type ArrangeCanvasSelectionHandler = (

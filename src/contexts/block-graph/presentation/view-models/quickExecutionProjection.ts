@@ -3,12 +3,9 @@ import type {
   QuickExecutionSlotNumber,
   QuickExecutionTargetSnapshot,
   TerminalBlockSnapshot
-} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { TerminalWorkflowPlanScope } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
-import {
-  resolveCanvasObjectContextTarget,
-  type CanvasTerminalObjectContextTarget
-} from './canvasObjectContextTarget'
+} from '../../application/dto/BlockGraphSnapshot'
+import type { TerminalCanvasObjectContextTarget } from './terminalCanvasContextTarget'
+import { resolveTerminalCanvasObjectContextTarget } from './terminalCanvasContextTarget'
 
 export interface QuickExecutionCandidate {
   readonly key: string
@@ -39,11 +36,11 @@ export function listQuickExecutionCandidates(graph: BlockGraphSnapshot): QuickEx
   const seenKeys = new Set<string>()
 
   for (const block of graph.blocks) {
-    const contextTarget = resolveCanvasObjectContextTarget(graph, {
+    const contextTarget = resolveTerminalCanvasObjectContextTarget(graph, {
       nodeId: block.id,
       nodeType: 'terminal'
     })
-    if (!contextTarget || contextTarget.kind === 'agent') continue
+    if (!contextTarget) continue
 
     const target = toQuickExecutionTarget(contextTarget)
     const projection = resolveQuickExecutionBinding(graph, target)
@@ -95,7 +92,7 @@ export function resolveQuickExecutionBinding(
   if (target.type === 'terminal') {
     const block = graph.blocks.find((candidate) => candidate.id === target.terminalBlockId)
     const resolved = block
-      ? resolveCanvasObjectContextTarget(graph, {
+      ? resolveTerminalCanvasObjectContextTarget(graph, {
           nodeId: block.id,
           nodeType: 'terminal'
         })
@@ -113,7 +110,7 @@ export function resolveQuickExecutionBinding(
   const blocksById = new Map(graph.blocks.map((block) => [block.id, block]))
   const firstExistingBlockId = target.terminalBlockIds.find((blockId) => blocksById.has(blockId))
   const resolved = firstExistingBlockId
-    ? resolveCanvasObjectContextTarget(graph, {
+    ? resolveTerminalCanvasObjectContextTarget(graph, {
         nodeId: firstExistingBlockId,
         nodeType: 'terminal'
       })
@@ -140,7 +137,7 @@ export function resolveQuickExecutionBinding(
 }
 
 export function toQuickExecutionTarget(
-  target: CanvasTerminalObjectContextTarget
+  target: TerminalCanvasObjectContextTarget
 ): QuickExecutionTargetSnapshot {
   if (target.kind === 'combination') {
     return { type: 'combination', terminalGroupId: target.groupId }
@@ -155,42 +152,4 @@ export function quickExecutionTargetKey(target: QuickExecutionTargetSnapshot): s
   if (target.type === 'terminal') return `terminal:${target.terminalBlockId}`
   if (target.type === 'combination') return `combination:${target.terminalGroupId}`
   return `workflow:${target.terminalBlockIds.join('\0')}`
-}
-
-export async function executeQuickExecutionTarget({
-  graph,
-  target,
-  quickLaunchTerminal,
-  requestTerminalLaunchCommand,
-  startScope,
-  startTerminalCombination
-}: {
-  readonly graph: BlockGraphSnapshot
-  readonly target: QuickExecutionTargetSnapshot
-  readonly quickLaunchTerminal: (block: TerminalBlockSnapshot) => Promise<unknown> | unknown
-  readonly requestTerminalLaunchCommand: (blockId: string) => void
-  readonly startScope: (scope: TerminalWorkflowPlanScope) => Promise<unknown> | unknown
-  readonly startTerminalCombination: (terminalGroupId: string) => Promise<unknown> | unknown
-}): Promise<boolean> {
-  if (!resolveQuickExecutionBinding(graph, target).isAvailable) return false
-
-  if (target.type === 'combination') {
-    await startTerminalCombination(target.terminalGroupId)
-    return true
-  }
-
-  if (target.type === 'workflow') {
-    await startScope({ type: 'block-set', blockIds: target.terminalBlockIds })
-    return true
-  }
-
-  const block = graph.blocks.find((candidate) => candidate.id === target.terminalBlockId)
-  if (!block) return false
-  if (!block.launchCommand.trim()) {
-    requestTerminalLaunchCommand(block.id)
-    return true
-  }
-
-  await quickLaunchTerminal(block)
-  return true
 }

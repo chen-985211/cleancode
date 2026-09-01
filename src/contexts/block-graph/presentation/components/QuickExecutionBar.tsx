@@ -12,14 +12,14 @@ import type {
   BlockGraphSnapshot,
   QuickExecutionSlotNumber,
   QuickExecutionTargetSnapshot
-} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+} from '../../application/dto/BlockGraphSnapshot'
 import {
   listQuickExecutionCandidates,
   readQuickExecutionSlots,
   resolveQuickExecutionBinding,
   type QuickExecutionBindingProjection,
   type QuickExecutionCandidate
-} from './quickExecutionTargets'
+} from '../view-models/quickExecutionProjection'
 import {
   blackHoleProximityThreshold,
   createQuickExecutionReturnAnimation,
@@ -28,24 +28,19 @@ import {
   type DragAnimation,
   type DragPreview,
   type DragPreviewGeometry
-} from './quickExecutionDrag'
+} from '../view-models/quickExecutionDrag'
 import { QuickExecutionProxyCard, TypeIcon } from './quickExecutionDragPresentation'
-import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
-import {
-  defaultApplicationShortcutBindings,
-  formatShortcutBinding,
-  type ShortcutPlatform
-} from './applicationShortcuts'
-import blackHoleMotionUrl from './assets/quick-execution-black-hole-motion.webm'
-import blackHoleAssetUrl from './assets/quick-execution-black-hole.png'
-import { useI18n } from '../i18n/useI18n'
-import { AnchoredSurfaceMotion } from './AppShellSurfaceMotion'
-import { TooltipLabel } from '../shared/components/Tooltip'
-import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
-import { WorkbenchIcon } from './WorkbenchIcons'
-import { useOutsidePointerDismiss } from '../shared/hooks/useOutsidePointerDismiss'
+import blackHoleMotionUrl from '../assets/quick-execution-black-hole-motion.webm'
+import blackHoleAssetUrl from '../assets/quick-execution-black-hole.png'
+import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
+import { useQuickExecutionDragMotionPresentation } from '../motion/useQuickExecutionDragMotionPresentation'
+import { QuickExecutionIcon } from './QuickExecutionIcons'
 
 type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
+type QuickExecutionShortcutPlatform = 'mac' | 'other'
 
 interface QuickExecutionBarProps {
   readonly isExternalDropTarget?: boolean
@@ -63,10 +58,8 @@ interface QuickExecutionBarProps {
     sourceNumber: QuickExecutionSlotNumber,
     destinationNumber: QuickExecutionSlotNumber
   ) => Promise<void> | void
-  readonly shortcutPlatform?: ShortcutPlatform
-  readonly shortcutTooltips?: Partial<
-    Pick<ApplicationShortcutTooltipLabels, QuickExecutionShortcutCommand>
-  >
+  readonly shortcutPlatform?: QuickExecutionShortcutPlatform
+  readonly shortcutTooltips?: Partial<Record<QuickExecutionShortcutCommand, string>>
 }
 
 type PopoverState =
@@ -122,7 +115,7 @@ export function QuickExecutionBar({
     className: clearMotionClassName,
     onAnimationEnd: onClearMotionAnimationEnd,
     surfaceRef: clearMotionSurfaceRef
-  } = useWorkbenchObjectMotionPresentation(clearAnimation?.motion, completeClearAnimation)
+  } = useQuickExecutionDragMotionPresentation(clearAnimation?.motion, completeClearAnimation)
   const completeReturnAnimation = useCallback((motionId: string): void => {
     setReturnAnimation((current) => (current?.motion.id === motionId ? null : current))
   }, [])
@@ -130,7 +123,7 @@ export function QuickExecutionBar({
     className: returnMotionClassName,
     onAnimationEnd: onReturnMotionAnimationEnd,
     surfaceRef: returnMotionSurfaceRef
-  } = useWorkbenchObjectMotionPresentation(returnAnimation?.motion, completeReturnAnimation)
+  } = useQuickExecutionDragMotionPresentation(returnAnimation?.motion, completeReturnAnimation)
   const candidates = useMemo(() => listQuickExecutionCandidates(graph), [graph])
   const slots = useMemo(
     () =>
@@ -409,7 +402,7 @@ export function QuickExecutionBar({
               type="button"
               onClick={() => openPopover({ type: 'candidates', number: presentedPopover.number })}
             >
-              <WorkbenchIcon role="restart" size={14} />
+              <QuickExecutionIcon role="rebind" size={14} />
               {t('quickExecution.rebind')}
             </button>
           </div>
@@ -420,10 +413,7 @@ export function QuickExecutionBar({
           const projection = slot.projection
           const isUnavailable = Boolean(projection && !projection.isAvailable)
           const shortcutCommand = `quickExecution${slot.number}` as QuickExecutionShortcutCommand
-          const defaultShortcut = formatShortcutBinding(
-            defaultApplicationShortcutBindings[shortcutCommand],
-            shortcutPlatform
-          ).join(shortcutPlatform === 'mac' ? '' : '+')
+          const defaultShortcut = `${shortcutPlatform === 'mac' ? '⌘' : 'Ctrl+'}${slot.number}`
           const shortcutHint =
             shortcutTooltips?.[shortcutCommand] ??
             t('quickExecution.tooltip.executeShortcut', { shortcut: defaultShortcut })
@@ -502,7 +492,11 @@ export function QuickExecutionBar({
                     }
                   >
                     <kbd>{slot.number}</kbd>
-                    <WorkbenchIcon className="quick-execution__type-icon" role="add" size={13} />
+                    <QuickExecutionIcon
+                      className="quick-execution__type-icon"
+                      role="add"
+                      size={13}
+                    />
                   </button>
                 ) : (
                   <div className="quick-execution__content quick-execution__content--empty">
@@ -519,7 +513,7 @@ export function QuickExecutionBar({
                       openPopover({ type: 'actions', number: slot.number }, event.currentTarget)
                     }
                   >
-                    <WorkbenchIcon role="more" size={13} />
+                    <QuickExecutionIcon role="more" size={13} />
                   </button>
                 ) : null}
               </div>

@@ -1,10 +1,5 @@
-import type {
-  TerminalFlowNode,
-  TerminalGroupDropFeedback,
-  TerminalGroupFlowNode,
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from './types'
+import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
+import type { TerminalGroupDropFeedback } from './TerminalGroupPresentationTypes'
 
 export type TerminalGroupDropAction =
   | {
@@ -19,11 +14,22 @@ export type TerminalGroupDropAction =
       readonly type: 'none'
     }
 
+interface TerminalGroupDropNode {
+  readonly id: string
+  readonly type?: string
+  readonly position: { readonly x: number; readonly y: number }
+  readonly width?: number
+  readonly height?: number
+  readonly measured?: { readonly width?: number; readonly height?: number }
+  readonly style?: { readonly width?: number | string; readonly height?: number | string }
+  readonly data: Readonly<Record<string, unknown>>
+}
+
 interface ResolveTerminalGroupDropActionInput {
-  readonly graph: WorkbenchSnapshot['graph']
-  readonly draggedNode: TerminalFlowNode
+  readonly graph: BlockGraphSnapshot
+  readonly draggedNode: TerminalGroupDropNode
   readonly editingTerminalGroupId?: string
-  readonly nodes: readonly WorkbenchFlowNode[]
+  readonly nodes: readonly TerminalGroupDropNode[]
 }
 
 export function resolveTerminalGroupDropAction({
@@ -36,9 +42,7 @@ export function resolveTerminalGroupDropAction({
   const currentGroup = graph.terminalGroups.find((group) =>
     group.memberBlockIds.includes(draggedNode.id)
   )
-  const groupNodes = nodes.filter(
-    (node): node is TerminalGroupFlowNode => node.type === 'terminalGroup'
-  )
+  const groupNodes = nodes.filter((node) => node.type === 'terminalGroup')
   const activeGroupId = editingTerminalGroupId ?? currentGroup?.id ?? groupNodes[0]?.id
   if (!activeGroupId) return { type: 'none' }
 
@@ -60,25 +64,6 @@ export function resolveTerminalGroupDropAction({
   return targetGroupNode
     ? { type: 'join-group', terminalGroupId: targetGroupNode.id }
     : { type: 'none' }
-}
-
-export function projectTerminalGroupDropAction(
-  nodes: WorkbenchFlowNode[],
-  action: TerminalGroupDropAction
-): WorkbenchFlowNode[] {
-  let didChange = false
-  const nextNodes = nodes.map((node): WorkbenchFlowNode => {
-    if (node.type !== 'terminalGroup') return node
-
-    const dropFeedback = resolveTerminalGroupDropFeedback(node.id, action)
-
-    if (node.data.dropFeedback === dropFeedback) return node
-
-    didChange = true
-    return { ...node, data: { ...node.data, dropFeedback } }
-  })
-
-  return didChange ? nextNodes : nodes
 }
 
 export function resolveTerminalGroupDropFeedback(
@@ -126,54 +111,36 @@ function isPointInsideRect(
   )
 }
 
-function getNodeCenter(node: TerminalFlowNode): { readonly x: number; readonly y: number } {
-  const width = resolveNodeDimension(node, 'width')
-  const height = resolveNodeDimension(node, 'height')
-
+function getNodeCenter(node: TerminalGroupDropNode): { readonly x: number; readonly y: number } {
   return {
-    x: node.position.x + width / 2,
-    y: node.position.y + height / 2
+    x: node.position.x + resolveNodeDimension(node, 'width') / 2,
+    y: node.position.y + resolveNodeDimension(node, 'height') / 2
   }
 }
 
 function isPointInsideNode(
   point: { readonly x: number; readonly y: number },
-  node: TerminalGroupFlowNode
+  node: TerminalGroupDropNode
 ): boolean {
-  const width = resolveNodeDimension(node, 'width')
-  const height = resolveNodeDimension(node, 'height')
-
-  return (
-    point.x >= node.position.x &&
-    point.x <= node.position.x + width &&
-    point.y >= node.position.y &&
-    point.y <= node.position.y + height
-  )
+  return isPointInsideRect(point, node.position, {
+    width: resolveNodeDimension(node, 'width'),
+    height: resolveNodeDimension(node, 'height')
+  })
 }
 
-function resolveNodeDimension(
-  node: TerminalFlowNode | TerminalGroupFlowNode,
-  dimension: 'width' | 'height'
-): number {
+function resolveNodeDimension(node: TerminalGroupDropNode, dimension: 'width' | 'height'): number {
   const styleValue = node.style?.[dimension]
-
-  if (typeof styleValue === 'number' && Number.isFinite(styleValue)) {
-    return styleValue
-  }
+  if (typeof styleValue === 'number' && Number.isFinite(styleValue)) return styleValue
 
   const nodeValue = node[dimension]
-
-  if (typeof nodeValue === 'number' && Number.isFinite(nodeValue)) {
-    return nodeValue
-  }
+  if (typeof nodeValue === 'number' && Number.isFinite(nodeValue)) return nodeValue
 
   const measuredValue = node.measured?.[dimension]
+  if (typeof measuredValue === 'number' && Number.isFinite(measuredValue)) return measuredValue
 
-  if (typeof measuredValue === 'number' && Number.isFinite(measuredValue)) {
-    return measuredValue
+  const data = node.data as {
+    readonly block?: { readonly size: { readonly width: number; readonly height: number } }
+    readonly group?: { readonly size: { readonly width: number; readonly height: number } }
   }
-
-  return node.type === 'terminal'
-    ? node.data.block.size[dimension]
-    : node.data.group.size[dimension]
+  return data.block?.size[dimension] ?? data.group?.size[dimension] ?? 0
 }

@@ -32,7 +32,7 @@ import { CanvasArrangementSelectionOverlay } from './CanvasArrangementOverlay'
 import { useWorkbenchCanvasArrangement } from './useCanvasStackDragging'
 import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
 import { WorkbenchCanvasBottomControls } from './WorkbenchCanvasBottomControls'
-import { toQuickExecutionTarget } from './quickExecutionTargets'
+import { toQuickExecutionTarget } from '../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { CanvasMenuMotionProvider } from './CanvasMenuMotionProvider'
 import { useCanvasPaneContextMenu } from './useCanvasPaneContextMenu'
@@ -40,7 +40,7 @@ import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEd
 import {
   isTerminalConnectionAllowedInCanvasScope,
   isTerminalConnectionEditableInCanvasScope
-} from './terminalConnectionScope'
+} from '../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
 import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 import { useWorkbenchDirectZoom } from './useWorkbenchDirectZoom'

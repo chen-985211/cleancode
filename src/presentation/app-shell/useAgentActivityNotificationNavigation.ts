@@ -10,7 +10,7 @@ import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import type { AgentActivityNavigationRequest } from './agentActivityNavigation'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { WorkspaceSelectionResult } from './useBranchWorkspaceActions'
-import { resolveVisibleTerminalCanvasTarget } from './visibleTerminalCanvasTarget'
+import { resolveVisibleTerminalCanvasTarget } from '../../contexts/block-graph/presentation/view-models/visibleTerminalCanvasTarget'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 
 interface UseAgentActivityNotificationNavigationInput {

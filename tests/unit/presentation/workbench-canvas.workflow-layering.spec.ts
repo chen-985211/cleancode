@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const terminalGroupStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-group-node.css'),
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/terminal-group-node.css'),
   'utf8'
 )
 const workbenchCanvasStyles = readFileSync(

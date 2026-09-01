@@ -1,6 +1,6 @@
 import type { QuickExecutionTargetSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
-import { toQuickExecutionTarget } from './quickExecutionTargets'
+import { toQuickExecutionTarget } from '../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
 export function resolveTerminalCreationGroupId(

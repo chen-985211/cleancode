@@ -1,5 +1,5 @@
-import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { resolveVisibleTerminalCanvasTarget } from '../../../src/presentation/app-shell/visibleTerminalCanvasTarget'
+import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { resolveVisibleTerminalCanvasTarget } from '../../../../src/contexts/block-graph/presentation/view-models/visibleTerminalCanvasTarget'
 
 describe('visible terminal canvas target', () => {
   it('keeps a visible terminal as the navigation target', () => {

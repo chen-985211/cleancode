@@ -1,6 +1,6 @@
-import type { QuickExecutionTargetSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { DragPreview } from './quickExecutionDrag'
-import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
+import type { QuickExecutionTargetSnapshot } from '../../application/dto/BlockGraphSnapshot'
+import type { DragPreview } from '../view-models/quickExecutionDrag'
+import { QuickExecutionIcon, type QuickExecutionIconRole } from './QuickExecutionIcons'
 
 export function QuickExecutionProxyCard({
   preview,
@@ -31,7 +31,7 @@ export function QuickExecutionProxyCard({
 }
 
 export function TypeIcon({ type }: { readonly type: QuickExecutionTargetSnapshot['type'] }) {
-  const role: WorkbenchIconRole =
+  const role: QuickExecutionIconRole =
     type === 'terminal' ? 'terminal' : type === 'workflow' ? 'workflow' : 'terminal-group'
-  return <WorkbenchIcon className="quick-execution__type-icon" role={role} size={13} />
+  return <QuickExecutionIcon className="quick-execution__type-icon" role={role} size={13} />
 }

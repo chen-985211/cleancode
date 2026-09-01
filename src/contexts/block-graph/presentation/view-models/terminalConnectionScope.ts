@@ -1,7 +1,7 @@
-import type { WorkbenchSnapshot } from './types'
+import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
 
 export function isTerminalConnectionAllowedInCanvasScope(
-  graph: WorkbenchSnapshot['graph'] | null,
+  graph: BlockGraphSnapshot | null,
   sourceBlockId: string | null,
   targetBlockId: string | null,
   editingTerminalGroupId: string | null
@@ -22,7 +22,7 @@ export function isTerminalConnectionAllowedInCanvasScope(
 }
 
 export function isTerminalConnectionEditableInCanvasScope(
-  graph: WorkbenchSnapshot['graph'] | null,
+  graph: BlockGraphSnapshot | null,
   sourceBlockId: string,
   targetBlockId: string,
   editingTerminalGroupId: string | null
@@ -34,9 +34,6 @@ export function isTerminalConnectionEditableInCanvasScope(
   )
 }
 
-function resolveTerminalScope(
-  graph: WorkbenchSnapshot['graph'] | null,
-  blockId: string
-): string | null {
+function resolveTerminalScope(graph: BlockGraphSnapshot | null, blockId: string): string | null {
   return graph?.terminalGroups.find((group) => group.memberBlockIds.includes(blockId))?.id ?? null
 }

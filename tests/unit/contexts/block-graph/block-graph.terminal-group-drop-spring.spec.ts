@@ -4,7 +4,7 @@ import {
   terminalGroupDropRemovalScale,
   type TerminalGroupDropSpringFrameScheduler,
   type TerminalGroupDropSpringSurface
-} from '../../../src/presentation/app-shell/terminalGroupDropSpring'
+} from '../../../../src/contexts/block-graph/presentation/motion/terminalGroupDropSpring'
 
 describe('terminal group drop spring', () => {
   it('springs the group past its engaged scale and settles while a terminal is near', () => {

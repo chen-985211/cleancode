@@ -10,7 +10,7 @@ const languageSettingsStyles = readFileSync(
   'utf8'
 )
 const quickExecutionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/quick-execution.css'),
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/quick-execution.css'),
   'utf8'
 )
 const canvasArrangementStyles = readFileSync(

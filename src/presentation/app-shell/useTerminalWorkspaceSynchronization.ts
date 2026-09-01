@@ -5,7 +5,6 @@ import {
   type TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkingDirectoryChangedEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
-import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import { findWorkspaceByDirectory } from './workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from './types'
 
@@ -320,7 +319,7 @@ async function ensureTerminalBlockForMigratedSession({
     position: sourceBlock.position,
     size: sourceBlock.size
   })
-  const definitionApi = getTerminalDefinitionRuntimeApi()
+  const definitionApi = window.cleancode
   if (typeof definitionApi?.updateTerminalDefinition !== 'function') {
     throw new Error('Terminal definition updates are unavailable.')
   }

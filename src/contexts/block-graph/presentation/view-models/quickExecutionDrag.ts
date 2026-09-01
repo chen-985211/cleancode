@@ -1,6 +1,12 @@
-import type { QuickExecutionSlotNumber } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchObjectMotion } from './types'
-import type { QuickExecutionBindingProjection } from './quickExecutionTargets'
+import type { QuickExecutionSlotNumber } from '../../application/dto/BlockGraphSnapshot'
+import type { QuickExecutionBindingProjection } from './quickExecutionProjection'
+
+export interface QuickExecutionDragMotion {
+  readonly id: string
+  readonly kind: 'delete' | 'move'
+  readonly offset: { readonly x: number; readonly y: number }
+  readonly scale?: { readonly from: number; readonly to: number }
+}
 
 export interface DragPreviewGeometry {
   readonly grabOffsetX: number
@@ -20,7 +26,7 @@ export interface DragPreview extends DragPreviewGeometry {
 }
 
 export interface DragAnimation extends DragPreview {
-  readonly motion: WorkbenchObjectMotion
+  readonly motion: QuickExecutionDragMotion
   readonly targetLeft: number
   readonly targetTop: number
 }

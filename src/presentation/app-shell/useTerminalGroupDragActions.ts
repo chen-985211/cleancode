@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } fr
 
 import {
   isSameTerminalGroupDropAction,
-  projectTerminalGroupDropAction,
   resolveTerminalGroupDropAction,
   type TerminalGroupDropAction
-} from './terminalGroupDropTarget'
+} from '../../contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
+import { projectTerminalGroupDropAction } from './terminalGroupDropProjection'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'

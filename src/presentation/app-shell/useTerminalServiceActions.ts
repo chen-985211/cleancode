@@ -2,7 +2,6 @@ import { useCallback } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalDefinitionInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
-import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
@@ -31,7 +30,7 @@ export function useTerminalServiceActions({
     async (block: TerminalBlockSnapshot, definition: TerminalDefinitionInput) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      const api = getTerminalDefinitionRuntimeApi()
+      const api = window.cleancode
       if (typeof api?.updateTerminalDefinition !== 'function') {
         throw new Error('Terminal definition updates are unavailable.')
       }
@@ -56,7 +55,7 @@ export function useTerminalServiceActions({
   }, [])
 
   const openServiceEndpoint = useCallback(async (identity: TerminalRunIdentity) => {
-    await getTerminalDefinitionRuntimeApi()?.openTerminalServiceEndpoint?.({
+    await window.cleancode?.openTerminalServiceEndpoint?.({
       runId: identity.runId,
       sessionId: identity.sessionId,
       generation: identity.generation

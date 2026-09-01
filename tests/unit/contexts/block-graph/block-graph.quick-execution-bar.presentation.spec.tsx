@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { QuickExecutionBar } from '../../../src/presentation/app-shell/QuickExecutionBar'
+import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { QuickExecutionBar } from '../../../../src/contexts/block-graph/presentation/components/QuickExecutionBar'
 
 describe('quick execution bar', () => {
   it('keeps the bottom surface inert through exit and reuses it when the handoff reverses', () => {

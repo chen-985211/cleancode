@@ -6,7 +6,7 @@ import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/W
 import {
   resolveTerminalGroupDropFeedback,
   type TerminalGroupDropAction
-} from './terminalGroupDropTarget'
+} from '../../contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
 import {
   createTerminalStateStore,
@@ -18,11 +18,11 @@ import type {
   TerminalDimensions,
   TerminalFlowNode,
   TerminalGroupFlowNode,
-  TerminalGroupMetadataInput,
   WorkbenchNodeLayoutInput,
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
+import type { UpdateTerminalGroupMetadataInput } from '../../contexts/block-graph/domain/aggregates/BlockGraphTypes'
 import type { TerminalDefinitionInput } from '../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
@@ -66,7 +66,7 @@ interface TerminalGroupFlowNodeHandlers {
   readonly onRestartGroup: (group: TerminalGroupSnapshot) => void
   readonly onUpdateGroupMetadata: (
     group: TerminalGroupSnapshot,
-    metadata: TerminalGroupMetadataInput
+    metadata: UpdateTerminalGroupMetadataInput
   ) => Promise<void>
   readonly onToggleGroupCollapsed: (
     group: TerminalGroupSnapshot,

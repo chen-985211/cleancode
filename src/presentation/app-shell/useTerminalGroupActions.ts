@@ -4,7 +4,8 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { TerminalGroupMetadataInput, WorkbenchSnapshot } from './types'
+import type { UpdateTerminalGroupMetadataInput } from '../../contexts/block-graph/domain/aggregates/BlockGraphTypes'
+import type { WorkbenchSnapshot } from './types'
 import type { TerminalSessionActionOptions } from './useTerminalSessions'
 
 interface UseTerminalGroupActionsInput {
@@ -78,7 +79,10 @@ export function useTerminalGroupActions({
           void restartTerminal(block, { shouldFocus: false })
         }
       },
-      onUpdateGroupMetadata: (group: TerminalGroupSnapshot, metadata: TerminalGroupMetadataInput) =>
+      onUpdateGroupMetadata: (
+        group: TerminalGroupSnapshot,
+        metadata: UpdateTerminalGroupMetadataInput
+      ) =>
         runGraphMutation(async (projectDirectory, workspaceId) =>
           window.cleancode?.updateTerminalGroupMetadata({
             projectDirectory,

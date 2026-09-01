@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { WorkbenchSnapshot } from './types'
-import { resolveVisibleTerminalCanvasTarget } from './visibleTerminalCanvasTarget'
+import { resolveVisibleTerminalCanvasTarget } from '../../contexts/block-graph/presentation/view-models/visibleTerminalCanvasTarget'
 
 export function useWorkflowNotificationNavigation(
   workbench: WorkbenchSnapshot | null,

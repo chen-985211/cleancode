@@ -1,4 +1,4 @@
-import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
 
 export interface VisibleTerminalCanvasTarget {
   readonly nodeId: string

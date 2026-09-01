@@ -1,10 +1,10 @@
-import type { TerminalGroupDropFeedback } from './types'
+import type { TerminalGroupDropFeedback } from '../view-models/TerminalGroupPresentationTypes'
 import {
   advanceSpringAxis,
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from '../shared/motion/motionSpring'
+} from '../../../../presentation/shared/motion/motionSpring'
 
 export interface TerminalGroupDropSpringSurface {
   readonly classList: Pick<DOMTokenList, 'add' | 'remove'>

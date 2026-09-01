@@ -4,10 +4,8 @@ import type {
   TerminalFlowNode,
   TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
-import {
-  projectTerminalGroupDropAction,
-  resolveTerminalGroupDropAction
-} from '../../../src/presentation/app-shell/terminalGroupDropTarget'
+import { resolveTerminalGroupDropAction } from '../../../src/contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
+import { projectTerminalGroupDropAction } from '../../../src/presentation/app-shell/terminalGroupDropProjection'
 
 describe('terminal group drop target', () => {
   it('joins an ungrouped terminal when its center is dropped inside a group', () => {

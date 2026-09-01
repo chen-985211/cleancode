@@ -6,10 +6,10 @@ import {
   type Dispatch,
   type SetStateAction
 } from 'react'
-import type { WorkbenchSnapshot } from './types'
+import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
 
 interface UseTerminalGroupSelectionModeInput {
-  readonly graph: WorkbenchSnapshot['graph'] | null
+  readonly graph: BlockGraphSnapshot | null
   readonly selectedTerminalBlockIds: readonly string[]
   readonly setSelectedTerminalBlockIds: Dispatch<SetStateAction<string[]>>
   readonly setSelectedTerminalGroupId: Dispatch<SetStateAction<string | null>>

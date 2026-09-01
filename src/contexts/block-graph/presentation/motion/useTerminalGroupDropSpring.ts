@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type RefCallback } from 'react'
 
+import { usePrefersReducedMotion } from '../../../../presentation/shared/hooks/usePrefersReducedMotion'
+import type { TerminalGroupDropFeedback } from '../view-models/TerminalGroupPresentationTypes'
 import { createTerminalGroupDropSpringController } from './terminalGroupDropSpring'
-import type { TerminalGroupDropFeedback } from './types'
-import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 
 export function useTerminalGroupDropSpring(
   feedback: TerminalGroupDropFeedback | null

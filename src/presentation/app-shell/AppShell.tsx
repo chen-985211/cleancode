@@ -9,7 +9,7 @@ import { ProjectSidebar } from '../../contexts/project/presentation/components/P
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
-import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
+import { useTerminalGroupSelectionMode } from '../../contexts/block-graph/presentation/view-models/useTerminalGroupSelectionMode'
 import { useTerminalBlockResizeAction } from './useTerminalBlockResizeAction'
 import { useInitialWorkbenchLoad } from './useInitialWorkbenchLoad'
 import { useMinimapNodeFocus } from './useMinimapNodeFocus'

@@ -6,7 +6,7 @@ const objectMotionStyles = readFileSync(
   'utf8'
 )
 const terminalGroupStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-group-node.css'),
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/terminal-group-node.css'),
   'utf8'
 )
 const terminalNodeStyles = readFileSync(

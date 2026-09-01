@@ -26,6 +26,8 @@ import type {
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { TerminalGroupDropFeedback } from '../../contexts/block-graph/presentation/view-models/TerminalGroupPresentationTypes'
+import type { UpdateTerminalGroupMetadataInput } from '../../contexts/block-graph/domain/aggregates/BlockGraphTypes'
 
 export type {
   ManagedTerminalServiceOwner,
@@ -43,16 +45,10 @@ export interface WorkbenchSnapshot {
   readonly graph: BlockGraphSnapshot
 }
 
-export interface TerminalGroupMetadataInput {
-  readonly name: string
-}
-
 export interface WorkbenchNodeLayoutInput {
   readonly position: { readonly x: number; readonly y: number }
   readonly size: { readonly width: number; readonly height: number }
 }
-export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
-
 export type WorkbenchObjectMotionKind =
   | 'canvas-arrange'
   | 'create'
@@ -164,7 +160,7 @@ interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObject
   readonly onRestartGroup: (group: TerminalGroupSnapshot) => void
   readonly onUpdateGroupMetadata: (
     group: TerminalGroupSnapshot,
-    metadata: TerminalGroupMetadataInput
+    metadata: UpdateTerminalGroupMetadataInput
   ) => Promise<void>
   readonly onToggleGroupCollapsed: (
     group: TerminalGroupSnapshot,

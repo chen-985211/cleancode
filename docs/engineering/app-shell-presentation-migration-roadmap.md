@@ -184,7 +184,7 @@ src/
 - 名称、描述、启动命令、任务/服务模式、就绪配置及端口意图继续作为一个终端定义提交；迁移不改变校验、焦点、文案或保存行为。
 - BlockGraph Presentation 不读取 Run session、端口租约或实际端点；App Shell `TerminalNode` 只组合定义表单与 Run runtime 子组件。
 - `TerminalDefinitionInput` 与元数据输入不再由 App Shell 重复声明，而是收窄到 BlockGraph 领域更新契约。
-- `terminalDefinitionRuntime.ts` 同时适配 BlockGraph 定义更新与 Run 实际端点打开，留待先拆端口职责后再判断归属。
+- 原本把 BlockGraph 定义更新与 Run 实际端点打开混在一起的 `terminalDefinitionRuntime.ts` 已删除；两个调用方直接使用各自精确的 preload 契约，不再通过一个伪统一 runtime API 模糊 owner。
 
 ### BlockGraph Template Library Presentation
 
@@ -194,6 +194,15 @@ src/
 - 模板库继续复用根级共享 Surface、Tooltip、selection motion、焦点恢复和 utility button motion；搜索、作用域切换、维护动作、受控退出与可访问性结果保持不变。
 - `BlockTemplatePlacementPreview`、规范 footprint/外包围盒、专属样式和 owner-level Unit 已迁入 BlockGraph；组件只消费模板、origin 与公开 Canvas viewport DTO。
 - `LiveBlockTemplatePlacementPreview` 留在 App Shell，仅订阅实时 viewport store；空位搜索继续使用跨 Agent、终端与组合的 Workbench occupancy，不能下沉为 BlockGraph 单一事实。
+
+### BlockGraph Terminal Group 与 Quick Execution Presentation
+
+- `TerminalGroupCard`、组合图标、成员行、组合专属样式、名称编辑、结构动作和 owner-level Unit 已迁入 BlockGraph Presentation；组件只消费 BlockGraph DTO、注入的成员状态标签和动作回调。
+- App Shell `TerminalGroupNode` 现在是 React Flow/Agent/Run 组合 wrapper：负责审批 handle、工作台对象动效、Run terminal state 实时订阅和选择 veil，再把窄数据注入 BlockGraph card。
+- 组合连接作用域、编辑选择模式、drop target 几何、drop feedback 和弹簧反馈已迁入 BlockGraph；App Shell 只保留 React Flow 节点投影、preload 提交和失败恢复。
+- `QuickExecutionBar`、拖拽反馈、资源、专属样式、候选/绑定投影和 owner-level Unit 已迁入 BlockGraph Presentation；点击仍只发布画布定位，栏本身不执行 Run。
+- App Shell `useQuickExecutionActions` 与 `executeQuickExecutionTarget` 继续协调 Run 启动、启动命令编辑、全局相机跟随、preload 持久化和通知；`quickExecutionFocus` 继续属于统一工作台相机。
+- BlockGraph 图索引、可见终端代理和连接作用域归上下文 ViewModel；`useWorkbenchGraphIndex` 仅组合 Project 当前工作区与上下文索引。
 
 ## 剩余清单
 
@@ -283,40 +292,29 @@ src/
 - `terminalWorkflowEdges.ts`、`terminalWorkflowBuildEdgePresentation.ts`：工作流定义来自 BlockGraph，运行/搭建状态来自 Run 或 Agent，React Flow 投影属于 App Shell。
 - `TerminalSettingsPane.tsx`：Run 滚屏设置 section 已拆出；App Shell wrapper 继续组合设置页标题与流程搭建偏好，后者需另行确认 owner。
 
-### BlockGraph Presentation 候选
+### BlockGraph Phase 5 收口结果
 
-组件：
+已归 BlockGraph Presentation：
 
-- `QuickExecutionBar.tsx`
-- `TerminalGroupNode.tsx`
+- 终端定义表单、执行配置 draft 与定义输入。
+- 模板库、保存对话框、规范 footprint、纯放置预览、动作契约、资源和样式。
+- `TerminalGroupCard`、组合图标、成员行、组合样式、drop spring、drop target 几何、连接作用域和组合编辑选择模式。
+- `QuickExecutionBar`、拖拽反馈/资源/样式、候选与绑定投影。
+- BlockGraph 图索引和折叠组合下的可见终端导航代理。
 
-ViewModel、策略和交互：
-
-- `quickExecutionDrag.ts`
-- `quickExecutionDragPresentation.tsx`
-- `quickExecutionFocus.ts`
-- `resizeTerminalBlockInWorkbench.ts`
-- `terminalConnectionScope.ts`
-- `terminalDefinitionRuntime.ts`
-- `terminalGroupDropSpring.ts`
-- `terminalGroupDropTarget.ts`
-- `updateGraphViewportInWorkbench.ts`
-- `useBlockTemplateActions.ts`
-- `useTerminalBlockResizeAction.ts`
-- `useTerminalGroupActions.ts`
-- `useTerminalGroupDragActions.ts`
-- `useTerminalGroupDropSpring.ts`
-- `useTerminalGroupSelectionMode.ts`
-- `useWorkbenchGraphIndex.ts`
-- `visibleTerminalCanvasTarget.ts`
-
-保留或先拆的混合模块：
+确认保留的 App Shell adapter/coordinator：
 
 - `WorkbenchCanvas.tsx`、`WorkbenchCanvasBottomControls.tsx`：App Shell 拥有组合布局，BlockGraph 组件作为消费者嵌入。
 - `BlockTemplateSurfaces.tsx`：模板组件已经下沉；该文件保留 preload 动作适配、当前 Workbench 选择和放置/运行协调，属于 App Shell composition adapter。
 - `blockTemplatePlacement.ts`、`useBlockTemplateCanvasInteraction.ts`：BlockGraph footprint 已下沉；剩余算法消费跨上下文 Workbench occupancy、React Flow 坐标和画布点击状态，继续归 App Shell coordinator。
 - `CanvasObjectContextMenu.tsx`、`CanvasNodeMenu.tsx`：菜单表面和互斥输入属于共享/App Shell，各对象动作与文案投影属于对应上下文。
-- `QuickExecutionBar.tsx`：绑定事实由 BlockGraph 拥有，实际启动由 Run；需要拆分展示/编辑与执行协调。
+- `TerminalGroupNode.tsx`：只组合 React Flow、Agent 审批、工作台动效、Run 实时状态与 BlockGraph `TerminalGroupCard`。
+- `terminalGroupDropProjection.ts`、`useTerminalGroupDragActions.ts`：前者把上下文 feedback 投到 React Flow node，后者提交 preload 布局/归组命令并负责失败恢复。
+- `useTerminalGroupActions.ts`：把 BlockGraph 结构变更与 Run 组合启动、逐终端停止/重开协调到同一节点动作入口。
+- `useQuickExecutionActions.ts`、`executeQuickExecutionTarget.ts`：协调 preload 快捷位写入、Run 启动、启动命令编辑、通知和去重。
+- `quickExecutionFocus.ts`：统一工作台相机需要处理 React Flow 实例和折叠代理，属于 App Shell 导航。
+- `resizeTerminalBlockInWorkbench.ts`、`updateGraphViewportInWorkbench.ts`、`useTerminalBlockResizeAction.ts`、`useBlockTemplateActions.ts`：都绑定当前 Project/Workspace、preload API 或工作台提交队列，属于运行时适配器。
+- `useWorkbenchGraphIndex.ts`：只把 Project 当前工作区与 BlockGraph `useBlockGraphIndex` 组合为 App Shell 入口。
 - `useCanvasSelectionViewport.ts`、`workbenchViewportMotion.ts`：选择事实来自对象 owner，统一相机结果属于 App Shell，不迁入 BlockGraph。
 
 ### CanvasArrangement Presentation 候选
@@ -437,15 +435,18 @@ ViewModel、策略和交互：
 
 ### 阶段 5：BlockGraph Presentation
 
-状态：进行中（2026-09-01）。
+状态：已完成（2026-09-01）。
 
 目标：下沉图编辑、终端定义、组合、模板和快捷执行的单上下文 UI。
 
 - 已迁移终端元数据/执行配置表单、draft、输入类型、专属样式和 owner-level Unit。
 - 已迁移模板库、保存对话框、动作契约、专属样式和 owner-level Unit；App Shell 只保留 preload 与放置/运行适配。
 - 已迁移模板规范几何与纯预览；App Shell 只保留 live viewport adapter 和跨上下文空位搜索。
-- 接下来迁移其他图内纯策略。
-- 再拆 TerminalNode、TerminalGroup、QuickExecution 的展示与 Run 执行协调。
+- 已迁移连接作用域、组合选择/drop/spring、可见终端代理、快捷执行绑定、拖拽和图索引等图内纯策略。
+- 已把 TerminalGroup 拆为 BlockGraph `TerminalGroupCard` 与 App Shell React Flow/Agent/Run wrapper。
+- 已把 QuickExecution 展示、编辑、拖拽、资源和样式整体下沉；Run 执行、preload 写入、通知和统一相机继续由 App Shell 协调。
+- TerminalNode 的 BlockGraph 定义表单与 Run viewport/service/runtime header 已分别归 owner；剩余节点只承担 React Flow 与跨上下文最终组合。
+- 已删除混合 BlockGraph 更新与 Run 端点打开的伪统一 runtime API，调用方使用各自精确 preload 契约。
 - 图事实和布局规则继续来自 BlockGraph 聚合/用例，不在 UI 复制。
 
 最低验证：BlockGraph Presentation Unit、BlockGraph Unit/Contract、相关 App Shell Unit、typecheck、dependency-cruiser、完整 `pre-commit`。

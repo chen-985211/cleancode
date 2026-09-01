@@ -8,10 +8,10 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkflowPlanScope } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
 import {
-  executeQuickExecutionTarget,
   quickExecutionTargetKey,
   resolveQuickExecutionBinding
-} from './quickExecutionTargets'
+} from '../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
+import { executeQuickExecutionTarget } from './executeQuickExecutionTarget'
 import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { resolveUserFacingErrorMessage } from '../shared/errors/appErrorMessages'
 import { useI18n } from '../i18n/useI18n'
