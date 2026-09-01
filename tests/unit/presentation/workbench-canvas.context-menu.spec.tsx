@@ -8,14 +8,12 @@ import type {
   QuickExecutionTargetSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
-import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
-import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
-import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/useTerminalWorkflow'
+import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/projections/agentConsoleFlowNode'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
+import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/projections/terminalWorkflowEdges'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
+import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/coordinators/useTerminalWorkflow'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({

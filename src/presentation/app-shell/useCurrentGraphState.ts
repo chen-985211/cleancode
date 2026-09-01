@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react'
 
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 interface UseCurrentGraphStateInput {
   readonly currentWorkbench: WorkbenchSnapshot | null

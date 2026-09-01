@@ -4,7 +4,7 @@ import {
   maximumCanvasZoom,
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import {
   browserViewportMotionFrameScheduler,
   type WorkbenchViewportMotionFrameScheduler

@@ -4,7 +4,7 @@ import type { CanvasViewportSnapshot } from '../../contexts/block-graph/applicat
 import {
   resolveWorkbenchCanvasDetailLevel,
   type WorkbenchCanvasDetailLevel
-} from './workbenchObjectMotion'
+} from './projections/workbenchObjectMotion'
 
 export interface WorkbenchCanvasViewportStore {
   readonly getViewport: () => CanvasViewportSnapshot

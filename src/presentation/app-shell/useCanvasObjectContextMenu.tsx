@@ -19,7 +19,8 @@ import {
   type CanvasObjectContextTarget,
   type CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
-import type { AgentConsoleFlowNode, WorkbenchFlowNode } from './types'
+import type { AgentConsoleFlowNode } from './types/agentConsoleFlowNode'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 interface CanvasObjectContextMenuState {
   readonly graphKey: string

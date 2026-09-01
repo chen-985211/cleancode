@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, useRef, type MutableRefObject } from 'react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 import { resolveNodeSize } from './resolveNodeSize'

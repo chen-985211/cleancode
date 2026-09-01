@@ -5,13 +5,11 @@ import type { ReactNode } from 'react'
 import type * as WorkbenchViewportMotionModule from '../../../src/presentation/app-shell/workbenchViewportMotion'
 import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
 
-import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
-import type {
-  AgentConsoleFlowNode,
-  TerminalFlowNode,
-  WorkbenchFlowNode
-} from '../../../src/presentation/app-shell/types'
+import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/projections/agentConsoleFlowNode'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 

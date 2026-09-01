@@ -1,7 +1,7 @@
 import type { NodeChange } from '@xyflow/react'
 
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
-import type { WorkbenchFlowNode } from './types'
+import { readAgentIdFromFlowNodeId } from './projections/agentConsoleFlowNode'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 export function isolateWorkbenchNodeDragChanges(
   changes: NodeChange<WorkbenchFlowNode>[],

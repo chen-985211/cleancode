@@ -1,6 +1,6 @@
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   createWorkbenchViewportMotionController,
   type WorkbenchViewportCommand

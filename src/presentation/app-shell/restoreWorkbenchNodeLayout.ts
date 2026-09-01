@@ -1,4 +1,5 @@
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 export function restoreWorkbenchNodeLayout(
   nodes: WorkbenchFlowNode[],

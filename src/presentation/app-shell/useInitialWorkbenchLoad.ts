@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 export type InitialWorkbenchLoadPhase = 'loading' | 'ready' | 'error'
 

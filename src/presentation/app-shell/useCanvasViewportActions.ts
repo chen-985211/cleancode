@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useCallback, type MutableRefObject } from 'react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 
 export function useCanvasViewportActions({

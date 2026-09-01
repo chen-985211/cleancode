@@ -3,7 +3,7 @@ import { useCallback, useRef, type MutableRefObject } from 'react'
 
 import { minimumCanvasZoom } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { resolveWorkbenchNodeCenter, type CanvasSize } from './applicationShortcutNavigation'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import {
   resolveWorkbenchNodeFocusZoom,
   resolveWorkbenchNodeSize
@@ -12,7 +12,7 @@ import {
   readWorkbenchViewportPresentation,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
-import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
+import { isWorkbenchNodePresentationHidden } from './projections/workbenchNodeVisibility'
 
 interface UseCanvasSelectionViewportInput {
   readonly canvasSizeRef: MutableRefObject<CanvasSize>

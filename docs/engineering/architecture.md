@@ -426,6 +426,9 @@ src/
     config/
   presentation/
     app-shell/
+      coordinators/
+      projections/
+      types/
     routes/
     layouts/
 ```

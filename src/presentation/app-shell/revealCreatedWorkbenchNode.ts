@@ -1,6 +1,6 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import type {
   WorkbenchNodePosition,
   WorkbenchNodeSize,

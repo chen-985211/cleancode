@@ -10,7 +10,7 @@ import {
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
-import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
+import { resolveAgentApprovalPresentation } from './projections/agentApprovalPresentation'
 import { deriveAgentProviderFeedback } from '../../contexts/agent/presentation/view-models/agentProviderFeedback'
 import {
   createFallbackAgent,
@@ -26,8 +26,8 @@ import {
 } from '../../contexts/agent/presentation/view-models/useAgentProviderCatalog'
 import { useAgentProviderState } from '../../contexts/agent/presentation/view-models/useAgentProviderState'
 import { useAgentProviderNotifications } from '../../contexts/agent/presentation/view-models/useAgentProviderNotifications'
-import { useAgentSessionAttachment } from './useAgentSessionAttachment'
-import { useAgentTerminalView } from './useAgentTerminalView'
+import { useAgentSessionAttachment } from './coordinators/useAgentSessionAttachment'
+import { useAgentTerminalView } from './coordinators/useAgentTerminalView'
 import { useI18n } from '../i18n/useI18n'
 import { useOptionalNotifications } from './useNotifications'
 

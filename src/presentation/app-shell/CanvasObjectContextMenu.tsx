@@ -3,21 +3,21 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { AgentCanvasContextActions } from '../../contexts/agent/presentation/components/AgentCanvasContextActions'
+import { TerminalCanvasContextActions } from '../../contexts/block-graph/presentation/components/TerminalCanvasContextActions'
 import type {
   CanvasObjectContextTarget,
   CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
 import { restoreCanvasMenuFocus } from './canvasMenuFocus'
-import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
+import { CanvasNodeMenu } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface CanvasObjectContextMenuProps {
   readonly agentActions?: {
@@ -52,8 +52,6 @@ export function CanvasObjectContextMenu({
   const wasOpenRef = useRef(false)
   const [isMenuPresent, setIsMenuPresent] = useState(open)
   const [mode, setMode] = useState<'actions' | 'rename'>('actions')
-  const [agentName, setAgentName] = useState(agentActions?.agent.name ?? '')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const resetKey = `${requestId}\0${agentActions?.agent.name ?? ''}`
   const [previousResetKey, setPreviousResetKey] = useState(resetKey)
   const [resolvedPosition, setResolvedPosition] = useState<{
@@ -68,8 +66,6 @@ export function CanvasObjectContextMenu({
   if (resetKey !== previousResetKey) {
     setPreviousResetKey(resetKey)
     setMode('actions')
-    setAgentName(agentActions?.agent.name ?? '')
-    setIsSubmitting(false)
   }
 
   useEffect(() => {
@@ -129,32 +125,6 @@ export function CanvasObjectContextMenu({
     return () => window.removeEventListener('resize', updatePosition)
   }, [isMenuPresent, mode, position.x, position.y, requestId])
 
-  const renameAgent = async (event: FormEvent): Promise<void> => {
-    event.preventDefault()
-    const normalizedName = agentName.trim()
-    if (!agentActions || !normalizedName || isSubmitting) return
-
-    setIsSubmitting(true)
-    try {
-      await agentActions.onRename(agentActions.agent, normalizedName)
-      onClose()
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const removeAgent = async (): Promise<void> => {
-    if (!agentActions || isSubmitting) return
-
-    setIsSubmitting(true)
-    onClose()
-    try {
-      await agentActions.onRemove(agentActions.agent)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const ariaLabel =
     target.kind === 'agent' && agentActions
       ? t('agent.actions', { agentName: agentActions.agent.name })
@@ -190,54 +160,18 @@ export function CanvasObjectContextMenu({
         visibility: motionReady ? 'visible' : 'hidden'
       }}
     >
-      {mode === 'rename' && agentActions ? (
-        <form
-          className="canvas-object-context-menu__rename"
-          onSubmit={(event) => void renameAgent(event)}
-        >
-          <input
-            autoFocus
-            aria-label={t('agent.name')}
-            disabled={isSubmitting}
-            value={agentName}
-            onChange={(event) => setAgentName(event.target.value)}
-            onFocus={(event) => event.currentTarget.select()}
-          />
-          <div className="canvas-object-context-menu__rename-actions">
-            <button
-              type="submit"
-              aria-label={t('agent.saveName')}
-              disabled={isSubmitting || !agentName.trim()}
-            >
-              <WorkbenchIcon role="confirm" size={14} />
-            </button>
-            <button
-              type="button"
-              aria-label={t('common.cancel')}
-              onClick={() => setMode('actions')}
-            >
-              <WorkbenchIcon role="close" size={14} />
-            </button>
-          </div>
-        </form>
-      ) : target.kind === 'agent' ? (
-        <>
-          <CanvasNodeMenuItem type="button" role="menuitem" onClick={() => setMode('rename')}>
-            <WorkbenchIcon role="edit" size={16} />
-            {t('agent.rename')}
-          </CanvasNodeMenuItem>
-          <CanvasNodeMenuItem
-            type="button"
-            role="menuitem"
-            disabled={isSubmitting}
-            onClick={() => void removeAgent()}
-          >
-            <WorkbenchIcon role="delete" size={16} />
-            {t('agent.remove')}
-          </CanvasNodeMenuItem>
-        </>
-      ) : (
-        <TerminalContextMenuItems
+      {target.kind === 'agent' && agentActions ? (
+        <AgentCanvasContextActions
+          key={resetKey}
+          agent={agentActions.agent}
+          mode={mode}
+          onClose={onClose}
+          onModeChange={setMode}
+          onRemove={agentActions.onRemove}
+          onRename={agentActions.onRename}
+        />
+      ) : target.kind === 'agent' ? null : (
+        <TerminalCanvasContextActions
           target={target}
           onAddToQuickExecution={onAddToQuickExecution}
           onClose={onClose}
@@ -247,64 +181,6 @@ export function CanvasObjectContextMenu({
       )}
     </CanvasNodeMenu>,
     document.body
-  )
-}
-
-function TerminalContextMenuItems({
-  target,
-  onAddToQuickExecution,
-  onClose,
-  onFavorite,
-  onRemove
-}: {
-  readonly target: CanvasTerminalObjectContextTarget
-  readonly onAddToQuickExecution?: (target: CanvasTerminalObjectContextTarget) => void
-  readonly onClose: () => void
-  readonly onFavorite?: (terminalBlockIds: readonly string[]) => void
-  readonly onRemove?: (target: CanvasObjectContextTarget) => void
-}) {
-  const { t } = useI18n()
-
-  return (
-    <>
-      <CanvasNodeMenuItem
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          onClose()
-          onFavorite?.(target.terminalBlockIds)
-        }}
-      >
-        <WorkbenchIcon role="favorite" size={16} />
-        {t(`canvas.contextMenu.favorite.${target.kind}`)}
-      </CanvasNodeMenuItem>
-      {onAddToQuickExecution ? (
-        <CanvasNodeMenuItem
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose()
-            onAddToQuickExecution(target)
-          }}
-        >
-          <WorkbenchIcon role="quick-execution-add" size={16} />
-          {t('canvas.contextMenu.addToQuickExecution')}
-        </CanvasNodeMenuItem>
-      ) : null}
-      {target.kind !== 'terminal' && onRemove ? (
-        <CanvasNodeMenuItem
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose()
-            onRemove(target)
-          }}
-        >
-          <WorkbenchIcon role="delete" size={16} />
-          {t(`canvas.contextMenu.remove.${target.kind}`)}
-        </CanvasNodeMenuItem>
-      ) : null}
-    </>
   )
 }
 

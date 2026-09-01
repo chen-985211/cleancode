@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, type MutableRefObject, type RefObject } from 'react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import {
   retargetWorkbenchDirectZoom,
   setWorkbenchDirectZoomReducedMotion,

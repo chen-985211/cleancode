@@ -4,7 +4,7 @@ import {
   createAgentApprovalIntentEdges,
   createAgentApprovalNodeIntents,
   resolveAgentApprovalPresentation
-} from '../../../src/presentation/app-shell/agentApprovalPresentation'
+} from '../../../src/presentation/app-shell/projections/agentApprovalPresentation'
 import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 
 describe('Agent approval presentation', () => {

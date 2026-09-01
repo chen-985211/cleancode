@@ -8,7 +8,7 @@ import type {
 import { createExpectedAppError } from '../../../src/shared-kernel/application/errors/AppError'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 import { useI18n } from '../../../src/presentation/i18n/useI18n'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import { useBranchWorkspaceActions } from '../../../src/presentation/app-shell/useBranchWorkspaceActions'
 import {
   createRuntimeApi,

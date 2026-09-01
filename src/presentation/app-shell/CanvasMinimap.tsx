@@ -15,7 +15,7 @@ import {
   type MinimapNodeInteractionContextValue
 } from './minimapInteraction'
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
-import type { MinimapFlowNode } from './types'
+import type { MinimapFlowNode } from './types/workbenchFlowNode'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from '../i18n/useI18n'
 import { TooltipLabel } from '../shared/components/Tooltip'

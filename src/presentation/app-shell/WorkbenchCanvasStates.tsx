@@ -5,7 +5,7 @@ import { useWorkspaceExternalOpen } from '../../contexts/project/presentation/vi
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { useI18n } from '../i18n/useI18n'
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
 import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 

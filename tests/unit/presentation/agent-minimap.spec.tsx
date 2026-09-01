@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 
 import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
-import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
 
 describe('Agent minimap navigation', () => {

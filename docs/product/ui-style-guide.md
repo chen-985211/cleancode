@@ -215,7 +215,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框与缩放百分比通过相机 owner 的轻量实时信号逐帧跟随，订阅和重渲染范围分别只覆盖框本身与百分比 `<output>`；不得为同步反馈而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
 
-画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有，逐帧 presentation 由 `workbenchObjectSpring.ts` 执行。新 Terminal 或 Agent 必须先以最终节点几何进入画布，再让完整视觉外壳从自身中心等比显露；删除沿同一路径缩回中心，创建与删除都不得逐帧改变 React Flow、xterm 网格或 resize 的布局几何。组合拖放的专用表面反馈属于下文明确的独立 owner，不得被创建动效规则误判为禁止。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
+画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/projections/workbenchObjectMotion.ts` 统一拥有，逐帧 presentation 由 `workbenchObjectSpring.ts` 执行。新 Terminal 或 Agent 必须先以最终节点几何进入画布，再让完整视觉外壳从自身中心等比显露；删除沿同一路径缩回中心，创建与删除都不得逐帧改变 React Flow、xterm 网格或 resize 的布局几何。组合拖放的专用表面反馈属于下文明确的独立 owner，不得被创建动效规则误判为禁止。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 
 MCP 搭建编排只能决定对象何时出现、从哪里开始、终端顺序以及连线何时显露，不得拥有另一套终端、组合或连线材质动效。编排在对应阶段只投影通用的 pending/entering 意图；Terminal、Terminal Group 和工作流 Edge 各自通过上述画布对象原子 owner 解释该意图，因此手动创建与 MCP 创建必须复用同一种出现效果。编排的阶段信号是一次性触发器，不得在 React 重投影后重复播放创建动效。
 

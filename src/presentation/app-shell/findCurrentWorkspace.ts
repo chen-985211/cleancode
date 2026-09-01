@@ -1,4 +1,4 @@
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 type WorkspaceSnapshot = WorkbenchSnapshot['project']['workspaces'][number]
 

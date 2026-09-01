@@ -1,4 +1,4 @@
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import type { CreatableAgentProviderSnapshot } from '../../../src/contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type {
   AgentRuntimeSnapshot,

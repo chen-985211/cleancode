@@ -1,5 +1,5 @@
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 

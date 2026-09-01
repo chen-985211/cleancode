@@ -1,7 +1,8 @@
 import type { QuickExecutionTargetSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { toQuickExecutionTarget } from '../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 export function resolveTerminalCreationGroupId(
   graph: WorkbenchSnapshot['graph'] | null,

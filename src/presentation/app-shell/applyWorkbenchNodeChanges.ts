@@ -1,6 +1,8 @@
 import { applyNodeChanges, type NodeChange } from '@xyflow/react'
 
-import type { TerminalFlowNode, TerminalGroupFlowNode, WorkbenchFlowNode } from './types'
+import type { TerminalFlowNode } from './types/terminalFlowNode'
+import type { TerminalGroupFlowNode } from './types/terminalGroupFlowNode'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 const terminalGroupShellPadding = {
   x: 32,

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 interface UseTerminalLaunchCommandRequestInput {
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined

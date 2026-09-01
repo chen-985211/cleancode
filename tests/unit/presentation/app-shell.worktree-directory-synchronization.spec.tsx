@@ -8,7 +8,7 @@ import {
 } from '../../fixtures/presentation/appShellFixtures'
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()

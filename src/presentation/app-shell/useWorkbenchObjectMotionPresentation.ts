@@ -10,7 +10,7 @@ import {
   type RefCallback
 } from 'react'
 
-import type { WorkbenchObjectMotion } from './types'
+import type { WorkbenchObjectMotion } from './types/workbenchObjectMotion'
 import { createWorkbenchObjectSpringController } from './workbenchObjectSpring'
 import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
 

@@ -2,7 +2,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { TerminalGroupSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { focusQuickExecutionTargetInCanvas } from '../../../src/presentation/app-shell/quickExecutionFocus'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('quick execution canvas focus', () => {
   beforeEach(() => {

@@ -1,7 +1,8 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, type MutableRefObject } from 'react'
 
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import { restoreCanvasViewport } from './workbenchCanvasViewport'
 import type { TerminalZoomRasterCoordinator } from '../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 

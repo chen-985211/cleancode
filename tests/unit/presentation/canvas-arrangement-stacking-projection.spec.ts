@@ -4,8 +4,8 @@ import { resolveCanvasStackDragTarget } from '../../../src/contexts/canvas-arran
 import {
   projectCanvasArrangementStackingOntoNodes,
   toCanvasArrangementProjectionNodes
-} from '../../../src/presentation/app-shell/workbenchCanvasArrangementStackingProjection'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+} from '../../../src/presentation/app-shell/projections/workbenchCanvasArrangementStackingProjection'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('canvas arrangement stacking projection', () => {
   it('projects one z-index band per stacked object while keeping combination members above its shell', () => {

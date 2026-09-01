@@ -10,7 +10,8 @@ import {
   type WorkspaceNavigationDirection
 } from './applicationShortcutNavigation'
 import type { ProjectSidebarIntent } from '../../contexts/project/presentation/components/ProjectSidebar'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import {
   resolveWorkbenchNodeFocusZoom,
   resolveWorkbenchNodeSize

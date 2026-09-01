@@ -7,7 +7,7 @@ import {
 } from '@xyflow/react'
 import { memo } from 'react'
 
-import type { AgentApprovalIntentEdgeData } from './agentApprovalPresentation'
+import type { AgentApprovalIntentEdgeData } from './projections/agentApprovalPresentation'
 import { useI18n } from '../i18n/useI18n'
 
 type ApprovalIntentEdge = Edge<AgentApprovalIntentEdgeData, 'approvalIntent'>

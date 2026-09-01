@@ -9,11 +9,9 @@ import type {
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createCanvasObjectIdentity } from '../../../src/shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { AgentActivityNavigationRequest } from '../../../src/presentation/app-shell/agentActivityNavigation'
-import { toAgentFlowNodeId } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import { toAgentFlowNodeId } from '../../../src/presentation/app-shell/projections/agentConsoleFlowNode'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import type { WorkspaceSelectionResult } from '../../../src/presentation/app-shell/useBranchWorkspaceActions'
 import { useAgentActivityNotificationNavigation } from '../../../src/presentation/app-shell/useAgentActivityNotificationNavigation'
 import {

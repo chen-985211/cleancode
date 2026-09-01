@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 const projectGitStateSynchronizationIntervalMs = 1500
 

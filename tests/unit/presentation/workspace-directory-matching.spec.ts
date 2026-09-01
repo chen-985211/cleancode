@@ -1,5 +1,5 @@
 import { findWorkspaceByDirectory } from '../../../src/presentation/app-shell/workspaceDirectoryMatching'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 describe('workspace directory matching', () => {
   it('matches the deepest workspace containing the terminal working directory', () => {

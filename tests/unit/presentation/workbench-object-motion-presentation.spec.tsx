@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import type { AnimationEvent } from 'react'
 
-import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types/workbenchObjectMotion'
 import { useWorkbenchObjectMotionPresentation } from '../../../src/presentation/app-shell/useWorkbenchObjectMotionPresentation'
 
 describe('workbench object motion presentation', () => {

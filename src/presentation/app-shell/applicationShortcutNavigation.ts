@@ -1,8 +1,10 @@
 import type { Viewport } from '@xyflow/react'
 
-import type { TerminalGroupFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { TerminalGroupFlowNode } from './types/terminalGroupFlowNode'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import { resolveWorkbenchNodeSize } from './workbenchNodeFocusViewport'
-import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
+import { isWorkbenchNodePresentationHidden } from './projections/workbenchNodeVisibility'
 
 export type WorkspaceNavigationDirection = 'next' | 'previous'
 

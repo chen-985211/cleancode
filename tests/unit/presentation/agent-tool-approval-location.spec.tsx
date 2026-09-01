@@ -3,8 +3,8 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useAgentToolApprovals } from '../../../src/presentation/app-shell/useAgentToolApprovals'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useAgentToolApprovals } from '../../../src/presentation/app-shell/coordinators/useAgentToolApprovals'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent connection approval location', () => {

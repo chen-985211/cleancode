@@ -3,7 +3,7 @@ import {
   createIdleTerminalState,
   type TerminalViewState
 } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('terminal flow nodes', () => {
   it('uses the terminal block size as the React Flow node dimensions', () => {

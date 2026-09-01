@@ -2,7 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useRef } from 'react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   resolveWorkbenchWheelZoomStops,
   useWorkbenchDirectZoom

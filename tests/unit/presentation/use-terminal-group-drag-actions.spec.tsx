@@ -4,9 +4,9 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
-import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types'
-import { useTerminalGroupDragActions } from '../../../src/presentation/app-shell/useTerminalGroupDragActions'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import { useTerminalGroupDragActions } from '../../../src/presentation/app-shell/coordinators/useTerminalGroupDragActions'
 import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbenchNodeLayoutCommitQueue'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 

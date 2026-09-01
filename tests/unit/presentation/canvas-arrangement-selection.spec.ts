@@ -4,8 +4,8 @@ import { canvasArrangementItemKey } from '../../../src/contexts/canvas-arrangeme
 import {
   projectCanvasArrangementSelectionOntoNodes,
   resolveCanvasArrangementSelectionItems
-} from '../../../src/presentation/app-shell/workbenchCanvasArrangementSelection'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+} from '../../../src/presentation/app-shell/projections/workbenchCanvasArrangementSelection'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('canvas arrangement selection', () => {
   it('selects independent terminals, complete workflows, combinations, and agents as whole objects', () => {

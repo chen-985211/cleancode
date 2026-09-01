@@ -1,7 +1,7 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { resolveWorkbenchSafeViewport } from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
-import { createWorkbenchNodeCreationCoordinator } from '../../../src/presentation/app-shell/workbenchNodeCreationCoordinator'
-import { createWorkbenchNodeOccupancy } from '../../../src/presentation/app-shell/workbenchNodeOccupancy'
+import { createWorkbenchNodeCreationCoordinator } from '../../../src/presentation/app-shell/coordinators/workbenchNodeCreationCoordinator'
+import { createWorkbenchNodeOccupancy } from '../../../src/presentation/app-shell/projections/workbenchNodeOccupancy'
 import { workbenchNodePlacementGap } from '../../../src/presentation/app-shell/workbenchNodeCreationPolicy'
 
 describe('workbench node creation coordination', () => {

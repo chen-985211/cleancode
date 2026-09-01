@@ -1,4 +1,4 @@
-import type { useTerminalWorkflow } from './useTerminalWorkflow'
+import type { useTerminalWorkflow } from './coordinators/useTerminalWorkflow'
 
 export const inactiveTerminalWorkflowController = {
   activeRunIdByRootBlockId: {},

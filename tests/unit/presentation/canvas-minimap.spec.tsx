@@ -7,10 +7,8 @@ import {
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
 import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
 import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import type {
-  TerminalFlowNode,
-  TerminalGroupFlowNode
-} from '../../../src/presentation/app-shell/types'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
 
 describe('canvas minimap', () => {
   const restoreSvgGeometry = installSvgGeometryMocks()

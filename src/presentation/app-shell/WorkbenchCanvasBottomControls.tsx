@@ -16,7 +16,8 @@ import type { ShortcutPlatform } from './applicationShortcuts'
 import { QuickExecutionBar } from '../../contexts/block-graph/presentation/components/QuickExecutionBar'
 import { useI18n } from '../i18n/useI18n'
 import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 export type ArrangeCanvasSelectionHandler = (
   action: 'detach-stack' | 'grid' | 'stack',

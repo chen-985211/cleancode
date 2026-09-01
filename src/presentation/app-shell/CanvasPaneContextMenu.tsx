@@ -10,7 +10,8 @@ import { createPortal } from 'react-dom'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { restoreCanvasMenuFocus } from './canvasMenuFocus'
-import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
+import { CanvasNodeMenu } from './CanvasNodeMenu'
+import { CanvasMenuItem } from '../shared/components/CanvasMenuItem'
 import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
@@ -170,7 +171,7 @@ function CanvasPaneContextMenuItem({
   readonly onSelect: () => void
 }) {
   return (
-    <CanvasNodeMenuItem type="button" role="menuitem" disabled={disabled} onClick={onSelect}>
+    <CanvasMenuItem type="button" role="menuitem" disabled={disabled} onClick={onSelect}>
       <WorkbenchIcon role={iconRole} size={16} />
       <span className="canvas-pane-context-menu__label">{label}</span>
       {shortcut ? (
@@ -178,7 +179,7 @@ function CanvasPaneContextMenuItem({
           {shortcut}
         </span>
       ) : null}
-    </CanvasNodeMenuItem>
+    </CanvasMenuItem>
   )
 }
 

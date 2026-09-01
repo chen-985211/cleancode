@@ -1,4 +1,4 @@
-import type { AgentApprovalPresentation } from './agentApprovalPresentation'
+import type { AgentApprovalPresentation } from './projections/agentApprovalPresentation'
 import { useI18n } from '../i18n/useI18n'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import type { Translate } from '../i18n/messages'

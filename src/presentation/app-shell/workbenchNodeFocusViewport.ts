@@ -2,7 +2,7 @@ import {
   maximumCanvasZoom,
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 export interface WorkbenchNodeFocusSize {
   readonly width: number

@@ -10,7 +10,8 @@ import {
 import { createPortal } from 'react-dom'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
+import { CanvasNodeMenu } from './CanvasNodeMenu'
+import { CanvasMenuItem } from '../shared/components/CanvasMenuItem'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { useI18n } from '../i18n/useI18n'
 import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
@@ -262,7 +263,7 @@ export function AgentConsoleActions({
             visibility: menuPosition ? 'visible' : 'hidden'
           }}
         >
-          <CanvasNodeMenuItem
+          <CanvasMenuItem
             type="button"
             role="menuitem"
             tabIndex={activeMenuItem === 0 ? 0 : -1}
@@ -271,8 +272,8 @@ export function AgentConsoleActions({
           >
             <WorkbenchIcon role="edit" size={14} />
             {t('agent.rename')}
-          </CanvasNodeMenuItem>
-          <CanvasNodeMenuItem
+          </CanvasMenuItem>
+          <CanvasMenuItem
             type="button"
             role="menuitem"
             tabIndex={activeMenuItem === 1 ? 0 : -1}
@@ -281,7 +282,7 @@ export function AgentConsoleActions({
           >
             <WorkbenchIcon role="delete" size={14} />
             {t('agent.remove')}
-          </CanvasNodeMenuItem>
+          </CanvasMenuItem>
         </CanvasNodeMenu>,
         document.body
       )}

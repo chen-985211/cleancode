@@ -9,7 +9,7 @@ import {
   removeWorkspaceTerminalStates
 } from '../../contexts/run/presentation/view-models/terminalSessionStateRetention'
 import type { TerminalViewState } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 interface UseTerminalSessionRetentionInput {
   readonly clearPendingTerminalInput: (terminalStateKey: string) => void

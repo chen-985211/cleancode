@@ -6,9 +6,10 @@ import {
   createCanvasObjectIdentityKey,
   type CanvasObjectIdentity
 } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import { toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { toAgentFlowNodeId } from './projections/agentConsoleFlowNode'
 import type { AgentActivityNavigationRequest } from './agentActivityNavigation'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import type { WorkspaceSelectionResult } from './useBranchWorkspaceActions'
 import { resolveVisibleTerminalCanvasTarget } from '../../contexts/block-graph/presentation/view-models/visibleTerminalCanvasTarget'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'

@@ -4,8 +4,8 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
 import { createTerminalStateStore } from '../../../src/contexts/run/presentation/view-models/terminalStateStore'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/useWorkbenchFlowNodes'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/coordinators/useWorkbenchFlowNodes'
 
 describe('Workbench flow node runtime isolation', () => {
   it('does not reproject the React Flow node set for a terminal-only runtime update', async () => {

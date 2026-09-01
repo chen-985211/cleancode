@@ -6,7 +6,7 @@ import {
   createIdleTerminalState,
   type TerminalViewState
 } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('terminal flow nodes for terminal groups', () => {
   it('creates an expanded terminal group node with its member terminals visible', () => {

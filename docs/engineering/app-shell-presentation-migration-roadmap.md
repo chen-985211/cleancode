@@ -475,12 +475,16 @@ src/
 
 ### 阶段 7：混合组件与 App Shell 收口
 
+状态：已完成（2026-09-01）。
+
 目标：处理不能按文件整体迁移的跨上下文组件。
 
-- 拆分 `types.ts`，避免所有模块依赖一个五上下文大类型文件。
-- 把 TerminalNode、AgentNode、Minimap、ContextMenu 和 Settings 变为 App Shell wrapper + 上下文子组件。
-- 将跨上下文 Hook 收敛到命名明确的 `coordinators/`，纯组合投影进入 `projections/`。
-- 清理旧 re-export、空目录和无 owner 的样式。
+- 已删除五上下文聚合的 `types.ts`，按 Workbench 快照、节点布局、对象动效和三类 Flow Node 拆入 `types/`；Run DTO 与终端展示类型由消费者直接引用 Run owner，不再经 App Shell re-export。
+- 跨上下文 Hook、创建/运行协调器已收敛到 `coordinators/`；无副作用的节点、连线、排列、Minimap 和动效投影已进入 `projections/`，调用方和测试全部改用真实 owner 路径。
+- `CanvasObjectContextMenu` 只保留 portal、定位、焦点、键盘导航和模式切换；Agent 重命名/移除叶子归 Agent Presentation，终端、流程与组合动作叶子归 BlockGraph Presentation，菜单项 primitive 提升为共享 Presentation。
+- `TerminalNode` 保留 React Flow、BlockGraph 定义与 Run runtime 的最终组合；`AgentNode` 保留 Agent 控制台、Run terminal surface 与工作台布局组合；Minimap 保留跨对象总览投影，继续消费各 owner 的窄外观投影。
+- Settings 已由 App Shell root 组合 Agent 设置和 Run 滚屏设置；应用级 Canvas、语言、主题与工作流搭建偏好继续由 App Shell 拥有，没有强行下沉到业务上下文。
+- 旧类型入口和旧模块路径已清除；菜单 surface 样式继续由实际渲染它的 App Shell 拥有，没有遗留空目录或兼容 re-export。
 
 最低验证：全部 Presentation Unit、typecheck、dependency-cruiser、knip、完整 `pre-commit`。
 

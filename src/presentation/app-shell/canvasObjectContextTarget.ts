@@ -3,7 +3,7 @@ import {
   resolveTerminalCanvasObjectContextTarget,
   type TerminalCanvasObjectContextTarget
 } from '../../contexts/block-graph/presentation/view-models/terminalCanvasContextTarget'
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
+import { readAgentIdFromFlowNodeId } from './projections/agentConsoleFlowNode'
 
 export type CanvasTerminalObjectContextTarget = TerminalCanvasObjectContextTarget
 

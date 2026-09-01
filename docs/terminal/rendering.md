@@ -74,7 +74,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 如果 attach Promise 尚未完成时尺寸再次变化，在 session 返回后补发最新 resize。
 - 测量结果和 session 都必须带当前 workspace key，旧工作区迟到的 Promise 不得绑定到新工作区。
 
-当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
+当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/coordinators/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
 
 ### 2. 右侧 padding 把滚动条整体推向左边
 
@@ -165,7 +165,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 ### Agent attach 失败与重试
 
-空白终端不一定是 xterm 渲染失败。Agent 首次进入工作区时先等待有效 terminal 测量，再由 [`useAgentSessionAttachment.ts`](../../src/presentation/app-shell/useAgentSessionAttachment.ts) 发起 session attach；这两个阶段分别投影为 `measuring` 和 `pending`。attach 拒绝后进入 `failed` 并显示通用重试，不能把错误吞掉后留下一个看似正常的空 surface。
+空白终端不一定是 xterm 渲染失败。Agent 首次进入工作区时先等待有效 terminal 测量，再由 [`useAgentSessionAttachment.ts`](../../src/presentation/app-shell/coordinators/useAgentSessionAttachment.ts) 发起 session attach；这两个阶段分别投影为 `measuring` 和 `pending`。attach 拒绝后进入 `failed` 并显示通用重试，不能把错误吞掉后留下一个看似正常的空 surface。
 
 同一工作区的重试是 single-flight。重新启动或新对话 attach 失败时，hook 保留原 terminal binding，输入仍指向原 session；切换作用域会使旧请求失效，迟到结果不能覆盖新工作区。排障时分别记录测量 key、attach operation、session binding 和 workspace generation，避免把 Provider launch 失败、Agent session attach 失败与后续 `AttachView` snapshot 恢复失败混为同一问题。[`agent-console.attach-lifecycle.spec.tsx`](../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx) 覆盖失败可见、重复重试、既有 binding 保留和迟到作用域隔离。
 

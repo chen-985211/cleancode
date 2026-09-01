@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { AgentToolApprovalCard } from '../../../src/presentation/app-shell/AgentToolApprovalCard'
-import { resolveAgentApprovalPresentation } from '../../../src/presentation/app-shell/agentApprovalPresentation'
+import { resolveAgentApprovalPresentation } from '../../../src/presentation/app-shell/projections/agentApprovalPresentation'
 import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 
 describe('Agent tool approval card', () => {

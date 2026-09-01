@@ -2,7 +2,8 @@ import { useCallback } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
-import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
+import type { WorkbenchNodeLayoutInput } from './types/workbenchNodeLayout'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]

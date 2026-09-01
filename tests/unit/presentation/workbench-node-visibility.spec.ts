@@ -1,5 +1,5 @@
-import { isWorkbenchNodePresentationHidden } from '../../../src/presentation/app-shell/workbenchNodeVisibility'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import { isWorkbenchNodePresentationHidden } from '../../../src/presentation/app-shell/projections/workbenchNodeVisibility'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('workbench node presentation visibility', () => {
   it('keeps staged objects out of navigation until their atomic entrance begins', () => {

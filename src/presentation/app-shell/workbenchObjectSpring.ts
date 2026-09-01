@@ -4,7 +4,7 @@ import {
   retargetSpringAxis,
   type SpringAxis
 } from '../shared/motion/motionSpring'
-import type { WorkbenchObjectMotion } from './types'
+import type { WorkbenchObjectMotion } from './types/workbenchObjectMotion'
 
 export interface WorkbenchObjectSpringSurface {
   readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>

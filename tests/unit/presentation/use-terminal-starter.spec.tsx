@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react'
 
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import { useTerminalStarter } from '../../../src/presentation/app-shell/useTerminalStarter'
+import { useTerminalStarter } from '../../../src/presentation/app-shell/coordinators/useTerminalStarter'
 import { createDeferred } from '../../fixtures/deferred'
 import {
   createRuntimeApi,

@@ -1,9 +1,9 @@
 import type { NodeChange } from '@xyflow/react'
 import { useCallback, type Dispatch, type MouseEvent, type SetStateAction } from 'react'
 
-import { readAgentIdFromFlowNodeId, toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { readAgentIdFromFlowNodeId, toAgentFlowNodeId } from './projections/agentConsoleFlowNode'
 import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 export function useWorkbenchNodeSelection({
   focusSelectedWorkbenchNode,

@@ -1,4 +1,4 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness,

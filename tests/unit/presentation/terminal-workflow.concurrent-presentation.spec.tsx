@@ -7,7 +7,7 @@ import type {
   AppNotificationController,
   AppNotificationInput
 } from '../../../src/presentation/shared/notifications/appNotifications'
-import { useTerminalWorkflow } from '../../../src/presentation/app-shell/useTerminalWorkflow'
+import { useTerminalWorkflow } from '../../../src/presentation/app-shell/coordinators/useTerminalWorkflow'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('terminal workflow concurrent presentation', () => {

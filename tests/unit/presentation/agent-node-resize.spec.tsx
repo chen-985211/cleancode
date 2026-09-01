@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { CSSProperties } from 'react'
 
 import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
-import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ className, id }: HandleProps) => <span className={className} data-handleid={id} />,

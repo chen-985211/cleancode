@@ -7,8 +7,8 @@ import type {
 } from '../shared/notifications/appNotifications'
 import type { Translate } from '../i18n/messages'
 import { useI18n } from '../i18n/useI18n'
-import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
-import type { WorkbenchSnapshot } from './types'
+import { manualWorkspaceSelectionBrowserEventName } from './coordinators/useTerminalWorkspaceSynchronization'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 interface UseBranchWorkspaceActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null

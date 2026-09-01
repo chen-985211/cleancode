@@ -2,13 +2,11 @@ import {
   getTerminalMiniMapNodeColor,
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeStrokeColor
-} from '../../../src/presentation/app-shell/terminalMinimapAppearance'
+} from '../../../src/presentation/app-shell/projections/terminalMinimapAppearance'
 import { getTerminalStatusColor } from '../../../src/presentation/app-shell/minimapInteraction'
 import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
-import type {
-  AgentConsoleFlowNode,
-  TerminalFlowNode
-} from '../../../src/presentation/app-shell/types'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 describe('terminal minimap appearance', () => {
   it('uses a neutral node border for unselected running terminals', () => {

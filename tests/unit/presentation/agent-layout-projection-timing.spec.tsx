@@ -4,12 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { AgentGraphUpdatedEvent } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/useAgentLayoutCoordination'
-import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/useWorkbenchFlowNodes'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/coordinators/useAgentLayoutCoordination'
+import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/coordinators/useWorkbenchFlowNodes'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 

@@ -1,4 +1,4 @@
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import { BlockTemplateLibraryRoot } from '../../contexts/block-graph/presentation/components/BlockTemplateLibraryRoot'
 import { BlockTemplateSaveDialog } from '../../contexts/block-graph/presentation/components/BlockTemplateSaveDialog'
 import type { BlockTemplateLibraryActions } from '../../contexts/block-graph/presentation/view-models/BlockTemplatePresentationActions'

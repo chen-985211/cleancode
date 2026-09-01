@@ -7,7 +7,8 @@ import {
 } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { createCanvasObjectIdentityKey } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
-import type { TerminalDimensions, WorkbenchSnapshot } from './types'
+import type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 
 const rendererLegacyDefaultProviderId = 'codex'
 

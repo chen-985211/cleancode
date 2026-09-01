@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/useWorkbenchNodeSelection'
 
 describe('workbench node selection', () => {

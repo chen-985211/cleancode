@@ -3,10 +3,8 @@ import type { CSSProperties, ReactNode } from 'react'
 
 import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
 import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
-import type {
-  AgentConsoleFlowNode,
-  TerminalFlowNode
-} from '../../../src/presentation/app-shell/types'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ className }: { readonly className?: string }) => <span className={className} />,

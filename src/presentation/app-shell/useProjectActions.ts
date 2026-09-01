@@ -7,7 +7,7 @@ import type {
 } from '../shared/notifications/appNotifications'
 import type { Translate } from '../i18n/messages'
 import { useI18n } from '../i18n/useI18n'
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import { resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 
 interface UseProjectActionsInput {

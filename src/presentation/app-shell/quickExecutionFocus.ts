@@ -4,7 +4,7 @@ import type {
   QuickExecutionTargetSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 
 export function focusQuickExecutionTargetInCanvas({

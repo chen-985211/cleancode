@@ -21,12 +21,10 @@ import { TerminalViewport } from './TerminalViewport'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
-import {
-  terminalNodeMinimumSize,
-  type TerminalDimensions,
-  type TerminalFlowNode,
-  type WorkbenchNodeLayoutInput
-} from './types'
+import { terminalNodeMinimumSize } from './types/terminalFlowNode'
+import type { TerminalDimensions } from '../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalFlowNode } from './types/terminalFlowNode'
+import type { WorkbenchNodeLayoutInput } from './types/workbenchNodeLayout'
 import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'

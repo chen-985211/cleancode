@@ -11,8 +11,8 @@ import {
   maximumCanvasZoom,
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from './types'
-import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import { isWorkbenchNodePresentationHidden } from './projections/workbenchNodeVisibility'
 import {
   createWorkbenchViewportFlight,
   resolveWorkbenchViewportFlightPresentation,

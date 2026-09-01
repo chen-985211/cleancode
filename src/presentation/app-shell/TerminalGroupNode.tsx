@@ -14,7 +14,7 @@ import {
   agentApprovalConnectionTargetHandleId,
   agentApprovalTargetHandleId
 } from './agentApprovalHandles'
-import type { TerminalGroupFlowNode } from './types'
+import type { TerminalGroupFlowNode } from './types/terminalGroupFlowNode'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 

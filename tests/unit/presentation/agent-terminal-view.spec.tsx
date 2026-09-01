@@ -9,7 +9,7 @@ import type {
 } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
-import { useAgentTerminalView } from '../../../src/presentation/app-shell/useAgentTerminalView'
+import { useAgentTerminalView } from '../../../src/presentation/app-shell/coordinators/useAgentTerminalView'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 const terminalViewMockState = vi.hoisted(() => ({ surfaces: [] as TerminalSurface[] }))

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
 
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot

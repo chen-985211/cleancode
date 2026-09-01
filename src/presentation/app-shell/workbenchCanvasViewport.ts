@@ -2,7 +2,8 @@ import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import type { MutableRefObject } from 'react'
 
 import type { MinimapViewportCenter } from './CanvasMinimap'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import {
   subscribeWorkbenchViewportMotionCompletion,
   transitionWorkbenchViewport,

@@ -5,8 +5,9 @@ import type { BlockTemplateSnapshot } from '../../contexts/block-graph/applicati
 import type { InstantiateBlockTemplateResult } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
 import type { AppNotificationController } from '../shared/notifications/appNotifications'
 import { useI18n } from '../i18n/useI18n'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
-import type { useTerminalWorkflow } from './useTerminalWorkflow'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
+import type { useTerminalWorkflow } from './coordinators/useTerminalWorkflow'
 import {
   useWorkbenchLayoutFocus,
   type WorkbenchLayoutFocusRequest

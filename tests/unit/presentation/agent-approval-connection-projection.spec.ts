@@ -1,7 +1,7 @@
 import type { Edge } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../../../src/presentation/app-shell/agentApprovalConnectionProjection'
+import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../../../src/presentation/app-shell/projections/agentApprovalConnectionProjection'
 import type {
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState

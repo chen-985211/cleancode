@@ -8,10 +8,8 @@ import {
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 const reactFlowSpies = vi.hoisted(() => ({
   fitView: vi.fn(async () => undefined),

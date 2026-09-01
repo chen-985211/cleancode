@@ -8,11 +8,9 @@ import {
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type {
-  TerminalFlowNode,
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null,

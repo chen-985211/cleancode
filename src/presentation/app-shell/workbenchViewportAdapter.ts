@@ -1,6 +1,6 @@
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 export async function applyWorkbenchViewport(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,

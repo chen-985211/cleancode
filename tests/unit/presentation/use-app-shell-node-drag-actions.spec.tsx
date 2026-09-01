@@ -1,8 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useAppShellNodeDragActions } from '../../../src/presentation/app-shell/useAppShellNodeDragActions'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useAppShellNodeDragActions } from '../../../src/presentation/app-shell/coordinators/useAppShellNodeDragActions'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('AppShell node drag actions', () => {

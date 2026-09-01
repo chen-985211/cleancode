@@ -1,6 +1,6 @@
 import { useSyncExternalStore, type Dispatch, type SetStateAction } from 'react'
 
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 
 export interface WorkbenchNodeStore {
   readonly getNodes: () => WorkbenchFlowNode[]

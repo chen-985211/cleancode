@@ -2,7 +2,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { focusAgentConsoleInCanvas } from '../../../src/presentation/app-shell/focusAgentConsoleInCanvas'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('focus Agent console in canvas', () => {
   beforeEach(() => {

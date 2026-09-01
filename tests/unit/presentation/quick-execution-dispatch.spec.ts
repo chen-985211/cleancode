@@ -1,5 +1,5 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { executeQuickExecutionTarget } from '../../../src/presentation/app-shell/executeQuickExecutionTarget'
+import { executeQuickExecutionTarget } from '../../../src/presentation/app-shell/coordinators/executeQuickExecutionTarget'
 
 describe('quick execution dispatch', () => {
   it('coordinates terminal, workflow, and combination execution entries', async () => {

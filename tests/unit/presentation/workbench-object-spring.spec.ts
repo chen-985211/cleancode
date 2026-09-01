@@ -3,7 +3,7 @@ import {
   type WorkbenchObjectSpringFrameScheduler,
   type WorkbenchObjectSpringSurface
 } from '../../../src/presentation/app-shell/workbenchObjectSpring'
-import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types/workbenchObjectMotion'
 
 describe('workbench object spring', () => {
   it('materializes a created object from the center without changing layout geometry', () => {

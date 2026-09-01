@@ -1,11 +1,11 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { toAgentFlowNodeId } from './projections/agentConsoleFlowNode'
 import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewport'
 import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness

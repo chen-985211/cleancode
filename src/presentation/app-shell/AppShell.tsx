@@ -7,31 +7,32 @@ import type { TerminalBlockSnapshot } from '../../contexts/block-graph/applicati
 import * as derived from './appShellDerived'
 import { ProjectSidebar } from '../../contexts/project/presentation/components/ProjectSidebar'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
-import { useTerminalGroupActions } from './useTerminalGroupActions'
-import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
+import { useTerminalGroupActions } from './coordinators/useTerminalGroupActions'
+import { useTerminalGroupDragActions } from './coordinators/useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from '../../contexts/block-graph/presentation/view-models/useTerminalGroupSelectionMode'
 import { useTerminalBlockResizeAction } from './useTerminalBlockResizeAction'
 import { useInitialWorkbenchLoad } from './useInitialWorkbenchLoad'
-import { useMinimapNodeFocus } from './useMinimapNodeFocus'
+import { useMinimapNodeFocus } from './coordinators/useMinimapNodeFocus'
 import { useProjectGitStateSynchronization } from './useProjectGitStateSynchronization'
 import { useProjectActions } from './useProjectActions'
-import { useTerminalWorkspaceSynchronization } from './useTerminalWorkspaceSynchronization'
+import { useTerminalWorkspaceSynchronization } from './coordinators/useTerminalWorkspaceSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
-import { useTerminalSessions } from './useTerminalSessions'
-import { useTerminalServiceActions } from './useTerminalServiceActions'
-import { useTerminalWorkflow } from './useTerminalWorkflow'
+import { useTerminalSessions } from './coordinators/useTerminalSessions'
+import { useTerminalServiceActions } from './coordinators/useTerminalServiceActions'
+import { useTerminalWorkflow } from './coordinators/useTerminalWorkflow'
 import { useCurrentGraphState } from './useCurrentGraphState'
-import { useWorkbenchFlowNodes } from './useWorkbenchFlowNodes'
+import { useWorkbenchFlowNodes } from './coordinators/useWorkbenchFlowNodes'
 import { useWorkbenchGraphIndex } from './useWorkbenchGraphIndex'
 import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
-import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
-import { useAgentToolApprovals } from './useAgentToolApprovals'
-import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import { useWorkspaceAgentActions } from './coordinators/useWorkspaceAgentActions'
+import { useAgentToolApprovals } from './coordinators/useAgentToolApprovals'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from './types/workbenchSnapshot'
 import { useI18n } from '../i18n/useI18n'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
-import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
+import { useAgentLayoutCoordination } from './coordinators/useAgentLayoutCoordination'
 import { ignoreAppNotifications } from '../shared/notifications/appNotifications'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -44,18 +45,18 @@ import { useTerminalRuntimePreference } from '../../contexts/run/presentation/vi
 import { useTerminalWorkflowBuildPreference } from './useTerminalWorkflowBuildPreference'
 import { useCanvasVisualNoisePreference } from './useCanvasVisualNoisePreference'
 import { useTerminalRuntimeAvailability } from '../../contexts/run/presentation/view-models/useTerminalRuntimeAvailability'
-import { toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { toAgentFlowNodeId } from './projections/agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
 import { useAgentCreationProviders } from '../../contexts/agent/presentation/view-models/useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
-import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
+import { useWorkbenchNodeCreationActions } from './coordinators/useWorkbenchNodeCreationActions'
 import { useBlockTemplateActions } from './useBlockTemplateActions'
 import { AppShellSettings } from './AppShellSettings'
 import { AppShellProviders } from './AppShellProviders'
-import { useQuickExecutionActions } from './useQuickExecutionActions'
-import { useAppShellBlockActions } from './useAppShellBlockActions'
+import { useQuickExecutionActions } from './coordinators/useQuickExecutionActions'
+import { useAppShellBlockActions } from './coordinators/useAppShellBlockActions'
 import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
-import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
+import { useAppShellNodeDragActions } from './coordinators/useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
 import { useCanvasSelectionViewport } from './useCanvasSelectionViewport'
 import { ProjectSidebarToggle } from './ProjectSidebarToggle'
@@ -64,12 +65,12 @@ import { useAgentActivityNotificationNavigation } from './useAgentActivityNotifi
 import { useProjectSidebarVisibility } from './useProjectSidebarVisibility'
 import { useProjectSidebarMotion } from './useProjectSidebarMotion'
 import { projectSidebarExpandedWidth } from './projectSidebarMotion'
-import { useAppShellCanvasArrangement } from './useAppShellCanvasArrangement'
+import { useAppShellCanvasArrangement } from './coordinators/useAppShellCanvasArrangement'
 import {
   useAppShellGraphViewportUpdate,
   useSingleTerminalBlockSelectionBridge,
   useWorkbenchListUpdates
-} from './useAppShellWorkbenchStateAdapters'
+} from './coordinators/useAppShellWorkbenchStateAdapters'
 export function AppShell({
   agentActivityNavigationRequest = null,
   notifications = ignoreAppNotifications,
@@ -562,139 +563,137 @@ export function AppShell({
   })
   return (
     <AppShellProviders {...{ notifications, onAgentActivityNavigate, terminalSurfaceRegistry }}>
-      <>
-        <main
-          className={[
-            'app-shell',
-            shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
-            isWindowFullScreen ? 'app-shell--window-full-screen' : '',
-            isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          aria-label={t('app.workspace')}
-        >
-          <AppShellSettings
-            agentCreation={agentCreation}
-            applicationSettings={applicationSettings}
-            bindings={bindings}
-            blockTemplates={blockTemplates}
-            changeBinding={changeBinding}
-            changeFollowQuickExecutionTarget={quickExecution.changeFollowQuickExecutionTarget}
-            changeReduceVisualNoise={changeReduceVisualNoise}
-            changeTerminalScrollback={changeTerminalScrollback}
-            changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
-            currentWorkbench={currentWorkbench}
-            followQuickExecutionTarget={quickExecution.followQuickExecutionTarget}
-            isDesktopRuntime={isDesktopRuntime}
-            resetAllBindings={resetAllBindings}
-            reduceVisualNoise={reduceVisualNoise}
-            shortcutPlatform={shortcutPlatform}
-            terminalScrollbackRows={terminalScrollbackRows}
-            terminalWorkflowBuildMode={terminalWorkflowBuildMode}
+      <main
+        className={[
+          'app-shell',
+          shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
+          isWindowFullScreen ? 'app-shell--window-full-screen' : '',
+          isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-label={t('app.workspace')}
+      >
+        <AppShellSettings
+          agentCreation={agentCreation}
+          applicationSettings={applicationSettings}
+          bindings={bindings}
+          blockTemplates={blockTemplates}
+          changeBinding={changeBinding}
+          changeFollowQuickExecutionTarget={quickExecution.changeFollowQuickExecutionTarget}
+          changeReduceVisualNoise={changeReduceVisualNoise}
+          changeTerminalScrollback={changeTerminalScrollback}
+          changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
+          currentWorkbench={currentWorkbench}
+          followQuickExecutionTarget={quickExecution.followQuickExecutionTarget}
+          isDesktopRuntime={isDesktopRuntime}
+          resetAllBindings={resetAllBindings}
+          reduceVisualNoise={reduceVisualNoise}
+          shortcutPlatform={shortcutPlatform}
+          terminalScrollbackRows={terminalScrollbackRows}
+          terminalWorkflowBuildMode={terminalWorkflowBuildMode}
+        />
+        <div className="project-sidebar-column">
+          <ProjectSidebarToggle
+            buttonRef={projectSidebarToggleRef}
+            isCollapsed={isProjectSidebarCollapsed}
+            motionSurfaceRef={projectSidebarMotion.titlebarRef}
+            shortcutTooltip={shortcutTooltips.toggleSidebar}
+            onToggle={toggleProjectSidebar}
           />
-          <div className="project-sidebar-column">
-            <ProjectSidebarToggle
-              buttonRef={projectSidebarToggleRef}
-              isCollapsed={isProjectSidebarCollapsed}
-              motionSurfaceRef={projectSidebarMotion.titlebarRef}
-              shortcutTooltip={shortcutTooltips.toggleSidebar}
-              onToggle={toggleProjectSidebar}
-            />
-            <ProjectSidebar
-              workbenches={workbenches}
-              currentWorkbench={currentWorkbench}
-              isCollapsed={isProjectSidebarCollapsed}
-              isDesktopRuntime={isDesktopRuntime}
-              motionSurfaceRef={projectSidebarMotion.sidebarRef}
-              intent={shortcutNavigation.projectSidebarIntent}
-              shortcutTooltips={shortcutTooltips}
-              isReorderPending={isReorderingProject}
-              onAddProject={addProject}
-              onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
-              onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
-              onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-              onRemoveProject={removeProject}
-              onReorderProject={reorderProject}
-              onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
-            />
-          </div>
-          <WorkbenchCanvas
-            approvalIntents={agentToolApprovals.approvals}
-            agentProviders={enabledCreatableAgentProviders}
-            defaultAgentProviderId={effectiveAgentProviderId}
-            isDesktopRuntime={isDesktopRuntime}
-            initialWorkbenchLoadPhase={initialWorkbenchLoad.phase}
-            isCreatingAgent={isCreatingAgent}
-            isAgentProviderDiscoveryPending={creatableAgentProviders.state.status === 'loading'}
-            terminalRuntimeAvailability={terminalRuntimeAvailability}
+          <ProjectSidebar
+            workbenches={workbenches}
             currentWorkbench={currentWorkbench}
-            currentWorkspace={currentWorkspace}
-            notifications={notifications}
-            nodeStore={nodeStore}
-            nodeTypes={workbenchNodeTypes}
-            canvasSizeRef={canvasSizeRef}
-            canvasLeftInset={isProjectSidebarCollapsed ? 0 : projectSidebarExpandedWidth}
-            centerMotionRef={projectSidebarMotion.centerRef}
-            reactFlowInstanceRef={reactFlowInstanceRef}
-            spatialMotionRef={projectSidebarMotion.spatialRef}
-            statusbarMotionRef={projectSidebarMotion.statusbarRef}
-            minimapNodeInteraction={minimapNodeInteraction}
-            reduceVisualNoise={reduceVisualNoise}
-            terminalWorkflow={terminalWorkflow}
-            terminalWorkflowBuildPresentation={terminalWorkflowBuildPresentation}
+            isCollapsed={isProjectSidebarCollapsed}
+            isDesktopRuntime={isDesktopRuntime}
+            motionSurfaceRef={projectSidebarMotion.sidebarRef}
+            intent={shortcutNavigation.projectSidebarIntent}
             shortcutTooltips={shortcutTooltips}
-            shortcutPlatform={shortcutPlatform}
-            placementTemplate={blockTemplates.placementTemplate}
-            onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
-            onPlaceBlockTemplate={blockTemplates.place}
-            onRequestSaveBlockTemplate={blockTemplates.requestSave}
-            isCanvasArrangementPending={canvasArrangement.isPending}
-            onArrangeCanvasSelection={canvasArrangement.arrange}
-            onMoveCanvasStack={canvasArrangement.moveStack}
-            onDeleteTerminalScope={blockActions.deleteTerminalScope}
-            onAddQuickExecutionTarget={quickExecution.addTarget}
-            onBindQuickExecutionSlot={quickExecution.bindSlot}
-            onClearQuickExecutionSlot={quickExecution.clearSlot}
-            onReorderQuickExecutionSlots={quickExecution.reorderSlots}
-            onQuickExecutionNodeDrop={bindQuickExecutionFromNodeDrop}
-            onQuickExecutionDragPreview={clearTerminalGroupDropPreview}
-            isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
-            onToggleMinimap={shortcutNavigation.toggleMinimap}
-            onZoomCanvasIn={zoomCanvasIn}
-            onZoomCanvasOut={zoomCanvasOut}
-            onFitCanvas={fitCanvas}
-            onOpenProject={addProject}
-            onRetryInitialWorkbenchLoad={initialWorkbenchLoad.retry}
-            onCreateTerminalBlock={createTerminalBlock}
-            onCreateWorkspaceAgent={createWorkspaceAgent}
-            onOpenAgentSettings={applicationSettings.openAgents}
-            onSelectDefaultAgentProvider={changePreferredProvider}
-            onCreateTerminalGroup={blockActions.createTerminalGroup}
-            onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
-            isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
-            editingTerminalGroupId={editingTerminalGroupId}
-            selectedTerminalGroupCandidateCount={
-              graph?.terminalGroups.find((group) => group.id === editingTerminalGroupId)
-                ?.memberBlockIds.length ?? 0
-            }
-            onNodesChange={workbenchNodeSelection.onNodesChange}
-            onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
-            onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
-            onNodeDrag={previewTerminalGroupDrop}
-            onNodeDragStart={onNodeDragStart}
-            onCancelNodeDrag={cancelNodeDrag}
-            onNodeDragStop={commitWorkbenchNodeDrag}
-            onViewportChange={updateGraphViewport}
-            onViewportInteractionStart={cancelLayoutFocus}
-            terminalZoomRasterCoordinator={terminalRendering}
-            onMinimapNodeClick={focusWorkbenchNode}
-            getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
-            getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
-            getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
+            isReorderPending={isReorderingProject}
+            onAddProject={addProject}
+            onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+            onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+            onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
+            onRemoveProject={removeProject}
+            onReorderProject={reorderProject}
+            onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
           />
-        </main>
-      </>
+        </div>
+        <WorkbenchCanvas
+          approvalIntents={agentToolApprovals.approvals}
+          agentProviders={enabledCreatableAgentProviders}
+          defaultAgentProviderId={effectiveAgentProviderId}
+          isDesktopRuntime={isDesktopRuntime}
+          initialWorkbenchLoadPhase={initialWorkbenchLoad.phase}
+          isCreatingAgent={isCreatingAgent}
+          isAgentProviderDiscoveryPending={creatableAgentProviders.state.status === 'loading'}
+          terminalRuntimeAvailability={terminalRuntimeAvailability}
+          currentWorkbench={currentWorkbench}
+          currentWorkspace={currentWorkspace}
+          notifications={notifications}
+          nodeStore={nodeStore}
+          nodeTypes={workbenchNodeTypes}
+          canvasSizeRef={canvasSizeRef}
+          canvasLeftInset={isProjectSidebarCollapsed ? 0 : projectSidebarExpandedWidth}
+          centerMotionRef={projectSidebarMotion.centerRef}
+          reactFlowInstanceRef={reactFlowInstanceRef}
+          spatialMotionRef={projectSidebarMotion.spatialRef}
+          statusbarMotionRef={projectSidebarMotion.statusbarRef}
+          minimapNodeInteraction={minimapNodeInteraction}
+          reduceVisualNoise={reduceVisualNoise}
+          terminalWorkflow={terminalWorkflow}
+          terminalWorkflowBuildPresentation={terminalWorkflowBuildPresentation}
+          shortcutTooltips={shortcutTooltips}
+          shortcutPlatform={shortcutPlatform}
+          placementTemplate={blockTemplates.placementTemplate}
+          onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
+          onPlaceBlockTemplate={blockTemplates.place}
+          onRequestSaveBlockTemplate={blockTemplates.requestSave}
+          isCanvasArrangementPending={canvasArrangement.isPending}
+          onArrangeCanvasSelection={canvasArrangement.arrange}
+          onMoveCanvasStack={canvasArrangement.moveStack}
+          onDeleteTerminalScope={blockActions.deleteTerminalScope}
+          onAddQuickExecutionTarget={quickExecution.addTarget}
+          onBindQuickExecutionSlot={quickExecution.bindSlot}
+          onClearQuickExecutionSlot={quickExecution.clearSlot}
+          onReorderQuickExecutionSlots={quickExecution.reorderSlots}
+          onQuickExecutionNodeDrop={bindQuickExecutionFromNodeDrop}
+          onQuickExecutionDragPreview={clearTerminalGroupDropPreview}
+          isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
+          onToggleMinimap={shortcutNavigation.toggleMinimap}
+          onZoomCanvasIn={zoomCanvasIn}
+          onZoomCanvasOut={zoomCanvasOut}
+          onFitCanvas={fitCanvas}
+          onOpenProject={addProject}
+          onRetryInitialWorkbenchLoad={initialWorkbenchLoad.retry}
+          onCreateTerminalBlock={createTerminalBlock}
+          onCreateWorkspaceAgent={createWorkspaceAgent}
+          onOpenAgentSettings={applicationSettings.openAgents}
+          onSelectDefaultAgentProvider={changePreferredProvider}
+          onCreateTerminalGroup={blockActions.createTerminalGroup}
+          onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
+          isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+          editingTerminalGroupId={editingTerminalGroupId}
+          selectedTerminalGroupCandidateCount={
+            graph?.terminalGroups.find((group) => group.id === editingTerminalGroupId)
+              ?.memberBlockIds.length ?? 0
+          }
+          onNodesChange={workbenchNodeSelection.onNodesChange}
+          onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
+          onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
+          onNodeDrag={previewTerminalGroupDrop}
+          onNodeDragStart={onNodeDragStart}
+          onCancelNodeDrag={cancelNodeDrag}
+          onNodeDragStop={commitWorkbenchNodeDrag}
+          onViewportChange={updateGraphViewport}
+          onViewportInteractionStart={cancelLayoutFocus}
+          terminalZoomRasterCoordinator={terminalRendering}
+          onMinimapNodeClick={focusWorkbenchNode}
+          getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
+          getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
+          getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
+        />
+      </main>
     </AppShellProviders>
   )
 }

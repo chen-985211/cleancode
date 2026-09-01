@@ -4,7 +4,7 @@ import type { TerminalBlockSnapshot } from '../../contexts/block-graph/applicati
 import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewport'
 import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
-import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types/workbenchFlowNode'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness

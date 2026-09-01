@@ -6,9 +6,9 @@ import type {
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
-import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
-import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
+import { readAgentIdFromFlowNodeId } from './projections/agentConsoleFlowNode'
+import type { MinimapFlowNode, WorkbenchFlowNode } from './types/workbenchFlowNode'
+import { isWorkbenchNodePresentationHidden } from './projections/workbenchNodeVisibility'
 
 export interface MinimapNodeInteractionContextValue {
   readonly getLabel: (blockId: string) => string

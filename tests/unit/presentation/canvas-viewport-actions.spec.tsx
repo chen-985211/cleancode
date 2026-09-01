@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { useCanvasViewportActions } from '../../../src/presentation/app-shell/useCanvasViewportActions'
 
 const directZoomSpies = vi.hoisted(() => ({ cancel: vi.fn() }))
