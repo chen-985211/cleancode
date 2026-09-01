@@ -1,12 +1,13 @@
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import {
+  projectBlockTemplateRects,
+  resolveBlockTemplateBounds
+} from '../../contexts/block-graph/presentation/view-models/blockTemplateGeometry'
+import {
   workbenchNodePlacementGap,
   type WorkbenchCanvasRect,
   type WorkbenchNodePosition
 } from './workbenchNodeCreationPolicy'
-
-const terminalGroupPadding = { x: 32, y: 76 }
-const minimumTerminalGroupSize = { width: 520, height: 320 }
 
 export function resolveBlockTemplatePlacement({
   desiredCenter,
@@ -18,10 +19,10 @@ export function resolveBlockTemplatePlacement({
   readonly template: BlockTemplateSnapshot
 }): WorkbenchNodePosition {
   const relativeFootprint = projectBlockTemplateRects(template, { x: 0, y: 0 })
-  const footprintBounds = boundsOf(relativeFootprint)
+  const footprintBounds = resolveBlockTemplateBounds(template, { x: 0, y: 0 })
   const desiredOrigin = {
-    x: desiredCenter.x - (footprintBounds.left + footprintBounds.right) / 2,
-    y: desiredCenter.y - (footprintBounds.top + footprintBounds.bottom) / 2
+    x: desiredCenter.x - (footprintBounds.x + footprintBounds.width / 2),
+    y: desiredCenter.y - (footprintBounds.y + footprintBounds.height / 2)
   }
 
   if (isOriginAvailable(relativeFootprint, desiredOrigin, occupiedRects)) {
@@ -67,68 +68,6 @@ export function resolveBlockTemplatePlacement({
       .filter((origin) => isOriginAvailable(relativeFootprint, origin, occupiedRects))
       .sort((left, right) => compareOrigins(left, right, desiredOrigin))[0] ?? desiredOrigin
   )
-}
-
-export function projectBlockTemplateRects(
-  template: BlockTemplateSnapshot,
-  origin: WorkbenchNodePosition
-): WorkbenchCanvasRect[] {
-  if (template.type === 'combination') {
-    const nodeBounds = boundsOf(
-      template.nodes.map((node) => ({
-        id: node.templateNodeId,
-        position: node.position,
-        size: node.size
-      }))
-    )
-
-    return [
-      {
-        id: template.id,
-        position: {
-          x: origin.x + nodeBounds.left - terminalGroupPadding.x,
-          y: origin.y + nodeBounds.top - terminalGroupPadding.y
-        },
-        size: {
-          width: Math.max(
-            minimumTerminalGroupSize.width,
-            nodeBounds.right - nodeBounds.left + terminalGroupPadding.x * 2
-          ),
-          height: Math.max(
-            minimumTerminalGroupSize.height,
-            nodeBounds.bottom - nodeBounds.top + terminalGroupPadding.y * 2
-          )
-        }
-      }
-    ]
-  }
-
-  return template.nodes.map((node) => ({
-    id: node.templateNodeId,
-    position: {
-      x: origin.x + node.position.x,
-      y: origin.y + node.position.y
-    },
-    size: node.size
-  }))
-}
-
-export function resolveBlockTemplateBounds(
-  template: BlockTemplateSnapshot,
-  origin: WorkbenchNodePosition
-): {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-} {
-  const bounds = boundsOf(projectBlockTemplateRects(template, origin))
-  return {
-    x: bounds.left,
-    y: bounds.top,
-    width: bounds.right - bounds.left,
-    height: bounds.bottom - bounds.top
-  }
 }
 
 function isOriginAvailable(
@@ -183,21 +122,4 @@ function compareOrigins(
 
 function directionRank(offset: number): number {
   return offset >= 0 ? 0 : 1
-}
-
-function boundsOf(rects: readonly WorkbenchCanvasRect[]) {
-  return rects.reduce(
-    (bounds, rect) => ({
-      left: Math.min(bounds.left, rect.position.x),
-      top: Math.min(bounds.top, rect.position.y),
-      right: Math.max(bounds.right, rect.position.x + rect.size.width),
-      bottom: Math.max(bounds.bottom, rect.position.y + rect.size.height)
-    }),
-    {
-      left: Number.POSITIVE_INFINITY,
-      top: Number.POSITIVE_INFINITY,
-      right: Number.NEGATIVE_INFINITY,
-      bottom: Number.NEGATIVE_INFINITY
-    }
-  )
 }

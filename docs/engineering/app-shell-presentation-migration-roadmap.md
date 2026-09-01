@@ -192,7 +192,8 @@ src/
 - 上下文组件通过 `BlockTemplatePresentationActions` 消费 list/save/update/move/delete，不直接访问 preload 全局或 Platform。
 - `BlockTemplateSurfaces` 留在 App Shell，负责运行时适配，以及把模板选择交给画布放置与可选 Run 执行协调器。
 - 模板库继续复用根级共享 Surface、Tooltip、selection motion、焦点恢复和 utility button motion；搜索、作用域切换、维护动作、受控退出与可访问性结果保持不变。
-- `BlockTemplatePlacementPreview`、放置坐标策略和画布交互仍组合 React Flow/Workbench viewport，后续先拆出 BlockGraph 纯投影再判断归属。
+- `BlockTemplatePlacementPreview`、规范 footprint/外包围盒、专属样式和 owner-level Unit 已迁入 BlockGraph；组件只消费模板、origin 与公开 Canvas viewport DTO。
+- `LiveBlockTemplatePlacementPreview` 留在 App Shell，仅订阅实时 viewport store；空位搜索继续使用跨 Agent、终端与组合的 Workbench occupancy，不能下沉为 BlockGraph 单一事实。
 
 ## 剩余清单
 
@@ -286,13 +287,11 @@ src/
 
 组件：
 
-- `BlockTemplatePlacementPreview.tsx`
 - `QuickExecutionBar.tsx`
 - `TerminalGroupNode.tsx`
 
 ViewModel、策略和交互：
 
-- `blockTemplatePlacement.ts`
 - `quickExecutionDrag.ts`
 - `quickExecutionDragPresentation.tsx`
 - `quickExecutionFocus.ts`
@@ -315,6 +314,7 @@ ViewModel、策略和交互：
 
 - `WorkbenchCanvas.tsx`、`WorkbenchCanvasBottomControls.tsx`：App Shell 拥有组合布局，BlockGraph 组件作为消费者嵌入。
 - `BlockTemplateSurfaces.tsx`：模板组件已经下沉；该文件保留 preload 动作适配、当前 Workbench 选择和放置/运行协调，属于 App Shell composition adapter。
+- `blockTemplatePlacement.ts`、`useBlockTemplateCanvasInteraction.ts`：BlockGraph footprint 已下沉；剩余算法消费跨上下文 Workbench occupancy、React Flow 坐标和画布点击状态，继续归 App Shell coordinator。
 - `CanvasObjectContextMenu.tsx`、`CanvasNodeMenu.tsx`：菜单表面和互斥输入属于共享/App Shell，各对象动作与文案投影属于对应上下文。
 - `QuickExecutionBar.tsx`：绑定事实由 BlockGraph 拥有，实际启动由 Run；需要拆分展示/编辑与执行协调。
 - `useCanvasSelectionViewport.ts`、`workbenchViewportMotion.ts`：选择事实来自对象 owner，统一相机结果属于 App Shell，不迁入 BlockGraph。
@@ -443,7 +443,8 @@ ViewModel、策略和交互：
 
 - 已迁移终端元数据/执行配置表单、draft、输入类型、专属样式和 owner-level Unit。
 - 已迁移模板库、保存对话框、动作契约、专属样式和 owner-level Unit；App Shell 只保留 preload 与放置/运行适配。
-- 接下来迁移图内纯策略，并拆分模板放置的 BlockGraph 投影与 App Shell viewport 协调。
+- 已迁移模板规范几何与纯预览；App Shell 只保留 live viewport adapter 和跨上下文空位搜索。
+- 接下来迁移其他图内纯策略。
 - 再拆 TerminalNode、TerminalGroup、QuickExecution 的展示与 Run 执行协调。
 - 图事实和布局规则继续来自 BlockGraph 聚合/用例，不在 UI 复制。
 

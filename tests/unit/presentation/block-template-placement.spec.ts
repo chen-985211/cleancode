@@ -1,8 +1,6 @@
 import type { BlockTemplateSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import {
-  projectBlockTemplateRects,
-  resolveBlockTemplatePlacement
-} from '../../../src/presentation/app-shell/blockTemplatePlacement'
+import { projectBlockTemplateRects } from '../../../src/contexts/block-graph/presentation/view-models/blockTemplateGeometry'
+import { resolveBlockTemplatePlacement } from '../../../src/presentation/app-shell/blockTemplatePlacement'
 
 describe('block template placement', () => {
   it('centers an unobstructed template on the clicked canvas point', () => {

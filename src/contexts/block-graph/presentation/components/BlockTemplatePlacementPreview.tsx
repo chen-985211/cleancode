@@ -1,33 +1,18 @@
-import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
-import { resolveBlockTemplateBounds } from './blockTemplatePlacement'
-import type { WorkbenchSnapshot } from './types'
-import {
-  useWorkbenchCanvasViewport,
-  type WorkbenchCanvasViewportStore
-} from './workbenchCanvasViewportStore'
+import type {
+  BlockPositionSnapshot,
+  CanvasViewportSnapshot
+} from '../../application/dto/BlockGraphSnapshot'
+import type { BlockTemplateSnapshot } from '../../application/dto/BlockTemplateSnapshot'
+import { resolveBlockTemplateBounds } from '../view-models/blockTemplateGeometry'
 
-export function LiveBlockTemplatePlacementPreview({
-  origin,
-  template,
-  viewportStore
-}: {
-  readonly origin: { readonly x: number; readonly y: number }
-  readonly template: BlockTemplateSnapshot
-  readonly viewportStore: WorkbenchCanvasViewportStore
-}) {
-  const viewport = useWorkbenchCanvasViewport(viewportStore)
-
-  return <BlockTemplatePlacementPreview origin={origin} template={template} viewport={viewport} />
-}
-
-function BlockTemplatePlacementPreview({
+export function BlockTemplatePlacementPreview({
   origin,
   template,
   viewport
 }: {
-  readonly origin: { readonly x: number; readonly y: number }
+  readonly origin: BlockPositionSnapshot
   readonly template: BlockTemplateSnapshot
-  readonly viewport: WorkbenchSnapshot['graph']['viewport']
+  readonly viewport: CanvasViewportSnapshot
 }) {
   const nodeById = new Map(template.nodes.map((node) => [node.templateNodeId, node]))
   const templateBounds = resolveBlockTemplateBounds(template, origin)
