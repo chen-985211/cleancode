@@ -11,17 +11,17 @@ import {
 } from '../../contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { WorkbenchSnapshot } from './types'
-import type { CanvasArrangementSelectionItem } from './canvasArrangementSelection'
 import {
   canvasArrangementItemKey,
   findCanvasArrangementStack,
-  findCanvasArrangementStacks
-} from './canvasArrangementSelection'
+  findCanvasArrangementStacks,
+  type CanvasArrangementSelectionItem
+} from '../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import {
   createCanvasArrangementMotionChoreography,
   type CanvasArrangementMotionChoreography
-} from './canvasArrangementMotion'
-import { createCanvasArrangementGridPlan } from './canvasArrangementGridPlanning'
+} from '../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
+import { createCanvasArrangementGridPlan } from './workbenchCanvasArrangementGridPlanning'
 
 interface UseCanvasArrangementActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null

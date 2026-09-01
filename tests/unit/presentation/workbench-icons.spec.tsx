@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import {
   WorkbenchIcon,
   type WorkbenchIconRole
-} from '../../../src/presentation/app-shell/WorkbenchIcons'
+} from '../../../src/presentation/shared/components/WorkbenchIcons'
 
 const canonicalIconCases = [
   ['terminal', 'terminal-window', 'regular'],

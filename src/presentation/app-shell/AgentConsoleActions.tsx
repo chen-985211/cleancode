@@ -13,7 +13,7 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface MenuPosition {
   readonly anchorX: number

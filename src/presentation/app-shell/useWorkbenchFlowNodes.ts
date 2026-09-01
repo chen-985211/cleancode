@@ -26,8 +26,8 @@ import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
-import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
-import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
+import { projectCanvasArrangementStackingOntoNodes } from './workbenchCanvasArrangementStackingProjection'
+import type { CanvasArrangementMotionChoreography } from '../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 import {
   createTerminalStateStore,
   type TerminalStateStore

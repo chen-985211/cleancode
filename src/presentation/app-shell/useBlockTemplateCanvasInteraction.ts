@@ -11,15 +11,15 @@ import {
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
-import type { ShortcutPlatform } from './applicationShortcuts'
 import {
   isCanvasArrangementSelectionModifier,
-  listCanvasArrangementItems,
   normalizeCanvasArrangementSelectionRect,
   resolveCanvasArrangementSelectionFromCandidates,
   type CanvasArrangementSelection,
   type CanvasArrangementSelectionItem
-} from './canvasArrangementSelection'
+} from '../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import type { ShortcutPlatform } from './applicationShortcuts'
+import { listCanvasArrangementItems } from './workbenchCanvasArrangementSelection'
 import { resolveBlockTemplatePlacement } from './blockTemplatePlacement'
 import type { WorkbenchFlowNode } from './types'
 import { createWorkbenchNodeOccupancy } from './workbenchNodeOccupancy'

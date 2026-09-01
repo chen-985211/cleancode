@@ -17,7 +17,7 @@ import { CanvasMenuSurface } from './CanvasMenuMotionProvider'
 import { useI18n } from '../i18n/useI18n'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { usePrefersReducedMotion } from '../shared/hooks/usePrefersReducedMotion'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface AgentCreateSplitButtonProps {
   readonly defaultProviderId: string | null

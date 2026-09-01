@@ -14,7 +14,10 @@ const quickExecutionStyles = readFileSync(
   'utf8'
 )
 const canvasArrangementStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-arrangement.css'),
+  resolve(
+    process.cwd(),
+    'src/contexts/canvas-arrangement/presentation/styles/canvas-arrangement.css'
+  ),
   'utf8'
 )
 

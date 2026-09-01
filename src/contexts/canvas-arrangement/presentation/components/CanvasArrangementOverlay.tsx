@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
-import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { CanvasArrangementSnapshot } from '../../application/dto/CanvasArrangementSnapshot'
 import { CanvasArrangementToolbar } from './CanvasArrangementToolbar'
 import {
   findCanvasArrangementStack,
   type CanvasArrangementSelection,
   type CanvasArrangementSelectionItem
-} from './canvasArrangementSelection'
+} from '../view-models/canvasArrangementSelection'
 
 export function CanvasArrangementOverlay({
   arrangement,

@@ -1,9 +1,10 @@
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import { resolveCanvasStackDragTarget } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementStackingProjection'
 import {
   projectCanvasArrangementStackingOntoNodes,
-  resolveCanvasStackDragTarget
-} from '../../../src/presentation/app-shell/canvasArrangementStackingProjection'
-import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
+  toCanvasArrangementProjectionNodes
+} from '../../../src/presentation/app-shell/workbenchCanvasArrangementStackingProjection'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 
 describe('canvas arrangement stacking projection', () => {
@@ -79,7 +80,7 @@ describe('canvas arrangement stacking projection', () => {
       arrangement,
       items,
       nodeId: 'group-terminal-1',
-      nodes
+      nodes: toCanvasArrangementProjectionNodes(nodes)
     })
 
     expect(target?.stackId).toBe('stack-1')

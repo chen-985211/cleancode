@@ -1,4 +1,4 @@
-import { createCanvasArrangementMotionChoreography } from '../../../src/presentation/app-shell/canvasArrangementMotion'
+import { createCanvasArrangementMotionChoreography } from '../../../../src/contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 
 describe('canvas arrangement motion choreography', () => {
   const items = [

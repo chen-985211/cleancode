@@ -12,7 +12,7 @@ import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMen
 import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface CanvasPaneContextMenuProps {
   readonly canCreateTerminal: boolean

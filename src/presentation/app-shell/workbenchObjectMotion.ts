@@ -2,7 +2,7 @@ import type { Edge } from '@xyflow/react'
 
 import { resolveNodeSize } from './resolveNodeSize'
 import type { WorkbenchFlowNode, WorkbenchObjectMotion, WorkbenchObjectMotionKind } from './types'
-import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
+import type { CanvasArrangementMotionChoreography } from '../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 
 export type WorkbenchCanvasDetailLevel = 'compact' | 'full' | 'overview'
 

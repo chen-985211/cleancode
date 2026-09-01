@@ -20,7 +20,7 @@
 @import './styles/canvas-minimap.css';
 @import './styles/block-template-canvas.css';
 @import '../../contexts/block-graph/presentation/styles/block-template-placement-preview.css';
-@import './styles/canvas-arrangement.css';
+@import '../../contexts/canvas-arrangement/presentation/styles/canvas-arrangement.css';
 @import './styles/workbench-node-selection.css';
 @import './styles/workbench-node-resizer.css';
 @import '../shared/styles/tooltips.css';

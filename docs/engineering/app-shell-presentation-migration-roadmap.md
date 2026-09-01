@@ -204,6 +204,15 @@ src/
 - App Shell `useQuickExecutionActions` 与 `executeQuickExecutionTarget` 继续协调 Run 启动、启动命令编辑、全局相机跟随、preload 持久化和通知；`quickExecutionFocus` 继续属于统一工作台相机。
 - BlockGraph 图索引、可见终端代理和连接作用域归上下文 ViewModel；`useWorkbenchGraphIndex` 仅组合 Project 当前工作区与上下文索引。
 
+### CanvasArrangement Presentation
+
+- `CanvasArrangementOverlay`、`CanvasArrangementToolbar`、堆叠动作图标、专属样式和 owner-level Unit 已迁入 CanvasArrangement Presentation；组件只消费 CanvasArrangement DTO、Presentation ViewModel、标签和动作回调。
+- 框选矩形、候选命中、完整堆叠扩选、精确堆叠查询、堆叠 z-index、整体拖拽目标、拖拽 session 和排列动效编排已迁入上下文 Presentation。
+- `workbenchCanvasArrangementSelection` 与 `workbenchCanvasArrangementStackingProjection` 留在 App Shell，只把 BlockGraph/Agent/React Flow 节点投影为 CanvasArrangement Presentation 输入，再把局部结果投回 Workbench 节点。
+- `workbenchCanvasArrangementGridPlanning` 留在 App Shell，因为它同时组合 BlockGraph 的流程收紧布局与 CanvasArrangement 的跨对象网格布局；两套规则仍分别调用各自现有 owner，没有在 UI 复制布局公式。
+- `useCanvasArrangementActions`、`useAppShellCanvasArrangement` 继续作为跨 owner coordinator，唯一负责 BlockGraph/Agent 位置提交、CanvasArrangement 关系提交、补偿、通知和 Workbench 状态写回。
+- `WorkbenchIcons` 与 CanvasArrangement 专属堆叠图标提升到根级共享 Presentation，使 App Shell 与上下文组件继续经过同一个画布语义图标边界，不形成第二套图标映射。
+
 ## 剩余清单
 
 以下是迁移候选清单，不表示整组文件必须原样移动。每批实施前仍需检查入站依赖、共享 UI 依赖、测试 owner 和跨上下文组合职责。
@@ -317,21 +326,21 @@ src/
 - `useWorkbenchGraphIndex.ts`：只把 Project 当前工作区与 BlockGraph `useBlockGraphIndex` 组合为 App Shell 入口。
 - `useCanvasSelectionViewport.ts`、`workbenchViewportMotion.ts`：选择事实来自对象 owner，统一相机结果属于 App Shell，不迁入 BlockGraph。
 
-### CanvasArrangement Presentation 候选
+### CanvasArrangement Phase 6 收口结果
 
-- `CanvasArrangementOverlay.tsx`
-- `CanvasArrangementToolbar.tsx`
-- `canvasArrangementGridPlanning.ts`
-- `canvasArrangementSelection.ts`
-- `canvasArrangementStackingProjection.ts`
-- `useCanvasStackDragging.ts`
-- `styles/canvas-arrangement.css`
+已归 CanvasArrangement Presentation：
 
-保留或先拆的混合模块：
+- Overlay、Toolbar、框选与堆叠 ViewModel、堆叠拖拽 Hook、排列动效和专属样式。
+- 只依赖 CanvasArrangement 公开 DTO 的选择、堆叠查询、z-index 与拖拽目标投影。
+- CanvasArrangement 组件与纯 Presentation Unit。
 
-- `useCanvasArrangementActions.ts`、`useAppShellCanvasArrangement.ts`：分别协调 Agent、BlockGraph 位置提交与 CanvasArrangement 关系提交，属于跨上下文 App Shell coordinator。
-- `CanvasArrangementOverlay.tsx`：选择框的视觉组件可以下沉；跨对象选择来源与提交顺序留在 App Shell。
-- `canvasArrangementGridPlanning.ts`：如果只做消费方 UI 投影可留 Presentation；若重复领域布局规则，必须改为消费 CanvasArrangement 应用 DTO，而不能在 UI 形成第二套 owner。
+确认保留的 App Shell adapter/coordinator：
+
+- `workbenchCanvasArrangementSelection.ts`、`workbenchCanvasArrangementStackingProjection.ts`：把 BlockGraph、Agent 与 React Flow 节点适配到上下文 Presentation 契约，并投回 Workbench 节点。
+- `workbenchCanvasArrangementGridPlanning.ts`：组合 BlockGraph 流程收紧结果与 CanvasArrangement 网格布局，属于跨 owner Workbench 投影。
+- `useWorkbenchCanvasArrangement.ts`：只提供当前 Workbench/Workspace、节点 store 和拖拽回调适配，实际拖拽 session 归上下文 Hook。
+- `useCanvasArrangementActions.ts`、`useAppShellCanvasArrangement.ts`：协调 Agent、BlockGraph 位置提交与 CanvasArrangement 关系提交，负责顺序、补偿、通知和统一状态写回。
+- `WorkbenchCanvas.tsx`、`WorkbenchCanvasBottomControls.tsx`、`useBlockTemplateCanvasInteraction.ts`：继续拥有跨对象选择来源、React Flow 坐标、底部控件切换和 App Shell 组合。
 
 ### 明确保留在 App Shell 的职责
 
@@ -453,10 +462,14 @@ src/
 
 ### 阶段 6：CanvasArrangement Presentation
 
+状态：已完成（2026-09-01）。
+
 目标：下沉堆叠选择、Overlay 和局部投影，同时保留跨 owner 提交协调。
 
-- CanvasArrangement 组件只消费公开 DTO。
-- App Shell 继续负责 Agent/BlockGraph 位置与 CanvasArrangement 关系的提交顺序、补偿和统一选择来源。
+- CanvasArrangement 组件已只消费公开 DTO、上下文 Presentation ViewModel、标签和动作回调。
+- 堆叠选择、Overlay、Toolbar、局部 z-index/拖拽目标、拖拽 session、排列动效与专属样式已归上下文 Presentation。
+- App Shell 已收窄为 Workbench 节点/坐标适配，并继续负责 Agent/BlockGraph 位置与 CanvasArrangement 关系的提交顺序、补偿和统一选择来源。
+- 跨 BlockGraph 流程收紧与 CanvasArrangement 网格布局的规划明确保留为 Workbench adapter；布局规则仍由两个上下文各自既有 owner 提供。
 
 最低验证：CanvasArrangement Unit/Contract、相关 App Shell Unit、typecheck、dependency-cruiser、完整 `pre-commit`。
 

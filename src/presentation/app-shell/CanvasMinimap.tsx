@@ -20,7 +20,7 @@ import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTool
 import { useI18n } from '../i18n/useI18n'
 import { TooltipLabel } from '../shared/components/Tooltip'
 import { useMinimapPanelMotion } from './useMinimapPanelMotion'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 import {
   useWorkbenchCanvasViewport,
   useWorkbenchCanvasZoomPercent,

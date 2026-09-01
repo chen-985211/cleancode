@@ -2,7 +2,7 @@ import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/applic
 import { AgentCreateSplitButton } from './AgentCreateSplitButton'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface WorkbenchToolbarProps {
   readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]

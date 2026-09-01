@@ -357,6 +357,11 @@ src/
         dto/
       infrastructure/
         persistence/
+      presentation/
+        components/
+        hooks/
+        motion/
+        view-models/
     run/
       domain/
         aggregates/

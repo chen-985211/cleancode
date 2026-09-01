@@ -7,7 +7,7 @@ import type { AppNotificationController } from '../shared/notifications/appNotif
 import { useI18n } from '../i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 

@@ -5,7 +5,7 @@ import {
   type CanvasArrangementLayout,
   type CanvasArrangementLayoutItem
 } from '../../contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
-import type { CanvasArrangementSelectionItem } from './canvasArrangementSelection'
+import type { CanvasArrangementSelectionItem } from '../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 
 interface Position {
   readonly x: number

@@ -17,7 +17,7 @@ import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from '../i18n/useI18n'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 
 interface CanvasObjectContextMenuProps {
   readonly agentActions?: {

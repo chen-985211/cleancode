@@ -19,7 +19,7 @@ import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import type { ArrangeCanvasSelectionHandler } from './WorkbenchCanvasBottomControls'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
-import type { MoveCanvasStackHandler } from './useCanvasStackDragging'
+import type { MoveCanvasStackHandler } from './useWorkbenchCanvasArrangement'
 import type { TerminalZoomRasterCanvasCoordinator } from './useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 

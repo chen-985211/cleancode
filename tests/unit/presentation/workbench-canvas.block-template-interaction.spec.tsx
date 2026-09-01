@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 
 import type { BlockTemplateSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
-import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
+import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'

@@ -29,7 +29,7 @@ import {
 } from './types'
 import { useI18n } from '../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkbenchIcon } from '../shared/components/WorkbenchIcons'
 import { useTerminalState } from '../../contexts/run/presentation/view-models/terminalStateStore'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {

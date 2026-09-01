@@ -1,6 +1,6 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { createCanvasArrangementGridPlan } from '../../../src/presentation/app-shell/canvasArrangementGridPlanning'
-import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
+import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import { createCanvasArrangementGridPlan } from '../../../src/presentation/app-shell/workbenchCanvasArrangementGridPlanning'
 
 describe('canvas arrangement grid planning', () => {
   it('compacts a workflow without moving the center of the original selection', () => {
