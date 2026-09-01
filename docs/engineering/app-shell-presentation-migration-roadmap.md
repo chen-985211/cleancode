@@ -10,7 +10,7 @@
 
 ## 背景
 
-根级 `src/presentation/app-shell` 当前同时承担应用外壳、跨上下文协调、共享 UI 基础能力和大量上下文专属界面。各上下文的 `presentation` 目录除 Project 外基本为空，导致后端边界已经按限界上下文表达，而 Renderer 代码的 owner 仍主要依靠文件名和开发者记忆判断。
+在 2026-08-31 的迁移前基线中，根级 `src/presentation/app-shell` 同时承担应用外壳、跨上下文协调、共享 UI 基础能力和大量上下文专属界面。各上下文的 `presentation` 目录除 Project 外基本为空，导致后端边界已经按限界上下文表达，而 Renderer 代码的 owner 仍主要依靠文件名和开发者记忆判断。
 
 2026-08-31 基线：
 
@@ -393,11 +393,11 @@ App Shell 各内部目录的规范职责以架构文档的 [App Shell 内部目�
 - `useApplicationSettingsNavigation.ts`
 - 跨上下文 lifecycle、焦点、选择、相机、恢复和补偿协调器
 
-这些文件仍需拆掉单一上下文内部实现，但它们的最终组合入口继续属于 App Shell。
+迁移计划要求这些文件拆掉单一上下文内部实现，但它们的最终组合入口继续属于 App Shell。
 
 ### 样式和资源
 
-当前 39 个 `styles/*.css` 和 4 个 `assets/*` 必须跟随其视觉 owner 迁移：
+2026-08-31 基线中的 39 个 `styles/*.css` 和 4 个 `assets/*` 计划跟随其视觉 owner 迁移：
 
 - 只服务单个上下文组件的样式/资源进入该上下文 `presentation/styles` 或 `presentation/assets`。
 - Tooltip、Surface、Selection、Notification 等跨上下文样式进入根级共享 Presentation。
@@ -561,4 +561,4 @@ App Shell 各内部目录的规范职责以架构文档的 [App Shell 内部目�
 - 仅移动文件也可能因为 CSS 导入顺序、React Context 装配位置或测试 mock 路径改变而产生回归。
 - `types.ts`、i18n、Tooltip、SurfaceMotion 和 Workbench 状态具有高 fan-in，必须独立成批，不能夹带上下文组件迁移。
 - Terminal/Agent/Canvas 的焦点、attach、resize 和动效使用同一工作台生命周期；错误拆分可能形成重复 owner 或异步时序差异。
-- 现有完整 E2E 在 Agent Provider 菜单发现上存在隔离运行通过、全套运行偶发缺失 Provider 的波动。该问题必须单独跟踪，不能通过延长固定等待掩盖，也不能把单次隔离通过当作完整门禁通过。
+- 实施期间的完整 E2E 曾在 Agent Provider 菜单发现上出现隔离运行通过、全套运行偶发缺失 Provider 的波动。该问题在当时需要单独跟踪，不能通过延长固定等待掩盖，也不能把单次隔离通过当作完整门禁通过。

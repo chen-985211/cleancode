@@ -55,6 +55,26 @@ describe('documentation quality gate', () => {
     )
   })
 
+  it.each(['README_ZH.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CLAUDE.md'])(
+    'checks local links from root document %s',
+    async (rootDocument) => {
+      await withDocumentationFixture(
+        {
+          [rootDocument]: '# Root document\n\nSee the [missing guide](docs/missing.md).\n',
+          'docs/README.md': '# Documentation\n'
+        },
+        async (cwd) => {
+          expect(collectDocumentationViolations({ cwd })).toEqual([
+            expect.objectContaining({
+              filePath: rootDocument,
+              rule: 'broken-local-link'
+            })
+          ])
+        }
+      )
+    }
+  )
+
   it('reports topic documents at the docs root and documents missing from the index', async () => {
     await withDocumentationFixture(
       {

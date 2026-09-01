@@ -2,7 +2,7 @@
 
 ## 文档地位
 
-本文记录 cleancode Agent 从 Codex 专用 PTY 演进为“稳定画布 Agent + 通用终端底座 + 可扩展 Provider”的已确认方向、实施阶段、阶段验收边界和完成证据。本路线正在 `feature/agent-terminal-providers` 分支实施；主体架构已经落地，但必须取得 macOS、Linux 和 Windows 三个原生平台的 PTY 验收证据后才能宣告完成。当前事实仍以各 owner 文档为准。
+本文记录 cleancode Agent 从 Codex 专用 PTY 演进为“稳定画布 Agent + 通用终端底座 + 可扩展 Provider”的已确认方向、实施阶段、阶段验收边界和完成证据。本路线的主体实现已经进入 `main`；主体架构已经落地，但必须取得 macOS、Linux 和 Windows 三个原生平台的 PTY 验收证据后才能宣告完成。当前事实仍以各 owner 文档为准。
 
 本文是实施路线，不是当前能力清单。尚未完成的条目不得被表现层、测试或其他文档当作已经存在的产品行为。每个阶段进入生产实现前仍须按照[开发协作规范](../../engineering/development.md)完成 Large Change 的 Spec、必要的可行性检查、Plan 和 TDD；阶段完成后，已经成为当前事实的规则必须迁入对应 owner 文档。
 
@@ -452,7 +452,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - Contract：11 个测试文件、68 项测试通过。
 - Electron E2E：11 个测试文件、43 项测试通过；其中包含多 Agent、固定 Provider 创建、Claude 空会话与首次输入后的恢复边界、画布取消选择时的 xterm 视觉稳定、`Ctrl+C` 后回到同一 shell、跨工作区主题/进程复用、普通终端、恢复、工作流、端口和 worktree 回归。
 - `pnpm build` 成功生成 Electron main、Terminal Provider、preload 和 renderer 产物。
-- 2026-08-10，远端 [Full cross-platform quality workflow](https://github.com/chen-985211/cleancode/actions/runs/31378114134) 已在 macOS、Linux 和 Windows 完整成功；同日 [Electron E2E workflow](https://github.com/chen-985211/cleancode/actions/runs/31377521733) 也曾在三平台全部成功。当前 `main` 的后续 [Electron E2E workflow](https://github.com/chen-985211/cleancode/actions/runs/31378114057) 仍有 macOS 与 Windows 失败，因此阶段 3、4、7 和全路线继续保持“实施中”；当前阻塞是最新 E2E 汇总尚未全绿，不再是 Windows/Linux runner 从未执行。
+- 2026-08-31，`main` 的最近一次全平台质量 workflow 已在 macOS、Linux 和 Windows 完整成功；同批 Electron E2E 的 macOS 与 Linux 已通过，Windows shard 2 在 `terminal-runtime-recovery.e2e.spec.ts` 的“Electron main 崩溃后 warm attach 保留会话”场景等待重连超时。因此阶段 3、4、7 和全路线继续保持“实施中”；当前阻塞是最近一次 E2E 汇总尚未全绿，不再是 Windows/Linux runner 从未执行。
 
 ## 阶段 0：当前行为证据
 
