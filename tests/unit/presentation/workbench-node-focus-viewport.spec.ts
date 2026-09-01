@@ -1,4 +1,4 @@
-import { resolveWorkbenchNodeFocusZoom } from '../../../src/presentation/app-shell/workbenchNodeFocusViewport'
+import { resolveWorkbenchNodeFocusZoom } from '../../../src/presentation/app-shell/workbench/viewport/workbenchNodeFocusViewport'
 
 describe('workbench node focus viewport', () => {
   it('restores a readable zoom when a compact target still fits safely', () => {

@@ -13,17 +13,15 @@ const ignoredDirectories = new Set([
 ])
 const rendererReducedMotionPath = 'src/platform/renderer-bootstrap/renderer.css'
 const registeredOwnerExceptions = new Map([
-  ['src/presentation/app-shell/styles/agent-tool-approval.css', new Set(['agent-approval-intent'])],
+  [
+    'src/presentation/app-shell/workbench/nodes/agent/agent-tool-approval.css',
+    new Set(['agent-approval-intent'])
+  ],
   ['src/presentation/app-shell/styles/base.css', new Set(['app-shell-layout'])],
   [
-    'src/presentation/app-shell/styles/terminal-group-node.css',
-    new Set(['terminal-group-drop-feedback'])
-  ],
-  [
-    'src/presentation/app-shell/styles/terminal-workflow-build.css',
-    new Set(['terminal-workflow-build'])
-  ],
-  ['src/presentation/app-shell/styles/workbench-object-motion.css', new Set(['workbench-object'])]
+    'src/presentation/app-shell/workbench/nodes/workbench-object-motion.css',
+    new Set(['workbench-object'])
+  ]
 ])
 const motionDeclarationPattern = /(?<![-\w])((?:transition|animation)(?:-[\w-]+)?)\s*:\s*([^;]+);/g
 const rawDurationPattern = /(?:^|[\s,(])-?(?:\d*\.)?\d+(?:ms|s)\b/i

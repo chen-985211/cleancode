@@ -6,7 +6,7 @@ import {
   terminalWorkspaceEventFreshnessMs,
   terminalWorkspaceFallbackIntervalMs,
   useTerminalWorkspaceSynchronization
-} from '../../../src/presentation/app-shell/useTerminalWorkspaceSynchronization'
+} from '../../../src/presentation/app-shell/coordinators/useTerminalWorkspaceSynchronization'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot

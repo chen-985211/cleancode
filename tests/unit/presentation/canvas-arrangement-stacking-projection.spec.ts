@@ -1,10 +1,11 @@
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import { resolveCanvasStackDragTarget } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementStackingProjection'
 import {
   projectCanvasArrangementStackingOntoNodes,
-  resolveCanvasStackDragTarget
-} from '../../../src/presentation/app-shell/canvasArrangementStackingProjection'
-import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+  toCanvasArrangementProjectionNodes
+} from '../../../src/presentation/app-shell/projections/workbenchCanvasArrangementStackingProjection'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('canvas arrangement stacking projection', () => {
   it('projects one z-index band per stacked object while keeping combination members above its shell', () => {
@@ -79,7 +80,7 @@ describe('canvas arrangement stacking projection', () => {
       arrangement,
       items,
       nodeId: 'group-terminal-1',
-      nodes
+      nodes: toCanvasArrangementProjectionNodes(nodes)
     })
 
     expect(target?.stackId).toBe('stack-1')

@@ -1,0 +1,3 @@
+.canvas-surface--placing-template {
+  cursor: var(--cc-canvas-pointer);
+}

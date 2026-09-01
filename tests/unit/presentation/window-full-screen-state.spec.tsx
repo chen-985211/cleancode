@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 
 import { createDeferred } from '../../fixtures/deferred'
-import { useWindowFullScreenState } from '../../../src/presentation/app-shell/useWindowFullScreenState'
+import { useWindowFullScreenState } from '../../../src/presentation/app-shell/shell/lifecycle/useWindowFullScreenState'
 
 describe('window fullscreen state', () => {
   beforeEach(() => {

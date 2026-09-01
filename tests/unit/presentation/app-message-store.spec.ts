@@ -4,7 +4,7 @@ import {
   dismissAppMessage,
   publishAppMessage,
   updateAppMessage
-} from '../../../src/presentation/app-shell/appMessageStore'
+} from '../../../src/presentation/app-shell/app-features/notifications/appMessageStore'
 
 describe('app message store', () => {
   it('updates the same semantic occurrence in place without adding another message', () => {

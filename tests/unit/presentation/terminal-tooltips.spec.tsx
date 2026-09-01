@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { CSSProperties } from 'react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
-import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
-import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types'
+import { TerminalNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalNode'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <span data-testid="terminal-flow-handle" />,

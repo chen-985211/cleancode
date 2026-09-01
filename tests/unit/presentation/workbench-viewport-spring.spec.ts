@@ -2,7 +2,7 @@ import {
   advanceCriticalSpringAxis,
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
-} from '../../../src/presentation/app-shell/workbenchViewportSpring'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportSpring'
 
 describe('workbench viewport spring', () => {
   it('settles without overshooting a programmatic camera target', () => {

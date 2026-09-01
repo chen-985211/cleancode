@@ -6,13 +6,11 @@ import type {
   QuickExecutionTargetSnapshot,
   TerminalBlockSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
-import { writeCanvasQuickExecutionFollowPreference } from '../../../src/presentation/app-shell/canvasQuickExecutionFollowPreference'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
-import { useQuickExecutionActions } from '../../../src/presentation/app-shell/useQuickExecutionActions'
+import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
+import { writeCanvasQuickExecutionFollowPreference } from '../../../src/presentation/app-shell/app-features/settings/canvasQuickExecutionFollowPreference'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
+import { useQuickExecutionActions } from '../../../src/presentation/app-shell/coordinators/useQuickExecutionActions'
 
 describe('quick execution actions', () => {
   beforeEach(() => {

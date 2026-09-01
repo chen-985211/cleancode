@@ -4,8 +4,8 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import { shortcutBindingsStorageKey } from '../../../src/presentation/app-shell/applicationShortcutPreference'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import { shortcutBindingsStorageKey } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutPreference'
 
 describe('app shell', () => {
   beforeEach(() => {

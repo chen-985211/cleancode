@@ -3,9 +3,9 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { AgentGraphUpdatedEvent } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/useAgentLayoutCoordination'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/coordinators/useAgentLayoutCoordination'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('Agent layout coordination', () => {
   beforeEach(() => {

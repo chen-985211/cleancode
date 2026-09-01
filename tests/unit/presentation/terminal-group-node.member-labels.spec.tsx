@@ -1,11 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
-import { TerminalGroupNode } from '../../../src/presentation/app-shell/TerminalGroupNode'
-import type {
-  TerminalGroupFlowNode,
-  TerminalViewState
-} from '../../../src/presentation/app-shell/types'
+import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import { TerminalGroupNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal-group/TerminalGroupNode'
+import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ className, id }: { readonly className?: string; readonly id?: string }) => (

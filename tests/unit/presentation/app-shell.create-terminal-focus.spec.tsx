@@ -1,17 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
-import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport'
 
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type {
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 const reactFlowSpies = vi.hoisted(() => ({
   fitView: vi.fn(async () => undefined),
@@ -26,7 +24,7 @@ const creationGeometry = vi.hoisted(() => ({
 }))
 
 vi.mock(
-  '../../../src/presentation/app-shell/workbenchCanvasSafeViewport',
+  '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport',
   async (importOriginal) => ({
     ...(await importOriginal<typeof WorkbenchCanvasSafeViewportModule>()),
     readWorkbenchCanvasCreationGeometry: () => creationGeometry

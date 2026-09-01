@@ -2,19 +2,22 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const surfaceMotionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/surface-motion.css'),
+  resolve(process.cwd(), 'src/presentation/shared/styles/surface-motion.css'),
   'utf8'
 )
 const languageSettingsStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/language-settings.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/app-features/settings/language-settings.css'),
   'utf8'
 )
 const quickExecutionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/quick-execution.css'),
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/quick-execution.css'),
   'utf8'
 )
 const canvasArrangementStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-arrangement.css'),
+  resolve(
+    process.cwd(),
+    'src/contexts/canvas-arrangement/presentation/styles/canvas-arrangement.css'
+  ),
   'utf8'
 )
 

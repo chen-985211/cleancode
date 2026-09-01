@@ -3,7 +3,7 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import {
   createTerminalWorkflowBuildChoreography,
   resolveTerminalWorkflowBuildOrigin
-} from '../../../src/presentation/app-shell/terminalWorkflowBuildChoreography'
+} from '../../../src/presentation/app-shell/projections/terminalWorkflowBuildChoreography'
 
 describe('terminal workflow build choreography', () => {
   it('launches every terminal simultaneously without dependency-layer delay', () => {

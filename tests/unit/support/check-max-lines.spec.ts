@@ -24,7 +24,7 @@ describe('max lines quality gate', () => {
   })
 
   it('only checks project code files', () => {
-    expect(isCodeFile('src/presentation/app-shell/AppShell.tsx')).toBe(true)
+    expect(isCodeFile('src/presentation/app-shell/shell/AppShell.tsx')).toBe(true)
     expect(isCodeFile('tests/unit/support/check-max-lines.spec.ts')).toBe(true)
     expect(isCodeFile('scripts/check-max-lines.mjs')).toBe(true)
     expect(isCodeFile('scripts/check-max-lines.d.mts')).toBe(true)

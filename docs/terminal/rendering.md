@@ -74,7 +74,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 如果 attach Promise 尚未完成时尺寸再次变化，在 session 返回后补发最新 resize。
 - 测量结果和 session 都必须带当前 workspace key，旧工作区迟到的 Promise 不得绑定到新工作区。
 
-当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/presentation/app-shell/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
+当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/coordinators/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
 
 ### 2. 右侧 padding 把滚动条整体推向左边
 
@@ -112,7 +112,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 }
 ```
 
-左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。wrapper 留白使用当前应用主题背景并保持未过滤，只有直接子 viewport 在源主题与当前主题不一致时应用滤镜。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。共享边界实现位于 [TerminalThemeProjection.tsx](../../src/presentation/app-shell/TerminalThemeProjection.tsx) 和 [terminal-theme-projection.css](../../src/presentation/app-shell/styles/terminal-theme-projection.css)，Agent 与普通终端的局部几何分别位于 [agent-console.css](../../src/presentation/app-shell/styles/agent-console.css) 和 [terminal-node.css](../../src/presentation/app-shell/styles/terminal-node.css)。
+左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。wrapper 留白使用当前应用主题背景并保持未过滤，只有直接子 viewport 在源主题与当前主题不一致时应用滤镜。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。共享边界实现位于 [TerminalThemeProjection.tsx](../../src/contexts/run/presentation/components/TerminalThemeProjection.tsx) 和 [terminal-theme-projection.css](../../src/contexts/run/presentation/styles/terminal-theme-projection.css)，Agent 与普通终端的局部几何分别位于 [agent-console.css](../../src/presentation/app-shell/workbench/nodes/agent/agent-console.css) 和 [terminal-node.css](../../src/presentation/app-shell/workbench/nodes/terminal/terminal-node.css)。
 
 ### 3. Chromium 对连续全角标点进行上下文压缩
 
@@ -161,11 +161,11 @@ Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequenc
 
 Provider launch replacement 不会重置 surface 或终端模型。只有 Agent terminal identity 真正变化时才按新 snapshot 恢复视图；旧 identity、旧 `viewId` 或 sequence 缺口都必须触发拒绝或有界重试。Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放 terminal、模型与视图租约；普通视图卸载只释放可丢弃 surface。
 
-[`agent-terminal-view.spec.tsx`](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 证明 Agent 使用共享 snapshot/sequence 视图协议、定向输出、输入、resize 和清理；[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明共享 registry 的精确 `viewId` 路由；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和 ANSI 输出证明工作区往返、源主题固定与最终像素明暗。
+[`agent-terminal-view.spec.tsx`](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 证明 Agent 使用共享 snapshot/sequence 视图协议、定向输出、输入、resize 和清理；[`run.terminal-surface-registry.presentation.spec.ts`](../../tests/unit/contexts/run/run.terminal-surface-registry.presentation.spec.ts) 证明共享 registry 的精确 `viewId` 路由；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和 ANSI 输出证明工作区往返、源主题固定与最终像素明暗。
 
 ### Agent attach 失败与重试
 
-空白终端不一定是 xterm 渲染失败。Agent 首次进入工作区时先等待有效 terminal 测量，再由 [`useAgentSessionAttachment.ts`](../../src/presentation/app-shell/useAgentSessionAttachment.ts) 发起 session attach；这两个阶段分别投影为 `measuring` 和 `pending`。attach 拒绝后进入 `failed` 并显示通用重试，不能把错误吞掉后留下一个看似正常的空 surface。
+空白终端不一定是 xterm 渲染失败。Agent 首次进入工作区时先等待有效 terminal 测量，再由 [`useAgentSessionAttachment.ts`](../../src/presentation/app-shell/coordinators/useAgentSessionAttachment.ts) 发起 session attach；这两个阶段分别投影为 `measuring` 和 `pending`。attach 拒绝后进入 `failed` 并显示通用重试，不能把错误吞掉后留下一个看似正常的空 surface。
 
 同一工作区的重试是 single-flight。重新启动或新对话 attach 失败时，hook 保留原 terminal binding，输入仍指向原 session；切换作用域会使旧请求失效，迟到结果不能覆盖新工作区。排障时分别记录测量 key、attach operation、session binding 和 workspace generation，避免把 Provider launch 失败、Agent session attach 失败与后续 `AttachView` snapshot 恢复失败混为同一问题。[`agent-console.attach-lifecycle.spec.tsx`](../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx) 覆盖失败可见、重复重试、既有 binding 保留和迟到作用域隔离。
 
@@ -192,7 +192,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model 承担；`.xterm-viewport` 不再是可用 `scrollTop` 判断历史是否存在的原生滚动容器。自动化验证优先使用 xterm 支持的 `Shift+PageUp` 用户交互和可见行结果，不得用旧 DOM 元素的 `scrollHeight` 作为 buffer oracle。
 
-[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`terminal-viewport.interaction.spec.tsx`](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`run.foreground-job-shell-control.spec.ts`](../../tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts) 证明 Windows Agent launch script 在 started 前选择正确 ConsoleColor；[`run.terminal-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.terminal-private-output-control.spec.ts) 与 [`run.node-pty-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.node-pty-private-output-control.spec.ts) 证明普通终端 private span 跨 chunk 过滤、错误 token 透传、私有环境原子激活和 Provider ANSI 保留；[`agent.terminal-activity-windows-command-shim.spec.ts`](../../tests/integration/contexts/agent/agent.terminal-activity-windows-command-shim.spec.ts) 在原生 Windows 中证明 light/dark Codex probe、非零退出、`Ctrl+C`、ConsoleColor 恢复和 shell 可写；[`run.windows-agent-pty.spec.ts`](../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) 继续证明随包 ConPTY 保留 mouse mode 与直接 Agent fallback；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
+[`run.terminal-surface-registry.presentation.spec.ts`](../../tests/unit/contexts/run/run.terminal-surface-registry.presentation.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`run.terminal-runtime-viewport.interaction.presentation.spec.tsx`](../../tests/unit/contexts/run/run.terminal-runtime-viewport.interaction.presentation.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`run.foreground-job-shell-control.spec.ts`](../../tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts) 证明 Windows Agent launch script 在 started 前选择正确 ConsoleColor；[`run.terminal-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.terminal-private-output-control.spec.ts) 与 [`run.node-pty-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.node-pty-private-output-control.spec.ts) 证明普通终端 private span 跨 chunk 过滤、错误 token 透传、私有环境原子激活和 Provider ANSI 保留；[`agent.terminal-activity-windows-command-shim.spec.ts`](../../tests/integration/contexts/agent/agent.terminal-activity-windows-command-shim.spec.ts) 在原生 Windows 中证明 light/dark Codex probe、非零退出、`Ctrl+C`、ConsoleColor 恢复和 shell 可写；[`run.windows-agent-pty.spec.ts`](../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) 继续证明随包 ConPTY 保留 mouse mode 与直接 Agent fallback；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
 
 ## 普通终端的 Unicode 与 renderer 降级
 
@@ -215,7 +215,7 @@ idle 调度同样属于正确性边界。`setRasterScale` 不在缩放事件或 
 
 终端搜索是 xterm buffer 上的局部投影。snapshot restore 会 reset 可见终端，因此 restore 完成后必须用当前查询重新建立匹配；关闭搜索则清除 decorations 并恢复终端焦点。粘贴进度、确认和链接反馈是 React 局部覆盖层，不得改变 xterm 网格或拦截无关终端输入。
 
-验证 renderer 改动时至少覆盖中文、emoji、组合字符、搜索命中、context loss 后的可见输出，以及降级后的 PTY 粘贴。真实 GPU/context 和 xterm 输入链路由 [`terminal-daily-interactions.e2e.spec.ts`](../../tests/e2e/terminal-daily-interactions.e2e.spec.ts) 证明；[`agent-codex-session.e2e.spec.ts`](../../tests/e2e/agent-codex-session.e2e.spec.ts) 进一步证明共享修复经过 Agent attach 生命周期后仍保持可见；渲染选择与释放分支由 [`terminal-renderer-controller.spec.ts`](../../tests/unit/presentation/terminal-renderer-controller.spec.ts) 覆盖。
+验证 renderer 改动时至少覆盖中文、emoji、组合字符、搜索命中、context loss 后的可见输出，以及降级后的 PTY 粘贴。真实 GPU/context 和 xterm 输入链路由 [`terminal-daily-interactions.e2e.spec.ts`](../../tests/e2e/terminal-daily-interactions.e2e.spec.ts) 证明；[`agent-codex-session.e2e.spec.ts`](../../tests/e2e/agent-codex-session.e2e.spec.ts) 进一步证明共享修复经过 Agent attach 生命周期后仍保持可见；渲染选择与释放分支由 [`run.terminal-renderer-controller.spec.ts`](../../tests/unit/contexts/run/run.terminal-renderer-controller.spec.ts) 覆盖。
 
 ## 画布缩放下的鼠标坐标
 
@@ -442,8 +442,8 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [agent.session-service.spec.ts](../../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
 - [run.terminal-capability-environment.spec.ts](../../tests/unit/contexts/run/run.terminal-capability-environment.spec.ts) 证明保留环境键、source-theme `COLORFGBG` 和 `NO_COLOR` 透传策略；[run.pty-terminal.spec.ts](../../tests/integration/contexts/run/run.pty-terminal.spec.ts) 再以真实 POSIX PTY 证明普通启动与 foreground launch 都收到同一 profile。
 - [run.terminal-provider-private-output-control.spec.ts](../../tests/integration/contexts/run/run.terminal-provider-private-output-control.spec.ts) 与 [run.terminal-private-output-control.spec.ts](../../tests/contract/contexts/run/run.terminal-private-output-control.spec.ts) 证明 private descriptor 独立于公开 process environment 跨本地 Provider 协议透传；旧 adapter 忽略 descriptor 时不会把私有环境注入 shell。
-- [run.terminal-source-palette.spec.ts](../../tests/unit/contexts/run/run.terminal-source-palette.spec.ts)、[terminal-theme.palette.spec.ts](../../tests/unit/presentation/terminal-theme.palette.spec.ts) 和 [check-theme.spec.ts](../../tests/unit/support/check-theme.spec.ts) 分别证明隐藏 OSC、renderer xterm 与生成门禁共用 canonical palette。
-- [terminal-theme-projection.spec.tsx](../../tests/unit/presentation/terminal-theme-projection.spec.tsx) 证明 Agent 与普通终端共享由 wrapper 留白和 direct viewport 组成的主题协调边界；[terminal-viewport.interaction.spec.tsx](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明普通终端的搜索覆盖层位于投影之外。
+- [run.terminal-source-palette.spec.ts](../../tests/unit/contexts/run/run.terminal-source-palette.spec.ts)、[run.terminal-theme-palette.spec.ts](../../tests/unit/contexts/run/run.terminal-theme-palette.spec.ts) 和 [check-theme.spec.ts](../../tests/unit/support/check-theme.spec.ts) 分别证明隐藏 OSC、renderer xterm 与生成门禁共用 canonical palette。
+- [terminal-theme-projection.spec.tsx](../../tests/unit/presentation/terminal-theme-projection.spec.tsx) 证明 Agent 与普通终端共享由 wrapper 留白和 direct viewport 组成的主题协调边界；[run.terminal-runtime-viewport.interaction.presentation.spec.tsx](../../tests/unit/contexts/run/run.terminal-runtime-viewport.interaction.presentation.spec.tsx) 证明普通终端的搜索覆盖层位于投影之外。
 - [agent.run-terminal-provider.spec.ts](../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts) 使用真实 Run terminal 和本地 fake Provider，证明 Agent CLI 启动、输入输出、`Ctrl+C` 与退出回到 shell。
 - [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
 - [RunAgentTerminalRuntimeAdapter.ts](../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts) 把 Agent 的 attach/resize 端口转交给 Run；[NodePtyTerminalProcessAdapter.ts](../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter.ts) 最终把行列传给 `node-pty.spawn` 和 PTY `resize`。

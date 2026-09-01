@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
-import { AgentConsoleActions } from '../../../src/presentation/app-shell/AgentConsoleActions'
-import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
+import { AgentConsoleActions } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsoleActions'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
 
 const agent = {
   agentId: 'agent-2',
@@ -173,11 +173,14 @@ describe('Agent console actions', () => {
 
   it('uses the canonical Spatial menu palette and an adequate icon-button target', () => {
     const agentStyles = readFileSync(
-      resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+      resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/agent/agent-console.css'),
       'utf8'
     )
     const menuStyles = readFileSync(
-      resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-object-context-menu.css'),
+      resolve(
+        process.cwd(),
+        'src/presentation/app-shell/workbench/menus/canvas-object-context-menu.css'
+      ),
       'utf8'
     )
     const themeStyles = readFileSync(

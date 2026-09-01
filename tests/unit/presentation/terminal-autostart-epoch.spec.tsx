@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
-import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
-import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types'
+import { TerminalNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalNode'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => null,
@@ -11,7 +11,7 @@ vi.mock('@xyflow/react', () => ({
   Position: { Left: 'left', Right: 'right' }
 }))
 
-vi.mock('../../../src/presentation/app-shell/TerminalViewport', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalViewport', () => ({
   TerminalViewport: ({
     isInputDisabled,
     onDimensionsChange

@@ -1,10 +1,10 @@
 import { getViewportForBounds, type Edge, type ReactFlowInstance } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   resolveWorkbenchViewportCommandTarget,
   resolveWorkbenchViewportTransition
-} from '../../../src/presentation/app-shell/workbenchViewportMotion'
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench viewport motion', () => {
   it.each([

@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
-import { CanvasObjectContextMenu } from '../../../src/presentation/app-shell/CanvasObjectContextMenu'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
+import { CanvasObjectContextMenu } from '../../../src/presentation/app-shell/workbench/menus/CanvasObjectContextMenu'
 
 describe('Agent canvas object context menu', () => {
   it('uses the canonical canvas node menu template', () => {

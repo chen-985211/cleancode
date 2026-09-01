@@ -1,9 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
-import { useAppShellBlockActions } from '../../../src/presentation/app-shell/useAppShellBlockActions'
+import type { AppNotificationController } from '../../../src/presentation/shared/notifications/appNotifications'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
+import { useAppShellBlockActions } from '../../../src/presentation/app-shell/coordinators/useAppShellBlockActions'
 
 describe('app shell terminal group creation', () => {
   beforeEach(() => {

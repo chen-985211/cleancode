@@ -1,6 +1,6 @@
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import { NotificationProvider } from '../../../src/presentation/app-shell/app-features/notifications/NotificationProvider'
+import { useNotifications } from '../../../src/presentation/app-shell/app-features/notifications/useNotifications'
 
 export function NotifiedAppShell() {
   return (

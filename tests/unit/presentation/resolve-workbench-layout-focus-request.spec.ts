@@ -1,5 +1,5 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { resolveWorkbenchLayoutFocusRequest } from '../../../src/presentation/app-shell/resolveWorkbenchLayoutFocusRequest'
+import { resolveWorkbenchLayoutFocusRequest } from '../../../src/presentation/app-shell/workbench/viewport/resolveWorkbenchLayoutFocusRequest'
 
 describe('resolve workbench layout focus request', () => {
   it('focuses visible groups and ungrouped arranged terminals without forcing the Agent into view', () => {

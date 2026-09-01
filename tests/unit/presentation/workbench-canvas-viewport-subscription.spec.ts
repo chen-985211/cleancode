@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { subscribeCanvasViewportMotionCompletion } from '../../../src/presentation/app-shell/workbenchCanvasViewport'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { subscribeCanvasViewportMotionCompletion } from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasViewport'
 
 const motionSubscriptions = vi.hoisted(() => ({
   directListener: null as ((completion: { readonly viewport: Viewport }) => void) | null,
@@ -13,7 +13,7 @@ const motionSubscriptions = vi.hoisted(() => ({
     | null
 }))
 
-vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom', () => ({
   subscribeWorkbenchDirectZoomCompletion: (
     _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: (completion: { readonly viewport: Viewport }) => void
@@ -23,7 +23,7 @@ vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', () => ({
   }
 }))
 
-vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion', () => ({
   subscribeWorkbenchViewportMotionCompletion: (
     _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: (completion: {

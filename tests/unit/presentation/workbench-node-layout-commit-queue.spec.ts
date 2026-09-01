@@ -1,4 +1,4 @@
-import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbenchNodeLayoutCommitQueue'
+import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeLayoutCommitQueue'
 
 describe('workbench node layout commit queue', () => {
   it('serializes one node and only applies its latest response', async () => {

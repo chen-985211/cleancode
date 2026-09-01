@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import { AgentConsole } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole'
 import type { AgentSessionSnapshot } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import {
   createAgentSessionSnapshot,

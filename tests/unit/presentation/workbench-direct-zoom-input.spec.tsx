@@ -2,13 +2,13 @@ import { act, fireEvent, render } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useRef } from 'react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   resolveWorkbenchWheelZoomStops,
   useWorkbenchDirectZoom
-} from '../../../src/presentation/app-shell/useWorkbenchDirectZoom'
-import * as directZoom from '../../../src/presentation/app-shell/workbenchDirectZoom'
-import * as viewportMotion from '../../../src/presentation/app-shell/workbenchViewportMotion'
+} from '../../../src/presentation/app-shell/workbench/viewport/useWorkbenchDirectZoom'
+import * as directZoom from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
+import * as viewportMotion from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench direct zoom input', () => {
   afterEach(() => {

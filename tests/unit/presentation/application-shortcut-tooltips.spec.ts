@@ -1,9 +1,9 @@
-import { createApplicationShortcutTooltipLabels } from '../../../src/presentation/app-shell/applicationShortcutTooltips'
+import { createApplicationShortcutTooltipLabels } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutTooltips'
 import {
   defaultApplicationShortcutBindings,
   type ApplicationShortcutBindings
-} from '../../../src/presentation/app-shell/applicationShortcuts'
-import { translate } from '../../../src/presentation/app-shell/i18n/messages'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
+import { translate } from '../../../src/presentation/i18n/messages'
 
 describe('application shortcut tooltips', () => {
   it('formats every default binding for the active platform', () => {

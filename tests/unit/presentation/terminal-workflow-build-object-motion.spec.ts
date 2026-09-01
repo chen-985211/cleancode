@@ -1,5 +1,5 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { projectWorkbenchObjectMotion } from '../../../src/presentation/app-shell/workbenchObjectMotion'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { projectWorkbenchObjectMotion } from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('terminal workflow build object motion', () => {
   it('keeps an orchestrated terminal pending without inventing a second creation effect', () => {

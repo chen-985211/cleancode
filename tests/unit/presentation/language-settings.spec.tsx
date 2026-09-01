@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
-import { localePreferenceStorageKey } from '../../../src/presentation/app-shell/i18n/localePreference'
-import { LanguageSettingsRoot } from '../../../src/presentation/app-shell/LanguageSettingsRoot'
-import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/ThemeSettingsRoot'
-import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { localePreferenceStorageKey } from '../../../src/presentation/i18n/localePreference'
+import { LanguageSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/LanguageSettingsRoot'
+import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ThemeSettingsRoot'
+import { WorkbenchToolbar } from '../../../src/presentation/app-shell/workbench/toolbar/WorkbenchToolbar'
 
 describe('language settings', () => {
   beforeEach(() => {
@@ -17,7 +17,7 @@ describe('language settings', () => {
     renderLanguageSettings('zh-CN')
 
     const trigger = screen.getByRole('button', { name: '语言' })
-    expect(trigger).toHaveClass('app-shell-utility-button')
+    expect(trigger).toHaveClass('toolbar-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 

@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode, useRef } from 'react'
 
-import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
-import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
+import { NotificationProvider } from '../../../src/presentation/app-shell/app-features/notifications/NotificationProvider'
+import { useNotifications } from '../../../src/presentation/app-shell/app-features/notifications/useNotifications'
 
 function NotificationHarness({
   onActivate = () => undefined,

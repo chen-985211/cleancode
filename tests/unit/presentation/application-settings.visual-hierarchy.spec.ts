@@ -2,11 +2,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const applicationSettingsStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/application-settings.css'),
+  resolve(
+    process.cwd(),
+    'src/presentation/app-shell/app-features/settings/application-settings.css'
+  ),
   'utf8'
 )
 const agentSettingsStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-settings.css'),
+  resolve(process.cwd(), 'src/contexts/agent/presentation/styles/agent-settings.css'),
   'utf8'
 )
 

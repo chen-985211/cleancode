@@ -5,7 +5,7 @@ import {
   matchesShortcutEvent,
   normalizeShortcutBinding,
   type ApplicationShortcutBindings
-} from '../../../src/presentation/app-shell/applicationShortcuts'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 
 describe('application shortcut bindings', () => {
   it('provides unique defaults with platform-native labels', () => {

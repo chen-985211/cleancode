@@ -3,7 +3,6 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node
 import { pathToFileURL } from 'node:url'
 
 const ignoredDirectoryNames = new Set(['.git', 'coverage', 'dist', 'node_modules', 'out'])
-const rootDocumentationFiles = ['README.md', 'AGENTS.md']
 const markdownLinkPattern = /!?\[[^\]]*\]\(([^)\n]+)\)/g
 
 export function collectDocumentationViolations({ cwd = process.cwd() } = {}) {
@@ -35,9 +34,9 @@ export function runDocumentationGate(cwd = process.cwd(), logger = console) {
 }
 
 function listDocumentationFiles(cwd) {
-  const rootFiles = rootDocumentationFiles
-    .map((filePath) => join(cwd, filePath))
-    .filter((filePath) => existsSync(filePath))
+  const rootFiles = readdirSync(cwd, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && extname(entry.name) === '.md')
+    .map((entry) => join(cwd, entry.name))
   const docsDirectory = join(cwd, 'docs')
   const docsFiles = existsSync(docsDirectory)
     ? listFilesRecursively(docsDirectory).filter((filePath) => extname(filePath) === '.md')

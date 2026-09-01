@@ -1,8 +1,8 @@
 import { render } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 
-import type { AgentToolApprovalViewState } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
-import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/useWorkbenchFlowNodes'
+import type { AgentToolApprovalViewState } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
+import { useWorkbenchFlowNodes } from '../../../src/presentation/app-shell/coordinators/useWorkbenchFlowNodes'
 
 describe('Workbench approval projection timing', () => {
   it('projects visible nodes before the browser layout phase can paint an approval', () => {

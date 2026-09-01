@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import { AgentConsole } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import {
   createAgentSessionSnapshot,
@@ -115,7 +115,7 @@ describe('Agent console provider-neutral presentation', () => {
 
   it('uses equal outer grid tracks so the MCP slot stays at the geometric center', () => {
     const styles = readFileSync(
-      resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+      resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/agent/agent-console.css'),
       'utf8'
     )
     const actionsRule = styles.split('.agent-console-actions {')[1]?.split('}')[0] ?? ''

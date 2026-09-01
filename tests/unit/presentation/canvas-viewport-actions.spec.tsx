@@ -1,16 +1,19 @@
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
+import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useCanvasViewportActions } from '../../../src/presentation/app-shell/useCanvasViewportActions'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useCanvasViewportActions } from '../../../src/presentation/app-shell/workbench/viewport/useCanvasViewportActions'
 
 const directZoomSpies = vi.hoisted(() => ({ cancel: vi.fn() }))
 
-vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
-  cancelWorkbenchDirectZoom: directZoomSpies.cancel
-}))
+vi.mock(
+  '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
+    cancelWorkbenchDirectZoom: directZoomSpies.cancel
+  })
+)
 
 describe('canvas viewport actions', () => {
   beforeEach(() => {

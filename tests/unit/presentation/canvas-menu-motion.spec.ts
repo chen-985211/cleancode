@@ -2,7 +2,7 @@ import {
   createCanvasMenuMotionController,
   type CanvasMenuMotionFrameScheduler,
   type CanvasMenuMotionPresentation
-} from '../../../src/presentation/app-shell/canvasMenuMotion'
+} from '../../../src/presentation/app-shell/workbench/menus/canvasMenuMotion'
 
 describe('canvas menu motion', () => {
   it('presents the same spring state at the same elapsed time on 60Hz and 120Hz displays', () => {

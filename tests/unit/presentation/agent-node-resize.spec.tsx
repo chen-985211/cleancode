@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { CSSProperties } from 'react'
 
-import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
-import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
+import { AgentNode } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentNode'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ className, id }: HandleProps) => <span className={className} data-handleid={id} />,
@@ -49,7 +49,7 @@ interface NodeResizerProps {
   readonly isVisible?: boolean
 }
 
-vi.mock('../../../src/presentation/app-shell/AgentConsole', () => ({
+vi.mock('../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole', () => ({
   AgentConsole: () => null
 }))
 

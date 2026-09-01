@@ -2,7 +2,7 @@ import {
   createMinimapPanelMotionController,
   type MinimapPanelMotionFrameScheduler,
   type MinimapPanelMotionRoot
-} from '../../../src/presentation/app-shell/minimapPanelMotion'
+} from '../../../src/presentation/app-shell/workbench/minimap/minimapPanelMotion'
 
 describe('minimap panel motion', () => {
   it('moves the panel, controls, and directional toggle through one spring presentation', () => {

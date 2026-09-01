@@ -1,0 +1,13 @@
+.selection-motion-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cc-selection-motion-width, 0px);
+  height: var(--cc-selection-motion-height, 0px);
+  pointer-events: none;
+  transform: translate3d(var(--cc-selection-motion-x, 0px), var(--cc-selection-motion-y, 0px), 0);
+}
+
+.selection-motion-indicator[data-selection-motion-state='moving'] {
+  will-change: transform;
+}

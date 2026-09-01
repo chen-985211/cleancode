@@ -1,7 +1,7 @@
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { createWorkbenchDirectZoomController } from '../../../src/presentation/app-shell/workbenchDirectZoom'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { createWorkbenchDirectZoomController } from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
 
 describe('workbench direct zoom controller', () => {
   it('follows one continuous time-based curve at 60Hz and 120Hz', () => {

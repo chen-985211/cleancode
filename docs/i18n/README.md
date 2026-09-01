@@ -4,7 +4,7 @@
 
 本文是 cleancode 国际化实现、文案归属和 AI 协作约束的唯一事实来源。语言入口、偏好恢复和切换结果属于 [UI 契约](../product/ui-contract.md)；本文只维护这些行为所需的 locale 与文案实现规则。
 
-当前国际化实现位于 `src/presentation/app-shell/i18n/`。第一方 UI 文案只允许由 locale catalog 持有，组件和其他表现层模块不得建立第二套文案事实来源。
+当前国际化实现位于 `src/presentation/i18n/`。第一方 UI 文案只允许由 locale catalog 持有，组件和其他表现层模块不得建立第二套文案事实来源。
 
 ## 支持范围
 
@@ -18,10 +18,11 @@
 ## 代码结构与事实归属
 
 ```txt
-src/presentation/app-shell/i18n/
+src/presentation/i18n/
   catalogs/
     zh-CN.ts              # 中文 catalog 与 MessageKey 事实来源
-    en.ts                 # 英文 catalog，必须完全匹配 MessageKey
+    en.ts                 # 英文 catalog 统一出口，必须完全匹配 MessageKey
+    enWorkflow.ts         # 英文工作流文案分片，由 en.ts 显式组装
   I18nProvider.tsx        # locale 状态与翻译函数注入
   locale.ts               # locale 集合、规范化与系统语言解析
   localePreference.ts     # 显式偏好的持久化边界
@@ -29,9 +30,9 @@ src/presentation/app-shell/i18n/
   useI18n.ts              # 表现层读取入口
 ```
 
-`catalogs/zh-CN.ts` 的键集合定义 `MessageKey`。`catalogs/en.ts` 使用 `MessageCatalog` 做完整性检查，因此缺键、多键或拼错键必须在类型检查阶段失败。`messages.ts` 只负责注册和解析，不得重新承载任何语言的文案。
+`catalogs/zh-CN.ts` 的键集合定义 `MessageKey`。`catalogs/en.ts` 使用 `MessageCatalog` 做完整性检查，并显式组装同语言的 `enWorkflow.ts` 分片，因此缺键、多键或拼错键必须在类型检查阶段失败。`messages.ts` 只负责注册和解析，不得重新承载任何语言的文案。
 
-每个 locale 必须独占一个物理文件。不得把多个语言写入同一文件，不得按“基础文案”“运行时文案”等技术阶段再次建立跨语言混合字典。
+每个 locale 必须只有一个统一 catalog 出口。单个 locale 内容过大时，可以按稳定的界面或文案 owner 拆成同语言分片，再由该 locale 的出口文件显式组装；完整性检查必须作用于组装后的 catalog。不得把多个语言写入同一文件，也不得按“基础文案”“运行时文案”等技术阶段建立跨语言混合字典。
 
 ## Message key 与插值
 

@@ -1,8 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { useCanvasSelectionViewport } from '../../../src/presentation/app-shell/useCanvasSelectionViewport'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { useCanvasSelectionViewport } from '../../../src/presentation/app-shell/workbench/viewport/useCanvasSelectionViewport'
 
 describe('canvas selection viewport', () => {
   beforeEach(() => {

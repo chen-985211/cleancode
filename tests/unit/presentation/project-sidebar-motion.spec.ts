@@ -3,7 +3,7 @@ import {
   type ProjectSidebarMotionElements,
   type ProjectSidebarMotionFrameScheduler,
   type ProjectSidebarMotionSurface
-} from '../../../src/presentation/app-shell/projectSidebarMotion'
+} from '../../../src/presentation/app-shell/shell/project-sidebar/projectSidebarMotion'
 
 describe('project sidebar motion', () => {
   it.each([

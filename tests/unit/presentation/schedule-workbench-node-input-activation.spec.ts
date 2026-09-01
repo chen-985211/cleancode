@@ -1,4 +1,4 @@
-import { scheduleWorkbenchNodeInputActivation } from '../../../src/presentation/app-shell/scheduleWorkbenchNodeInputActivation'
+import { scheduleWorkbenchNodeInputActivation } from '../../../src/presentation/app-shell/workbench/creation/scheduleWorkbenchNodeInputActivation'
 
 describe('schedule workbench node input activation', () => {
   beforeEach(() => {

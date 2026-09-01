@@ -71,6 +71,33 @@ module.exports = {
         'UI depends on application contracts and view models, not infrastructure adapters directly.',
       from: { path: '^src/presentation/' },
       to: { path: '^src/contexts/[^/]+/infrastructure' }
+    },
+    {
+      name: 'context-presentation-must-not-depend-on-app-shell',
+      severity: 'error',
+      comment:
+        'Context-owned UI may depend on shared presentation, but not on App Shell internals.',
+      from: { path: '^src/contexts/[^/]+/presentation' },
+      to: { path: '^src/presentation/app-shell' }
+    },
+    {
+      name: 'context-presentation-must-not-depend-on-infrastructure',
+      severity: 'error',
+      comment:
+        'Context-owned UI consumes application and presentation contracts, never infrastructure adapters.',
+      from: { path: '^src/contexts/[^/]+/presentation' },
+      to: { path: '^src/contexts/[^/]+/infrastructure' }
+    },
+    {
+      name: 'shared-presentation-must-not-depend-on-outer-ui-or-runtime',
+      severity: 'error',
+      comment:
+        'Shared presentation may consume its own modules, i18n, and Shared Kernel contracts, but not bounded contexts, Platform, or higher-level UI composition.',
+      from: { path: '^src/presentation/shared(?:/|$)' },
+      to: {
+        path: '^src/(contexts|platform|presentation/)',
+        pathNot: '^src/presentation/(shared|i18n)(?:/|$)'
+      }
     }
   ],
   options: {

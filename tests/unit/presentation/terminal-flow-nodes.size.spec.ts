@@ -2,8 +2,8 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import {
   createIdleTerminalState,
   type TerminalViewState
-} from '../../../src/presentation/app-shell/types'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+} from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('terminal flow nodes', () => {
   it('uses the terminal block size as the React Flow node dimensions', () => {

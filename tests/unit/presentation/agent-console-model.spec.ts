@@ -1,4 +1,4 @@
-import { createFallbackAgent } from '../../../src/presentation/app-shell/agentConsoleModel'
+import { createFallbackAgent } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentConsoleModel'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent console model', () => {

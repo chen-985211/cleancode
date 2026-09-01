@@ -1,0 +1,142 @@
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+
+import { useI18n } from '../../../i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../shell/AppShellSurfaceMotion'
+import { TooltipLabel } from '../../../shared/components/Tooltip'
+import { supportedLocales, type Locale } from '../../../i18n/locale'
+import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarUtilityButtonMotion'
+
+export function LanguageSettingsRoot() {
+  const [isOpen, setIsOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const optionRefs = useRef(new Map<Locale, HTMLButtonElement>())
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
+  const { locale, selectLocale, t } = useI18n()
+
+  const closeMenu = (): void => {
+    setIsOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    optionRefs.current.get(locale)?.focus()
+    return undefined
+  }, [isOpen, locale])
+
+  return (
+    <div className="language-settings">
+      {isOpen ? (
+        <div
+          className="language-settings-dismiss-layer"
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            closeMenu()
+          }}
+        />
+      ) : null}
+      <TooltipLabel content={t('language.settings')} side="bottom">
+        <button
+          ref={triggerRef}
+          className="language-settings-trigger toolbar-utility-button"
+          type="button"
+          aria-label={t('language.settings')}
+          aria-controls="language-settings-menu"
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+          {...triggerMotionProps}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <TranslateIcon size={18} weight="bold" aria-hidden="true" />
+        </button>
+      </TooltipLabel>
+      <AnchoredSurfaceMotion
+        id="language-settings-menu"
+        className="language-settings-menu anchored-surface-motion"
+        springPreset="anchored-top-right"
+        role="menu"
+        aria-label={t('language.settings')}
+        open={isOpen}
+      >
+        {supportedLocales.map((optionLocale, index) => (
+          <button
+            key={optionLocale}
+            ref={(element) => {
+              if (element) {
+                optionRefs.current.set(optionLocale, element)
+              } else {
+                optionRefs.current.delete(optionLocale)
+              }
+            }}
+            className="language-settings-option"
+            type="button"
+            role="menuitemradio"
+            aria-checked={locale === optionLocale}
+            onClick={() => chooseLocale(optionLocale)}
+            onKeyDown={(event) => handleOptionKeyDown(event, index)}
+          >
+            <span>{languageLabel(optionLocale)}</span>
+            {locale === optionLocale ? (
+              <CheckIcon size={17} weight="bold" aria-hidden="true" />
+            ) : null}
+          </button>
+        ))}
+      </AnchoredSurfaceMotion>
+    </div>
+  )
+
+  function languageLabel(optionLocale: Locale): string {
+    return optionLocale === 'zh-CN' ? t('language.simplifiedChinese') : t('language.english')
+  }
+
+  function chooseLocale(nextLocale: Locale): void {
+    selectLocale(nextLocale)
+    closeMenu()
+  }
+
+  function handleOptionKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMenu()
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      chooseLocale(supportedLocales[index])
+      return
+    }
+
+    const nextIndex = resolveNextOptionIndex(event.key, index)
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    optionRefs.current.get(supportedLocales[nextIndex])?.focus()
+  }
+}
+
+function resolveNextOptionIndex(key: string, currentIndex: number): number | null {
+  if (key === 'ArrowDown' || key === 'ArrowRight') {
+    return (currentIndex + 1) % supportedLocales.length
+  }
+  if (key === 'ArrowUp' || key === 'ArrowLeft') {
+    return (currentIndex - 1 + supportedLocales.length) % supportedLocales.length
+  }
+  if (key === 'Home') {
+    return 0
+  }
+  if (key === 'End') {
+    return supportedLocales.length - 1
+  }
+
+  return null
+}

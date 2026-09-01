@@ -1,4 +1,4 @@
-import { resolveCanvasObjectContextMenuPosition } from '../../../src/presentation/app-shell/canvasObjectContextMenuPosition'
+import { resolveCanvasObjectContextMenuPosition } from '../../../src/presentation/app-shell/workbench/menus/canvasObjectContextMenuPosition'
 
 describe('canvas object context menu position', () => {
   it('opens near the pointer when enough viewport space is available', () => {

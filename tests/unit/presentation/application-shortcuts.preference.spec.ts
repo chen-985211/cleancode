@@ -1,12 +1,12 @@
 import {
   defaultApplicationShortcutBindings,
   type ApplicationShortcutBindings
-} from '../../../src/presentation/app-shell/applicationShortcuts'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 import {
   readApplicationShortcutBindings,
   shortcutBindingsStorageKey,
   writeApplicationShortcutBindings
-} from '../../../src/presentation/app-shell/applicationShortcutPreference'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutPreference'
 
 describe('application shortcut preference', () => {
   beforeEach(() => window.localStorage.clear())

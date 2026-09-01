@@ -6,11 +6,14 @@ import { useState } from 'react'
 import {
   CanvasMenuMotionProvider,
   CanvasMenuSurface
-} from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
-import type { CanvasMenuMotionFrameScheduler } from '../../../src/presentation/app-shell/canvasMenuMotion'
+} from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
+import type { CanvasMenuMotionFrameScheduler } from '../../../src/presentation/app-shell/workbench/menus/canvasMenuMotion'
 
 const canvasMenuStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-object-context-menu.css'),
+  resolve(
+    process.cwd(),
+    'src/presentation/app-shell/workbench/menus/canvas-object-context-menu.css'
+  ),
   'utf8'
 )
 

@@ -2,7 +2,7 @@ import {
   defaultFollowQuickExecutionTarget,
   readCanvasQuickExecutionFollowPreference,
   writeCanvasQuickExecutionFollowPreference
-} from '../../../src/presentation/app-shell/canvasQuickExecutionFollowPreference'
+} from '../../../src/presentation/app-shell/app-features/settings/canvasQuickExecutionFollowPreference'
 
 describe('canvas quick execution follow preference', () => {
   it('defaults missing, malformed, and unsupported stored values to following the target', () => {

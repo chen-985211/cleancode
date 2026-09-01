@@ -6,15 +6,15 @@ import type { TerminalSnapshot } from '../../../src/contexts/run/application/dto
 import type {
   TerminalSurface,
   TerminalSurfaceAttachment
-} from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
-import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
-import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
-import { useAgentTerminalView } from '../../../src/presentation/app-shell/useAgentTerminalView'
+} from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
+import { useAgentTerminalView } from '../../../src/presentation/app-shell/coordinators/useAgentTerminalView'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 const terminalViewMockState = vi.hoisted(() => ({ surfaces: [] as TerminalSurface[] }))
 
-vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
+vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
   createTerminalXtermSurface: vi.fn(() => {
     const surface = {
       attach: vi.fn(),

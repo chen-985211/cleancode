@@ -3,7 +3,7 @@ import {
   resolveWorkbenchNodeCreationViewport,
   workbenchNodePlacementGap,
   type WorkbenchCanvasRect
-} from '../../../src/presentation/app-shell/workbenchNodeCreationPolicy'
+} from '../../../src/presentation/app-shell/workbench/creation/workbenchNodeCreationPolicy'
 
 describe('workbench node creation policy', () => {
   const canvasSize = { width: 1_200, height: 800 }

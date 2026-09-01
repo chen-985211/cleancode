@@ -1,13 +1,9 @@
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  createIdleTerminalState,
-  type TerminalFlowNode,
-  type TerminalGroupFlowNode
-} from '../../../src/presentation/app-shell/types'
-import {
-  projectTerminalGroupDropAction,
-  resolveTerminalGroupDropAction
-} from '../../../src/presentation/app-shell/terminalGroupDropTarget'
+import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
+import { resolveTerminalGroupDropAction } from '../../../src/contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
+import { projectTerminalGroupDropAction } from '../../../src/presentation/app-shell/projections/terminalGroupDropProjection'
 
 describe('terminal group drop target', () => {
   it('joins an ungrouped terminal when its center is dropped inside a group', () => {

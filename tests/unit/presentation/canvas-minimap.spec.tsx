@@ -3,14 +3,12 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import {
   CanvasMinimap,
   LiveCanvasMinimapViewportFrame
-} from '../../../src/presentation/app-shell/CanvasMinimap'
-import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
-import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
-import {
-  createIdleTerminalState,
-  type TerminalFlowNode,
-  type TerminalGroupFlowNode
-} from '../../../src/presentation/app-shell/types'
+} from '../../../src/presentation/app-shell/workbench/minimap/CanvasMinimap'
+import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/workbench/minimap/minimapInteraction'
+import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasViewportStore'
+import { createIdleTerminalState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
 
 describe('canvas minimap', () => {
   const restoreSvgGeometry = installSvgGeometryMocks()

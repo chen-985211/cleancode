@@ -1,9 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
-import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
-import { useCanvasArrangementActions } from '../../../src/presentation/app-shell/useCanvasArrangementActions'
+import type { CanvasArrangementSelectionItem } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
+import { useCanvasArrangementActions } from '../../../src/presentation/app-shell/coordinators/useCanvasArrangementActions'
 
 describe('canvas arrangement actions', () => {
   it('creates one attached stack without a presentation state', async () => {

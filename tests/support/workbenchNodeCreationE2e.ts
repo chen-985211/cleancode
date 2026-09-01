@@ -1,6 +1,6 @@
 import type { Page } from 'playwright'
 
-import { resolveWorkbenchSafeViewport } from '../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+import { resolveWorkbenchSafeViewport } from '../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport'
 import { waitForCanvasViewportZoomCommit } from './e2eCanvasViewport'
 import { pollUntilState } from './e2ePolling'
 

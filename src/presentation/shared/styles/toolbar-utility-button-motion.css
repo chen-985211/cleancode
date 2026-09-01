@@ -1,0 +1,15 @@
+.toolbar-utility-button {
+  transform: translate3d(0, var(--toolbar-utility-motion-y, 0px), 0)
+    scale(var(--toolbar-utility-motion-scale, 1));
+  transform-origin: center;
+  transition:
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.toolbar-utility-button[data-toolbar-utility-motion-state='opening'] {
+  will-change: transform;
+}

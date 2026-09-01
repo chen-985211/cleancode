@@ -1,8 +1,8 @@
 import {
   resolveAdjacentWorkspaceTarget,
   resolveDirectionalWorkbenchNode
-} from '../../../src/presentation/app-shell/applicationShortcutNavigation'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutNavigation'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('application shortcut navigation', () => {

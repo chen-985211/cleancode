@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 
-import { ApplicationSettingsRoot } from '../../../src/presentation/app-shell/ApplicationSettingsRoot'
+import { ApplicationSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ApplicationSettingsRoot'
 import {
   defaultApplicationShortcutBindings,
   type ApplicationShortcutBinding,
   type ApplicationShortcutBindings,
   type ApplicationShortcutCommand
-} from '../../../src/presentation/app-shell/applicationShortcuts'
+} from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 
 describe('application settings', () => {
   it('projects the default navigation selection when the delayed settings surface first mounts', () => {
@@ -56,7 +56,7 @@ describe('application settings', () => {
     )
 
     const trigger = screen.getByRole('button', { name: '设置' })
-    expect(trigger).toHaveClass('app-shell-utility-button')
+    expect(trigger).toHaveClass('toolbar-utility-button')
     fireEvent.pointerDown(trigger, { pointerType: 'mouse' })
     fireEvent.click(trigger)
 

@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const notificationStyles = readStyles('notifications.css')
-const branchFormStyles = readStyles('project-sidebar-branch-workspace-form.css')
-const projectRemovalStyles = readStyles('project-sidebar-project-removal.css')
-const applicationSettingsStyles = readStyles('application-settings.css')
+const notificationStyles = readStyles('app-features/notifications/notifications.css')
+const branchFormStyles = readProjectStyles('project-sidebar-branch-workspace-form.css')
+const projectRemovalStyles = readProjectStyles('project-sidebar-project-removal.css')
+const applicationSettingsStyles = readStyles('app-features/settings/application-settings.css')
 
 describe('status and pane motion styles', () => {
   it('keeps every notification on one fixed card geometry and surface', () => {
@@ -109,8 +109,12 @@ describe('status and pane motion styles', () => {
 })
 
 function readStyles(fileName: string): string {
+  return readFileSync(resolve(process.cwd(), 'src', 'presentation', 'app-shell', fileName), 'utf8')
+}
+
+function readProjectStyles(fileName: string): string {
   return readFileSync(
-    resolve(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', fileName),
+    resolve(process.cwd(), 'src/contexts/project/presentation/styles', fileName),
     'utf8'
   )
 }

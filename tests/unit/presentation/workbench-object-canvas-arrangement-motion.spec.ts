@@ -1,5 +1,5 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { projectWorkbenchObjectMotion } from '../../../src/presentation/app-shell/workbenchObjectMotion'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { projectWorkbenchObjectMotion } from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object canvas arrangement motion', () => {
   it('projects grid moves with distance-aware dynamics and no cascade delay', () => {

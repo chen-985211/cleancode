@@ -6,8 +6,8 @@ import { createClientAppError } from '../../../src/shared-kernel/application/err
 import type {
   AppNotificationController,
   AppNotificationInput
-} from '../../../src/presentation/app-shell/appNotifications'
-import { useTerminalWorkflow } from '../../../src/presentation/app-shell/useTerminalWorkflow'
+} from '../../../src/presentation/shared/notifications/appNotifications'
+import { useTerminalWorkflow } from '../../../src/presentation/app-shell/coordinators/useTerminalWorkflow'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('terminal workflow notification publishing', () => {

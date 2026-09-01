@@ -5,9 +5,9 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import {
   useWorkbenchLayoutFocus,
   type WorkbenchLayoutFocusRequest
-} from '../../../src/presentation/app-shell/useWorkbenchLayoutFocus'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+} from '../../../src/presentation/app-shell/workbench/viewport/useWorkbenchLayoutFocus'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('workbench layout focus', () => {
   beforeEach(() => {

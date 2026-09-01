@@ -1,11 +1,11 @@
 import type { Edge } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../../../src/presentation/app-shell/agentApprovalConnectionProjection'
+import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../../../src/presentation/app-shell/projections/agentApprovalConnectionProjection'
 import type {
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
-} from '../../../src/presentation/app-shell/agentToolApprovalTypes'
+} from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
 
 describe('Agent connection approval edge projection', () => {
   it('highlights the real workflow edge without replacing its persistent identity', () => {

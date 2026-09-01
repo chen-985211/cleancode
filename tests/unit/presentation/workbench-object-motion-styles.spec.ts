@@ -2,19 +2,19 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const objectMotionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-object-motion.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/workbench-object-motion.css'),
   'utf8'
 )
 const terminalGroupStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-group-node.css'),
+  resolve(process.cwd(), 'src/contexts/block-graph/presentation/styles/terminal-group-node.css'),
   'utf8'
 )
 const terminalNodeStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-node.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/terminal/terminal-node.css'),
   'utf8'
 )
 const agentConsoleStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/agent/agent-console.css'),
   'utf8'
 )
 const themeStyles = readFileSync(
@@ -22,7 +22,7 @@ const themeStyles = readFileSync(
   'utf8'
 )
 const appShellStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/AppShell.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/shell/AppShell.css'),
   'utf8'
 )
 

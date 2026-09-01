@@ -4,8 +4,8 @@ import {
   resolveApplicationSettingsPaneDirection,
   type ApplicationSettingsPaneMotionLayer,
   type ApplicationSettingsPaneMotionRoot
-} from '../../../src/presentation/app-shell/applicationSettingsPaneMotion'
-import type { SpringProgressMotionFrameScheduler } from '../../../src/presentation/app-shell/springProgressMotion'
+} from '../../../src/presentation/app-shell/app-features/settings/applicationSettingsPaneMotion'
+import type { SpringProgressMotionFrameScheduler } from '../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('application settings pane motion', () => {
   it('derives spatial direction from the stable navigation order', () => {

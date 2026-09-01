@@ -1,7 +1,7 @@
 import { createRef } from 'react'
 import { fireEvent, render } from '@testing-library/react'
 
-import { AgentTerminalSurface } from '../../../src/presentation/app-shell/AgentTerminalSurface'
+import { AgentTerminalSurface } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentTerminalSurface'
 
 describe('Agent terminal paste shortcuts', () => {
   const originalPlatform = navigator.platform

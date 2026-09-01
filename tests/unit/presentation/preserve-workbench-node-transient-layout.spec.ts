@@ -1,5 +1,6 @@
-import { preserveWorkbenchNodeTransientLayout } from '../../../src/presentation/app-shell/preserveWorkbenchNodeTransientLayout'
-import type { TerminalFlowNode, WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import { preserveWorkbenchNodeTransientLayout } from '../../../src/presentation/app-shell/projections/preserveWorkbenchNodeTransientLayout'
+import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('preserve workbench node transient layout', () => {
   it('keeps current positions and sizes while refreshing node data', () => {

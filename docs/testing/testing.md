@@ -95,7 +95,7 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
-`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、动效、国际化、可移植路径、测试稳定性、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。`pnpm test:unit` 通过独立 Vitest projects 让 `tests/unit/presentation` 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争。Windows CI 可以把 unit、integration 和 contract 文件确定性地分到两个独立 runner；每个 runner 内的 integration 仍须串行，两个 shard 的并集必须覆盖全部测试文件。
+`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、动效、国际化、可移植路径、测试稳定性、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。`pnpm test:unit` 通过独立 Vitest projects 让 `tests/unit/presentation` 和 `tests/unit/contexts/**/*.presentation.spec.ts(x)` 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争。Windows CI 可以把 unit、integration 和 contract 文件确定性地分到两个独立 runner；每个 runner 内的 integration 仍须串行，两个 shard 的并集必须覆盖全部测试文件。
 
 国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
 
@@ -183,7 +183,7 @@ tests/
   support/
 ```
 
-`tests/unit` 是单元测试根目录。上下文内单元测试放在 `tests/unit/contexts/<context>`；共享内核单元测试放在 `tests/unit/shared-kernel`；根级表现层单元测试放在 `tests/unit/presentation`；测试工具自身的单元测试放在 `tests/unit/support`。
+`tests/unit` 是单元测试根目录。上下文内单元测试放在 `tests/unit/contexts/<context>`；其中需要 DOM 的上下文表现层测试使用 `*.presentation.spec.ts` 或 `*.presentation.spec.tsx` 文件名，由 jsdom project 执行，不再增加 `presentation` 子目录。共享内核单元测试放在 `tests/unit/shared-kernel`；根级表现层单元测试放在 `tests/unit/presentation`；测试工具自身的单元测试放在 `tests/unit/support`。
 
 `tests/integration` 是集成测试根目录。上下文内集成测试放在 `tests/integration/contexts/<context>`；平台能力集成测试放在 `tests/integration/platform`。
 

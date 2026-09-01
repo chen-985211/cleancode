@@ -2,7 +2,7 @@ import {
   defaultTerminalWorkflowBuildMode,
   readTerminalWorkflowBuildPreference,
   writeTerminalWorkflowBuildPreference
-} from '../../../src/presentation/app-shell/terminalWorkflowBuildPreference'
+} from '../../../src/presentation/app-shell/app-features/settings/terminalWorkflowBuildPreference'
 
 describe('terminal workflow build preference', () => {
   it('defaults malformed and unsupported stored values to progressive construction', () => {

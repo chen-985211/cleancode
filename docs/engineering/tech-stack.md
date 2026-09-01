@@ -23,7 +23,7 @@
 | 状态管理       | React 本地状态与 hooks；当前没有集中式状态库                                        |
 | 进程通信       | Electron IPC、主进程事件、本机 Unix socket / Windows named pipe 长度帧协议          |
 | 持久化         | Node.js 文件系统、版本化 JSON 与 JSONL                                              |
-| Agent CLI      | Codex CLI、Claude Code、OpenCode Provider contributions + node-pty                  |
+| Agent CLI      | 内建 33 个 Provider 的 catalog、可选 Provider contributions、node-pty               |
 | Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                                                         |
 | 测试           | Vitest、Testing Library、Playwright                                                 |
 

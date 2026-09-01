@@ -1,6 +1,6 @@
-import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
+import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/projections/terminalWorkflowEdges'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { projectTerminalWorkflowBuildOntoEdges } from '../../../src/presentation/app-shell/terminalWorkflowBuildEdgePresentation'
+import { projectTerminalWorkflowBuildOntoEdges } from '../../../src/presentation/app-shell/projections/terminalWorkflowBuildEdgePresentation'
 
 describe('terminal workflow edges', () => {
   it('maps persistent connections and hides edges of collapsed group members', () => {

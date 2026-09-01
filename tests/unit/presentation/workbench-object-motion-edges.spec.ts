@@ -1,8 +1,8 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   createWorkbenchObjectMotionEdgeProjector,
   projectWorkbenchObjectMotionOntoEdges
-} from '../../../src/presentation/app-shell/workbenchObjectMotion'
+} from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object motion edges', () => {
   it('holds workflow edges until expanding group members reach stable handle geometry', () => {

@@ -2,15 +2,15 @@ import { createRef } from 'react'
 import { act, render, waitFor } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { AgentTerminalSurface } from '../../../src/presentation/app-shell/AgentTerminalSurface'
-import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
+import { AgentTerminalSurface } from '../../../src/presentation/app-shell/workbench/nodes/agent/AgentTerminalSurface'
+import { TerminalViewport } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalViewport'
 import { createAgentSessionSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 const terminalSurfaceState = vi.hoisted(() => ({
   onOpenSearch: null as (() => void) | null
 }))
 
-vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
+vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface', () => ({
   createTerminalXtermSurface: vi.fn(() => ({
     attach: vi.fn((attachment: { readonly onOpenSearch: () => void }) => {
       terminalSurfaceState.onOpenSearch = attachment.onOpenSearch

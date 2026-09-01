@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/ThemeSettingsRoot'
-import { themePreferenceStorageKey } from '../../../src/presentation/app-shell/themePreference'
+import { ThemeSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ThemeSettingsRoot'
+import { themePreferenceStorageKey } from '../../../src/presentation/app-shell/app-features/settings/themePreference'
 
 interface MutableMediaQueryList extends MediaQueryList {
   matches: boolean
@@ -43,7 +43,7 @@ describe('theme settings', () => {
     render(<ThemeSettingsRoot />)
 
     const trigger = screen.getByRole('button', { name: '主题设置' })
-    expect(trigger).toHaveClass('app-shell-utility-button')
+    expect(trigger).toHaveClass('toolbar-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })

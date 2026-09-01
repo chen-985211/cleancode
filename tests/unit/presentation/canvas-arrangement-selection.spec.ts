@@ -1,29 +1,13 @@
 import { BlockGraph } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import { canvasArrangementItemKey } from '../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import {
-  canvasArrangementItemKey,
-  isCanvasArrangementSelectionModifier,
   projectCanvasArrangementSelectionOntoNodes,
   resolveCanvasArrangementSelectionItems
-} from '../../../src/presentation/app-shell/canvasArrangementSelection'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+} from '../../../src/presentation/app-shell/projections/workbenchCanvasArrangementSelection'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('canvas arrangement selection', () => {
-  it('uses Command on macOS and Control on other platforms', () => {
-    expect(isCanvasArrangementSelectionModifier({ ctrlKey: false, metaKey: true }, 'mac')).toBe(
-      true
-    )
-    expect(isCanvasArrangementSelectionModifier({ ctrlKey: true, metaKey: false }, 'mac')).toBe(
-      false
-    )
-    expect(isCanvasArrangementSelectionModifier({ ctrlKey: true, metaKey: false }, 'other')).toBe(
-      true
-    )
-    expect(isCanvasArrangementSelectionModifier({ ctrlKey: false, metaKey: true }, 'other')).toBe(
-      false
-    )
-  })
-
   it('selects independent terminals, complete workflows, combinations, and agents as whole objects', () => {
     const graph = createGraph()
     const selection = resolveCanvasArrangementSelectionItems({

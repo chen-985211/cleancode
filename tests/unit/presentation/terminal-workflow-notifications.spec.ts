@@ -3,7 +3,7 @@ import {
   createWorkflowFailureNotification,
   createWorkflowRunNotification,
   getWorkflowRunRootBlockIds
-} from '../../../src/presentation/app-shell/terminalWorkflowNotifications'
+} from '../../../src/presentation/app-shell/context-adapters/run/terminalWorkflowNotifications'
 
 describe('terminal workflow notifications', () => {
   it('describes one failed terminal with its exit code', () => {

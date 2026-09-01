@@ -1,9 +1,9 @@
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
   projectWorkbenchObjectMotion,
   resolveWorkbenchCanvasDetailLevel,
   scheduleWorkbenchCreatedObjectFocus
-} from '../../../src/presentation/app-shell/workbenchObjectMotion'
+} from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object motion', () => {
   it.each([

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap'
-import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
-import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
-import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
+import { CanvasMinimap } from '../../../src/presentation/app-shell/workbench/minimap/CanvasMinimap'
+import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/workbench/minimap/minimapInteraction'
+import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types/agentConsoleFlowNode'
+import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasViewportStore'
 
 describe('Agent minimap navigation', () => {
   it('renders a neutral content-free Agent node and routes activation', () => {

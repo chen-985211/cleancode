@@ -3,11 +3,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const terminalNodeStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-node.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/terminal/terminal-node.css'),
   'utf8'
 )
 const terminalThemeProjectionStyles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-theme-projection.css'),
+  resolve(process.cwd(), 'src/contexts/run/presentation/styles/terminal-theme-projection.css'),
   'utf8'
 )
 

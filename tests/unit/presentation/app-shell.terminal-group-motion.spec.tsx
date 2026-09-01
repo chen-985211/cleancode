@@ -7,18 +7,16 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type {
-  TerminalGroupFlowNode,
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from '../../../src/presentation/app-shell/types'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/types/terminalGroupFlowNode'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
 }))
 
-vi.mock('../../../src/presentation/app-shell/ProjectSidebar', async () => {
+vi.mock('../../../src/contexts/project/presentation/components/ProjectSidebar', async () => {
   const React = await import('react')
   return { ProjectSidebar: () => React.createElement('aside') }
 })

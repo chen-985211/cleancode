@@ -4,11 +4,11 @@ import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/useTerminalWorkflow'
-import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
-import type { AgentToolApprovalViewState } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
+import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/coordinators/useTerminalWorkflow'
+import { WorkbenchCanvas } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvas'
+import type { AgentToolApprovalViewState } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
-import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({ latest: null as MockReactFlowProps | null }))
 

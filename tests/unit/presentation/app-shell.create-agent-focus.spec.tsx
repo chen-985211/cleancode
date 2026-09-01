@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
-import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport'
 
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -20,7 +20,7 @@ const creationGeometry = vi.hoisted(() => ({
 }))
 
 vi.mock(
-  '../../../src/presentation/app-shell/workbenchCanvasSafeViewport',
+  '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport',
   async (importOriginal) => ({
     ...(await importOriginal<typeof WorkbenchCanvasSafeViewportModule>()),
     readWorkbenchCanvasCreationGeometry: () => creationGeometry

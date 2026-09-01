@@ -1,13 +1,13 @@
 import type { NodeChange } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/applyWorkbenchNodeChanges'
 import {
   createIdleTerminalState,
-  type TerminalViewState,
-  type WorkbenchFlowNode
-} from '../../../src/presentation/app-shell/types'
-import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+  type TerminalViewState
+} from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
+import { applyWorkbenchNodeChanges } from '../../../src/presentation/app-shell/workbench/nodes/applyWorkbenchNodeChanges'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('workbench node changes', () => {
   it('moves terminal group members while the group node is being dragged', () => {
