@@ -9,8 +9,16 @@ import type { TerminalSessionSnapshot } from '../../../run/application/dto/Termi
 export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort {
   private readonly terminals = new Map<string, TerminalSessionSnapshot>()
   private readonly titleObservers = new Map<string, { readonly accept: (title: string) => void }>()
+  private readonly environment: NodeJS.ProcessEnv
+  private readonly platform: NodeJS.Platform
 
-  constructor(private readonly terminalSessions: TerminalSessionService) {}
+  constructor(
+    private readonly terminalSessions: TerminalSessionService,
+    options: { readonly environment?: NodeJS.ProcessEnv; readonly platform?: NodeJS.Platform } = {}
+  ) {
+    this.environment = options.environment ?? process.env
+    this.platform = options.platform ?? process.platform
+  }
 
   async open(command: OpenAgentTerminalCommand) {
     const existing = this.terminals.get(command.sessionId)
@@ -18,6 +26,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
 
     const terminal = await this.terminalSessions.start({
       columns: command.columns,
+      environment: this.createLaunchEnvironment(),
       gitBranch: command.gitBranch,
       onExit: (event) => {
         if (this.terminals.get(command.sessionId)?.sessionId !== event.sessionId) return
@@ -70,7 +79,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
     try {
       const job = this.terminalSessions.launchForegroundJob({
         args: command.plan.args,
-        environment: command.plan.env,
+        environment: this.createLaunchEnvironment(command.plan.env),
         executable: command.plan.executable,
         onExit: (event) => {
           if (observer && this.titleObservers.get(command.sessionId) === observer) {
@@ -115,6 +124,15 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
   releaseApplicationShutdown(): void {
     this.terminals.clear()
     this.titleObservers.clear()
+  }
+
+  private createLaunchEnvironment(
+    explicit: Readonly<Record<string, string>> = {}
+  ): Readonly<Record<string, string>> {
+    // The detached Run provider and an existing shell cannot inherit later PATH
+    // hydration in Electron main. Snapshot it at each process boundary instead.
+    const path = this.platform === 'win32' ? undefined : this.environment.PATH
+    return { ...(path ? { PATH: path } : {}), ...explicit }
   }
 
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {
