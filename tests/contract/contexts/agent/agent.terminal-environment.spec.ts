@@ -6,7 +6,7 @@ import { TerminalSessionService } from '../../../../src/contexts/run/application
 
 describe('Agent terminal environment contract', () => {
   it.each(['darwin', 'linux'] as const)(
-    'carries the current detected PATH into new terminals and every launch on %s',
+    'initializes terminals with detected PATH and offers refreshed paths as fallback on %s',
     async (platform) => {
       const environment = { PATH: '/first/bin', PRIVATE_VALUE: 'not-a-launch-variable' }
       const { runtime, processes } = createRuntime(environment, platform)
@@ -21,9 +21,12 @@ describe('Agent terminal environment contract', () => {
         plan: { executable: 'example-agent', args: [], env: { PROVIDER_OPTION: 'enabled' } }
       })
       expect(processes.launchForegroundJob.mock.calls[0]?.[0].environment).toMatchObject({
-        PATH: environment.PATH,
         PROVIDER_OPTION: 'enabled'
       })
+      expect(processes.launchForegroundJob.mock.calls[0]?.[0].environment).not.toHaveProperty(
+        'PATH'
+      )
+      expect(processes.launchForegroundJob.mock.calls[0]?.[0].fallbackPath).toBe(environment.PATH)
       expect(processes.launchForegroundJob.mock.calls[0]?.[0].environment).not.toHaveProperty(
         'PRIVATE_VALUE'
       )
@@ -58,6 +61,7 @@ describe('Agent terminal environment contract', () => {
       expect(processes.launchForegroundJob.mock.calls[0]?.[0].environment).not.toHaveProperty(
         'PATH'
       )
+      expect(processes.launchForegroundJob.mock.calls[0]?.[0].fallbackPath).toBeUndefined()
     }
   )
 
@@ -76,6 +80,7 @@ describe('Agent terminal environment contract', () => {
       path
     )
     expect(processes.launchForegroundJob.mock.calls[0]?.[0].environment).not.toHaveProperty('PATH')
+    expect(processes.launchForegroundJob.mock.calls[0]?.[0].fallbackPath).toBeUndefined()
   })
 })
 

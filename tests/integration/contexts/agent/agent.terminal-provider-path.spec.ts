@@ -21,7 +21,8 @@ import {
   pathFixtureExecutable,
   quotePathFixtureWord,
   writeAgentProviderLoginProfile,
-  writeAgentProviderPathFixture
+  writeAgentProviderPathFixture,
+  writeProjectPathTool
 } from '../../../fixtures/contexts/agent/agentProviderPathFixture'
 
 const execFileAsync = promisify(execFile)
@@ -55,7 +56,7 @@ describe.each(shells)(
     })
 
     it.runIf(available)(
-      'uses the detected CLI after the backend starts, refreshes and explicit overrides',
+      'supplements detected CLI paths while preserving live shell tools and explicit overrides',
       async () => {
         directory = await mkdtemp(join(tmpdir(), 'cc-agent-path-'))
         const home = join(directory, 'home')
@@ -67,7 +68,8 @@ describe.each(shells)(
         await Promise.all([
           writeAgentProviderPathFixture(firstBin, 'first'),
           writeAgentProviderPathFixture(secondBin, 'second'),
-          writeAgentProviderPathFixture(overrideBin, 'override')
+          writeAgentProviderPathFixture(overrideBin, 'override'),
+          writeProjectPathTool(join(directory, 'bin'), 'project')
         ])
         await writeAgentProviderLoginProfile(home, name, [firstBin, systemPath].join(delimiter))
 
@@ -147,23 +149,33 @@ describe.each(shells)(
         await vi.waitFor(() => expect(output).toContain('path-shell-ready'), { timeout: 10_000 })
 
         const report = join(directory, 'report.json')
-        const launch = async (expectedVersion: string, env: Record<string, string> = {}) => {
+        const launchProcess = (
+          executable: string,
+          args: readonly string[],
+          env: Record<string, string> = {}
+        ) => {
           let resolveExit: (exitCode: number | null) => void = () => undefined
           const exit = new Promise<number | null>((resolve) => {
             resolveExit = resolve
           })
           runtime!.launch({
             sessionId: 'agent-session-path',
-            plan: {
-              executable: pathFixtureExecutable,
-              args: [report, 'argument with spaces'],
-              env
-            },
+            plan: { executable, args, env },
             onExit: (event) => resolveExit(event.exitCode)
           })
-          await expect(exit).resolves.toBe(7)
+          return exit
+        }
+        const launch = async (
+          expectedVersion: string,
+          toolVersion = 'project',
+          env: Record<string, string> = {}
+        ) => {
+          await expect(
+            launchProcess(pathFixtureExecutable, [report, 'argument with spaces'], env)
+          ).resolves.toBe(7)
           expect(JSON.parse(await readFile(report, 'utf8'))).toEqual({
             version: expectedVersion,
+            toolVersion,
             args: ['argument with spaces']
           })
           expect(sessions.getSession(terminal.terminalId)?.status).toBe('running')
@@ -184,11 +196,34 @@ describe.each(shells)(
           { timeout: 5_000 }
         )
 
+        const activatedBin = join(directory, "activated 'bin")
+        await writeProjectPathTool(activatedBin, 'activated')
+        runtime.write(
+          'agent-session-path',
+          `export PATH=${quotePathFixtureWord(activatedBin)}:"$PATH"; printf '%s%s\\n' 'activated-shell-' 'ready'\n`
+        )
+        await vi.waitFor(() => expect(output).toContain('activated-shell-ready'))
+
         await writeAgentProviderLoginProfile(home, name, [secondBin, systemPath].join(delimiter))
         await hydrator.prepare({ refresh: true })
         expect(await detector.inspect()).toMatchObject({ status: 'installed', version: 'second' })
-        await launch('second')
-        await launch('override', { PATH: [overrideBin, systemPath].join(delimiter) })
+        // A refreshed detection must not change the priority of the live shell's tools.
+        await launch('first', 'activated')
+        // Once the old installation is removed, the same terminal finds the refreshed CLI.
+        await rm(firstBin, { recursive: true })
+        await launch('second', 'activated')
+        await launch('override', 'override', { PATH: [overrideBin, systemPath].join(delimiter) })
+        const emptyPathReport = join(directory, 'empty-path.txt')
+        await expect(
+          launchProcess(
+            '/bin/sh',
+            ['-c', `printf '%s' "$PATH" > ${quotePathFixtureWord(emptyPathReport)}`],
+            {
+              PATH: ''
+            }
+          )
+        ).resolves.toBe(0)
+        expect(await readFile(emptyPathReport, 'utf8')).toBe('')
         await sessions.detachView({ ...terminal.viewIdentity, viewId: 'path-view' })
       },
       20_000

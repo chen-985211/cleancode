@@ -9,6 +9,7 @@ export interface LaunchForegroundJobCommand {
   readonly args: readonly string[]
   readonly environment?: Readonly<Record<string, string>>
   readonly executable: string
+  readonly fallbackPath?: string
   readonly onExit: (job: ForegroundJobSnapshot) => void
   readonly onStarted?: (job: ForegroundJobSnapshot) => void
   readonly sessionId: string
@@ -66,6 +67,7 @@ export class TerminalForegroundJobCoordinator {
           session.terminalSourceTheme
         ),
         executable: command.executable,
+        fallbackPath: command.fallbackPath,
         generation,
         launchId: identity.launchId,
         onExit: (event) => {

@@ -222,6 +222,7 @@ export class PersistentTerminalProviderClient
         args: command.args,
         environment: command.environment,
         executable: command.executable,
+        fallbackPath: command.fallbackPath,
         generation: command.generation,
         launchId: command.launchId,
         sessionId: command.sessionId

@@ -26,7 +26,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
 
     const terminal = await this.terminalSessions.start({
       columns: command.columns,
-      environment: this.createLaunchEnvironment(),
+      environment: this.posixPath ? { PATH: this.posixPath } : {},
       gitBranch: command.gitBranch,
       onExit: (event) => {
         if (this.terminals.get(command.sessionId)?.sessionId !== event.sessionId) return
@@ -79,8 +79,9 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
     try {
       const job = this.terminalSessions.launchForegroundJob({
         args: command.plan.args,
-        environment: this.createLaunchEnvironment(command.plan.env),
+        environment: command.plan.env,
         executable: command.plan.executable,
+        fallbackPath: this.posixPath,
         onExit: (event) => {
           if (observer && this.titleObservers.get(command.sessionId) === observer) {
             this.titleObservers.delete(command.sessionId)
@@ -126,13 +127,10 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
     this.titleObservers.clear()
   }
 
-  private createLaunchEnvironment(
-    explicit: Readonly<Record<string, string>> = {}
-  ): Readonly<Record<string, string>> {
-    // The detached Run provider and an existing shell cannot inherit later PATH
-    // hydration in Electron main. Snapshot it at each process boundary instead.
-    const path = this.platform === 'win32' ? undefined : this.environment.PATH
-    return { ...(path ? { PATH: path } : {}), ...explicit }
+  private get posixPath(): string | undefined {
+    // Read each time: Electron can refresh detection after the detached Run
+    // provider or interactive shell starts. Foreground jobs retain shell priority.
+    return this.platform === 'win32' ? undefined : this.environment.PATH || undefined
   }
 
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {

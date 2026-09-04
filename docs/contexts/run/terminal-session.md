@@ -75,6 +75,8 @@ Windows agent-owned terminal 在开放 `launchForegroundJob` 前必须先完成�
 
 `launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。Windows 脚本必须在 started 控制帧之前重申 Console 输入、输出和 PowerShell native pipeline 的 UTF-8 encoding，再按固定 `terminalSourceTheme` 设置 ConsoleColor：浅色使用 `Black`/`White`，深色使用 `Gray`/`Black`；这样前一个前台任务即使改变 console encoding，也不能污染下一次 Agent launch。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、编码与颜色准备、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
 
+POSIX 前台任务可以提供可选 `fallbackPath`，由 Run 的 launch 脚本在子进程中追加到实时继承的 PATH 后；路径值按独立 shell word 引用，保留已有目录顺序，不回写外层 shell。显式 `environment.PATH`（包括空字符串）完全覆盖该合并结果，Windows 不使用此补充字段。该字段沿应用端口和 Provider RPC 透传，不承载 Agent Provider 身份或检测事实。
+
 前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。
 
 ## PTY 端口语义
@@ -167,6 +169,8 @@ Provider 启动协调使用短期、版本化且带唯一 owner 的本机租约�
 当前 Provider 协议为 v10，并兼容已认证的 v8 至 v10 Provider。v9 在稳定 `workspaceId`、画布 owner 身份、`terminalSourceTheme`、结构化 `launchForegroundJob`、started/exited 定向事件与两阶段应用 detach 的既有边界上，为请求增加 controller lease 身份和有界 deadline；v10 继续增加携带完整运行身份和单调 revision 的 `terminal-working-directory` 事件。v9 与 v10 的受控请求必须携带当前 lease，v8 兼容请求可以不携带该字段。发现仍存活的 v7 或更旧 Provider 时以 `TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED` 失败关闭，不复用身份或请求隔离语义不一致的旧进程，也不为升级杀死其中仍被用户保留的普通终端。旧 Provider 自然结束后，后续应用启动按陈旧 metadata 流程创建当前版本 Provider。Provider 的并发关闭调用必须共享同一个完成 Promise，不能让后到的信号处理误判清理已经完成并提前退出进程。
 
 `startProcess` 的 `privateOutputControl` 是可选、additive、provider-neutral launch decoration，不改变 session 身份、恢复 schema、协议认证或最低兼容版本。私有环境只存在该 descriptor 内，不能提前并入公开 `environment`；理解 `osc-633-span-v1` 的 NodePty adapter 才能原子注入并建立匹配 gate。兼容旧 Provider 时未知字段会被透传或忽略，但旧 adapter 不会注入其中环境，因此不会执行缺少 gate 的 Console setter；新客户端不得据此把该字段提升为必需协议版本。
+
+`launchForegroundJob.fallbackPath` 同样为可选附加字段，不改变协议版本或恢复身份。旧 Provider 忽略该字段时仍继承存活 shell 的 PATH；新 terminal 的显式初始 PATH 仍生效，但既有 terminal 的刷新路径补充需要支持该字段的 Provider。不得为获得此能力强制终止用户保留的普通终端。
 
 `health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程。`TerminalProviderShutdownCoordinator` 是 release 完成与各会话 checkpoint、stop、retire 有界预算的唯一协调 owner；controller lifecycle 必须等待该协调结果，不能再用独立外层截止时间越过仍在进行的持久化或补偿屏障。Provider 按 release 开始时捕获的精确 session identity，以默认并发度 8 处理互不依赖的会话：Agent、工作流和默认策略会话必须先确认 PTY stop，再 retire 会话与恢复资料；明确保留的普通会话必须先完成 checkpoint。保留会话 checkpoint 失败时立即转为终止候选，不能继续承诺跨应用恢复。stop、retire 或补偿 checkpoint 失败不得伪造成功或丢弃 owner/evidence；只要仍有存活的待终止会话，controller 就保持 `releasing` 并拒绝后继 claim，Provider 继续清理或保留可诊断状态。只有 release 后不存在不安全的 live 会话才允许后继 controller；不存在任何 live 会话时 Provider 才可以退出。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。新启动的 Provider 必须写入当前 metadata 和协议版本。
 
