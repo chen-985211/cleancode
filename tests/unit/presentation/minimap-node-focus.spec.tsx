@@ -53,7 +53,7 @@ describe('minimap node focus', () => {
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
     const [viewport] = setViewport.mock.calls[0] as unknown as [{ readonly zoom: number }]
-    expect(viewport.zoom).toBe(0.9)
+    expect(viewport.zoom).toBe(1)
   })
 
   it('zooms out enough to keep an oversized minimap terminal inside the focus safe frame', () => {

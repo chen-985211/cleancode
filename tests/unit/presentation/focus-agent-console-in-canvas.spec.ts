@@ -33,7 +33,7 @@ describe('focus Agent console in canvas', () => {
     expect(setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
     expect(setHoveredTerminalBlockId).toHaveBeenCalledWith(null)
-    expect(setViewport).toHaveBeenCalledWith({ x: -654, y: -103, zoom: 0.9 }, { duration: 0 })
+    expect(setViewport).toHaveBeenCalledWith({ x: -780, y: -150, zoom: 1 }, { duration: 0 })
   })
 })
 

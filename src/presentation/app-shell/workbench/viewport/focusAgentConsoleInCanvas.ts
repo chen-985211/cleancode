@@ -6,6 +6,7 @@ import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewpo
 import { revealCreatedWorkbenchNode } from '../creation/revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from '../creation/scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
+import { workbenchNodeReadableZoom } from './workbenchNodeFocusViewport'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness
@@ -113,7 +114,7 @@ function revealNavigatedAgentConsole({
   readonly targetCenter: { readonly x: number; readonly y: number }
   readonly targetZoom?: number
 }): Promise<boolean> {
-  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
+  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), workbenchNodeReadableZoom)
   const command = {
     center: targetCenter,
     intent: motion,

@@ -5,6 +5,7 @@ import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewpo
 import { revealCreatedWorkbenchNode } from '../creation/revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from '../creation/scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
+import { workbenchNodeReadableZoom } from './workbenchNodeFocusViewport'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness
@@ -106,7 +107,7 @@ function revealNavigatedTerminalBlock({
   readonly targetZoom?: number
   readonly width: number
 }): Promise<boolean> {
-  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
+  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), workbenchNodeReadableZoom)
   const command = {
     center: { x: position.x + width / 2, y: position.y + height / 2 },
     intent: motion,
