@@ -1,4 +1,5 @@
 import type { MessageCatalog } from './zh-CN'
+import { enApplicationDiagnosticsMessages } from './applicationDiagnostics'
 import { enWorkflowMessages } from './enWorkflow'
 
 export const enMessages = {
@@ -117,6 +118,7 @@ export const enMessages = {
   'settings.terminal.workflowBuild.simultaneous': 'Build all at once',
   'settings.terminal.workflowBuild.simultaneousDescription':
     'Show every terminal and dependency together to complete construction faster.',
+  ...enApplicationDiagnosticsMessages,
   'settings.agents.title': 'Agents',
   'settings.agents.preferences': 'Agent defaults',
   'settings.agents.permission': 'Agent permissions',

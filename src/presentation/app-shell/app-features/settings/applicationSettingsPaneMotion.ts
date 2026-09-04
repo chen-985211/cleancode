@@ -6,7 +6,7 @@ import {
 } from '../../../shared/motion/motionSpring'
 import type { SpringProgressMotionFrameScheduler } from '../../../shared/motion/springProgressMotion'
 
-export type ApplicationSettingsPane = 'agents' | 'canvas' | 'shortcuts' | 'terminal'
+export type ApplicationSettingsPane = 'agents' | 'canvas' | 'diagnostics' | 'shortcuts' | 'terminal'
 export type ApplicationSettingsPaneDirection = 'backward' | 'forward' | 'none'
 
 export interface ApplicationSettingsPaneMotionRoot {
@@ -50,7 +50,13 @@ interface LiveLayerMotion {
 
 export const applicationSettingsPaneEntryOffset = 30
 
-const paneOrder: readonly ApplicationSettingsPane[] = ['shortcuts', 'canvas', 'terminal', 'agents']
+const paneOrder: readonly ApplicationSettingsPane[] = [
+  'shortcuts',
+  'canvas',
+  'terminal',
+  'agents',
+  'diagnostics'
+]
 const dynamics = { dampingRatio: 1, response: 0.3 }
 const opacityProperty = '--application-settings-pane-motion-opacity'
 const translationProperty = '--application-settings-pane-motion-x'

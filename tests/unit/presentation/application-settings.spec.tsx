@@ -71,7 +71,7 @@ describe('application settings', () => {
       within(settingsNavigation)
         .getAllByRole('button')
         .map((button) => button.textContent)
-    ).toEqual(['快捷键', '画布', '终端', 'Agent'])
+    ).toEqual(['快捷键', '画布', '终端', 'Agent', '问题反馈'])
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(
@@ -287,6 +287,17 @@ describe('application settings', () => {
     fireEvent.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('places problem feedback last and opens its lightweight diagnostics actions', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '问题反馈' }))
+
+    expect(screen.getByRole('heading', { name: '问题反馈' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '复制诊断摘要' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导出诊断文件' })).toBeInTheDocument()
+    expect(screen.getByText('不包含源码、终端内容或 Agent 对话。')).toBeInTheDocument()
   })
 })
 

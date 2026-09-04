@@ -165,6 +165,14 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 
 终端 Provider 使用应用状态目录中的本地轮转诊断文件记录 ready、controller 断连、协议/存储失败等事件。日志可以记录 Provider instance、结构化失败原因和有界计数，不得记录认证 token、终端输入、terminal 输出、checkpoint 内容、环境变量或用户源码。E2E 失败证据可以附带有界 Provider 日志尾部，但仍遵守这些内容限制；Provider 日志不是会话或恢复事实来源。
 
+### 用户导出诊断
+
+用户从应用设置主动导出诊断时，Platform 在用户选择保存位置后即时收集一份 `schemaVersion: 1` 的 JSON 文件。收集范围固定为最近 30 分钟的当前及轮转 `main.log`、终端 Provider `provider.log`，以及应用版本、打包状态、操作系统、架构和 Electron/Node/Chromium 版本；序列化结果上限为 5 MiB，超限时从最旧记录开始裁剪并标记 `truncated`。文件只保存在用户选定位置，不自动上传或发送。
+
+导出记录使用显式字段白名单。主日志只允许时间、级别、scope、operation、outcome、耗时、correlation ID 和有限错误 code / expected / message；Provider 日志只允许时间、event、phase 和有限 message。已知用户目录与应用状态目录必须替换为稳定占位符，其他绝对路径和常见凭证形态必须再次脱敏。无法解析或不满足白名单的行只计数并跳过；单条文本和每个日志文件读取尾部都必须有界。
+
+用户诊断文件不得读取或包含 Agent 审计日志、普通终端输入/输出、会话恢复与 checkpoint、Agent prompt/输出/对话、源码、完整环境变量、stack、details、未知日志字段、截图、crash dump 或操作系统全量日志。复制到剪贴板的诊断摘要只能包含相同快照中的应用与运行环境信息、收集计数及有界近期失败元数据，不能包含日志 message。
+
 ## 工程门禁
 
 `pnpm check:logging` 必须检查：

@@ -1,0 +1,142 @@
+.application-diagnostics-pane {
+  display: grid;
+  width: min(100%, 760px);
+  gap: 20px;
+}
+
+.application-diagnostics-pane__header {
+  display: grid;
+  gap: 8px;
+}
+
+.application-diagnostics-pane__header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.application-diagnostics-pane__header p,
+.application-diagnostics-action p,
+.application-diagnostics-pane__feedback {
+  margin: 0;
+  color: var(--cc-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.application-diagnostics-pane__privacy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 9px;
+  background: var(--cc-primary-wash);
+  padding: 10px 12px;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.application-diagnostics-pane__privacy svg {
+  flex: 0 0 auto;
+  color: var(--cc-primary);
+}
+
+.application-diagnostics-actions {
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  background: var(--cc-surface);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-sm);
+}
+
+.application-diagnostics-action {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 20px;
+}
+
+.application-diagnostics-action + .application-diagnostics-action {
+  border-top: 1px solid var(--cc-border);
+}
+
+.application-diagnostics-action h3 {
+  margin: 0 0 4px;
+  color: var(--cc-foreground);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.application-diagnostics-action button {
+  display: inline-flex;
+  min-width: 154px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 9px;
+  background: var(--cc-surface-raised);
+  padding: 0 13px;
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-xs);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 620;
+  transition:
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.application-diagnostics-action button:hover:not(:disabled) {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-wash);
+  color: var(--cc-primary);
+  transform: translateY(-1px);
+}
+
+.application-diagnostics-action button:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(0);
+}
+
+.application-diagnostics-action button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+
+.application-diagnostics-action button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.application-diagnostics-pane__feedback {
+  min-height: 20px;
+  color: var(--cc-success-strong);
+}
+
+.application-diagnostics-pane__feedback--error {
+  color: var(--cc-danger-strong);
+}
+
+@media (max-width: 720px) {
+  .application-diagnostics-action {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .application-diagnostics-action button {
+    justify-self: start;
+  }
+}
