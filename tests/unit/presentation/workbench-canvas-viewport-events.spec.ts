@@ -17,6 +17,7 @@ describe('workbench canvas viewport events', () => {
       synchronizeCanvasViewportFromMove({ viewport, ...projection })
       persistCanvasViewportFromMoveEnd({
         event: null,
+        isManagedViewportMove: true,
         isRestoringViewport: false,
         viewport,
         ...projection
@@ -85,6 +86,7 @@ describe('workbench canvas viewport events', () => {
       synchronizeCanvasViewportFromMove({ viewport, ...projection })
       persistCanvasViewportFromMoveEnd({
         event,
+        isManagedViewportMove: true,
         isRestoringViewport: false,
         viewport,
         ...projection
@@ -93,6 +95,25 @@ describe('workbench canvas viewport events', () => {
       expect(projection.onRasterZoomChange).toHaveBeenCalledWith(1.6)
       expect(projection.onRasterInteractionEnd).not.toHaveBeenCalled()
       expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
+      expect(projection.onViewportChange).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([null, undefined])(
+    'ends an unmanaged React Flow move with source event %s without persisting it',
+    (event) => {
+      const projection = createViewportProjection()
+      const viewport = { x: -120, y: 30, zoom: 1.6 }
+
+      synchronizeCanvasViewportFromMove({ viewport, ...projection })
+      persistCanvasViewportFromMoveEnd({
+        event,
+        isRestoringViewport: false,
+        viewport,
+        ...projection
+      })
+
+      expect(projection.onRasterInteractionEnd).toHaveBeenCalledExactlyOnceWith(viewport.zoom)
       expect(projection.onViewportChange).not.toHaveBeenCalled()
     }
   )

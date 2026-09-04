@@ -5,6 +5,7 @@ import {
   minimumCanvasZoom
 } from '../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
+import { applyWorkbenchViewport } from './workbenchViewportAdapter'
 import {
   browserViewportMotionFrameScheduler,
   type WorkbenchViewportMotionFrameScheduler
@@ -158,7 +159,7 @@ export function createWorkbenchDirectZoomController(
 
   const applyPresentation = (motion: ActiveDirectZoom, viewport: Viewport): Promise<boolean> => {
     const requestId = motion.requestId
-    return applyViewport(motion.instance, viewport).then((applied) => {
+    return applyWorkbenchViewport(motion.instance, viewport).then((applied) => {
       if (applied && isLatestRequest(motion.instance, requestId)) {
         presentationListeners.get(motion.instance)?.forEach((listener) => listener(viewport))
       }
@@ -343,17 +344,6 @@ function resolveAnchoredViewport(anchor: DirectZoomAnchor, zoom: number): Viewpo
 
 function clampZoomStops(zoomStops: number): number {
   return Math.min(Math.log2(maximumCanvasZoom), Math.max(Math.log2(minimumCanvasZoom), zoomStops))
-}
-
-async function applyViewport(
-  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-  viewport: Viewport
-): Promise<boolean> {
-  try {
-    return (await instance.setViewport(viewport, { duration: 0 })) !== false
-  } catch {
-    return false
-  }
 }
 
 const browserDirectZoomController = createWorkbenchDirectZoomController(

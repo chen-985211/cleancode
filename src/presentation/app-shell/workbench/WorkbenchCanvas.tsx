@@ -43,6 +43,7 @@ import {
 } from '../../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
 import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
+import { isApplyingWorkbenchViewport } from './viewport/workbenchViewportAdapter'
 import { useWorkbenchDirectZoom } from './viewport/useWorkbenchDirectZoom'
 import {
   centerCanvasViewportOnMinimapPoint,
@@ -223,6 +224,7 @@ export function WorkbenchCanvas({
   const isRestoringViewportRef = useRef(false)
   const onViewportChangeRef = useRef(onViewportChange)
   const terminalZoomRasterCoordinatorRef = useRef(terminalZoomRasterCoordinator)
+  const viewportMoveCompletionRef = useRef<'controller' | 'node-drag' | null>(null)
   const unsubscribeViewportMotionRef = useRef<(() => void) | null>(null)
   const templateInteraction = useBlockTemplateCanvasInteraction({
     arrangement: canvasArrangement.arrangement,
@@ -435,6 +437,9 @@ export function WorkbenchCanvas({
               }}
               onNodeDragStart={(event, node) => {
                 setIsQuickExecutionDropTarget(false)
+                if (viewportMoveCompletionRef.current === 'node-drag') {
+                  viewportMoveCompletionRef.current = null
+                }
                 activeDraggedNodeRef.current = node
                 canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
                 canvasArrangement.dragging.begin(event, node)
@@ -477,7 +482,13 @@ export function WorkbenchCanvas({
                   onNodeDragStop(event, node)
                 } finally {
                   activeDraggedNodeRef.current = null
-                  terminalZoomRasterCoordinator?.requestRasterAlignment()
+                  if (viewportMoveCompletionRef.current === 'node-drag') {
+                    terminalZoomRasterCoordinator?.endInteraction(
+                      reactFlowInstanceRef.current?.getZoom()
+                    )
+                  } else {
+                    terminalZoomRasterCoordinator?.requestRasterAlignment()
+                  }
                 }
               }}
               onMove={(_event, viewport) =>
@@ -489,6 +500,12 @@ export function WorkbenchCanvas({
                 })
               }
               onMoveStart={(event) => {
+                viewportMoveCompletionRef.current =
+                  !event && isApplyingWorkbenchViewport(reactFlowInstanceRef.current)
+                    ? 'controller'
+                    : activeDraggedNodeRef.current !== null
+                      ? 'node-drag'
+                      : null
                 terminalZoomRasterCoordinator?.beginInteraction()
                 if (event) {
                   cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
@@ -499,6 +516,7 @@ export function WorkbenchCanvas({
               onMoveEnd={(event, viewport) =>
                 persistCanvasViewportFromMoveEnd({
                   event,
+                  isManagedViewportMove: viewportMoveCompletionRef.current !== null,
                   isRestoringViewport: isRestoringViewportRef.current,
                   onRasterInteractionEnd: (zoom) =>
                     terminalZoomRasterCoordinator?.endInteraction(zoom),

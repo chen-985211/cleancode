@@ -35,6 +35,7 @@ export function synchronizeCanvasViewportFromMove({
 
 interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistence {
   readonly event: unknown
+  readonly isManagedViewportMove?: boolean
   readonly isRestoringViewport: boolean
   readonly onRasterInteractionEnd?: (zoom: number) => void
   readonly viewport: Viewport
@@ -42,16 +43,17 @@ interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistenc
 
 export function persistCanvasViewportFromMoveEnd({
   event,
+  isManagedViewportMove = false,
   isRestoringViewport,
   onRasterInteractionEnd,
   viewport,
   onViewportChange
 }: PersistCanvasViewportFromMoveEndInput): void {
-  // Programmatic frames also emit move-end. Their controllers report the
-  // completion of the whole motion through the subscription below.
-  if (!event) return
+  // Controller frames and node auto-pan have an explicit whole-motion end.
+  // Other React Flow moves (such as focus auto-pan) may also have no event.
+  if (isManagedViewportMove) return
   onRasterInteractionEnd?.(viewport.zoom)
-  if (isRestoringViewport) {
+  if (!event || isRestoringViewport) {
     return
   }
 
