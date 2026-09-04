@@ -30,6 +30,10 @@ import {
   type CodexThreadPrefixResolver
 } from './CodexThreadPrefixResolver'
 import { serializeCodexTomlString, serializeCodexTomlStringArray } from './CodexTomlConfiguration'
+import {
+  inspectCodexThreadResumability,
+  type CodexThreadResumabilityInspector
+} from './CodexThreadResumabilityInspector'
 
 export const codexInstallCommands = {
   linux: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
@@ -65,6 +69,7 @@ export interface CodexAgentProviderContributionOptions {
   readonly runtimePlatform?: NodeJS.Platform
   readonly telemetryFactory?: CodexTelemetryFactory
   readonly threadPrefixResolver?: CodexThreadPrefixResolver
+  readonly threadResumabilityInspector?: CodexThreadResumabilityInspector
 }
 
 export class CodexAgentProviderContribution implements AgentProviderContribution {
@@ -100,6 +105,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
     const baseArgs = options.baseArgs ?? []
     const runtimeExecutable = options.runtimeExecutable ?? process.execPath
     const runtimePlatform = options.runtimePlatform ?? process.platform
+    const inspectThread = options.threadResumabilityInspector ?? inspectCodexThreadResumability
     this.detector =
       options.detector ??
       new NodeAgentProviderCliDetector({
@@ -126,6 +132,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
       baseArgs,
       cleancodeCapability: this.cleancodeCapability,
       command,
+      inspectThread,
       resume: this.resume,
       telemetry: this.telemetry
     })
@@ -259,6 +266,7 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       readonly baseArgs: readonly string[]
       readonly cleancodeCapability: AgentCapabilityInjector
       readonly command: string
+      readonly inspectThread: CodexThreadResumabilityInspector
       readonly resume: AgentResumeStrategy
       readonly telemetry: CodexTelemetryContribution
     }
@@ -266,6 +274,18 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
 
   async createLaunchPlan(command: CreateAgentLaunchPlanCommand) {
     const executable = command.launchProfile?.executable ?? this.options.command
+    const resumeArgs = command.providerSessionRef
+      ? this.options.resume.createResumeArgs(command.providerSessionRef)
+      : []
+    const discardProviderSessionRef =
+      command.providerSessionRef !== undefined &&
+      (await this.options.inspectThread({
+        appServerArgs: [...this.options.baseArgs, ...(command.launchProfile?.arguments ?? [])],
+        environment: command.launchProfile?.environment ?? {},
+        executable,
+        threadId: resumeArgs[1]!,
+        workspaceDirectory: command.workspaceDirectory
+      })) === 'missing'
     const telemetry = await this.options.telemetry.prepareForExecutable(command, executable)
     const capability = command.cleancodeMcp
       ? await this.options.cleancodeCapability.inject({
@@ -277,9 +297,7 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       args: [
         ...this.options.baseArgs,
         ...(command.launchProfile?.arguments ?? []),
-        ...(command.providerSessionRef
-          ? this.options.resume.createResumeArgs(command.providerSessionRef)
-          : []),
+        ...(discardProviderSessionRef ? [] : resumeArgs),
         '--no-alt-screen',
         '-C',
         command.workspaceDirectory,
@@ -294,6 +312,7 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         ...telemetry.env,
         ...createAgentProviderLoopbackEnvironment()
       },
+      discardProviderSessionRef,
       executable,
       gracefulShutdown: {
         inputIntervalMs: 100,

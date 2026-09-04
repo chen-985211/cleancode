@@ -52,13 +52,17 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 
 文件系统仓储当前只接受 schema v5，每个 Agent 只有一个 `providerSessionRef`。旧 schema、未知 session ref 版本或畸形数据必须拒绝读取，不迁移或回写；产品尚未公开期间由新的应用状态代际生成全新数据。cleancode 不复制或解析 Provider 对话正文。
 
+Codex 的 title、完成回合 notify 和 `SessionEnd` Hook 上报的是已分配身份，UUID 存在不代表聊天记录已经保存。Agent 仍跟随并保存 CLI 最后报告的编号，包括 CLI 内切换到空 thread 的情况；是否可恢复由启动时的正式查询确认，不能因空 thread 尚无记录而继续恢复前一个 thread。
+
+Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时清除绑定并打开空白对话；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
+
 ## Provider contribution
 
 `AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：
 
 - `descriptor` 明确声明显示名称、经过约束的矢量图标、session-ref codec、resume、身份捕获、activity、launch instructions 和是否支持 CleanCode MCP。图标只允许有限 `viewBox`、路径数量、路径语法、填充和 fill rule；registry 在 composition root 注册时统一校验。
 - `detector` 返回 `installed`、`missing`、`upgrade_required` 或 `temporarily_unavailable` 的结构化诊断。
-- `launcher` 只返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本；使用 Provider 正式 session 参数时，可以同时返回待本次 launch 启动后确认的候选 session ref。
+- `launcher` 返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本；使用 Provider 正式 session 参数时，可以同时返回待本次 launch 启动后确认的候选 session ref。Provider 正式查询明确确认旧对话无保存记录时，launcher 可以声明清除旧引用并生成新对话参数；应用层负责清除持久化绑定和内存绑定，Provider 不直接写仓储。
 - `freshSession`、`resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
 - `AgentLaunchArtifactScope` 在资源创建后立即接管 reporter、临时配置和插件，按 LIFO 清理；并发清理合并为同一操作，成功项只清理一次，失败项保留给下次重试。
 

@@ -167,10 +167,7 @@ export class AgentSessionService {
     if (existingSession?.isTerminalRunning) {
       existingSession.callbacks = createAgentSessionCallbacks(command)
       if (command.restartMode === 'new' && existingSession.shouldPersist) {
-        await this.persistence.waitForIdle()
-        await this.sessionRepository.delete(scope)
-        existingSession.providerSessionRef = null
-        transitionAgentRuntime(existingSession, { binding: 'unbound' })
+        await this.persistence.clear(existingSession)
       }
       existingSession.isStopping = false
       this.toolInvocations.reopenSession(existingSession.sessionId)
@@ -597,12 +594,13 @@ export class AgentSessionService {
       provider,
       session
     })
-    if (!canLaunchAgentProvider(session, processSessionId)) {
-      managedActivity.recordExit()
-      await disposeAgentLaunchArtifacts(session)
-      return
-    }
     try {
+      if (plan.discardProviderSessionRef) await this.persistence.clear(session)
+      if (!canLaunchAgentProvider(session, processSessionId)) {
+        managedActivity.recordExit()
+        await disposeAgentLaunchArtifacts(session)
+        return
+      }
       const lifecycle = createAgentLaunchRuntimeController({
         attempt: providerLaunchGeneration,
         onStartedAccepted: () => {

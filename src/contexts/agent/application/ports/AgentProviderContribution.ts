@@ -110,6 +110,8 @@ interface AgentLaunchArtifactRegistrar {
 
 export interface AgentLaunchPlan {
   readonly args: readonly string[]
+  /** Set only when the Provider confirms the prior conversation has no saved record. */
+  readonly discardProviderSessionRef?: boolean
   readonly env: Readonly<Record<string, string>>
   readonly executable: string
   readonly gracefulShutdown?: {
