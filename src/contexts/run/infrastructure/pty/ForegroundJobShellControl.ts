@@ -143,6 +143,9 @@ function createPosixLaunchScript(
       '#!/bin/sh',
       "trap ':' INT",
       `printf '\\036CLEANCODE_JOB:${token}:started\\037'`,
+      ...(command.fallbackPath && !Object.hasOwn(command.environment, 'PATH')
+        ? [`export PATH="$PATH":${quotePosixShellWord(command.fallbackPath)}`]
+        : []),
       invocation,
       'cleancode_job_status=$?',
       `printf '%s\\n' "$cleancode_job_status" > ${quotePosixShellWord(statusPath)}`,

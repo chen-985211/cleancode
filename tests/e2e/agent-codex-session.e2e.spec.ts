@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import type { ElectronApplication, Page } from 'playwright'
+import { writeFile } from 'node:fs/promises'
 
 import {
   installFakeCodexCli,
@@ -72,6 +73,46 @@ describe('Codex Agent session e2e', () => {
       taskName: task.name
     })
   })
+
+  // Proves shutdown hooks, persisted Agent identity and restart launch agree across processes.
+  // The isolated CLI store and launch argv are the oracle; scenario teardown owns all resources.
+  it(
+    'reopens the same empty Agent without resuming an unmaterialized thread',
+    async () => {
+      await writeFile(fakeCodex.savedThreadsPath, '[]', 'utf8')
+      await configureCodexExecutable(page, fakeCodex.executablePath)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentProviderInstalled(page, 'codex')
+      await selectAgentProviderFromCreateMenu(page, 'Codex')
+      await waitForCodexLaunch(fakeCodex.reportPath, 1)
+      const agentId = await page
+        .locator('[data-agent-console-node]')
+        .getAttribute('data-agent-console-node')
+      expect(agentId).toBeTruthy()
+
+      await closeElectronApp(electronApp)
+      resources.electronApp = undefined
+      resources.page = undefined
+      await waitForCodexSessionEnd(fakeCodex.reportPath, fakeCodex.sessionId)
+      // The CLI has allocated an identity, but its transcript store is still empty.
+      await waitForCodexConversationBinding(workbench, fakeCodex.sessionId)
+
+      electronApp = await launchApp(workbench, {
+        environment: createAgentProviderEnvironment(fakeCodex)
+      })
+      resources.electronApp = electronApp
+      page = await electronApp.firstWindow()
+      resources.page = page
+      await page.waitForLoadState('domcontentloaded')
+      await waitForAgentCount(page, 1)
+      const restored = await waitForCodexLaunch(fakeCodex.reportPath, 2)
+      expect(restored.args).not.toContain('resume')
+      expect(
+        await page.locator('[data-agent-console-node]').getAttribute('data-agent-console-node')
+      ).toBe(agentId)
+    },
+    electronScenarioTimeoutMs
+  )
 
   it(
     'keeps the Agent WebGL surface visible while raising its backing density',

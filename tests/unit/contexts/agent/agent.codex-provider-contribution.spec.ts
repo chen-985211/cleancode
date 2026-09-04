@@ -21,6 +21,7 @@ describe('Codex Agent Provider contribution', () => {
   it('builds the existing resume, MCP, instruction, no-alt-screen and notify launch contract', async () => {
     const disposeTelemetry = vi.fn(async () => undefined)
     const contribution = new CodexAgentProviderContribution({
+      threadResumabilityInspector: async () => 'available',
       detector: {
         inspect: async () => ({
           providerId: 'codex',
@@ -140,6 +141,7 @@ describe('Codex Agent Provider contribution', () => {
   it('trusts only the discovered session-flags SessionEnd hook for the selected executable', async () => {
     const resolveHookTrust = vi.fn(async () => 'hooks.state={trusted-session-end-hook}')
     const contribution = new CodexAgentProviderContribution({
+      threadResumabilityInspector: async () => 'available',
       command: '/default/codex',
       hookTrustResolver: resolveHookTrust,
       telemetryFactory: async () => ({
@@ -196,6 +198,7 @@ describe('Codex Agent Provider contribution', () => {
       return null
     })
     const contribution = new CodexAgentProviderContribution({
+      threadResumabilityInspector: async () => 'available',
       hookTrustResolver: resolveHookTrust,
       runtimeExecutable: String.raw`C:\Program Files\CleanCode\node.exe`,
       runtimePlatform: 'win32',
@@ -241,6 +244,7 @@ describe('Codex Agent Provider contribution', () => {
 
   it('falls back to legacy notify when Codex cannot identify the temporary hook', async () => {
     const contribution = new CodexAgentProviderContribution({
+      threadResumabilityInspector: async () => 'available',
       hookTrustResolver: async () => {
         throw new Error('hooks/list unavailable')
       },
@@ -309,6 +313,7 @@ describe('Codex Agent Provider contribution', () => {
       return null
     })
     const contribution = new CodexAgentProviderContribution({
+      threadResumabilityInspector: async () => 'available',
       hookTrustResolver: resolveHookTrust,
       runtimeExecutable: process.execPath
     })

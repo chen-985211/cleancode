@@ -14,6 +14,41 @@ import {
 } from '../../../fixtures/agentTerminalRuntime'
 
 describe('Agent Provider session following', () => {
+  it('clears a confirmed missing binding and accepts the next durable identity', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const firstProviders = new RecordingAgentProviderRegistry()
+    await attachAgent(createSessionService(firstProviders, repository), 'agent-1')
+    const ref = {
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    }
+    firstProviders.launchCommands[0]!.onProviderSessionIdentified(ref)
+    await vi.waitFor(async () => {
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef
+      ).toMatchObject(ref)
+    })
+
+    const providers = new RecordingAgentProviderRegistry()
+    const originalLaunch = providers.contribution.launcher.createLaunchPlan
+    vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockImplementation(
+      async (command) => ({
+        ...(await originalLaunch(command)),
+        discardProviderSessionRef: true
+      })
+    )
+    await attachAgent(createSessionService(providers, repository), 'agent-1')
+    expect(await repository.findAgent('project-1', 'main', 'agent-1')).toBeNull()
+
+    providers.launchCommands[0]!.onProviderSessionIdentified(ref)
+    await vi.waitFor(async () => {
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef
+      ).toMatchObject(ref)
+    })
+  })
+
   it('resumes the last identified thread when an older persistence finishes late', async () => {
     const repository = new GatedAgentSessionRepository()
     const firstProviders = new RecordingAgentProviderRegistry()

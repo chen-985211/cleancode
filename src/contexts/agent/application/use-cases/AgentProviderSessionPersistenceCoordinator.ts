@@ -66,6 +66,14 @@ export class AgentProviderSessionPersistenceCoordinator {
     while (this.pending.size > 0) await Promise.all([...this.pending])
   }
 
+  async clear(session: ManagedAgentSession): Promise<void> {
+    await this.lanes.get(session)?.tail
+    if (session.shouldPersist) await this.repository.delete(session.scope)
+    this.lanes.delete(session)
+    session.providerSessionRef = null
+    transitionAgentRuntime(session, { binding: 'unbound' })
+  }
+
   private resolveLane(
     session: ManagedAgentSession,
     providerLaunchGeneration: number

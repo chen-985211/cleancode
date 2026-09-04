@@ -6,6 +6,7 @@ export interface FakeCodexCliFixture {
   readonly binDirectory: string
   readonly executablePath: string
   readonly reportPath: string
+  readonly savedThreadsPath: string
   readonly sessionId: string
   readonly switchSessionId: string
 }
@@ -37,11 +38,13 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   const binDirectory = join(fixtureDirectory, 'bin')
   const executablePath = join(binDirectory, process.platform === 'win32' ? 'codex.cmd' : 'codex')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
+  const savedThreadsPath = `${reportPath}.threads.json`
   const programPath = join(fixtureDirectory, 'codex.mjs')
   const sessionId = randomUUID()
   const switchSessionId = randomUUID()
 
   await mkdir(binDirectory, { recursive: true })
+  await writeFile(savedThreadsPath, JSON.stringify([sessionId, switchSessionId]), 'utf8')
   await writeFile(programPath, createFakeCodexProgram(), 'utf8')
   if (process.platform === 'win32') {
     await Promise.all([
@@ -57,7 +60,7 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
     await chmod(executablePath, 0o755)
   }
 
-  return { binDirectory, executablePath, reportPath, sessionId, switchSessionId }
+  return { binDirectory, executablePath, reportPath, savedThreadsPath, sessionId, switchSessionId }
 }
 
 export async function readFakeCodexCliReports(
@@ -81,7 +84,7 @@ export async function readFakeCodexCliReports(
 
 function createFakeCodexProgram(): string {
   return `import { spawn } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 
 const CSI = '\\x1b['
 const OSC = '\\x1b]'
@@ -182,6 +185,18 @@ function handleAppServerRequest(line) {
           ],
       nextCursor: archived || !firstPage ? null : 'switch-session'
     })
+    return
+  }
+  if (request.method === 'thread/read') {
+    const threadId = request.params?.threadId
+    const savedThreads = JSON.parse(readFileSync(reportPath + '.threads.json', 'utf8'))
+    if (savedThreads.includes(threadId)) {
+      writeProtocolResponse(request.id, { thread: { id: threadId } })
+    } else {
+      process.stdout.write(JSON.stringify({ id: request.id, error: {
+        code: -32600, message: 'thread not loaded: ' + threadId
+      } }) + '\\n')
+    }
     return
   }
   if (request.method !== 'hooks/list') return

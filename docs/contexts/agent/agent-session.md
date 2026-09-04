@@ -52,13 +52,19 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 
 文件系统仓储当前只接受 schema v5，每个 Agent 只有一个 `providerSessionRef`。旧 schema、未知 session ref 版本或畸形数据必须拒绝读取，不迁移或回写；产品尚未公开期间由新的应用状态代际生成全新数据。cleancode 不复制或解析 Provider 对话正文。
 
+Codex 的 title、完成回合 notify 和 `SessionEnd` Hook 上报的是已分配身份，UUID 存在不代表聊天记录已经保存。Agent 仍跟随并保存 CLI 最后报告的编号，包括 CLI 内切换到空 thread 的情况；是否可恢复由启动时的正式查询确认，不能因空 thread 尚无记录而继续恢复前一个 thread。
+
+Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时清除绑定并打开空白对话；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
+
+查询结果须等待查询进程关闭后再返回：先关闭标准输入，允许 CLI 及其启动器正常退出；有界等待超时后，Windows 终止本次查询的进程树。清理超时同样返回不可用，不能据此清除绑定。Windows 原生 CLI 由 Node 直接启动并拥有 JSON-RPC 标准流和原生参数；没有可执行扩展名的命令先通过短命 PowerShell 查询其真实路径，再直接启动原生文件，避免在协议管道中插入 PowerShell。脚本 shim 继续使用既有 PowerShell 启动方式。
+
 ## Provider contribution
 
 `AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：
 
 - `descriptor` 明确声明显示名称、经过约束的矢量图标、session-ref codec、resume、身份捕获、activity、launch instructions 和是否支持 CleanCode MCP。图标只允许有限 `viewBox`、路径数量、路径语法、填充和 fill rule；registry 在 composition root 注册时统一校验。
 - `detector` 返回 `installed`、`missing`、`upgrade_required` 或 `temporarily_unavailable` 的结构化诊断。
-- `launcher` 只返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本；使用 Provider 正式 session 参数时，可以同时返回待本次 launch 启动后确认的候选 session ref。
+- `launcher` 返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本；使用 Provider 正式 session 参数时，可以同时返回待本次 launch 启动后确认的候选 session ref。Provider 正式查询明确确认旧对话无保存记录时，launcher 可以声明清除旧引用并生成新对话参数；应用层负责清除持久化绑定和内存绑定，Provider 不直接写仓储。
 - `freshSession`、`resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
 - `AgentLaunchArtifactScope` 在资源创建后立即接管 reporter、临时配置和插件，按 LIFO 清理；并发清理合并为同一操作，成功项只清理一次，失败项保留给下次重试。
 
@@ -89,6 +95,8 @@ registry 是完整支持 catalog 的唯一来源。列出 descriptor 不执行 C
 
 macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首次检查前，环境适配器通过当前 POSIX shell 的交互式 login invocation 获取 `PATH`，把去重后的 shell 路径优先合并到当前进程环境；显式刷新会重新探测。探测超时、输出无标记、启动或退出失败时安全保留继承环境，不得因此把任意输出写入 PATH。Windows 不运行 POSIX hydration，继续由参数边界明确的 PowerShell detector 兼容 npm `.cmd` shim。
 
+独立 Terminal Provider 可能早于检测启动，也可能从上次应用运行继续存活，不能把更新主进程环境视为已经更新 PTY 环境。`RunAgentTerminalRuntimeAdapter` 在每次创建 POSIX Agent terminal 时，把当前检测环境中的非空 `PATH` 通过 Run 的显式 environment 参数传递；每次 foreground launch 则重新读取路径并通过可选 `fallbackPath` 传递，不能在适配器构造时缓存路径，也不能覆盖存活 shell 的 PATH。Run 在本次前台子进程中把检测路径追加到实时继承的 PATH 后，保留 shell 启动配置、项目工具和后续激活虚拟环境的查找优先级。Provider launch plan 显式配置的 `PATH`（包括空值）完全优先，缺失或空的检测路径保留终端继承行为。该传递只补充 `PATH`，不复制主进程其他环境变量、不改写存活 shell 环境、不写用户 dotfile、不持久化路径，也不改变 Windows Profile 和大小写不敏感的环境覆盖规则。
+
 可创建发现按 registry 顺序检查完整 catalog，只返回 `installed` descriptor 及其版本快照；`missing`、`upgrade_required` 和 `temporarily_unavailable` 都不进入创建候选。新建选择器只消费该专用结果，不得先投影静态 catalog。用户选定后，`CreateWorkspaceAgentUseCase` 必须以 `refresh` 再检查一次；只有仍为 `installed` 才构造并保存稳定 Agent，状态已经变化时以 `AGENT_PROVIDER_UNAVAILABLE` 失败且不产生持久化事实。
 
 增加基础 Agent CLI 时，只需在 Provider 模块实现包含图标的 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。任意已注册 descriptor 都必须沿同一 Provider-neutral IPC 和 Presentation 投影；安装后会自动进入可创建发现，未安装时仍只存在于支持 catalog。新增 Provider 不得要求修改 `AgentConsole`、选择器或其他表现层组件。可选能力通过 contribution 增加；确需新的通用用户能力时，必须先扩展 capability 契约，并让所有现有 Provider 明确声明支持或诚实降级，不得在 Agent domain、Run domain、通用 IPC 或 Presentation 中按 Provider ID 分支。
@@ -107,7 +115,7 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 1. 建立 `projectId + workspaceId + agentId` 对话作用域，并重新确认项目、物理工作区目录和 Agent 定义仍有效。
 2. 按该稳定身份串行 attach、挂起、恢复、重配和释放，阻止迟到 renderer 命令穿过生命周期 lease。
 3. 读取稳定 Agent 的固定 Provider 和唯一 session ref；“新对话”先等待在途绑定保存，再清除该引用。
-4. 需要创建新 terminal 时，先通过共享可用性服务刷新固定 Provider 的检测环境并取得预检快照，保证 POSIX login-shell PATH 在 PTY 快照主进程环境之前完成水合；然后创建或复用 Run 的 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸。
+4. 需要创建新 terminal 时，先通过共享可用性服务刷新固定 Provider 的检测环境并取得预检快照，完成 POSIX login-shell PATH 水合；然后由 Agent terminal adapter 把路径快照显式传给 Run，创建或复用 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸；后续 foreground launch 把本次检测后的路径作为实时 shell PATH 的补充，已有同名工具仍按 shell 原有优先级选择。
 5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域；registration handle 精确拥有这一代注册，旧 handle 的释放或回调不能影响替代注册。
 6. 在生成 Provider 启动计划前验证固定 Provider；新 terminal 消费第 4 步的预检快照，既有 terminal 上的重新启动则刷新共享可用性结果。不可用时保留稳定 Agent 和既有 terminal 事实，但拒绝创建新的 Provider launch。
 7. Provider 生成启动计划；使用正式 session 参数的 Provider 可以同时给出候选 fresh session ref。Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`，候选引用在此之前不得持久化。
@@ -174,6 +182,8 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 | Platform / UI    | [`agentIpcHandlers.ts`](../../../src/platform/electron-main/agentIpcHandlers.ts)、[`AgentActivityObserver.tsx`](../../../src/contexts/agent/presentation/components/AgentActivityObserver.tsx)、[`AgentCanvasContextActions.tsx`](../../../src/contexts/agent/presentation/components/AgentCanvasContextActions.tsx)、[`agentActivityStore.ts`](../../../src/contexts/agent/presentation/view-models/agentActivityStore.ts)、[`AgentConsole.tsx`](../../../src/presentation/app-shell/workbench/nodes/agent/AgentConsole.tsx)                                                   |
 
 ## 验证矩阵
+
+PATH 的跨进程回归由 [`agent.terminal-provider-path.spec.ts`](../../../tests/integration/contexts/agent/agent.terminal-provider-path.spec.ts) 使用隔离登录配置、真实 Provider RPC 和 bash/zsh PTY 验证：后台先启动后检测、仅登录配置含 CLI 路径、项目工具与后续激活目录优先、刷新后补充新 CLI、显式覆盖与空值、带空格与单引号的目录，以及 CLI 退出后手动调用。跨平台继承、缺失路径和显式空值等边界由 [`agent.terminal-environment.spec.ts`](../../../tests/contract/contexts/agent/agent.terminal-environment.spec.ts) 覆盖。
 
 | 层级        | 证明内容                                                                                                                                  | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

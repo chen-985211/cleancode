@@ -9,8 +9,16 @@ import type { TerminalSessionSnapshot } from '../../../run/application/dto/Termi
 export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort {
   private readonly terminals = new Map<string, TerminalSessionSnapshot>()
   private readonly titleObservers = new Map<string, { readonly accept: (title: string) => void }>()
+  private readonly environment: NodeJS.ProcessEnv
+  private readonly platform: NodeJS.Platform
 
-  constructor(private readonly terminalSessions: TerminalSessionService) {}
+  constructor(
+    private readonly terminalSessions: TerminalSessionService,
+    options: { readonly environment?: NodeJS.ProcessEnv; readonly platform?: NodeJS.Platform } = {}
+  ) {
+    this.environment = options.environment ?? process.env
+    this.platform = options.platform ?? process.platform
+  }
 
   async open(command: OpenAgentTerminalCommand) {
     const existing = this.terminals.get(command.sessionId)
@@ -18,6 +26,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
 
     const terminal = await this.terminalSessions.start({
       columns: command.columns,
+      environment: this.posixPath ? { PATH: this.posixPath } : {},
       gitBranch: command.gitBranch,
       onExit: (event) => {
         if (this.terminals.get(command.sessionId)?.sessionId !== event.sessionId) return
@@ -72,6 +81,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
         args: command.plan.args,
         environment: command.plan.env,
         executable: command.plan.executable,
+        fallbackPath: this.posixPath,
         onExit: (event) => {
           if (observer && this.titleObservers.get(command.sessionId) === observer) {
             this.titleObservers.delete(command.sessionId)
@@ -115,6 +125,12 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
   releaseApplicationShutdown(): void {
     this.terminals.clear()
     this.titleObservers.clear()
+  }
+
+  private get posixPath(): string | undefined {
+    // Read each time: Electron can refresh detection after the detached Run
+    // provider or interactive shell starts. Foreground jobs retain shell priority.
+    return this.platform === 'win32' ? undefined : this.environment.PATH || undefined
   }
 
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {
