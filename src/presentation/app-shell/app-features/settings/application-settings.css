@@ -173,6 +173,7 @@
 }
 
 .application-settings-pane-transition {
+  position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
@@ -184,10 +185,17 @@
   display: grid;
   width: 100%;
   min-width: 0;
+  align-content: start;
   grid-area: pane;
   justify-items: center;
   opacity: var(--application-settings-pane-motion-opacity, 1);
   transform: translate3d(var(--application-settings-pane-motion-x, 0), 0, 0);
+}
+
+.application-settings-pane-transition__layer--overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .application-settings-pane-transition[data-application-settings-pane-direction]:not(

@@ -230,6 +230,8 @@ describe('application settings', () => {
     expect(transition).toHaveAttribute('data-application-settings-pane-direction', 'forward')
     expect(currentPane).toHaveAttribute('data-application-settings-pane', 'terminal')
     expect(outgoingPane).toHaveAttribute('data-application-settings-pane', 'shortcuts')
+    expect(outgoingPane).toHaveClass('application-settings-pane-transition__layer--overlay')
+    expect(currentPane).not.toHaveClass('application-settings-pane-transition__layer--overlay')
     expect(outgoingPane).toHaveAttribute('aria-hidden', 'true')
     expect(outgoingPane).toHaveAttribute('inert')
     expect(selectionIndicator).toHaveAttribute('data-selection-motion-target', 'terminal')
