@@ -1,5 +1,5 @@
 // Cap the last tier at the canvas limit supplied by the presentation shell.
-export const terminalRasterScaleLevels = [1, 1.25, 1.5, 1.75] as const
+export const terminalRasterScaleLevels = [1, 1.15, 1.3, 1.45, 1.6] as const
 
 export type TerminalRasterScale = number
 
@@ -26,7 +26,8 @@ export function resolveTerminalRasterScale({
   if (
     desiredScale < currentScale &&
     lowerBoundary !== undefined &&
-    canvasZoom > lowerBoundary - terminalRasterDowngradeHysteresis
+    // Decimal tiers such as 1.15 must downgrade at exactly 1.10 as well.
+    canvasZoom > lowerBoundary - terminalRasterDowngradeHysteresis + Number.EPSILON
   ) {
     return currentScale
   }

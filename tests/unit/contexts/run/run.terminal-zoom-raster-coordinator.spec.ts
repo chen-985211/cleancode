@@ -31,7 +31,10 @@ describe('terminal zoom raster coordinator', () => {
   it.each([
     [0.35, 1],
     [0.77, 1],
-    [1.49, 1.5],
+    [1.14, 1.15],
+    [1.29, 1.3],
+    [1.44, 1.45],
+    [1.49, 1.6],
     [1.6, 1.6]
   ])('covers settled zoom %s from either direction', (zoom, scale) => {
     vi.useFakeTimers()
@@ -135,14 +138,16 @@ describe('terminal zoom raster coordinator', () => {
     const coordinator = new TerminalZoomRasterCoordinator({ scheduler, maximumRasterScale: 1.6 })
     const target = createTarget('terminal', 'focused')
     coordinator.register(target)
-    for (const zoom of [0.35, 0.5, 0.77, 1, 1.1, 1.24, 1.26, 1.49, 1.51, 1.6, 1.49, 1.6]) {
+    for (const zoom of [
+      0.35, 0.5, 0.77, 1, 1.01, 1.14, 1.16, 1.29, 1.31, 1.44, 1.46, 1.6, 1.44, 1.6
+    ]) {
       coordinator.beginInteraction()
       coordinator.endInteraction(zoom)
       scheduler.runAllIdle()
       vi.advanceTimersByTime(1_100)
       scheduler.runAllIdle()
     }
-    expect(target.appliedScales).toEqual([1.25, 1.5, 1.6])
+    expect(target.appliedScales).toEqual([1.15, 1.3, 1.45, 1.6])
   })
 
   it('realigns immediately but retains high resolution during the downgrade grace period', () => {
@@ -197,14 +202,14 @@ describe('terminal zoom raster coordinator', () => {
       const focused = createTarget('focused', 'focused')
       coordinator.register(retained)
       coordinator.register(focused)
-      coordinator.endInteraction(1.3)
+      coordinator.endInteraction(1.4)
       scheduler.runNextIdle()
       if (budget === 400) {
-        expect(retained.appliedScales).toEqual([1.25])
+        expect(retained.appliedScales).toEqual([1.3])
         expect(focused.appliedScales).toEqual([])
       } else {
         expect(retained.appliedScales).toEqual([])
-        expect(focused.appliedScales).toEqual([1.5])
+        expect(focused.appliedScales).toEqual([1.45])
       }
       scheduler.runAllIdle()
       expect(
@@ -213,8 +218,8 @@ describe('terminal zoom raster coordinator', () => {
       ).toBeLessThanOrEqual(budget)
       vi.advanceTimersByTime(1_000)
       scheduler.runAllIdle()
-      expect(retained.getRasterScale()).toBe(budget === 400 ? 1.25 : 1.5)
-      expect(focused.getRasterScale()).toBe(1.5)
+      expect(retained.getRasterScale()).toBe(budget === 400 ? 1.3 : 1.45)
+      expect(focused.getRasterScale()).toBe(1.45)
     }
   )
 
@@ -344,8 +349,8 @@ describe('terminal zoom raster coordinator', () => {
     scheduler.runAllIdle()
 
     expect(focused.appliedScales).toEqual([1.6])
-    expect(firstVisible.appliedScales).toEqual([1.25])
-    expect(secondVisible.appliedScales).toEqual([1.25])
+    expect(firstVisible.appliedScales).toEqual([1.3])
+    expect(secondVisible.appliedScales).toEqual([1.3])
     expect(
       [focused, firstVisible, secondVisible].reduce(
         (total, target) => total + target.getRasterCost(target.getRasterScale()),
@@ -378,7 +383,7 @@ describe('terminal zoom raster coordinator', () => {
     expect(second.appliedScales).toEqual([])
 
     scheduler.runNextIdle({ timeRemaining: () => 10 })
-    expect(second.appliedScales).toEqual([1.25])
+    expect(second.appliedScales).toEqual([1.3])
   })
 
   it('cancels upgrades that depend on a permanently failed backing-store release', () => {
@@ -425,7 +430,7 @@ describe('terminal zoom raster coordinator', () => {
     vi.advanceTimersByTime(100)
     scheduler.runAllIdle()
 
-    expect(target.appliedScales).toEqual([1.6, 1.25])
+    expect(target.appliedScales).toEqual([1.6, 1.3])
     expect(target.getRasterCost(target.getRasterScale())).toBeLessThanOrEqual(360)
   })
 
@@ -453,7 +458,7 @@ describe('terminal zoom raster coordinator', () => {
       scheduler,
       onRasterFailure: ({ error }) => failures.push(error)
     })
-    const target = createTarget('terminal', 'focused', 1.5, {
+    const target = createTarget('terminal', 'focused', 1.45, {
       shouldFail: (scale) => scale === 1.6
     })
     coordinator.updateCanvasZoom(1.6)

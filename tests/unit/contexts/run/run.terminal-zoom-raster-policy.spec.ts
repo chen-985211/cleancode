@@ -5,14 +5,19 @@ describe('terminal zoom raster policy', () => {
     [0.35, 1],
     [0.5, 1],
     [0.77, 1],
+    [0.99, 1],
     [1, 1],
-    [1.01, 1.25],
-    [1.24, 1.25],
-    [1.25, 1.25],
-    [1.26, 1.5],
-    [1.49, 1.5],
-    [1.5, 1.5],
-    [1.51, 1.6],
+    [1.01, 1.15],
+    [1.1, 1.15],
+    [1.15, 1.15],
+    [1.150001, 1.3],
+    [1.2, 1.3],
+    [1.3, 1.3],
+    [1.300001, 1.45],
+    [1.33, 1.45],
+    [1.45, 1.45],
+    [1.450001, 1.6],
+    [1.5, 1.6],
     [1.6, 1.6]
   ])('covers zoom %s with a stable raster tier %s', (canvasZoom, expectedScale) => {
     expect(resolveTerminalRasterScale({ canvasZoom, currentScale: 1, maximumScale: 1.6 })).toBe(
@@ -21,13 +26,22 @@ describe('terminal zoom raster policy', () => {
   })
 
   it.each([
-    [1, 1.25, 1.25],
-    [0.96, 1.25, 1.25],
-    [0.94, 1.25, 1],
-    [1.24, 1.5, 1.5],
-    [1.19, 1.5, 1.25],
-    [1.49, 1.6, 1.6],
-    [1.44, 1.6, 1.5]
+    [1, 1.15, 1.15],
+    [0.96, 1.15, 1.15],
+    [0.95, 1.15, 1],
+    [0.94, 1.15, 1],
+    [1.14, 1.3, 1.3],
+    [1.100001, 1.3, 1.3],
+    [1.1, 1.3, 1.15],
+    [1.09, 1.3, 1.15],
+    [1.29, 1.45, 1.45],
+    [1.250001, 1.45, 1.45],
+    [1.25, 1.45, 1.3],
+    [1.24, 1.45, 1.3],
+    [1.44, 1.6, 1.6],
+    [1.400001, 1.6, 1.6],
+    [1.4, 1.6, 1.45],
+    [1.39, 1.6, 1.45]
   ])(
     'avoids a downgrade near a tier boundary at zoom %s',
     (canvasZoom, currentScale, expectedScale) => {
@@ -54,7 +68,7 @@ describe('terminal zoom raster policy', () => {
   )
 
   it('bounds unsupported zooms without an unbounded backing allocation', () => {
-    expect(resolveTerminalRasterScale({ canvasZoom: 3 })).toBe(1.75)
+    expect(resolveTerminalRasterScale({ canvasZoom: 3 })).toBe(1.6)
     expect(resolveTerminalRasterScale({ canvasZoom: 0.01 })).toBe(1)
   })
 })

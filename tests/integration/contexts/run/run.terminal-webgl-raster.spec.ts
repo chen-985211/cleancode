@@ -55,9 +55,12 @@ describe.each([1, 1.25, 1.5, 2])(
           { zoom: 0.35, rasterScale: 1, columns: 60, theme: 'light' },
           { zoom: 0.77, rasterScale: 1, columns: 60, theme: 'light' },
           { zoom: 1, rasterScale: 1, columns: 60, theme: 'dark' },
-          { zoom: 1.25, rasterScale: 1.25, columns: 79, theme: 'dark' },
-          { zoom: 1.1, rasterScale: 1.25, columns: 60, theme: 'light' },
-          { zoom: 1.4, rasterScale: 1.5, columns: 79, theme: 'dark' },
+          { zoom: 1.15, rasterScale: 1.15, columns: 79, theme: 'dark' },
+          { zoom: 1.1, rasterScale: 1.15, columns: 60, theme: 'light' },
+          { zoom: 1.3, rasterScale: 1.3, columns: 60, theme: 'light' },
+          { zoom: 1.2, rasterScale: 1.3, columns: 79, theme: 'dark' },
+          { zoom: 1.45, rasterScale: 1.45, columns: 79, theme: 'dark' },
+          { zoom: 1.4, rasterScale: 1.45, columns: 79, theme: 'dark' },
           { zoom: 0.77, rasterScale: 1.6, columns: 60, theme: 'light' },
           { zoom: 1.4, rasterScale: 1.6, columns: 79, theme: 'dark' }
         ] as const
@@ -87,12 +90,17 @@ describe.each([1, 1.25, 1.5, 2])(
           expect(projection.columns).toBe(columns)
           expect(projection.rows).toBe(10)
           expect(projection.preservesScreenGeometry).toBe(true)
-          expect(projection.backingWidth).toBe(
-            Math.round(projection.screenWidth * deviceScaleFactor * rasterScale)
-          )
-          expect(projection.backingHeight).toBe(
-            Math.round(projection.screenHeight * deviceScaleFactor * rasterScale)
-          )
+          // Half-pixel ties can round either way depending on multiplication
+          // order (for example 180 * 1.5 * 1.45). Require the nearest pixel;
+          // matched raster/display dimensions below must still be identical.
+          for (const [backing, physical] of [
+            [projection.backingWidth, projection.screenWidth * deviceScaleFactor * rasterScale],
+            [projection.backingHeight, projection.screenHeight * deviceScaleFactor * rasterScale]
+          ]) {
+            expect(Math.abs(backing - physical)).toBeLessThanOrEqual(
+              0.5 + Number.EPSILON * physical
+            )
+          }
           if (zoom === rasterScale) {
             expect(projection.backingWidth).toBe(
               Math.round(projection.displayWidth * deviceScaleFactor)

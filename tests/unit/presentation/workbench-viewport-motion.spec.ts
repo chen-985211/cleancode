@@ -206,11 +206,38 @@ describe('workbench viewport motion', () => {
     expect(viewport).toEqual({ x: 10, y: 20, zoom: 0.8 })
     expect(fitView).toEqual(fittedView)
     expect(fitBounds).toEqual(fittedBounds)
-    expect(zoomIn).toEqual({ x: -96, y: -64, zoom: 1.2 })
-    expect(zoomOut.x).toBe(80)
-    expect(zoomOut.y).toBeCloseTo(160 / 3)
-    expect(zoomOut.zoom).toBeCloseTo(5 / 6)
+    expect(zoomIn).toEqual({ x: -144, y: -96, zoom: 1.3 })
+    expect(zoomOut).toEqual({ x: 144, y: 96, zoom: 0.7 })
   })
+
+  it.each([
+    { type: 'zoom-out', zoom: 0.4, expectedZoom: 0.35 },
+    { type: 'zoom-out', zoom: 0.35, expectedZoom: 0.35 },
+    { type: 'zoom-out', zoom: 1.33, expectedZoom: 1.03 },
+    { type: 'zoom-in', zoom: 1.45, expectedZoom: 1.6 },
+    { type: 'zoom-in', zoom: 1.6, expectedZoom: 1.6 },
+    { type: 'zoom-in', zoom: 0.35, expectedZoom: 0.65 },
+    { type: 'zoom-in', zoom: 1.07, expectedZoom: 1.37 }
+  ] as const)(
+    '$type from $zoom changes zoom by 30 percentage points within the canvas limits',
+    ({ type, zoom, expectedZoom }) => {
+      const center = { x: 1_250, y: -850 }
+      const canvasSize = { height: 640, width: 960 }
+      const currentViewport = viewportCenteredOn(center, zoom, canvasSize)
+      const instance = {
+        getViewport: () => currentViewport
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+
+      const target = resolveWorkbenchViewportCommandTarget(instance, {
+        intent: { type: 'quick' },
+        type
+      })
+
+      expect(target.zoom).toBeCloseTo(expectedZoom, 12)
+      expect((canvasSize.width / 2 - target.x) / target.zoom).toBeCloseTo(center.x, 12)
+      expect((canvasSize.height / 2 - target.y) / target.zoom).toBeCloseTo(center.y, 12)
+    }
+  )
 })
 
 function viewportCenteredOn(

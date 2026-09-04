@@ -245,9 +245,9 @@ export function resolveWorkbenchViewportCommandTarget(
     case 'set-viewport':
       return command.viewport
     case 'zoom-in':
-      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, 1.2)
+      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, 0.3)
     case 'zoom-out':
-      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, 1 / 1.2)
+      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, -0.3)
   }
 }
 

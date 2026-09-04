@@ -7,6 +7,41 @@ import {
 } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
+  it.each([
+    { type: 'zoom-out', zooms: [1.6, 1.3, 1, 0.7, 0.4, 0.35] },
+    { type: 'zoom-in', zooms: [1, 1.3, 1.6] }
+  ] as const)(
+    'settles successive $type commands in 30 percentage point steps',
+    async ({ type, zooms }) => {
+      const frames = new TestFrameScheduler()
+      const controller = createWorkbenchViewportMotionController(frames)
+      const canvasSize = { height: 640, width: 960 }
+      const center = { x: 1_250, y: -850 }
+      const instance = createViewportInstance(centeredViewport(center, zooms[0], canvasSize))
+
+      for (const zoom of zooms.slice(1)) {
+        const completion = controller.transition(instance.value, {
+          intent: { type: 'quick' },
+          type
+        })
+        frames.finish()
+
+        await expect(completion).resolves.toBe(true)
+        expect(instance.viewport.zoom).toBeCloseTo(zoom, 12)
+        expect((canvasSize.width / 2 - instance.viewport.x) / instance.viewport.zoom).toBeCloseTo(
+          center.x,
+          12
+        )
+        expect((canvasSize.height / 2 - instance.viewport.y) / instance.viewport.zoom).toBeCloseTo(
+          center.y,
+          12
+        )
+        expect(frames.pendingCount).toBe(0)
+        expect(frames.pendingTimeoutCount).toBe(0)
+      }
+    }
+  )
+
   it('exposes the live presentation while the renderer viewport is still stale', async () => {
     const frames = new TestFrameScheduler()
     const controller = createWorkbenchViewportMotionController(frames)
