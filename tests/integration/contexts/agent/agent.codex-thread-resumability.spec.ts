@@ -42,7 +42,9 @@ describe('Codex persisted thread inspection', () => {
       )
       expect(await realpath(invocation.executable)).toBe(await realpath(process.execPath))
       expect(invocation.args).toEqual(providerArgs)
-    }
+    },
+    // The lookup owns a bounded Windows CLI discovery process with a 10 s deadline.
+    12_000
   )
 
   it.each([
