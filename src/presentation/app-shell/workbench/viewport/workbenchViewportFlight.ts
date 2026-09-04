@@ -15,6 +15,16 @@ const flightThresholdInViewports = 0.35
 const flightZoomStopsPerViewport = 0.28
 const maximumFlightZoomStops = 0.75
 
+export function resolveWorkbenchViewportFlight(
+  currentViewport: Viewport,
+  targetViewport: Viewport,
+  intent: { readonly type: string; readonly canvasSize?: WorkbenchCanvasSize }
+): WorkbenchViewportFlight | null {
+  return intent.type === 'adaptive-focus' && intent.canvasSize
+    ? createWorkbenchViewportFlight(currentViewport, targetViewport, intent.canvasSize)
+    : null
+}
+
 export function createWorkbenchViewportFlight(
   currentViewport: Viewport,
   targetViewport: Viewport,

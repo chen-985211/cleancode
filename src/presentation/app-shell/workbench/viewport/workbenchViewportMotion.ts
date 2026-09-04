@@ -14,7 +14,7 @@ import {
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
 import {
-  createWorkbenchViewportFlight,
+  resolveWorkbenchViewportFlight,
   resolveWorkbenchViewportFlightPresentation,
   type WorkbenchViewportFlight
 } from './workbenchViewportFlight'
@@ -81,6 +81,7 @@ export type WorkbenchViewportMotionPresentationListener = (viewport: Viewport) =
 export interface WorkbenchViewportMotionController {
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
   readonly readPresentation: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => Viewport
+  readonly readTargetZoom: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => number
   readonly setReducedMotion: (
     reducedMotion: boolean,
     instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
@@ -288,11 +289,16 @@ export function createWorkbenchViewportMotionController(
   let latestRequest: {
     readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
     readonly requestId: number
+    readonly targetZoom: number
   } | null = null
   let nextRequestId = 1
 
   const readPresentation = (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>): Viewport =>
     activeMotion?.instance === instance ? activeMotion.presentation : instance.getViewport()
+
+  // Focus policy inherits the intended zoom, never a temporary flight zoom-out.
+  const readTargetZoom = (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>): number =>
+    latestRequest?.instance === instance ? latestRequest.targetZoom : instance.getViewport().zoom
 
   const cancelMotionSchedule = (motion: ActiveViewportMotion): void => {
     if (motion.frameId !== null) {
@@ -492,7 +498,7 @@ export function createWorkbenchViewportMotionController(
 
     if (transitionOptions.response === undefined) {
       cancelActiveMotion()
-      latestRequest = { instance, requestId }
+      latestRequest = { instance, requestId, targetZoom: target.zoom }
       return applyPresentedViewport(instance, target).then((applied) =>
         completeRequest(instance, requestId, applied, { intent: command.intent, viewport: target })
       )
@@ -513,7 +519,11 @@ export function createWorkbenchViewportMotionController(
         activeMotion.centerX = { value: camera.centerX, velocity: cameraVelocity.centerX }
         activeMotion.centerY = { value: camera.centerY, velocity: cameraVelocity.centerY }
         activeMotion.elapsedMilliseconds = 0
-        activeMotion.flight = resolveViewportFlight(currentViewport, target, command.intent)
+        activeMotion.flight = resolveWorkbenchViewportFlight(
+          currentViewport,
+          target,
+          command.intent
+        )
         activeMotion.flightProgress = { value: 0, velocity: 0 }
         activeMotion.intent = command.intent
         activeMotion.lastTimestamp = scheduler.now()
@@ -526,21 +536,21 @@ export function createWorkbenchViewportMotionController(
           value: camera.zoomStops,
           velocity: cameraVelocity.zoomStops
         }
-        latestRequest = { instance, requestId }
+        latestRequest = { instance, requestId, targetZoom: target.zoom }
         scheduleNextFrame()
         scheduleMotionDeadline(activeMotion)
         return
       }
 
       cancelActiveMotion()
-      latestRequest = { instance, requestId }
+      latestRequest = { instance, requestId, targetZoom: target.zoom }
       const camera = resolveWorkbenchViewportCamera(currentViewport, canvasSize)
       activeMotion = {
         canvasSize,
         centerX: { value: camera.centerX, velocity: 0 },
         centerY: { value: camera.centerY, velocity: 0 },
         elapsedMilliseconds: 0,
-        flight: resolveViewportFlight(currentViewport, target, command.intent),
+        flight: resolveWorkbenchViewportFlight(currentViewport, target, command.intent),
         flightProgress: { value: 0, velocity: 0 },
         frameId: null,
         instance,
@@ -572,6 +582,7 @@ export function createWorkbenchViewportMotionController(
   return {
     cancel,
     readPresentation,
+    readTargetZoom,
     setReducedMotion,
     subscribe,
     subscribePresentation,
@@ -595,6 +606,12 @@ export function readWorkbenchViewportPresentation(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
 ): Viewport {
   return browserViewportMotionController.readPresentation(instance)
+}
+
+export function readWorkbenchViewportTargetZoom(
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+): number {
+  return browserViewportMotionController.readTargetZoom(instance)
 }
 
 export function cancelWorkbenchViewportMotion(
@@ -648,16 +665,6 @@ function isMotionSettled(motion: ActiveViewportMotion): boolean {
         value: flightProgressValueSettlement
       }))
   )
-}
-
-function resolveViewportFlight(
-  currentViewport: Viewport,
-  targetViewport: Viewport,
-  intent: WorkbenchViewportMotionIntent
-): WorkbenchViewportFlight | null {
-  return intent.type === 'adaptive-focus'
-    ? createWorkbenchViewportFlight(currentViewport, targetViewport, intent.canvasSize)
-    : null
 }
 
 function resolvePresentationVelocity(

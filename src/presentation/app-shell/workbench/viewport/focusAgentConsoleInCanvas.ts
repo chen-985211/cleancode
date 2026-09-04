@@ -13,6 +13,7 @@ import {
 } from '../creation/workbenchNodeInputActivation'
 import {
   transitionWorkbenchViewport,
+  readWorkbenchViewportTargetZoom,
   type WorkbenchViewportCommand,
   type WorkbenchViewportMotionIntent
 } from './workbenchViewportMotion'
@@ -114,7 +115,9 @@ function revealNavigatedAgentConsole({
   readonly targetCenter: { readonly x: number; readonly y: number }
   readonly targetZoom?: number
 }): Promise<boolean> {
-  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), workbenchNodeReadableZoom)
+  const nextZoom =
+    targetZoom ??
+    Math.max(readWorkbenchViewportTargetZoom(reactFlowInstance), workbenchNodeReadableZoom)
   const command = {
     center: targetCenter,
     intent: motion,

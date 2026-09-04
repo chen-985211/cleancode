@@ -150,11 +150,14 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
       const terminal = page.locator('.agent-terminal-viewport').first()
-      await page.waitForFunction(
-        () =>
-          document.querySelector<HTMLElement>('.agent-terminal-viewport')?.dataset
-            .terminalRendererReady === 'true'
-      )
+      await page.waitForFunction(() => {
+        const viewport = document.querySelector<HTMLElement>('.agent-terminal-viewport')
+        const cellWidth = viewport
+          ?.querySelector('.xterm-helper-textarea')
+          ?.getBoundingClientRect().width
+        // Renderer activation can finish before xterm paints its first cell geometry.
+        return viewport?.dataset.terminalRendererReady === 'true' && (cellWidth ?? 0) > 0
+      })
 
       const rightInsets = await terminal.evaluate((element) => {
         const terminalElement = element as HTMLElement

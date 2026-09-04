@@ -16,7 +16,11 @@ import {
   resolveWorkbenchNodeFocusZoom,
   resolveWorkbenchNodeSize
 } from '../../workbench/viewport/workbenchNodeFocusViewport'
-import { transitionWorkbenchViewport } from '../../workbench/viewport/workbenchViewportMotion'
+import {
+  readWorkbenchViewportPresentation,
+  readWorkbenchViewportTargetZoom,
+  transitionWorkbenchViewport
+} from '../../workbench/viewport/workbenchViewportMotion'
 
 interface UseApplicationShortcutNavigationInput {
   readonly activateWorkbenchNodeInput: (node: WorkbenchFlowNode) => void
@@ -81,7 +85,7 @@ export function useApplicationShortcutNavigation({
         return
       }
 
-      const viewport = instance.getViewport()
+      const viewport = readWorkbenchViewportPresentation(instance)
       const currentSelectedNodeId = selectedNodeIdRef.current
       const target = resolveDirectionalWorkbenchNode(
         getNodes(),
@@ -103,7 +107,7 @@ export function useApplicationShortcutNavigation({
       const center = resolveWorkbenchNodeCenter(target)
       const zoom = resolveWorkbenchNodeFocusZoom({
         canvasSize: canvasSizeRef.current,
-        currentZoom: viewport.zoom,
+        currentZoom: readWorkbenchViewportTargetZoom(instance),
         nodeSize: resolveWorkbenchNodeSize(target)
       })
       const transitionCompletion = transitionWorkbenchViewport(instance, {

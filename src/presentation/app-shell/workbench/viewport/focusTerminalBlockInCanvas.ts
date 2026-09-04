@@ -12,6 +12,7 @@ import {
 } from '../creation/workbenchNodeInputActivation'
 import {
   transitionWorkbenchViewport,
+  readWorkbenchViewportTargetZoom,
   type WorkbenchViewportCommand,
   type WorkbenchViewportMotionIntent
 } from './workbenchViewportMotion'
@@ -107,7 +108,9 @@ function revealNavigatedTerminalBlock({
   readonly targetZoom?: number
   readonly width: number
 }): Promise<boolean> {
-  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), workbenchNodeReadableZoom)
+  const nextZoom =
+    targetZoom ??
+    Math.max(readWorkbenchViewportTargetZoom(reactFlowInstance), workbenchNodeReadableZoom)
   const command = {
     center: { x: position.x + width / 2, y: position.y + height / 2 },
     intent: motion,

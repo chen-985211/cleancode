@@ -12,6 +12,7 @@ import {
 } from './workbenchNodeFocusViewport'
 import {
   readWorkbenchViewportPresentation,
+  readWorkbenchViewportTargetZoom,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
@@ -39,10 +40,9 @@ export function useCanvasSelectionViewport({
       const node = instance?.getNode(nodeId)
       if (!instance || !node || isWorkbenchNodePresentationHidden(node)) return
 
-      const viewport = instance.getViewport()
       const zoom = resolveWorkbenchNodeFocusZoom({
         canvasSize: canvasSizeRef.current,
-        currentZoom: viewport.zoom,
+        currentZoom: readWorkbenchViewportTargetZoom(instance),
         nodeSize: resolveWorkbenchNodeSize(node)
       })
 

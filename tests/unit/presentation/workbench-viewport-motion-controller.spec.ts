@@ -50,15 +50,19 @@ describe('workbench viewport motion controller', () => {
       getViewport: () => staleViewport,
       setViewport: vi.fn(async () => true)
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-    const completion = controller.transition(instance, centerCommand(1_480))
+    const completion = controller.transition(instance, focusCommand({ x: 1_480, y: 320 }, 1.3))
 
     frames.step()
 
     expect(controller.readPresentation(instance)).not.toEqual(staleViewport)
     expect(instance.getViewport()).toEqual(staleViewport)
+    expect(controller.readTargetZoom(instance)).toBe(1.3)
+    const otherInstance = createViewportInstance({ x: 0, y: 0, zoom: 0.5 })
+    expect(controller.readTargetZoom(otherInstance.value)).toBe(0.5)
 
     controller.cancel()
     await expect(completion).resolves.toBe(false)
+    expect(controller.readTargetZoom(instance)).toBe(1)
   })
 
   it('presents the same spring state at the same elapsed time on 60Hz and 120Hz displays', async () => {
@@ -387,6 +391,8 @@ describe('workbench viewport motion controller', () => {
     expect(instance.viewport).toEqual(presentationViewport)
     expect(frames.pendingCount).toBe(0)
     expect(frames.pendingTimeoutCount).toBe(0)
+    await instance.value.setViewport({ ...presentationViewport, zoom: 1.17 })
+    expect(controller.readTargetZoom(instance.value)).toBe(1.17)
   })
 
   it('lets an instant workspace restore supersede a spring without a late completion', async () => {
@@ -426,10 +432,41 @@ describe('workbench viewport motion controller', () => {
 
     instance.completions[0]?.(true)
     await expect(staleCompletion).resolves.toBe(false)
+    expect(controller.readTargetZoom(instance.value)).toBe(0.7)
 
     instance.completions[1]?.(true)
     await expect(latestCompletion).resolves.toBe(true)
   })
+
+  it.each(['instant', 'quick'] as const)(
+    'retains a %s target until renderer apply finishes and releases it on failure',
+    async (type) => {
+      const frames = new TestFrameScheduler()
+      const controller = createWorkbenchViewportMotionController(frames)
+      const viewport = { x: 0, y: 0, zoom: 0.8 }
+      let finishApply: (completed: boolean) => void = () => undefined
+      const instance = {
+        getViewport: () => viewport,
+        setViewport: () =>
+          new Promise<boolean>((resolve) => {
+            finishApply = resolve
+          })
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+      const completion = controller.transition(instance, {
+        intent: { type },
+        type: 'set-viewport',
+        viewport: { x: 0, y: 0, zoom: 1.3 }
+      })
+      frames.finish()
+
+      expect(controller.readTargetZoom(instance)).toBe(1.3)
+      expect(instance.getViewport().zoom).toBe(0.8)
+      finishApply(false)
+
+      await expect(completion).resolves.toBe(false)
+      expect(controller.readTargetZoom(instance)).toBe(0.8)
+    }
+  )
 })
 
 function centerCommand(centerX: number): WorkbenchViewportCommand {
