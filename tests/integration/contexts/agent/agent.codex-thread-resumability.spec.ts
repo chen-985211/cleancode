@@ -15,10 +15,14 @@ const providerArgs = [
 
 describe('Codex persisted thread inspection', () => {
   let directory: string
+  let query: Promise<unknown> | undefined
   beforeEach(async () => {
+    query = undefined
     directory = await mkdtemp(join(tmpdir(), 'cleancode-codex-thread-read-'))
   })
   afterEach(async () => {
+    // Even an assertion/test deadline must let the inspector finish owning its child processes.
+    await query?.catch(() => undefined)
     await rm(directory, { recursive: true, force: true })
   })
   it.each([
@@ -66,19 +70,18 @@ createInterface({ input: process.stdin }).on('line', (line) => {
 }).on('close', () => writeFileSync(process.env.REPORT_PATH + '.closed', 'closed'))
 `
       )
-      expect(
-        await inspectCodexThreadResumability({
-          appServerArgs: [script, ...providerArgs],
-          environment: {
-            CODEX_HOME: directory,
-            REPORT_PATH: report,
-            RESPONSE: JSON.stringify(response)
-          },
-          executable: process.execPath,
-          threadId,
-          workspaceDirectory: directory
-        })
-      ).toBe(expected)
+      query = inspectCodexThreadResumability({
+        appServerArgs: [script, ...providerArgs],
+        environment: {
+          CODEX_HOME: directory,
+          REPORT_PATH: report,
+          RESPONSE: JSON.stringify(response)
+        },
+        executable: process.execPath,
+        threadId,
+        workspaceDirectory: directory
+      })
+      expect(await query).toBe(expected)
       const observation = JSON.parse(await readFile(report, 'utf8')) as { cwd: string; pid: number }
       expect(observation).toMatchObject({
         args: [...providerArgs, 'app-server'],
@@ -88,18 +91,19 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       expect(await realpath(observation.cwd)).toBe(await realpath(directory))
       expect(() => process.kill(observation.pid, 0)).toThrow()
       expect(await readFile(`${report}.closed`, 'utf8')).toBe('closed')
-    }
+    },
+    // Includes the production request deadline (7.5 s) and bounded cleanup (2.5 s).
+    12_000
   )
 
   it('preserves the binding when the selected executable cannot start', async () => {
-    expect(
-      await inspectCodexThreadResumability({
-        appServerArgs: [],
-        environment: {},
-        executable: join(tmpdir(), 'cleancode-missing-codex-executable'),
-        threadId,
-        workspaceDirectory: tmpdir()
-      })
-    ).toBe('unavailable')
-  })
+    query = inspectCodexThreadResumability({
+      appServerArgs: [],
+      environment: {},
+      executable: join(tmpdir(), 'cleancode-missing-codex-executable'),
+      threadId,
+      workspaceDirectory: tmpdir()
+    })
+    expect(await query).toBe('unavailable')
+  }, 12_000)
 })

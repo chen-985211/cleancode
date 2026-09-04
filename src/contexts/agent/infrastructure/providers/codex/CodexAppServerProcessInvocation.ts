@@ -18,18 +18,18 @@ export function createCodexAppServerProcessInvocation(
     '$codexCommand = Get-Command -Name $codexExecutable -ErrorAction Stop | Select-Object -First 1',
     '$codexExtension = [System.IO.Path]::GetExtension($codexCommand.Path).ToLowerInvariant()',
     "if ($codexCommand.CommandType -eq 'Application' -and @('.cmd', '.bat') -notcontains $codexExtension) {",
-    // Bypass PowerShell's native-command pipeline: inherit the raw JSON-RPC handles and argv.
+    // Explicitly forward pipes: a windowless .NET child does not inherit Node's stdio reliably.
+    `  Add-Type -TypeDefinition (Decode-CodexValue '${encode(windowsPipeBridge)}')`,
     '  $codexStart = New-Object System.Diagnostics.ProcessStartInfo',
     '  $codexStart.FileName = $codexCommand.Path',
     '  $codexStart.Arguments = $codexNativeArguments',
     '  $codexStart.WorkingDirectory = (Get-Location).ProviderPath',
     '  $codexStart.UseShellExecute = $false',
     '  $codexStart.CreateNoWindow = $true',
-    '  $codexProcess = [System.Diagnostics.Process]::Start($codexStart)',
-    '  try {',
-    '    $codexProcess.WaitForExit()',
-    '    exit $codexProcess.ExitCode',
-    '  } finally { $codexProcess.Dispose() }',
+    '  $codexStart.RedirectStandardInput = $true',
+    '  $codexStart.RedirectStandardOutput = $true',
+    '  $codexStart.RedirectStandardError = $true',
+    '  exit [CleanCodeCodexQueryPipes]::Run($codexStart)',
     '} else {',
     '  & $codexExecutable @codexArguments',
     '  exit $LASTEXITCODE',
@@ -48,6 +48,33 @@ export function createCodexAppServerProcessInvocation(
     ]
   }
 }
+
+const windowsPipeBridge = `
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
+
+public static class CleanCodeCodexQueryPipes {
+  public static int Run(ProcessStartInfo start) {
+    using (var child = Process.Start(start)) {
+      var input = CopyInput(Console.OpenStandardInput(), child.StandardInput.BaseStream);
+      var output = child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
+      var error = child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
+      child.WaitForExit();
+      Task.WaitAll(output, error);
+      return child.ExitCode;
+    }
+  }
+
+  private static async Task CopyInput(Stream source, Stream destination) {
+    try { await source.CopyToAsync(destination); }
+    catch (IOException) { }
+    catch (ObjectDisposedException) { }
+    finally { destination.Dispose(); }
+  }
+}
+`
 
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64')
