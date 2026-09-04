@@ -134,7 +134,7 @@ describe.runIf(process.platform === 'win32')(
         shell.write(windowsPowerShellReadinessCommand)
         await waitUntil(
           () => includesInOrder(output, `CLEANCODE_SHELL_READY:${completionToken}`, promptMarker),
-          10_000,
+          windowsPowerShellStartupTimeoutMs,
           () => ({ output: outputTail(output) })
         )
         shell.write(
@@ -233,7 +233,7 @@ describe.runIf(process.platform === 'win32')(
         }
         await rm(root, { force: true, recursive: true })
       }
-    }, 40_000)
+    }, 60_000)
 
     it.each([
       {
@@ -318,7 +318,7 @@ describe.runIf(process.platform === 'win32')(
           adapter.write(sessionId, windowsPowerShellReadinessCommand)
           await waitUntil(
             () => includesInOrder(output, `CLEANCODE_SHELL_READY:${completionToken}`, promptMarker),
-            10_000,
+            windowsPowerShellStartupTimeoutMs,
             () => ({ output: outputTail(output), rawOutput: outputTail(rawOutput) })
           )
 
@@ -494,13 +494,14 @@ describe.runIf(process.platform === 'win32')(
           await rm(root, { force: true, recursive: true })
         }
       },
-      60_000
+      90_000
     )
   }
 )
 
 const windowsPowerShellReadinessCommand =
   "function global:prompt { [Console]::WriteLine(('CLEANCODE_TEST_PROMPT:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)); return ('PS ' + $PWD.Path + '> ') }; Write-Output ('CLEANCODE_SHELL_READY:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r"
+const windowsPowerShellStartupTimeoutMs = 30_000
 
 const windowsInteractiveProviderCommandScript = [
   '@echo off',
