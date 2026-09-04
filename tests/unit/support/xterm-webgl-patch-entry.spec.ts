@@ -7,6 +7,7 @@ interface WebglAddonModule {
   readonly WebglAddon: {
     readonly prototype: {
       readonly setRasterScale?: unknown
+      readonly refreshRasterAlignment?: unknown
     }
   }
 }
@@ -21,5 +22,7 @@ describe('xterm WebGL patched package entries', () => {
 
     expect(cjsModule.WebglAddon.prototype.setRasterScale).toBeTypeOf('function')
     expect(esmModule.WebglAddon.prototype.setRasterScale).toBeTypeOf('function')
+    expect(cjsModule.WebglAddon.prototype.refreshRasterAlignment).toBeTypeOf('function')
+    expect(esmModule.WebglAddon.prototype.refreshRasterAlignment).toBeTypeOf('function')
   })
 })

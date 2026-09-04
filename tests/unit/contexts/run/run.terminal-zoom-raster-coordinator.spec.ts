@@ -10,6 +10,60 @@ import type { TerminalRasterScale } from '../../../../src/contexts/run/presentat
 describe('terminal zoom raster coordinator', () => {
   afterEach(() => vi.useRealTimers())
 
+  it('defers a node-position alignment request while the viewport is interacting', () => {
+    vi.useFakeTimers()
+    const scheduler = new ManualRasterScheduler()
+    const coordinator = new TerminalZoomRasterCoordinator({ scheduler })
+    const refreshRasterAlignment = vi.fn()
+    coordinator.register({ ...createTarget('terminal', 'visible'), refreshRasterAlignment })
+    coordinator.beginInteraction()
+    coordinator.requestRasterAlignment()
+    vi.advanceTimersByTime(100)
+    scheduler.runAllIdle()
+    expect(refreshRasterAlignment).not.toHaveBeenCalled()
+
+    coordinator.endInteraction(1)
+    vi.advanceTimersByTime(100)
+    scheduler.runAllIdle()
+    expect(refreshRasterAlignment).toHaveBeenCalledOnce()
+  })
+
+  it.each([0.35, 0.77, 1.49, 1.6])('converges to settled zoom %s from either direction', (zoom) => {
+    vi.useFakeTimers()
+    const scheduler = new ManualRasterScheduler()
+    const coordinator = new TerminalZoomRasterCoordinator({ scheduler })
+    const smaller = createTarget('smaller', 'focused', 0.25)
+    const larger = createTarget('larger', 'visible', 1.75)
+    coordinator.register(smaller)
+    coordinator.register(larger)
+    coordinator.endInteraction(zoom)
+    vi.advanceTimersByTime(100)
+    scheduler.runAllIdle()
+
+    expect(smaller.getRasterScale()).toBe(zoom)
+    expect(larger.getRasterScale()).toBe(zoom)
+  })
+
+  it('realigns a panned terminal at the same zoom only after interaction settles', () => {
+    vi.useFakeTimers()
+    const scheduler = new ManualRasterScheduler()
+    const coordinator = new TerminalZoomRasterCoordinator({ scheduler })
+    const refreshRasterAlignment = vi.fn()
+    const target = { ...createTarget('terminal', 'focused'), refreshRasterAlignment }
+    coordinator.register(target)
+    coordinator.beginInteraction()
+    vi.advanceTimersByTime(100)
+    scheduler.runAllIdle()
+    expect(refreshRasterAlignment).not.toHaveBeenCalled()
+
+    coordinator.endInteraction(1)
+    vi.advanceTimersByTime(100)
+    expect(refreshRasterAlignment).not.toHaveBeenCalled()
+    scheduler.runAllIdle()
+    expect(refreshRasterAlignment).toHaveBeenCalledOnce()
+    expect(target.appliedScales).toEqual([])
+  })
+
   it('keeps gesture frames compositor-only and performs focused and visible work in ordered idle slices', () => {
     vi.useFakeTimers()
     const scheduler = new ManualRasterScheduler()
@@ -35,12 +89,12 @@ describe('terminal zoom raster coordinator', () => {
 
     expect(scheduler.nextIdleTimeout).toBe(32)
     scheduler.runNextIdle({ timeRemaining: () => 10 })
-    expect(focused.appliedScales).toEqual([1.75])
+    expect(focused.appliedScales).toEqual([1.6])
     expect(visible.appliedScales).toEqual([])
     expect(scheduler.pendingIdleCount).toBe(1)
     expect(scheduler.nextIdleTimeout).toBe(250)
     scheduler.runNextIdle({ timeRemaining: () => 10 })
-    expect(visible.appliedScales).toEqual([1.75])
+    expect(visible.appliedScales).toEqual([1.6])
     expect(hidden.appliedScales).toEqual([])
   })
 
@@ -59,7 +113,7 @@ describe('terminal zoom raster coordinator', () => {
     expect(scheduler.pendingIdleCount).toBe(1)
 
     scheduler.runNextIdle({ timeRemaining: () => 10 })
-    expect(target.appliedScales).toEqual([1.75])
+    expect(target.appliedScales).toEqual([1.6])
   })
 
   it('invalidates queued work when a newer zoom generation starts', () => {
@@ -83,11 +137,11 @@ describe('terminal zoom raster coordinator', () => {
     expect(target.appliedScales).toEqual([])
   })
 
-  it('delays downgrades and removes released targets from pending work', () => {
+  it('removes released targets from pending settled work', () => {
     vi.useFakeTimers()
     const scheduler = new ManualRasterScheduler()
     const coordinator = new TerminalZoomRasterCoordinator({ scheduler })
-    const target = createTarget('terminal', 'visible', 1.75)
+    const target = createTarget('terminal', 'visible', 1.6)
     const unregister = coordinator.register(target)
 
     coordinator.updateCanvasZoom(1)
@@ -103,8 +157,8 @@ describe('terminal zoom raster coordinator', () => {
     vi.useFakeTimers()
     const scheduler = new ManualRasterScheduler()
     const coordinator = new TerminalZoomRasterCoordinator({ scheduler })
-    const visible = createTarget('visible', 'visible', 1.75)
-    const hidden = createTarget('hidden', 'hidden', 1.75)
+    const visible = createTarget('visible', 'visible', 1.6)
+    const hidden = createTarget('hidden', 'hidden', 1.6)
     coordinator.register(visible)
     coordinator.register(hidden)
 
@@ -130,7 +184,7 @@ describe('terminal zoom raster coordinator', () => {
     vi.advanceTimersByTime(100)
     scheduler.runNextIdle({ timeRemaining: () => 10 })
 
-    expect(target.appliedScales).toEqual([1.75])
+    expect(target.appliedScales).toEqual([1.6])
   })
 
   it('uses a hard window budget with focused-first and level-by-level fair visible allocation', () => {
@@ -138,7 +192,7 @@ describe('terminal zoom raster coordinator', () => {
     const scheduler = new ManualRasterScheduler()
     const coordinator = new TerminalZoomRasterCoordinator({
       scheduler,
-      maxBackingPixels: 650
+      maxBackingPixels: 600
     })
     const focused = createTarget('focused', 'focused', 1, { baseRasterCost: 100 })
     const firstVisible = createTarget('first-visible', 'visible', 1, { baseRasterCost: 100 })
@@ -153,7 +207,7 @@ describe('terminal zoom raster coordinator', () => {
     vi.advanceTimersByTime(100)
     scheduler.runAllIdle()
 
-    expect(focused.appliedScales).toEqual([1.75])
+    expect(focused.appliedScales).toEqual([1.6])
     expect(firstVisible.appliedScales).toEqual([1.25])
     expect(secondVisible.appliedScales).toEqual([1.25])
     expect(
@@ -161,7 +215,7 @@ describe('terminal zoom raster coordinator', () => {
         (total, target) => total + target.getRasterCost(target.getRasterScale()),
         0
       )
-    ).toBeLessThanOrEqual(650)
+    ).toBeLessThanOrEqual(600)
   })
 
   it('releases hidden backing pixels before admitting another visible upgrade', () => {
@@ -171,7 +225,7 @@ describe('terminal zoom raster coordinator', () => {
       scheduler,
       maxBackingPixels: 300
     })
-    const first = createTarget('first', 'visible', 1.75, { baseRasterCost: 100 })
+    const first = createTarget('first', 'visible', 1.6, { baseRasterCost: 100 })
     const second = createTarget('second', 'visible', 1, { baseRasterCost: 100 })
     coordinator.updateCanvasZoom(1.6)
     coordinator.register(first)
@@ -197,7 +251,7 @@ describe('terminal zoom raster coordinator', () => {
       scheduler,
       maxBackingPixels: 300
     })
-    const hidden = createTarget('hidden', 'hidden', 1.75, {
+    const hidden = createTarget('hidden', 'hidden', 1.6, {
       baseRasterCost: 100,
       shouldFail: (scale) => scale === 1
     })
@@ -226,13 +280,13 @@ describe('terminal zoom raster coordinator', () => {
     coordinator.register(target)
     vi.advanceTimersByTime(100)
     scheduler.runAllIdle()
-    expect(target.appliedScales).toEqual([1.75])
+    expect(target.appliedScales).toEqual([1.6])
 
     target.setBaseRasterCost(200)
     vi.advanceTimersByTime(100)
     scheduler.runAllIdle()
 
-    expect(target.appliedScales).toEqual([1.75, 1.25])
+    expect(target.appliedScales).toEqual([1.6, 1.25])
     expect(target.getRasterCost(target.getRasterScale())).toBeLessThanOrEqual(360)
   })
 
@@ -248,7 +302,7 @@ describe('terminal zoom raster coordinator', () => {
     scheduler.runAllIdle()
 
     expect(target.setRasterScaleAttempts).toBe(3)
-    expect(target.appliedScales).toEqual([1.75])
+    expect(target.appliedScales).toEqual([1.6])
   })
 
   it('falls back to baseline after a bounded number of permanent upgrade failures', () => {
@@ -260,7 +314,7 @@ describe('terminal zoom raster coordinator', () => {
       onRasterFailure: ({ error }) => failures.push(error)
     })
     const target = createTarget('terminal', 'focused', 1.5, {
-      shouldFail: (scale) => scale === 1.75
+      shouldFail: (scale) => scale === 1.6
     })
     coordinator.updateCanvasZoom(1.6)
     coordinator.register(target)

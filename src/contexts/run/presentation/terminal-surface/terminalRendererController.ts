@@ -8,6 +8,7 @@ interface TerminalRendererAddon {
   dispose(): void
   onContextLoss(listener: () => void): IDisposable
   setRasterScale(scale: TerminalRasterScale): void
+  refreshRasterAlignment?(): void
 }
 
 interface TerminalRendererHost {
@@ -42,6 +43,10 @@ export class TerminalRendererController {
 
   get state(): TerminalRendererState {
     return this.currentState
+  }
+
+  refreshRasterAlignment(): void {
+    if (!this.isDisposed) this.addon?.refreshRasterAlignment?.()
   }
 
   setRasterScale(scale: TerminalRasterScale): void {

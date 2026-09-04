@@ -473,6 +473,7 @@ export function WorkbenchCanvas({
                   onNodeDragStop(event, node)
                 } finally {
                   activeDraggedNodeRef.current = null
+                  terminalZoomRasterCoordinator?.requestRasterAlignment()
                 }
               }}
               onMove={(_event, viewport) =>

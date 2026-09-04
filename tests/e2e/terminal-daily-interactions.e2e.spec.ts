@@ -199,9 +199,11 @@ describe('terminal daily interactions e2e', () => {
               accept: (projection) =>
                 projection !== null &&
                 projection.renderer === 'webgl' &&
-                projection.rasterScale === 1.75 &&
+                Math.abs(projection.rasterScale - projection.zoom) < 0.001 &&
                 projection.zoom >= 1.599 &&
-                projection.backingDensity >= projection.devicePixelRatio * 0.98,
+                Math.abs(
+                  projection.backingWidth - projection.displayWidth * projection.devicePixelRatio
+                ) < 1,
               intervalMs: 50,
               timeoutMs: 10_000
             })
@@ -218,12 +220,35 @@ describe('terminal daily interactions e2e', () => {
         rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
       const afterDimensions = await probeTerminalDimensions(page, sessionId, 'AFTER')
 
+      if (process.env.CLEANCODE_CAPTURE_RASTER) {
+        const output = join(
+          process.cwd(),
+          'test-results',
+          'terminal-raster',
+          process.env.CLEANCODE_CAPTURE_RASTER
+        )
+        await mkdir(output, { recursive: true })
+        await page.screenshot({ path: join(output, 'application-maximum-zoom.png') })
+      }
+
       if (rendererState.renderer === 'webgl') {
         expect(rasterProjection).not.toBeNull()
         expect(initialRasterProjection).not.toBeNull()
         expect(beforeCssGeometry).not.toBeNull()
         expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
-        expect(afterCssGeometry).toEqual(beforeCssGeometry)
+        expect(afterCssGeometry!.screenWidth).toBe(beforeCssGeometry!.screenWidth)
+        expect(afterCssGeometry!.screenHeight).toBe(beforeCssGeometry!.screenHeight)
+        // The drawing surface may shift its edge by half a physical pixel;
+        // the xterm screen (and therefore FitAddon's grid) remains unchanged.
+        for (const dimension of ['canvasWidth', 'canvasHeight'] as const) {
+          const correction = Math.abs(
+            Number.parseFloat(afterCssGeometry![dimension]) -
+              Number.parseFloat(beforeCssGeometry![dimension])
+          )
+          expect(
+            correction * rasterProjection!.zoom * rasterProjection!.devicePixelRatio
+          ).toBeLessThanOrEqual(0.51)
+        }
       } else {
         expect(rendererState.renderer).toBe('dom')
         expect(webgl2Available).toBe(false)

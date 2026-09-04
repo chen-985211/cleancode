@@ -205,11 +205,13 @@ xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model �
 3. 降级不得 reset xterm、重新 attach view、替换 session、重放 snapshot 或清空搜索和粘贴状态。
 4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，并在异步 addon 激活完成后把 `data-terminal-renderer-ready` 置为 `true`；registry 诊断同时统计两类 surface，便于测试和故障定位。
 
-React Flow 放大节点时，不能长期把原始 WebGL backing store 交给 compositor 插值，也不能在每个缩放手势帧里重新分配 canvas。当前 surface 使用两阶段策略：手势期间只更新外层 transform；视口停稳后，根据画布 zoom 选择 `1`、`1.25`、`1.5`、`1.75` 的离散 raster scale，再在浏览器 idle slice 中逐个重建可见终端。焦点终端优先，未聚焦但可见的终端随后处理；离开 viewport 或被 parked 样式隐藏的终端回到 `1x`。调度器按 backing pixels 使用窗口级硬预算，并对同优先级终端逐级公平分配倍率，避免多个大终端同时抢占 GPU 内存。
+React Flow 缩放节点时，不能长期把原始 WebGL backing store 交给 compositor 插值，也不能在每个缩放手势帧里重新分配 canvas。surface 使用两阶段策略：手势期间只更新外层 transform；视口停稳后，可见终端以实际画布 zoom 作为 raster scale，在浏览器 idle slice 中逐个重建。缩小和放大遵循同一个结果契约：在预算允许时，绘制位图与最终显示的物理像素尺寸一致。焦点终端优先，未聚焦但可见的终端随后处理；`1`、`1.25`、`1.5`、`1.75` 仅作为预算分配阶梯，最后一级截断到实际目标倍率，不再强制把 160% 画布画成 175%。同优先级终端逐级公平分配，预算不足时允许降低清晰度；隐藏终端不升采样，已有大于 `1x` 的位图回到 `1x`。基础位图总量已经超过预算时不再增加额外采样，预算不代表能够消除现有基础占用。
 
-额外 raster scale 只能影响 device backing geometry 和 glyph atlas，CSS canvas、CSS cell、FitAddon 与 PTY 行列仍由真实 browser DPR 决定。倍率切换会清空 WebGL canvas 和 render model，因此 resize 后必须无条件请求完整 viewport redraw，不能等待下一段 PTY 输出、光标闪烁或 ResizeObserver 偶然触发恢复。倍率提交是事务式的：重建失败时恢复上一倍率并允许有界重试；连续失败后回到 `1x`，不能让失败倍率成为同值重试的 no-op。
+额外 raster scale 只能影响绘制投影，xterm screen 的 CSS 尺寸、CSS cell、FitAddon 与 PTY 行列仍由真实 browser DPR 决定。完整 backing bitmap 只取整一次，字符网格按该位图分配间距，WebGL 把每个字形起点及背景、光标边界对齐到整数像素，避免逐 cell 取整后的累计拉伸。glyph atlas 的像素尺寸必须另行取整，不能把小数网格宽高用作字形缓存的像素扫描步长。绘制 canvas 的位置与显示边缘允许在半个物理像素内修正，但不得反向改变 screen、节点布局或鼠标坐标系；在完整质量下直接复用已提交位图尺寸，避免小数 zoom 和 DOM 测量在半像素边界上向相反方向取整。平移视口或拖动节点结束后，即使 zoom 未变，也通过同一 idle 调度入口重新对齐，且不重建位图。
 
-这项能力通过 `pnpm-workspace.yaml` 中的精确版本 `patchedDependencies` 修补 `@xterm/addon-webgl`。包的 CommonJS main、ESM module 和类型声明必须同时暴露相同契约；入口契约测试负责防止构建器切换入口后静默退回未修补实现。升级 addon 时应先确认上游能力和实际 bundle 入口，再重建或删除本地补丁。
+倍率切换会清空 WebGL canvas 和 render model，因此 resize 后必须无条件请求完整 viewport redraw，不能等待下一段 PTY 输出、光标闪烁或 ResizeObserver 偶然触发恢复。倍率提交是事务式的：重建失败时恢复上一倍率并允许有界重试；连续失败后释放大于 `1x` 的额外位图，小于 `1x` 的已有位图不因失败而升采样，不能让失败倍率成为同值重试的 no-op。
+
+这项能力通过 `pnpm-workspace.yaml` 中的精确版本 `patchedDependencies` 修补 `@xterm/addon-webgl`。补丁内 `src/RasterGeometry.ts` 拥有尺寸与对齐算法，CommonJS main、ESM module 内嵌对应实现，类型声明同时暴露 `setRasterScale` 与 `refreshRasterAlignment`。入口契约测试负责防止构建器切换入口后静默退回未修补实现；真实 Electron 的 [`run.terminal-webgl-raster.spec.ts`](../../tests/integration/contexts/run/run.terminal-webgl-raster.spec.ts) 使用两个实际入口，在 DPR 1、1.25、1.5、2 下覆盖缩小、原始大小、最大放大、不同列数与浅深主题，统一验证位图尺寸、像素落点、重复字形一致性及重对齐幂等性。这是独立 xterm 适配器的 integration，不启动项目或 PTY；完整会话协作仍由 E2E 证明。它运行于当前宿主，模拟 DPR 不等于覆盖其他系统的字体和 GPU 驱动，三平台最终观感仍需对应实机检查。升级 addon 时应先确认上游能力和实际 bundle 入口，再重建或删除本地补丁。
 
 idle 调度同样属于正确性边界。`setRasterScale` 不在缩放事件或 animation frame 回调内执行；每个可用 idle slice 最多处理一个 surface，并为焦点任务设置较短 timeout、普通可见任务设置较长 timeout。这样 resize 清空发生在已经完成的 paint 之后，其请求的完整 redraw 可以在下一次 paint 前运行，既避免交互卡顿，也避免把空 backing store 呈现成一帧白屏。
 

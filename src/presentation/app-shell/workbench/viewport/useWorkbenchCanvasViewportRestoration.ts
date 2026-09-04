@@ -8,7 +8,7 @@ import type { TerminalZoomRasterCoordinator } from '../../../../contexts/run/pre
 
 export type TerminalZoomRasterCanvasCoordinator = Pick<
   TerminalZoomRasterCoordinator,
-  'beginInteraction' | 'endInteraction' | 'updateCanvasZoom'
+  'beginInteraction' | 'endInteraction' | 'updateCanvasZoom' | 'requestRasterAlignment'
 >
 
 export function useWorkbenchCanvasViewportRestoration({

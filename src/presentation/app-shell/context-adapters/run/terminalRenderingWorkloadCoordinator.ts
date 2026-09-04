@@ -6,16 +6,18 @@ export interface TerminalRenderingWorkloadCoordinator {
   endInteraction(canvasZoom?: number): void
   setSidebarMotionActive(isActive: boolean): void
   updateCanvasZoom(canvasZoom: number): void
+  requestRasterAlignment(): void
 }
 
 export function createTerminalRenderingWorkloadCoordinator(
   rasterCoordinator: Pick<
     TerminalZoomRasterCoordinator,
-    'beginInteraction' | 'endInteraction' | 'updateCanvasZoom'
+    'beginInteraction' | 'endInteraction' | 'updateCanvasZoom' | 'requestRasterAlignment'
   >,
   workloadScheduler: Pick<TerminalWorkloadScheduler, 'beginInteraction' | 'endInteraction'>
 ): TerminalRenderingWorkloadCoordinator {
   return {
+    requestRasterAlignment: () => rasterCoordinator.requestRasterAlignment(),
     beginInteraction: () => {
       rasterCoordinator.beginInteraction()
       workloadScheduler.beginInteraction('canvas')

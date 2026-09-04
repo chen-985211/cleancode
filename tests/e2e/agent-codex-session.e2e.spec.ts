@@ -181,8 +181,11 @@ describe('Codex Agent session e2e', () => {
               accept: (projection) =>
                 projection !== null &&
                 projection.renderer === 'webgl' &&
-                projection.rasterScale === 1.75 &&
-                projection.zoom >= 1.599,
+                Math.abs(projection.rasterScale - projection.zoom) < 0.001 &&
+                projection.zoom >= 1.599 &&
+                Math.abs(
+                  projection.backingWidth - projection.displayWidth * projection.devicePixelRatio
+                ) < 1,
               intervalMs: 50,
               timeoutMs: 10_000
             })
