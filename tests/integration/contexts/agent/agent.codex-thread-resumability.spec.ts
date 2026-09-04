@@ -1,7 +1,8 @@
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, delimiter, dirname, extname, join } from 'node:path'
 
+import { createCodexAppServerProcessInvocation } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAppServerProcessInvocation'
 import { inspectCodexThreadResumability } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexThreadResumabilityInspector'
 
 const threadId = '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
@@ -25,6 +26,25 @@ describe('Codex persisted thread inspection', () => {
     await query?.catch(() => undefined)
     await rm(directory, { recursive: true, force: true })
   })
+
+  it.runIf(process.platform === 'win32')(
+    'resolves a PATH command before opening native query pipes',
+    async () => {
+      const invocation = await createCodexAppServerProcessInvocation(
+        basename(process.execPath, extname(process.execPath)),
+        providerArgs,
+        {
+          environment: {
+            PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ''}`
+          },
+          workspaceDirectory: directory
+        }
+      )
+      expect(await realpath(invocation.executable)).toBe(await realpath(process.execPath))
+      expect(invocation.args).toEqual(providerArgs)
+    }
+  )
+
   it.each([
     { response: { result: { thread: { id: threadId } } }, expected: 'available' },
     {

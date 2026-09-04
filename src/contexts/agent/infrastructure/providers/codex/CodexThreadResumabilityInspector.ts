@@ -24,13 +24,14 @@ export const inspectCodexThreadResumability: CodexThreadResumabilityInspector = 
   }
 }
 
-function readPersistedThread(
+async function readPersistedThread(
   input: CodexThreadResumabilityInput
 ): Promise<CodexThreadResumability> {
-  const invocation = createCodexAppServerProcessInvocation(input.executable, [
-    ...input.appServerArgs,
-    'app-server'
-  ])
+  const invocation = await createCodexAppServerProcessInvocation(
+    input.executable,
+    [...input.appServerArgs, 'app-server'],
+    input
+  )
   return new Promise((resolve) => {
     // A separate app-server has no live threads: thread/read can only confirm persisted metadata.
     const child = spawn(invocation.executable, [...invocation.args], {

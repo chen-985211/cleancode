@@ -22,6 +22,7 @@ describe('Codex query process lifecycle', () => {
     const child = createChild()
     processes.spawn.mockReturnValue(child)
     const query = inspect()
+    await Promise.resolve()
     child.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
     child.stdout.write(JSON.stringify({ id: 2, result: { thread: { id: threadId } } }) + '\n')
     expect(processes.execFile).not.toHaveBeenCalled()
@@ -48,6 +49,7 @@ describe('Codex query process lifecycle', () => {
         returned = true
         return result
       })
+      await Promise.resolve()
       child.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
       child.stdout.write(
         JSON.stringify({
@@ -75,6 +77,7 @@ describe('Codex query process lifecycle', () => {
     const child = createChild()
     processes.spawn.mockReturnValue(child)
     const query = inspect()
+    await Promise.resolve()
     child.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
     child.stdout.write(
       JSON.stringify({
@@ -94,7 +97,7 @@ function inspect() {
   return inspectCodexThreadResumability({
     appServerArgs: [],
     environment: {},
-    executable: 'codex',
+    executable: 'codex.exe',
     threadId,
     workspaceDirectory: '/workspace'
   })

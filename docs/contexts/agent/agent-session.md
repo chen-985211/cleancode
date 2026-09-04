@@ -56,7 +56,7 @@ Codex 的 title、完成回合 notify 和 `SessionEnd` Hook 上报的是已分�
 
 Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时清除绑定并打开空白对话；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
 
-查询结果须等待查询进程关闭后再返回：先关闭标准输入，允许 CLI 及其启动器正常退出；有界等待超时后，Windows 终止本次查询的进程树。清理超时同样返回不可用，不能据此清除绑定。Windows 原生 CLI 通过原生进程参数和显式重定向的标准流运行；启动器并发转发原始输入、输出和错误字节，输入结束后向 CLI 传递 EOF，避免依赖无窗口子进程的句柄继承或让 PowerShell 命令管道改写 JSON-RPC 与引号参数。
+查询结果须等待查询进程关闭后再返回：先关闭标准输入，允许 CLI 及其启动器正常退出；有界等待超时后，Windows 终止本次查询的进程树。清理超时同样返回不可用，不能据此清除绑定。Windows 原生 CLI 由 Node 直接启动并拥有 JSON-RPC 标准流和原生参数；没有可执行扩展名的命令先通过短命 PowerShell 查询其真实路径，再直接启动原生文件，避免在协议管道中插入 PowerShell。脚本 shim 继续使用既有 PowerShell 启动方式。
 
 ## Provider contribution
 
