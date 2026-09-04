@@ -124,7 +124,13 @@ describe.each([1, 1.25, 1.5, 2])(
             Math.round(projection.displayTop * deviceScaleFactor),
             2
           )
-          expect(projection.glyphVariants, JSON.stringify({ zoom, ...projection })).toBe(1)
+          // Compare aligned glyph pixels within 8-bit GPU color precision. Windows
+          // produces up to two intensity levels of variation at identical positions;
+          // a shifted or resampled glyph still exceeds this per-pixel bound.
+          expect(
+            projection.glyphMaximumDifference,
+            JSON.stringify({ zoom, ...projection })
+          ).toBeLessThanOrEqual(2)
           expect(projection.hasInk).toBe(true)
           expect(projection.pannedLeft * deviceScaleFactor).toBeCloseTo(
             Math.round(projection.pannedLeft * deviceScaleFactor),

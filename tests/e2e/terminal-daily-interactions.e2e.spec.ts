@@ -235,19 +235,28 @@ describe('terminal daily interactions e2e', () => {
         expect(rasterProjection).not.toBeNull()
         expect(initialRasterProjection).not.toBeNull()
         expect(beforeCssGeometry).not.toBeNull()
-        expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
+        expect(rasterProjection!.backingWidth).toBeGreaterThan(
+          initialRasterProjection!.backingWidth
+        )
         expect(afterCssGeometry!.screenWidth).toBe(beforeCssGeometry!.screenWidth)
         expect(afterCssGeometry!.screenHeight).toBe(beforeCssGeometry!.screenHeight)
-        // The drawing surface may shift its edge by half a physical pixel;
-        // the xterm screen (and therefore FitAddon's grid) remains unchanged.
-        for (const dimension of ['canvasWidth', 'canvasHeight'] as const) {
-          const correction = Math.abs(
-            Number.parseFloat(afterCssGeometry![dimension]) -
-              Number.parseFloat(beforeCssGeometry![dimension])
-          )
-          expect(
-            correction * rasterProjection!.zoom * rasterProjection!.devicePixelRatio
-          ).toBeLessThanOrEqual(0.51)
+        // Each frame rounds the canvas against its unchanged screen geometry at
+        // that frame's own display scale. Two independent corrections need not
+        // differ by less than half a pixel when converted at the final zoom.
+        for (const geometry of [beforeCssGeometry!, afterCssGeometry!]) {
+          for (const [canvasDimension, screenDimension, scale] of [
+            ['canvasWidth', 'screenWidth', 'scaleX'],
+            ['canvasHeight', 'screenHeight', 'scaleY']
+          ] as const) {
+            const correction = Math.abs(
+              Number.parseFloat(geometry[canvasDimension]) -
+                Number.parseFloat(geometry[screenDimension])
+            )
+            expect(
+              correction * geometry[scale] * geometry.devicePixelRatio,
+              JSON.stringify(geometry)
+            ).toBeLessThanOrEqual(0.51)
+          }
         }
       } else {
         expect(rendererState.renderer).toBe('dom')
@@ -319,6 +328,9 @@ function readTerminalCssGeometry(
 ): Promise<{
   readonly canvasHeight: string
   readonly canvasWidth: string
+  readonly devicePixelRatio: number
+  readonly scaleX: number
+  readonly scaleY: number
   readonly screenHeight: string
   readonly screenWidth: string
 } | null> {
@@ -334,9 +346,13 @@ function readTerminalCssGeometry(
     )
     if (!screen || !canvas) return null
 
+    const screenBounds = screen.getBoundingClientRect()
     return {
       canvasHeight: canvas.style.height,
       canvasWidth: canvas.style.width,
+      devicePixelRatio: window.devicePixelRatio,
+      scaleX: screenBounds.width / Number.parseFloat(screen.style.width),
+      scaleY: screenBounds.height / Number.parseFloat(screen.style.height),
       screenHeight: screen.style.height,
       screenWidth: screen.style.width
     }
