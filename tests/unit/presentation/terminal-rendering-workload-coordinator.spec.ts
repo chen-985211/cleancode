@@ -1,6 +1,38 @@
-import { createTerminalRenderingWorkloadCoordinator } from '../../../src/presentation/app-shell/context-adapters/run/terminalRenderingWorkloadCoordinator'
+import {
+  createTerminalRenderingWorkloadCoordinator,
+  createTerminalRenderingServices
+} from '../../../src/presentation/app-shell/context-adapters/run/terminalRenderingWorkloadCoordinator'
 
 describe('terminal rendering workload coordinator', () => {
+  it('wires the canvas limit and completed motion into the shared raster owner', () => {
+    vi.useFakeTimers()
+    const services = createTerminalRenderingServices(1.6)
+    let scale = 1
+    try {
+      services.terminalZoomRasterCoordinator.register({
+        id: 'terminal',
+        getRasterPriority: () => 'focused',
+        getRasterScale: () => scale,
+        getRasterCost: (next) => next * next * 100,
+        setRasterScale: (next) => {
+          scale = next
+        }
+      })
+      services.terminalRenderingWorkloadCoordinator.beginInteraction()
+      services.terminalRenderingWorkloadCoordinator.updateCanvasZoom(1.6)
+      vi.runOnlyPendingTimers()
+      expect(scale).toBe(1)
+      services.terminalRenderingWorkloadCoordinator.endInteraction(1.6)
+      vi.runOnlyPendingTimers()
+      expect(scale).toBe(1.6)
+    } finally {
+      services.terminalSurfaceRegistry.disposeAll()
+      services.terminalZoomRasterCoordinator.dispose()
+      services.terminalWorkloadScheduler.dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it('publishes canvas motion to raster and output owners while sidebar motion only affects output', () => {
     const raster = {
       beginInteraction: vi.fn(),

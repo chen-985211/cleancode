@@ -38,7 +38,7 @@ describe.each([1, 1.25, 1.5, 2])(
     })
 
     it.each(['esm', 'cjs'] as const)(
-      '%s entry preserves the terminal grid and draws unscaled, aligned glyph pixels',
+      '%s entry preserves grid and glyph alignment with matched or retained bitmap resolution',
       async (entry) => {
         const page = await application!.firstWindow()
         const xtermSource = await readFile(join(xtermDirectory, 'xterm.mjs'), 'utf8')
@@ -50,40 +50,64 @@ describe.each([1, 1.25, 1.5, 2])(
         await page.addStyleTag({ content: xtermStyles })
 
         const cases = [
-          { zoom: 1.6, columns: 60, theme: 'light' },
-          { zoom: 1.6, columns: 79, theme: 'dark' },
-          { zoom: 0.35, columns: 60, theme: 'light' },
-          { zoom: 0.77, columns: 60, theme: 'light' },
-          { zoom: 1, columns: 60, theme: 'dark' },
-          { zoom: 1.25, columns: 79, theme: 'dark' }
+          { zoom: 1.6, rasterScale: 1.6, columns: 60, theme: 'light' },
+          { zoom: 1.6, rasterScale: 1.6, columns: 79, theme: 'dark' },
+          { zoom: 0.35, rasterScale: 1, columns: 60, theme: 'light' },
+          { zoom: 0.77, rasterScale: 1, columns: 60, theme: 'light' },
+          { zoom: 1, rasterScale: 1, columns: 60, theme: 'dark' },
+          { zoom: 1.25, rasterScale: 1.25, columns: 79, theme: 'dark' },
+          { zoom: 1.1, rasterScale: 1.25, columns: 60, theme: 'light' },
+          { zoom: 1.4, rasterScale: 1.5, columns: 79, theme: 'dark' },
+          { zoom: 0.77, rasterScale: 1.6, columns: 60, theme: 'light' },
+          { zoom: 1.4, rasterScale: 1.6, columns: 79, theme: 'dark' }
         ] as const
-        for (const { zoom, columns, theme } of cases) {
+        for (const { zoom, rasterScale, columns, theme } of cases) {
           const projection = await renderTerminalRasterFixture(page, {
             addonSource,
             entry,
             columns,
             theme,
             xtermSource,
-            zoom
+            zoom,
+            rasterScale
           })
           const capture = process.env.CLEANCODE_CAPTURE_RASTER
           if (capture) {
             const output = join(process.cwd(), 'test-results', 'terminal-raster', capture)
             await mkdir(output, { recursive: true })
             await page.screenshot({
-              path: join(output, `${entry}-dpr-${deviceScaleFactor}-zoom-${zoom}-${theme}.png`)
+              path: join(
+                output,
+                `${entry}-dpr-${deviceScaleFactor}-zoom-${zoom}-raster-${rasterScale}-${theme}.png`
+              )
             })
           }
 
           expect(projection.devicePixelRatio).toBeCloseTo(deviceScaleFactor, 5)
           expect(projection.columns).toBe(columns)
           expect(projection.rows).toBe(10)
+          expect(projection.preservesScreenGeometry).toBe(true)
           expect(projection.backingWidth).toBe(
-            Math.round(projection.displayWidth * deviceScaleFactor)
+            Math.round(projection.screenWidth * deviceScaleFactor * rasterScale)
           )
           expect(projection.backingHeight).toBe(
-            Math.round(projection.displayHeight * deviceScaleFactor)
+            Math.round(projection.screenHeight * deviceScaleFactor * rasterScale)
           )
+          if (zoom === rasterScale) {
+            expect(projection.backingWidth).toBe(
+              Math.round(projection.displayWidth * deviceScaleFactor)
+            )
+            expect(projection.backingHeight).toBe(
+              Math.round(projection.displayHeight * deviceScaleFactor)
+            )
+          } else {
+            expect(projection.backingWidth).toBeGreaterThan(
+              projection.displayWidth * deviceScaleFactor
+            )
+            expect(projection.backingHeight).toBeGreaterThan(
+              projection.displayHeight * deviceScaleFactor
+            )
+          }
           expect(projection.displayLeft * deviceScaleFactor).toBeCloseTo(
             Math.round(projection.displayLeft * deviceScaleFactor),
             2

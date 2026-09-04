@@ -11,9 +11,11 @@ export function renderTerminalRasterFixture(
     readonly theme: 'light' | 'dark'
     readonly xtermSource: string
     readonly zoom: number
+    readonly rasterScale: number
   }
 ) {
-  return page.evaluate(async ({ addonSource, entry, columns, theme, xtermSource, zoom }) => {
+  return page.evaluate(async (input) => {
+    const { addonSource, entry, columns, theme, xtermSource, zoom, rasterScale } = input
     const fixtureWindow = window as Window & { rasterFixtureTerminal?: Terminal }
     fixtureWindow.rasterFixtureTerminal?.dispose()
     document.body.replaceChildren()
@@ -63,7 +65,10 @@ export function renderTerminalRasterFixture(
         resolve
       )
     )
-    addon.setRasterScale(zoom)
+    const screen = container.querySelector<HTMLElement>('.xterm-screen')!
+    const screenWidth = Number.parseFloat(screen.style.width)
+    const screenHeight = Number.parseFloat(screen.style.height)
+    addon.setRasterScale(rasterScale)
     await new Promise<void>((resolve) => {
       const subscription = terminal.onRender(() => {
         subscription.dispose()
@@ -115,6 +120,11 @@ export function renderTerminalRasterFixture(
     return {
       backingWidth: canvas.width,
       backingHeight: canvas.height,
+      screenWidth,
+      screenHeight,
+      preservesScreenGeometry:
+        Number.parseFloat(screen.style.width) === screenWidth &&
+        Number.parseFloat(screen.style.height) === screenHeight,
       displayWidth: bounds.width,
       displayHeight: bounds.height,
       displayLeft: bounds.left,

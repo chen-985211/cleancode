@@ -8,7 +8,10 @@ import {
   type SetStateAction
 } from 'react'
 
-import type { TerminalBlockSnapshot } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import {
+  maximumCanvasZoom,
+  type TerminalBlockSnapshot
+} from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionSnapshot } from '../../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import {
@@ -32,12 +35,9 @@ import { useTerminalSessionRetention } from '../context-adapters/run/useTerminal
 import type { NotifyApp } from '../../shared/notifications/appNotifications'
 import { notifyTerminalLaunchFailure } from '../context-adapters/run/terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from '../../shared/errors/appErrorMessages'
-import { TerminalSurfaceRegistry } from '../../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { readTerminalSourceTheme } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
-import { TerminalWorkloadScheduler } from '../../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
-import { TerminalZoomRasterCoordinator } from '../../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 import { createTerminalStateStore } from '../../../contexts/run/presentation/view-models/terminalStateStore'
-import { createTerminalRenderingWorkloadCoordinator } from '../context-adapters/run/terminalRenderingWorkloadCoordinator'
+import { createTerminalRenderingServices } from '../context-adapters/run/terminalRenderingWorkloadCoordinator'
 import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention
@@ -87,23 +87,14 @@ export function useTerminalSessions({
   )
   const [terminalStateStore] = useState(createTerminalStateStore)
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
-  const [terminalZoomRasterCoordinator] = useState(() => new TerminalZoomRasterCoordinator())
-  const [terminalWorkloadScheduler] = useState(() => new TerminalWorkloadScheduler())
-  const [terminalRenderingWorkloadCoordinator] = useState(() =>
-    createTerminalRenderingWorkloadCoordinator(
+  const [
+    {
       terminalZoomRasterCoordinator,
-      terminalWorkloadScheduler
-    )
-  )
-  const [terminalSurfaceRegistry] = useState(
-    () =>
-      new TerminalSurfaceRegistry(
-        undefined,
-        undefined,
-        terminalZoomRasterCoordinator,
-        terminalWorkloadScheduler
-      )
-  )
+      terminalWorkloadScheduler,
+      terminalRenderingWorkloadCoordinator,
+      terminalSurfaceRegistry
+    }
+  ] = useState(() => createTerminalRenderingServices(maximumCanvasZoom))
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())

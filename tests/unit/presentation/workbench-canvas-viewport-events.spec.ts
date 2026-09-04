@@ -25,6 +25,7 @@ describe('workbench canvas viewport events', () => {
 
     expect(projection.projectCanvasViewport).toHaveBeenCalledTimes(3)
     expect(projection.onViewportChange).not.toHaveBeenCalled()
+    expect(projection.onRasterInteractionEnd).not.toHaveBeenCalled()
 
     commitCompletedCanvasViewportMotion({
       completion: {
@@ -56,6 +57,8 @@ describe('workbench canvas viewport events', () => {
     expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
     expect(projection.onViewportChange).toHaveBeenCalledOnce()
     expect(projection.onViewportChange).toHaveBeenCalledWith(viewport)
+    expect(projection.onRasterInteractionEnd).toHaveBeenCalledOnce()
+    expect(projection.onRasterInteractionEnd).toHaveBeenCalledWith(viewport.zoom)
   })
 
   it('leaves instant restoration and preview commits with their explicit callers', () => {
@@ -73,23 +76,26 @@ describe('workbench canvas viewport events', () => {
     expect(projection.onViewportChange).not.toHaveBeenCalled()
   })
 
-  it('reports programmatic zoom frames and completion without treating them as persistence', () => {
-    const projection = createViewportProjection()
-    const viewport = { x: -120, y: 30, zoom: 1.6 }
+  it.each([null, undefined])(
+    'projects a programmatic frame with source event %s without ending raster interaction',
+    (event) => {
+      const projection = createViewportProjection()
+      const viewport = { x: -120, y: 30, zoom: 1.6 }
 
-    synchronizeCanvasViewportFromMove({ viewport, ...projection })
-    persistCanvasViewportFromMoveEnd({
-      event: null,
-      isRestoringViewport: false,
-      viewport,
-      ...projection
-    })
+      synchronizeCanvasViewportFromMove({ viewport, ...projection })
+      persistCanvasViewportFromMoveEnd({
+        event,
+        isRestoringViewport: false,
+        viewport,
+        ...projection
+      })
 
-    expect(projection.onRasterZoomChange).toHaveBeenCalledWith(1.6)
-    expect(projection.onRasterInteractionEnd).toHaveBeenCalledWith(1.6)
-    expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
-    expect(projection.onViewportChange).not.toHaveBeenCalled()
-  })
+      expect(projection.onRasterZoomChange).toHaveBeenCalledWith(1.6)
+      expect(projection.onRasterInteractionEnd).not.toHaveBeenCalled()
+      expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
+      expect(projection.onViewportChange).not.toHaveBeenCalled()
+    }
+  )
 })
 
 function createViewportProjection() {

@@ -47,8 +47,11 @@ export function persistCanvasViewportFromMoveEnd({
   viewport,
   onViewportChange
 }: PersistCanvasViewportFromMoveEndInput): void {
+  // Programmatic frames also emit move-end. Their controllers report the
+  // completion of the whole motion through the subscription below.
+  if (!event) return
   onRasterInteractionEnd?.(viewport.zoom)
-  if (!event || isRestoringViewport) {
+  if (isRestoringViewport) {
     return
   }
 
@@ -92,28 +95,33 @@ export function commitCompletedCanvasViewportMotion({
 
 export function subscribeCanvasViewportMotionCompletion({
   instance,
+  onRasterInteractionEnd,
   onViewportChangeRef,
   projectCanvasViewport
 }: CanvasViewportProjection & {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  readonly onRasterInteractionEnd?: (zoom: number) => void
   readonly onViewportChangeRef: MutableRefObject<CanvasViewportPersistence['onViewportChange']>
 }): () => void {
   const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionCompletion(
     instance,
-    (completion) =>
+    (completion) => {
+      onRasterInteractionEnd?.(completion.viewport.zoom)
       commitCompletedCanvasViewportMotion({
         completion,
         onViewportChange: onViewportChangeRef.current,
         projectCanvasViewport
       })
+    }
   )
-  const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) =>
+  const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) => {
+    onRasterInteractionEnd?.(viewport.zoom)
     commitCanvasViewport({
       viewport,
       onViewportChange: onViewportChangeRef.current,
       projectCanvasViewport
     })
-  )
+  })
 
   return () => {
     unsubscribeProgrammatic()

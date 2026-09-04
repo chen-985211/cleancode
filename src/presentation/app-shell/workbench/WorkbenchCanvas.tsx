@@ -222,6 +222,7 @@ export function WorkbenchCanvas({
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
   const onViewportChangeRef = useRef(onViewportChange)
+  const terminalZoomRasterCoordinatorRef = useRef(terminalZoomRasterCoordinator)
   const unsubscribeViewportMotionRef = useRef<(() => void) | null>(null)
   const templateInteraction = useBlockTemplateCanvasInteraction({
     arrangement: canvasArrangement.arrangement,
@@ -258,7 +259,8 @@ export function WorkbenchCanvas({
   }
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange
-  }, [onViewportChange])
+    terminalZoomRasterCoordinatorRef.current = terminalZoomRasterCoordinator
+  }, [onViewportChange, terminalZoomRasterCoordinator])
 
   useEffect(() => {
     return () => unsubscribeViewportMotionRef.current?.()
@@ -382,6 +384,8 @@ export function WorkbenchCanvas({
                 unsubscribeViewportMotionRef.current?.()
                 unsubscribeViewportMotionRef.current = subscribeCanvasViewportMotionCompletion({
                   instance,
+                  onRasterInteractionEnd: (zoom) =>
+                    terminalZoomRasterCoordinatorRef.current?.endInteraction(zoom),
                   onViewportChangeRef,
                   projectCanvasViewport: viewportStore.setViewport
                 })

@@ -1,5 +1,25 @@
-import type { TerminalWorkloadScheduler } from '../../../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
-import type { TerminalZoomRasterCoordinator } from '../../../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
+import { TerminalSurfaceRegistry } from '../../../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
+import { TerminalWorkloadScheduler } from '../../../../contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
+import { TerminalZoomRasterCoordinator } from '../../../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
+
+export function createTerminalRenderingServices(maximumRasterScale: number) {
+  const terminalZoomRasterCoordinator = new TerminalZoomRasterCoordinator({ maximumRasterScale })
+  const terminalWorkloadScheduler = new TerminalWorkloadScheduler()
+  return {
+    terminalZoomRasterCoordinator,
+    terminalWorkloadScheduler,
+    terminalRenderingWorkloadCoordinator: createTerminalRenderingWorkloadCoordinator(
+      terminalZoomRasterCoordinator,
+      terminalWorkloadScheduler
+    ),
+    terminalSurfaceRegistry: new TerminalSurfaceRegistry(
+      undefined,
+      undefined,
+      terminalZoomRasterCoordinator,
+      terminalWorkloadScheduler
+    )
+  }
+}
 
 export interface TerminalRenderingWorkloadCoordinator {
   beginInteraction(): void
