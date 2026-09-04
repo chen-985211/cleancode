@@ -5,8 +5,22 @@ import { join } from 'node:path'
 import { inspectCodexThreadResumability } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexThreadResumabilityInspector'
 
 const threadId = '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+const providerArgs = [
+  '--config',
+  'profile="dev"',
+  '',
+  'C:\\path with spaces\\',
+  'literal "quote" & %PATH%'
+]
 
 describe('Codex persisted thread inspection', () => {
+  let directory: string
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'cleancode-codex-thread-read-'))
+  })
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true })
+  })
   it.each([
     { response: { result: { thread: { id: threadId } } }, expected: 'available' },
     {
@@ -31,13 +45,11 @@ describe('Codex persisted thread inspection', () => {
   ])(
     'classifies a metadata-only read as $expected for $response',
     async ({ response, expected }) => {
-      const directory = await mkdtemp(join(tmpdir(), 'cleancode-codex-thread-read-'))
       const script = join(directory, 'app-server.mjs')
       const report = join(directory, 'request.json')
-      try {
-        await writeFile(
-          script,
-          `
+      await writeFile(
+        script,
+        `
 import { createInterface } from 'node:readline'
 import { writeFileSync } from 'node:fs'
 createInterface({ input: process.stdin }).on('line', (line) => {
@@ -51,33 +63,31 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     }))
     process.stdout.write(JSON.stringify({ id: request.id, ...JSON.parse(process.env.RESPONSE) }) + '\\n')
   }
-})
+}).on('close', () => writeFileSync(process.env.REPORT_PATH + '.closed', 'closed'))
 `
-        )
-        expect(
-          await inspectCodexThreadResumability({
-            appServerArgs: [script, '--config', 'profile="dev"'],
-            environment: {
-              CODEX_HOME: directory,
-              REPORT_PATH: report,
-              RESPONSE: JSON.stringify(response)
-            },
-            executable: process.execPath,
-            threadId,
-            workspaceDirectory: directory
-          })
-        ).toBe(expected)
-        const observation = JSON.parse(await readFile(report, 'utf8')) as { pid: number }
-        expect(observation).toMatchObject({
-          args: ['--config', 'profile="dev"', 'app-server'],
-          cwd: await realpath(directory),
-          codexHome: directory,
-          request: { method: 'thread/read', params: { threadId, includeTurns: false } }
+      )
+      expect(
+        await inspectCodexThreadResumability({
+          appServerArgs: [script, ...providerArgs],
+          environment: {
+            CODEX_HOME: directory,
+            REPORT_PATH: report,
+            RESPONSE: JSON.stringify(response)
+          },
+          executable: process.execPath,
+          threadId,
+          workspaceDirectory: directory
         })
-        await vi.waitFor(() => expect(() => process.kill(observation.pid, 0)).toThrow())
-      } finally {
-        await rm(directory, { recursive: true, force: true })
-      }
+      ).toBe(expected)
+      const observation = JSON.parse(await readFile(report, 'utf8')) as { cwd: string; pid: number }
+      expect(observation).toMatchObject({
+        args: [...providerArgs, 'app-server'],
+        codexHome: directory,
+        request: { method: 'thread/read', params: { threadId, includeTurns: false } }
+      })
+      expect(await realpath(observation.cwd)).toBe(await realpath(directory))
+      expect(() => process.kill(observation.pid, 0)).toThrow()
+      expect(await readFile(`${report}.closed`, 'utf8')).toBe('closed')
     }
   )
 

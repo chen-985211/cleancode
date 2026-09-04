@@ -56,6 +56,8 @@ Codex 的 title、完成回合 notify 和 `SessionEnd` Hook 上报的是已分�
 
 Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时清除绑定并打开空白对话；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
 
+查询结果须等待查询进程关闭后再返回：先关闭标准输入，允许 CLI 及其启动器正常退出；有界等待超时后，Windows 终止本次查询的进程树。清理超时同样返回不可用，不能据此清除绑定。Windows 原生 CLI 通过原生进程参数和继承的标准流运行，避免 PowerShell 的命令管道改写 JSON-RPC 输入或带引号的启动参数。
+
 ## Provider contribution
 
 `AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：

@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 
-import { createAgentProviderCliProcessInvocation } from '../shared/NodeAgentProviderCliDetector'
+import { createCodexAppServerProcessInvocation } from './CodexAppServerProcessInvocation'
 
 interface CodexThreadResumabilityInput {
   readonly appServerArgs: readonly string[]
@@ -27,7 +27,7 @@ export const inspectCodexThreadResumability: CodexThreadResumabilityInspector = 
 function readPersistedThread(
   input: CodexThreadResumabilityInput
 ): Promise<CodexThreadResumability> {
-  const invocation = createAgentProviderCliProcessInvocation(input.executable, [
+  const invocation = createCodexAppServerProcessInvocation(input.executable, [
     ...input.appServerArgs,
     'app-server'
   ])
@@ -42,23 +42,50 @@ function readPersistedThread(
     let output = ''
     let initialized = false
     let settled = false
+    let result: CodexThreadResumability = 'unavailable'
+    let closed = false
     let forceKill: ReturnType<typeof setTimeout> | undefined
+    let cleanupTimeout: ReturnType<typeof setTimeout> | undefined
     const timeout = setTimeout(() => finish('unavailable'), 7_500)
     const finish = (status: CodexThreadResumability): void => {
       if (settled) return
       settled = true
+      result = status
       clearTimeout(timeout)
       child.stdin.end()
-      if (child.exitCode === null && child.signalCode === null) {
-        child.kill()
-        forceKill = setTimeout(() => child.kill('SIGKILL'), 500)
-        forceKill.unref()
-      }
-      resolve(status)
+      // EOF lets both the CLI and its Windows launcher release their working directory.
+      forceKill = setTimeout(() => {
+        if (process.platform === 'win32' && child.pid) {
+          execFile(
+            'taskkill.exe',
+            ['/PID', String(child.pid), '/T', '/F'],
+            {
+              timeout: 1_500,
+              windowsHide: true
+            },
+            (error) => {
+              if (error && !closed) child.kill('SIGKILL')
+            }
+          )
+        } else {
+          child.kill('SIGKILL')
+        }
+      }, 500)
+      cleanupTimeout = setTimeout(() => {
+        // An unconfirmed cleanup must never authorize discarding a saved conversation.
+        result = 'unavailable'
+        child.stdin.destroy()
+        child.stdout.destroy()
+        child.stderr.destroy()
+        resolve('unavailable')
+      }, 2_500)
     }
     child.once('close', () => {
+      closed = true
+      clearTimeout(timeout)
       clearTimeout(forceKill)
-      finish('unavailable')
+      clearTimeout(cleanupTimeout)
+      resolve(result)
     })
     child.once('error', () => finish('unavailable'))
     child.stdin.on('error', () => finish('unavailable'))

@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["taskkill.exe"],
   "entry": [
     "electron.vite.config.ts",
     "src/platform/electron-main/main.ts",
