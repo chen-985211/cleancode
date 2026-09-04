@@ -199,9 +199,11 @@ describe('terminal daily interactions e2e', () => {
               accept: (projection) =>
                 projection !== null &&
                 projection.renderer === 'webgl' &&
-                projection.rasterScale === 1.75 &&
+                Math.abs(projection.rasterScale - projection.zoom) < 0.001 &&
                 projection.zoom >= 1.599 &&
-                projection.backingDensity >= projection.devicePixelRatio * 0.98,
+                Math.abs(
+                  projection.backingWidth - projection.displayWidth * projection.devicePixelRatio
+                ) < 1,
               intervalMs: 50,
               timeoutMs: 10_000
             })
@@ -218,12 +220,44 @@ describe('terminal daily interactions e2e', () => {
         rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
       const afterDimensions = await probeTerminalDimensions(page, sessionId, 'AFTER')
 
+      if (process.env.CLEANCODE_CAPTURE_RASTER) {
+        const output = join(
+          process.cwd(),
+          'test-results',
+          'terminal-raster',
+          process.env.CLEANCODE_CAPTURE_RASTER
+        )
+        await mkdir(output, { recursive: true })
+        await page.screenshot({ path: join(output, 'application-maximum-zoom.png') })
+      }
+
       if (rendererState.renderer === 'webgl') {
         expect(rasterProjection).not.toBeNull()
         expect(initialRasterProjection).not.toBeNull()
         expect(beforeCssGeometry).not.toBeNull()
-        expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
-        expect(afterCssGeometry).toEqual(beforeCssGeometry)
+        expect(rasterProjection!.backingWidth).toBeGreaterThan(
+          initialRasterProjection!.backingWidth
+        )
+        expect(afterCssGeometry!.screenWidth).toBe(beforeCssGeometry!.screenWidth)
+        expect(afterCssGeometry!.screenHeight).toBe(beforeCssGeometry!.screenHeight)
+        // Each frame rounds the canvas against its unchanged screen geometry at
+        // that frame's own display scale. Two independent corrections need not
+        // differ by less than half a pixel when converted at the final zoom.
+        for (const geometry of [beforeCssGeometry!, afterCssGeometry!]) {
+          for (const [canvasDimension, screenDimension, scale] of [
+            ['canvasWidth', 'screenWidth', 'scaleX'],
+            ['canvasHeight', 'screenHeight', 'scaleY']
+          ] as const) {
+            const correction = Math.abs(
+              Number.parseFloat(geometry[canvasDimension]) -
+                Number.parseFloat(geometry[screenDimension])
+            )
+            expect(
+              correction * geometry[scale] * geometry.devicePixelRatio,
+              JSON.stringify(geometry)
+            ).toBeLessThanOrEqual(0.51)
+          }
+        }
       } else {
         expect(rendererState.renderer).toBe('dom')
         expect(webgl2Available).toBe(false)
@@ -294,6 +328,9 @@ function readTerminalCssGeometry(
 ): Promise<{
   readonly canvasHeight: string
   readonly canvasWidth: string
+  readonly devicePixelRatio: number
+  readonly scaleX: number
+  readonly scaleY: number
   readonly screenHeight: string
   readonly screenWidth: string
 } | null> {
@@ -309,9 +346,13 @@ function readTerminalCssGeometry(
     )
     if (!screen || !canvas) return null
 
+    const screenBounds = screen.getBoundingClientRect()
     return {
       canvasHeight: canvas.style.height,
       canvasWidth: canvas.style.width,
+      devicePixelRatio: window.devicePixelRatio,
+      scaleX: screenBounds.width / Number.parseFloat(screen.style.width),
+      scaleY: screenBounds.height / Number.parseFloat(screen.style.height),
       screenHeight: screen.style.height,
       screenWidth: screen.style.width
     }

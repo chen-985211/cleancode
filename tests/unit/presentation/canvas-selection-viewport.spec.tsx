@@ -13,45 +13,65 @@ describe('canvas selection viewport', () => {
     vi.unstubAllGlobals()
   })
 
-  it('centers a selected node with the existing readable focus zoom', () => {
-    const node = createNode('terminal-1', { x: 240, y: 180 }, { width: 400, height: 300 })
-    const { instance, setViewport } = createReactFlowInstance([node], {
-      x: -100,
-      y: -80,
-      zoom: 0.5
-    })
-    const { result } = renderSelectionViewportHook(instance)
+  it.each(['terminal', 'terminalGroup', 'agentConsole'] as const)(
+    'centers a selected %s at 100%',
+    (type) => {
+      const node = createNode(
+        'selected-node',
+        { x: 240, y: 180 },
+        { width: 400, height: 300 },
+        type
+      )
+      const { instance, setViewport } = createReactFlowInstance([node], {
+        x: -100,
+        y: -80,
+        zoom: 0.5
+      })
+      const { result } = renderSelectionViewportHook(instance)
 
-    act(() => {
-      result.current.focusSelectedWorkbenchNode(node.id)
-    })
+      act(() => {
+        result.current.focusSelectedWorkbenchNode(node.id)
+      })
 
-    expect(setViewport).toHaveBeenCalledWith({ x: 84, y: 23, zoom: 0.9 }, { duration: 0 })
-  })
+      expect(setViewport).toHaveBeenCalledWith({ x: 40, y: -10, zoom: 1 }, { duration: 0 })
+    }
+  )
 
-  it('returns to 35% around the uniquely selected node center', () => {
-    const selectedNode = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
-    const distantNode = createNode('terminal-2', { x: 2_000, y: 900 }, { width: 420, height: 306 })
-    const { getNodesBounds, instance, setViewport } = createReactFlowInstance([
-      selectedNode,
-      distantNode
-    ])
-    const { result } = renderSelectionViewportHook(instance)
+  it.each(['terminal', 'terminalGroup', 'agentConsole'] as const)(
+    'returns to 50% around the uniquely selected %s center',
+    (type) => {
+      const selectedNode = createNode(
+        'selected-node',
+        { x: 100, y: 120 },
+        { width: 400, height: 300 },
+        type
+      )
+      const distantNode = createNode(
+        'terminal-2',
+        { x: 2_000, y: 900 },
+        { width: 420, height: 306 }
+      )
+      const { getNodesBounds, instance, setViewport } = createReactFlowInstance([
+        selectedNode,
+        distantNode
+      ])
+      const { result } = renderSelectionViewportHook(instance)
 
-    act(() => {
-      result.current.returnToGlobalCanvasView(selectedNode.id)
-    })
+      act(() => {
+        result.current.returnToGlobalCanvasView(selectedNode.id)
+      })
 
-    expect(getNodesBounds).not.toHaveBeenCalled()
-    expect(setViewport).toHaveBeenCalledWith({ x: 375, y: 225.5, zoom: 0.35 }, { duration: 0 })
-  })
+      expect(getNodesBounds).not.toHaveBeenCalled()
+      expect(setViewport).toHaveBeenCalledWith({ x: 330, y: 185, zoom: 0.5 }, { duration: 0 })
+    }
+  )
 
   it('keeps the current viewport center when no unique selection exists', () => {
     const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
     const { instance, setViewport } = createReactFlowInstance([node], {
       x: -100,
       y: -80,
-      zoom: 0.5
+      zoom: 1
     })
     const { result } = renderSelectionViewportHook(instance)
 
@@ -59,7 +79,7 @@ describe('canvas selection viewport', () => {
       result.current.returnToGlobalCanvasView(null)
     })
 
-    expect(setViewport).toHaveBeenCalledWith({ x: 74, y: 40, zoom: 0.35 }, { duration: 0 })
+    expect(setViewport).toHaveBeenCalledWith({ x: 190, y: 120, zoom: 0.5 }, { duration: 0 })
   })
 
   it('coalesces repeated overview requests while the first request is still in flight', () => {
@@ -67,7 +87,7 @@ describe('canvas selection viewport', () => {
     const { instance, setViewport } = createReactFlowInstance([node], {
       x: -100,
       y: -80,
-      zoom: 0.5
+      zoom: 1
     })
     const { result } = renderSelectionViewportHook(instance)
 
@@ -80,12 +100,12 @@ describe('canvas selection viewport', () => {
     expect(setViewport).toHaveBeenCalledOnce()
   })
 
-  it('does not restart overview motion after the viewport has already settled at 35%', async () => {
+  it('does not restart overview motion after the viewport has already settled at 50%', async () => {
     const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
     const { instance, setViewport } = createReactFlowInstance([node], {
       x: -100,
       y: -80,
-      zoom: 0.5
+      zoom: 1
     })
     const { result } = renderSelectionViewportHook(instance)
 
@@ -111,7 +131,7 @@ describe('canvas selection viewport', () => {
       const { instance, setViewport } = createReactFlowInstance([visibleNode, hiddenNode], {
         x: -100,
         y: -80,
-        zoom: 0.5
+        zoom: 1
       })
       const { result } = renderSelectionViewportHook(instance)
 
@@ -119,9 +139,23 @@ describe('canvas selection viewport', () => {
         result.current.returnToGlobalCanvasView(anchorNodeId)
       })
 
-      expect(setViewport).toHaveBeenCalledWith({ x: 74, y: 40, zoom: 0.35 }, { duration: 0 })
+      expect(setViewport).toHaveBeenCalledWith({ x: 190, y: 120, zoom: 0.5 }, { duration: 0 })
     }
   )
+
+  it('returns from the manual minimum zoom to 50% around the current viewport center', () => {
+    const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance, setViewport } = createReactFlowInstance([node], {
+      x: 340,
+      y: 250,
+      zoom: 0.35
+    })
+    const { result } = renderSelectionViewportHook(instance)
+
+    act(() => result.current.returnToGlobalCanvasView(null))
+
+    expect(setViewport).toHaveBeenCalledWith({ x: 280, y: 220, zoom: 0.5 }, { duration: 0 })
+  })
 
   it('does not move an empty canvas', () => {
     const { instance, setViewport } = createReactFlowInstance([])
@@ -193,14 +227,15 @@ function createReactFlowInstance(
 function createNode(
   id: string,
   position: { readonly x: number; readonly y: number },
-  measured: { readonly width: number; readonly height: number }
+  measured: { readonly width: number; readonly height: number },
+  type: WorkbenchFlowNode['type'] = 'terminal'
 ): WorkbenchFlowNode {
   return {
     data: {},
     id,
     measured,
     position,
-    type: 'terminal'
+    type
   } as unknown as WorkbenchFlowNode
 }
 

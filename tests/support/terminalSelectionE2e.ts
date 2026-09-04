@@ -10,7 +10,10 @@ export async function setCanvasZoomFromDefault(
 ): Promise<number> {
   const buttonName = direction === 'in' ? '放大画布' : '缩小画布'
   const initialZoom = await readCanvasZoom(page)
-  const expectedZoom = direction === 'in' ? initialZoom * 1.2 : initialZoom / 1.2
+  const expectedZoom = Math.min(
+    1.6,
+    Math.max(0.35, initialZoom + (direction === 'in' ? 0.3 : -0.3))
+  )
 
   await page.getByRole('button', { name: buttonName }).click()
   await page.waitForFunction((expected) => {

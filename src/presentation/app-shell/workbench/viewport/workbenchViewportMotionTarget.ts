@@ -33,11 +33,11 @@ export function resolveWorkbenchCommandCanvasSize(
 export function resolveWorkbenchZoomTarget(
   currentViewport: Viewport,
   canvasSize: { readonly height: number; readonly width: number },
-  factor: number
+  delta: number
 ): Viewport {
   const zoom = Math.min(
     maximumCanvasZoom,
-    Math.max(minimumCanvasZoom, currentViewport.zoom * factor)
+    Math.max(minimumCanvasZoom, currentViewport.zoom + delta)
   )
   const centerX = (canvasSize.width / 2 - currentViewport.x) / currentViewport.zoom
   const centerY = (canvasSize.height / 2 - currentViewport.y) / currentViewport.zoom

@@ -35,6 +35,7 @@ export function synchronizeCanvasViewportFromMove({
 
 interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistence {
   readonly event: unknown
+  readonly isManagedViewportMove?: boolean
   readonly isRestoringViewport: boolean
   readonly onRasterInteractionEnd?: (zoom: number) => void
   readonly viewport: Viewport
@@ -42,11 +43,15 @@ interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistenc
 
 export function persistCanvasViewportFromMoveEnd({
   event,
+  isManagedViewportMove = false,
   isRestoringViewport,
   onRasterInteractionEnd,
   viewport,
   onViewportChange
 }: PersistCanvasViewportFromMoveEndInput): void {
+  // Controller frames and node auto-pan have an explicit whole-motion end.
+  // Other React Flow moves (such as focus auto-pan) may also have no event.
+  if (isManagedViewportMove) return
   onRasterInteractionEnd?.(viewport.zoom)
   if (!event || isRestoringViewport) {
     return
@@ -92,28 +97,33 @@ export function commitCompletedCanvasViewportMotion({
 
 export function subscribeCanvasViewportMotionCompletion({
   instance,
+  onRasterInteractionEnd,
   onViewportChangeRef,
   projectCanvasViewport
 }: CanvasViewportProjection & {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  readonly onRasterInteractionEnd?: (zoom: number) => void
   readonly onViewportChangeRef: MutableRefObject<CanvasViewportPersistence['onViewportChange']>
 }): () => void {
   const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionCompletion(
     instance,
-    (completion) =>
+    (completion) => {
+      onRasterInteractionEnd?.(completion.viewport.zoom)
       commitCompletedCanvasViewportMotion({
         completion,
         onViewportChange: onViewportChangeRef.current,
         projectCanvasViewport
       })
+    }
   )
-  const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) =>
+  const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) => {
+    onRasterInteractionEnd?.(viewport.zoom)
     commitCanvasViewport({
       viewport,
       onViewportChange: onViewportChangeRef.current,
       projectCanvasViewport
     })
-  )
+  })
 
   return () => {
     unsubscribeProgrammatic()

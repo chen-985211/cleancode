@@ -43,7 +43,7 @@ describe('canvas selection viewport e2e', () => {
   })
 
   it(
-    'returns to 35% around the node selected from its title',
+    'returns to 50% around the node selected from its title',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -57,14 +57,14 @@ describe('canvas selection viewport e2e', () => {
         page,
         node,
         (presentation) =>
-          isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
+          isNear(presentation.zoom, 0.5, 0.000_1) && isCanvasNodeCentered(presentation)
       )
       const focusedZoom = await resolveExpectedFocusedZoom(page, node)
 
       await node.locator('.terminal-node__header').click()
       await waitForCanvasViewportZoomCommit(page, {
         direction: 'increase',
-        previousZoom: 0.35,
+        previousZoom: 0.5,
         projectDirectory: workbench.projectDirectory
       })
       const focusedPresentation = await pollCanvasPresentation(
@@ -92,10 +92,10 @@ describe('canvas selection viewport e2e', () => {
         page,
         node,
         (presentation) =>
-          isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
+          isNear(presentation.zoom, 0.5, 0.000_1) && isCanvasNodeCentered(presentation)
       )
 
-      expect(globalPresentation.zoom).toBeCloseTo(0.35, 3)
+      expect(globalPresentation.zoom).toBeCloseTo(0.5, 3)
       expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
       expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
       const settledPresentation = await readCanvasPresentation(page, node)
@@ -122,7 +122,7 @@ describe('canvas selection viewport e2e', () => {
         page,
         node,
         (presentation) =>
-          isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
+          isNear(presentation.zoom, 0.5, 0.000_1) && isCanvasNodeCentered(presentation)
       )
 
       const anchor = await resolveTrueCanvasPanePoint(pane)

@@ -54,8 +54,9 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.element) this.element.dataset.terminalRenderer = state
     }
   })
-  private readonly xtermRasterTarget = new TerminalXtermRasterTarget((scale) =>
-    this.rendererController.setRasterScale(scale)
+  private readonly xtermRasterTarget = new TerminalXtermRasterTarget(
+    (scale) => this.rendererController.setRasterScale(scale),
+    () => this.rendererController.refreshRasterAlignment()
   )
   readonly rasterTarget = this.xtermRasterTarget.target
   readonly workloadTarget: TerminalSurfaceWorkloadTarget = {

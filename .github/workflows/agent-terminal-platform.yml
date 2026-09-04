@@ -76,7 +76,11 @@ jobs:
         run: pnpm verify:native
       - name: Run every static and structural quality gate
         run: pnpm check:quality
+      - name: Run all unit, integration, and contract tests with a Linux display
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm test:core:ci
       - name: Run all unit, integration, and contract tests
+        if: runner.os != 'Linux'
         run: pnpm test:core:ci
       - run: pnpm build
 

@@ -63,6 +63,7 @@ export interface TerminalSurfaceRasterTarget {
   getRasterCost(scale: TerminalRasterScale): number
   onRasterCostChange?(listener: () => void): () => void
   onRasterPriorityChange?(listener: () => void): () => void
+  refreshRasterAlignment?(): void
   setRasterScale(scale: TerminalRasterScale): void
 }
 

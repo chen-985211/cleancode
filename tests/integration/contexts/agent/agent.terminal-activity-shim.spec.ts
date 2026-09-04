@@ -192,10 +192,11 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
       const rcPath = [providerDirectory, dirname(process.execPath), '/usr/bin', '/bin'].join(
         delimiter
       )
+      const shellPrompt = 'cleancode-agent-shell-ready> '
       if (shell.endsWith('/bash')) {
         await writeFile(
           join(homeDirectory, '.bashrc'),
-          'export PATH="$RC_PROVIDER_PATH"\nexport CLEANCODE_TEST_RC_LOADED=bash\n'
+          `export PATH="$RC_PROVIDER_PATH"\nexport CLEANCODE_TEST_RC_LOADED=bash\nPS1="${shellPrompt}"\n`
         )
       } else {
         await writeFile(
@@ -204,7 +205,7 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
         )
         await writeFile(
           join(userZdotDirectory, '.zshrc'),
-          'export PATH="$RC_PROVIDER_PATH"\nexport CLEANCODE_TEST_RC_LOADED=zsh\n'
+          `export PATH="$RC_PROVIDER_PATH"\nexport CLEANCODE_TEST_RC_LOADED=zsh\nPS1="${shellPrompt}"\n`
         )
       }
 
@@ -249,6 +250,7 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
           shell: prepared.shell,
           workingDirectory: root
         })
+        await vi.waitFor(() => expect(output).toContain(shellPrompt), { timeout: 5_000 })
         adapter.write(runCommand.scope.sessionId, 'codex --model interrupt-test\r')
 
         const capture = await waitForJsonFile(capturePath)

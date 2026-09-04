@@ -28,10 +28,14 @@ export class TerminalXtermRasterTarget {
       this.priorityListeners.add(listener)
       return () => this.priorityListeners.delete(listener)
     },
-    setRasterScale: (scale) => this.setScale(scale)
+    setRasterScale: (scale) => this.setScale(scale),
+    refreshRasterAlignment: () => this.refreshAlignment()
   }
 
-  constructor(private readonly applyScale: (scale: TerminalRasterScale) => void) {}
+  constructor(
+    private readonly applyScale: (scale: TerminalRasterScale) => void,
+    private readonly refreshAlignment: () => void = () => undefined
+  ) {}
 
   attach(element: HTMLDivElement): void {
     this.detach(this.element)

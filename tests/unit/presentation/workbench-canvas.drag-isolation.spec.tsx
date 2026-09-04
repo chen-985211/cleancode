@@ -12,6 +12,9 @@ import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvas'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
+import { applyWorkbenchViewport } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportAdapter'
+import { createWorkbenchDirectZoomController } from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
+import type { WorkbenchCanvasProps } from '../../../src/presentation/app-shell/workbench/workbenchCanvasProps'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null,
@@ -170,6 +173,132 @@ describe('workbench canvas drag isolation', () => {
     expect(reactFlowProps.latest?.zoomOnScroll).toBe(false)
   })
 
+  it.each([null, undefined])('ends React Flow automatic movement with source %s', (event) => {
+    const { terminalNode } = createNodes()
+    const coordinator = createRenderingCoordinator()
+    renderCanvas([terminalNode], vi.fn(), vi.fn(), vi.fn(), {
+      terminalZoomRasterCoordinator: coordinator
+    })
+    const viewport = { x: -120, y: 30, zoom: 1.25 }
+
+    act(() => {
+      reactFlowProps.latest?.onMoveStart?.(event)
+      reactFlowProps.latest?.onMove?.(event, viewport)
+      reactFlowProps.latest?.onMoveEnd?.(event, viewport)
+    })
+
+    expect(coordinator.beginInteraction).toHaveBeenCalledOnce()
+    expect(coordinator.endInteraction).toHaveBeenCalledExactlyOnceWith(viewport.zoom)
+  })
+
+  it.each(['terminalNode', 'agentNode'] as const)(
+    'ends edge auto-pan when dragging %s stops, including a late move-end',
+    (nodeKey) => {
+      const node = createNodes()[nodeKey]
+      const coordinator = createRenderingCoordinator()
+      const viewport = { x: -120, y: 30, zoom: 1.25 }
+      const instance = { getZoom: () => viewport.zoom } as ReactFlowModule.ReactFlowInstance<
+        WorkbenchFlowNode,
+        ReactFlowModule.Edge
+      >
+      renderCanvas([node], vi.fn(), vi.fn(), vi.fn(), {
+        terminalZoomRasterCoordinator: coordinator,
+        reactFlowInstanceRef: { current: instance }
+      })
+
+      act(() => {
+        reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, node)
+        reactFlowProps.latest?.onMoveStart?.(null)
+        reactFlowProps.latest?.onMove?.(null, viewport)
+        reactFlowProps.latest?.onMoveEnd?.(null, viewport)
+      })
+      expect(coordinator.beginInteraction).toHaveBeenCalledOnce()
+      expect(coordinator.endInteraction).not.toHaveBeenCalled()
+
+      act(() => reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, node))
+      expect(coordinator.endInteraction).toHaveBeenCalledExactlyOnceWith(viewport.zoom)
+
+      act(() => reactFlowProps.latest?.onMoveEnd?.(null, viewport))
+      expect(coordinator.endInteraction).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('keeps controller motion active when a node drag ends without auto-pan', async () => {
+    const { terminalNode } = createNodes()
+    const coordinator = createRenderingCoordinator()
+    const viewport = { x: -120, y: 30, zoom: 1.25 }
+    const instance = {
+      getZoom: () => viewport.zoom,
+      setViewport: vi.fn(async () => {
+        reactFlowProps.latest?.onMoveStart?.(null)
+        return true
+      })
+    } as unknown as ReactFlowModule.ReactFlowInstance<WorkbenchFlowNode, ReactFlowModule.Edge>
+    renderCanvas([terminalNode], vi.fn(), vi.fn(), vi.fn(), {
+      terminalZoomRasterCoordinator: coordinator,
+      reactFlowInstanceRef: { current: instance }
+    })
+
+    act(() => reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, terminalNode))
+    await act(async () => {
+      await applyWorkbenchViewport(instance, viewport)
+    })
+    act(() => reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, terminalNode))
+    act(() => reactFlowProps.latest?.onMoveEnd?.(null, viewport))
+
+    expect(coordinator.endInteraction).not.toHaveBeenCalled()
+    expect(coordinator.requestRasterAlignment).toHaveBeenCalledOnce()
+  })
+
+  it.each(['programmatic', 'wheel'])(
+    'ignores a delayed %s frame end but ends the next automatic move',
+    async (source) => {
+      const { terminalNode } = createNodes()
+      const coordinator = createRenderingCoordinator()
+      const viewport = { x: -120, y: 30, zoom: 1.25 }
+      const instance = {
+        getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+        setViewport: vi.fn(async (next: ReactFlowModule.Viewport) => {
+          reactFlowProps.latest?.onMoveStart?.(null)
+          reactFlowProps.latest?.onMove?.(null, next)
+          return true
+        })
+      } as unknown as ReactFlowModule.ReactFlowInstance<WorkbenchFlowNode, ReactFlowModule.Edge>
+      renderCanvas([terminalNode], vi.fn(), vi.fn(), vi.fn(), {
+        terminalZoomRasterCoordinator: coordinator,
+        reactFlowInstanceRef: { current: instance }
+      })
+
+      await act(async () => {
+        if (source === 'programmatic') {
+          await applyWorkbenchViewport(instance, viewport)
+        } else {
+          const controller = createWorkbenchDirectZoomController({
+            cancelFrame: vi.fn(),
+            cancelTimeout: vi.fn(),
+            now: () => 0,
+            requestFrame: () => 1,
+            requestTimeout: () => 1
+          })
+          controller.retarget(instance, {
+            anchor: { x: 0, y: 0 },
+            deltaZoomStops: Math.log2(viewport.zoom),
+            reducedMotion: true
+          })
+          controller.cancel()
+        }
+      })
+      act(() => reactFlowProps.latest?.onMoveEnd?.(null, viewport))
+      expect(coordinator.endInteraction).not.toHaveBeenCalled()
+
+      act(() => {
+        reactFlowProps.latest?.onMoveStart?.(null)
+        reactFlowProps.latest?.onMoveEnd?.(null, viewport)
+      })
+      expect(coordinator.endInteraction).toHaveBeenCalledExactlyOnceWith(viewport.zoom)
+    }
+  )
+
   it('keeps viewport presentation frames out of the React Flow tree until detail changes', () => {
     const { agentNode, terminalNode } = createNodes()
 
@@ -214,13 +343,18 @@ interface MockReactFlowProps {
   readonly multiSelectionKeyCode?: string | null
   readonly nodes?: WorkbenchFlowNode[]
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onMove?: (
-    event: MouseEvent | null,
+    event: MouseEvent | null | undefined,
     viewport: { readonly x: number; readonly y: number; readonly zoom: number }
   ) => void
   readonly onPaneClick?: () => void
-  readonly onMoveStart?: (event: MouseEvent | null) => void
+  readonly onMoveStart?: (event: MouseEvent | null | undefined) => void
+  readonly onMoveEnd?: (
+    event: MouseEvent | null | undefined,
+    viewport: ReactFlowModule.Viewport
+  ) => void
   readonly selectionKeyCode?: string | null
   readonly zoomOnScroll?: boolean
 }
@@ -229,7 +363,8 @@ function renderCanvas(
   nodes: WorkbenchFlowNode[],
   onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void,
   onPaneClick = vi.fn(),
-  onViewportInteractionStart = vi.fn()
+  onViewportInteractionStart = vi.fn(),
+  overrides: Partial<WorkbenchCanvasProps> = {}
 ): void {
   const nodeStore = createWorkbenchNodeStore(nodes)
 
@@ -293,8 +428,18 @@ function renderCanvas(
       getMiniMapNodeColor={() => '#fff'}
       getMiniMapNodeStrokeColor={() => '#000'}
       getMiniMapNodeClassName={() => ''}
+      {...overrides}
     />
   )
+}
+
+function createRenderingCoordinator() {
+  return {
+    beginInteraction: vi.fn(),
+    endInteraction: vi.fn(),
+    requestRasterAlignment: vi.fn(),
+    updateCanvasZoom: vi.fn()
+  }
 }
 
 function createNodes(): {

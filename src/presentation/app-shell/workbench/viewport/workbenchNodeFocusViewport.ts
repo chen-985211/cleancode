@@ -17,7 +17,7 @@ interface ResolveWorkbenchNodeFocusZoomInput {
 
 const focusSafeWidthRatio = 0.72
 const focusSafeHeightRatio = 0.68
-const workbenchNodeReadableZoom = 0.9
+export const workbenchNodeReadableZoom = 1
 const zoomChangeThresholdRatio = 0.08
 const fallbackCanvasSize = { width: 960, height: 640 }
 

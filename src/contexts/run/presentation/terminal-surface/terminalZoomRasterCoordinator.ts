@@ -13,6 +13,7 @@ export interface TerminalZoomRasterTarget {
   getRasterCost(scale: TerminalRasterScale): number
   onRasterCostChange?(listener: () => void): () => void
   onRasterPriorityChange?(listener: () => void): () => void
+  refreshRasterAlignment?(): void
   setRasterScale(scale: TerminalRasterScale): void
 }
 
@@ -58,6 +59,7 @@ export class TerminalZoomRasterCoordinator {
   private readonly targetSubscriptions = new Map<string, () => void>()
   private readonly scheduler: TerminalZoomRasterScheduler
   private readonly maxBackingPixels: number
+  private readonly maximumRasterScale: number
   private readonly onRasterFailure: (failure: TerminalZoomRasterFailure) => void
   private canvasZoom = 1
   private generation = 0
@@ -73,14 +75,17 @@ export class TerminalZoomRasterCoordinator {
   constructor({
     scheduler = createBrowserRasterScheduler(),
     maxBackingPixels = defaultMaxBackingPixels,
+    maximumRasterScale = terminalRasterScaleLevels.at(-1)!,
     onRasterFailure = () => undefined
   }: {
     scheduler?: TerminalZoomRasterScheduler
     maxBackingPixels?: number
+    maximumRasterScale?: number
     onRasterFailure?: (failure: TerminalZoomRasterFailure) => void
   } = {}) {
     this.scheduler = scheduler
     this.maxBackingPixels = normalizeBackingPixelBudget(maxBackingPixels)
+    this.maximumRasterScale = maximumRasterScale
     this.onRasterFailure = onRasterFailure
   }
 
@@ -112,6 +117,10 @@ export class TerminalZoomRasterCoordinator {
     this.invalidatePendingWork()
   }
 
+  requestRasterAlignment(): void {
+    this.handleTargetStateChange()
+  }
+
   updateCanvasZoom(canvasZoom: number): void {
     if (this.isDisposed) return
     const normalizedZoom = normalizeCanvasZoom(canvasZoom)
@@ -126,7 +135,9 @@ export class TerminalZoomRasterCoordinator {
     this.canvasZoom = normalizeCanvasZoom(canvasZoom)
     this.isInteracting = false
     this.invalidatePendingWork()
-    this.scheduleSettlement()
+    // The viewport has already signalled completion. Queue idle work now;
+    // drawing still happens only in the scheduler's idle slices.
+    this.prepareTasks(this.generation)
   }
 
   dispose(): void {
@@ -176,7 +187,8 @@ export class TerminalZoomRasterCoordinator {
           ? 1
           : resolveTerminalRasterScale({
               canvasZoom: this.canvasZoom,
-              currentScale: target.getRasterScale()
+              currentScale: target.getRasterScale(),
+              maximumScale: this.maximumRasterScale
             })
       )
     }
@@ -186,6 +198,7 @@ export class TerminalZoomRasterCoordinator {
       policyScales
     })
     const upgrades: RasterTask[] = []
+    const alignments: RasterTask[] = []
     const downgrades: RasterTask[] = []
     const currentBackingPixels = sumRasterCosts(orderedTargets, (target) =>
       target.getRasterCost(target.getRasterScale())
@@ -194,19 +207,34 @@ export class TerminalZoomRasterCoordinator {
     for (const target of orderedTargets) {
       const currentScale = target.getRasterScale()
       const scale = desiredScales.get(target) ?? 1
-      if (scale === currentScale) continue
-      const lane: RasterTaskLane =
-        scale > currentScale && target.getRasterPriority() === 'focused' ? 'focused' : 'idle'
+      if (
+        scale === currentScale &&
+        (target.getRasterPriority() === 'hidden' || !target.refreshRasterAlignment)
+      )
+        continue
+      const lane: RasterTaskLane = target.getRasterPriority() === 'focused' ? 'focused' : 'idle'
       const task = { attempt: 1, generation, lane, scale, target }
       if (scale > currentScale) upgrades.push(task)
-      else downgrades.push(task)
+      else if (scale < currentScale) downgrades.push(task)
+      else alignments.push(task)
     }
 
     const immediateReleases: RasterTask[] = []
     const delayedDowngrades: RasterTask[] = []
+    const upgradeBackingPixels = upgrades.reduce(
+      (total, task) =>
+        total +
+        Math.max(
+          0,
+          normalizeRasterCost(task.target.getRasterCost(task.scale)) -
+            normalizeRasterCost(task.target.getRasterCost(task.target.getRasterScale()))
+        ),
+      0
+    )
+    const mustReleaseBeforeUpgrade =
+      currentBackingPixels + upgradeBackingPixels > this.maxBackingPixels
     for (const task of downgrades) {
       const policyScale = policyScales.get(task.target) ?? 1
-      const mustReleaseBeforeUpgrade = upgrades.length > 0
       const isBudgetConstrained = task.scale < policyScale
       const isOverBudget = currentBackingPixels > this.maxBackingPixels
       if (
@@ -218,10 +246,13 @@ export class TerminalZoomRasterCoordinator {
         immediateReleases.push({ ...task, lane: 'release' })
       } else {
         delayedDowngrades.push(task)
+        if (task.target.refreshRasterAlignment) {
+          alignments.push({ ...task, scale: task.target.getRasterScale() })
+        }
       }
     }
 
-    this.enqueue([...immediateReleases, ...upgrades])
+    this.enqueue([...immediateReleases, ...upgrades, ...alignments])
     if (delayedDowngrades.length === 0) return
     this.downgradeTimer = this.scheduler.setTimeout(() => {
       this.downgradeTimer = null
@@ -262,12 +293,13 @@ export class TerminalZoomRasterCoordinator {
     if (
       task.generation !== this.generation ||
       this.targets.get(task.target.id) !== task.target ||
-      task.target.getRasterScale() === task.scale
+      (task.target.getRasterScale() === task.scale && !task.target.refreshRasterAlignment)
     ) {
       return
     }
     try {
-      task.target.setRasterScale(task.scale)
+      if (task.target.getRasterScale() !== task.scale) task.target.setRasterScale(task.scale)
+      if (task.target.getRasterPriority() !== 'hidden') task.target.refreshRasterAlignment?.()
     } catch (error) {
       if (task.target.getRasterScale() === task.scale) return
       this.reportRasterFailure({
@@ -280,7 +312,7 @@ export class TerminalZoomRasterCoordinator {
         this.enqueue([{ ...task, attempt: task.attempt + 1 }])
         return
       }
-      if (task.scale !== 1 && task.target.getRasterScale() !== 1) {
+      if (task.scale !== 1 && task.target.getRasterScale() > 1) {
         this.enqueue([
           {
             attempt: 1,
@@ -332,15 +364,20 @@ function allocateRasterScales({
   readonly policyScales: ReadonlyMap<TerminalZoomRasterTarget, TerminalRasterScale>
 }): Map<TerminalZoomRasterTarget, TerminalRasterScale> {
   const allocatedScales = new Map<TerminalZoomRasterTarget, TerminalRasterScale>()
-  for (const target of orderedTargets) allocatedScales.set(target, 1)
-  let allocatedBackingPixels = sumRasterCosts(orderedTargets, (target) => target.getRasterCost(1))
+  for (const target of orderedTargets) {
+    allocatedScales.set(target, 1)
+  }
+  let allocatedBackingPixels = sumRasterCosts(orderedTargets, (target) =>
+    target.getRasterCost(allocatedScales.get(target)!)
+  )
 
   for (const priority of ['focused', 'visible'] as const) {
     const targets = orderedTargets.filter((target) => target.getRasterPriority() === priority)
-    for (const scale of terminalRasterScaleLevels.slice(1)) {
+    for (const level of terminalRasterScaleLevels.slice(1)) {
       for (const target of targets) {
-        if ((policyScales.get(target) ?? 1) < scale) continue
+        const scale = Math.min(level, policyScales.get(target) ?? 1)
         const currentScale = allocatedScales.get(target) ?? 1
+        if (scale <= currentScale) continue
         const currentCost = normalizeRasterCost(target.getRasterCost(currentScale))
         const nextCost = normalizeRasterCost(target.getRasterCost(scale))
         const nextTotal = allocatedBackingPixels - currentCost + nextCost

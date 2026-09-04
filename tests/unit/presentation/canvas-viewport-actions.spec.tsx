@@ -61,7 +61,7 @@ describe('canvas viewport actions', () => {
       result.current.fitCanvas()
     })
 
-    expect(setViewport).toHaveBeenNthCalledWith(1, { x: -96, y: -64, zoom: 1.2 }, { duration: 0 })
+    expect(setViewport).toHaveBeenNthCalledWith(1, { x: -144, y: -96, zoom: 1.3 }, { duration: 0 })
     expect(setViewport).toHaveBeenNthCalledWith(2, { x: 0, y: 0, zoom: 1 }, { duration: 0 })
     expect(setViewport).toHaveBeenNthCalledWith(3, expect.any(Object), { duration: 0 })
   })

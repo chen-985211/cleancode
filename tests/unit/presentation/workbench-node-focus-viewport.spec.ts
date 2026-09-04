@@ -1,15 +1,18 @@
 import { resolveWorkbenchNodeFocusZoom } from '../../../src/presentation/app-shell/workbench/viewport/workbenchNodeFocusViewport'
 
 describe('workbench node focus viewport', () => {
-  it('restores a readable zoom when a compact target still fits safely', () => {
-    expect(
-      resolveWorkbenchNodeFocusZoom({
-        canvasSize: { width: 1_000, height: 800 },
-        currentZoom: 0.5,
-        nodeSize: { width: 400, height: 300 }
-      })
-    ).toBe(0.9)
-  })
+  it.each([0.35, 0.5, 0.9])(
+    'restores 100% from %s when a compact target still fits safely',
+    (currentZoom) => {
+      expect(
+        resolveWorkbenchNodeFocusZoom({
+          canvasSize: { width: 1_000, height: 800 },
+          currentZoom,
+          nodeSize: { width: 400, height: 300 }
+        })
+      ).toBe(1)
+    }
+  )
 
   it('keeps the current zoom when a target is already readable and fits safely', () => {
     expect(

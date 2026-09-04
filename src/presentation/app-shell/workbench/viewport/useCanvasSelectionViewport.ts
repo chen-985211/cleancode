@@ -1,7 +1,6 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useCallback, useRef, type MutableRefObject } from 'react'
 
-import { minimumCanvasZoom } from '../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
   resolveWorkbenchNodeCenter,
   type CanvasSize
@@ -13,9 +12,12 @@ import {
 } from './workbenchNodeFocusViewport'
 import {
   readWorkbenchViewportPresentation,
+  readWorkbenchViewportTargetZoom,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
+
+const globalCanvasViewZoom = 0.5
 
 interface UseCanvasSelectionViewportInput {
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
@@ -38,10 +40,9 @@ export function useCanvasSelectionViewport({
       const node = instance?.getNode(nodeId)
       if (!instance || !node || isWorkbenchNodePresentationHidden(node)) return
 
-      const viewport = instance.getViewport()
       const zoom = resolveWorkbenchNodeFocusZoom({
         canvasSize: canvasSizeRef.current,
-        currentZoom: viewport.zoom,
+        currentZoom: readWorkbenchViewportTargetZoom(instance),
         nodeSize: resolveWorkbenchNodeSize(node)
       })
 
@@ -98,7 +99,7 @@ export function useCanvasSelectionViewport({
           type: 'adaptive-focus'
         },
         type: 'center',
-        zoom: minimumCanvasZoom
+        zoom: globalCanvasViewZoom
       })
       const overviewRequest = { anchorNodeId }
       overviewRequestRef.current = overviewRequest
@@ -145,11 +146,11 @@ function isGlobalCanvasViewPresented(
 ): boolean {
   const width = canvasSize.width > 0 ? canvasSize.width : 960
   const height = canvasSize.height > 0 ? canvasSize.height : 640
-  const targetX = width / 2 - center.x * minimumCanvasZoom
-  const targetY = height / 2 - center.y * minimumCanvasZoom
+  const targetX = width / 2 - center.x * globalCanvasViewZoom
+  const targetY = height / 2 - center.y * globalCanvasViewZoom
 
   return (
-    Math.abs(viewport.zoom - minimumCanvasZoom) < 0.000_1 &&
+    Math.abs(viewport.zoom - globalCanvasViewZoom) < 0.000_1 &&
     Math.abs(viewport.x - targetX) < 0.1 &&
     Math.abs(viewport.y - targetY) < 0.1
   )

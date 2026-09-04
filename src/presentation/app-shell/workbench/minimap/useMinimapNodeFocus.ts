@@ -21,6 +21,7 @@ import {
 } from '../viewport/workbenchNodeFocusViewport'
 import {
   transitionWorkbenchViewport,
+  readWorkbenchViewportTargetZoom,
   type WorkbenchViewportMotionIntent
 } from '../viewport/workbenchViewportMotion'
 import { isExactWorkbenchNodeInputTarget } from '../creation/workbenchNodeInputActivation'
@@ -319,7 +320,7 @@ function resolveMinimapTargetZoom(
 ): number {
   return resolveWorkbenchNodeFocusZoom({
     canvasSize: readMinimapFocusCanvasSize(),
-    currentZoom: reactFlowInstance.getZoom(),
+    currentZoom: readWorkbenchViewportTargetZoom(reactFlowInstance),
     nodeSize
   })
 }

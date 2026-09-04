@@ -90,7 +90,7 @@ describe('application shortcut navigation hook', () => {
     act(() => hook.result.current.selectCanvasNode('right'))
 
     const [viewport] = setViewport.mock.calls[0] as unknown as [{ readonly zoom: number }]
-    expect(viewport.zoom).toBe(0.9)
+    expect(viewport.zoom).toBe(1)
   })
 
   it('centers without spatial motion when the user prefers reduced motion', () => {
