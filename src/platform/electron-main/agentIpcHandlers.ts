@@ -21,6 +21,9 @@ import { createExpectedAppError } from '../../shared-kernel/application/errors/A
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
+import { AgentPeerCanvasBridge } from './AgentPeerCanvasBridge'
+import type { AgentPeerCreationRegistry } from '../../contexts/agent/application/services/AgentPeerCreationRegistry'
+import type { AgentPeerCreationPort } from '../../contexts/agent/application/ports/AgentPeerCreationPort'
 
 interface IpcSender {
   isDestroyed(): boolean
@@ -28,8 +31,11 @@ interface IpcSender {
 }
 
 export interface AgentIpcHandlersInput {
+  readonly peerCreationRegistry?: AgentPeerCreationRegistry
   readonly approveAgentTool: (approvalId: string) => Promise<AgentToolApprovalDecisionResult>
   readonly attachAgentSession: (command: {
+    readonly initialPrompt?: string
+    readonly peerCreation?: AgentPeerCreationPort
     readonly agentId: string
     readonly agentName?: string
     readonly columns?: number
@@ -107,7 +113,28 @@ export interface AgentIpcHandlersInput {
   ) => Promise<AgentProviderPreferencesSnapshot>
 }
 
-export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
+export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => void {
+  const peerCanvas = new AgentPeerCanvasBridge()
+  registerIpcHandler<unknown, boolean>({
+    channel: 'cleancode:complete-agent-peer-creation',
+    handler: (command, event) => {
+      if (
+        !isRecord(command) ||
+        typeof command.requestId !== 'string' ||
+        typeof command.created !== 'boolean'
+      ) {
+        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid peer creation response.')
+      }
+      return peerCanvas.complete(readIpcSender(event), {
+        requestId: command.requestId,
+        created: command.created
+      })
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'completeAgentPeerCreation',
+    scope: 'agent'
+  })
   registerIpcHandler<void, AgentProviderPreferencesSnapshot>({
     channel: 'cleancode:get-agent-provider-preferences',
     handler: () => input.getAgentProviderPreferences(),
@@ -208,14 +235,37 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       const sender = readIpcSender(event)
 
       return input.attachAgentSession({
+        initialPrompt: input.peerCreationRegistry?.initialPrompt(command),
+        peerCreation: input.peerCreationRegistry
+          ? {
+              create: (peer) =>
+                input.peerCreationRegistry!.create(command, peer, () =>
+                  peerCanvas.create(sender, {
+                    agentId: peer.agentId,
+                    providerId: peer.providerId,
+                    projectId: command.projectId,
+                    workspaceId: command.workspaceId
+                  })
+                )
+            }
+          : undefined,
         agentId: command.agentId,
         agentName: command.agentName,
         columns: command.columns,
         gitBranch: command.gitBranch,
         onGraphUpdated: (graphEvent) =>
           sendIfAlive(sender, 'cleancode:agent-graph-updated', graphEvent),
-        onRuntimeChanged: (runtimeEvent) =>
-          sendIfAlive(sender, 'cleancode:agent-runtime-changed', runtimeEvent),
+        onRuntimeChanged: (runtimeEvent) => {
+          if (runtimeEvent.runtime.launch.status === 'running')
+            input.peerCreationRegistry?.markStarted(command)
+          if (['failed', 'exited', 'stopped'].includes(runtimeEvent.runtime.launch.status)) {
+            input.peerCreationRegistry?.markStopped(
+              command,
+              runtimeEvent.runtime.launch.status === 'failed' ? 'failed' : 'stopped'
+            )
+          }
+          sendIfAlive(sender, 'cleancode:agent-runtime-changed', runtimeEvent)
+        },
         onToolApprovalRequested: (approvalEvent) =>
           sendIfAlive(sender, 'cleancode:agent-tool-approval-requested', approvalEvent),
         persistenceMode: command.persistenceMode,
@@ -393,6 +443,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     operation: 'rejectAgentTool',
     scope: 'agent'
   })
+  return () => peerCanvas.dispose()
 }
 
 function readAgentTerminalSourceTheme(value: unknown): AgentTerminalSourceTheme {

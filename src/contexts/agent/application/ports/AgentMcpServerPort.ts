@@ -2,6 +2,7 @@ import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 import type { AgentToolExecutionResult } from '../use-cases/ExecuteAgentToolUseCase'
 
 export interface AgentMcpToolCallCommand {
+  readonly signal?: AbortSignal
   readonly input: Record<string, unknown>
   readonly sessionId: string
   readonly toolCallId: string

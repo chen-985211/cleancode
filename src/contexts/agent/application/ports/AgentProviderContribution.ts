@@ -2,6 +2,7 @@ import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/Prov
 import type { AgentActivityStatus } from '../dto/AgentSessionProtocol'
 
 interface AgentProviderCapabilities {
+  readonly initialPrompt?: boolean
   readonly activityTracking: boolean
   readonly cleancodeMcp: boolean
   readonly launchInstructions: boolean
@@ -124,6 +125,7 @@ export interface AgentLaunchPlan {
 }
 
 export interface CreateAgentLaunchPlanCommand {
+  readonly initialPrompt?: string
   readonly artifacts: AgentLaunchArtifactRegistrar
   readonly cleancodeMcp?: {
     readonly bearerToken: string

@@ -76,6 +76,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   readonly descriptor = {
     capabilities: {
       activityTracking: false,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
@@ -302,7 +303,8 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         '-C',
         command.workspaceDirectory,
         ...capability.args,
-        ...telemetry.args
+        ...telemetry.args,
+        ...(command.initialPrompt ? ['--', command.initialPrompt] : [])
       ],
       env: {
         ELECTRON_RUN_AS_NODE: '1',

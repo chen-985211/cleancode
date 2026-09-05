@@ -121,6 +121,9 @@ function exitCleanly() {
 }
 
 await publishSessionStart(sessionId, args.includes('--resume') ? 'resume' : 'startup')
+if (process.env.CLEANCODE_FAKE_PEER_MODULE) {
+  void import(process.env.CLEANCODE_FAKE_PEER_MODULE).then((scenario) => scenario.runPeerScenario('claude-code', args))
+}
 
 process.stdin.setRawMode?.(true)
 process.stdin.resume()

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchCanvasSafeViewport'
 
 import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
+import type { AgentPeerCanvasRequest } from '../../../src/contexts/agent/application/dto/AgentCollaborationProtocol'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import {
   createRuntimeApi,
@@ -53,6 +54,54 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 })
 
 describe('app shell create Agent focus', () => {
+  it('uses the same placement flow for an MCP peer and rejects a request for another workspace', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    let receive: (request: AgentPeerCanvasRequest) => void = () => undefined
+    const complete = vi.fn(async () => true)
+    const runtimeApi = createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    runtimeApi.createWorkspaceAgent.mockImplementation(async (command) =>
+      createAgent(command.agentId, workbench.project.id, {
+        position: command.initialPosition,
+        size: { width: 720, height: 460 }
+      })
+    )
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...runtimeApi,
+        onAgentPeerCreationRequested: (listener: typeof receive) => {
+          receive = listener
+          return () => undefined
+        },
+        completeAgentPeerCreation: complete
+      }
+    })
+    render(<AppShell />)
+    await screen.findByRole('button', { name: '新建 Agent' })
+    const request = {
+      requestId: 'request',
+      agentId: 'peer',
+      providerId: 'codex',
+      projectId: workbench.project.id,
+      workspaceId: 'main'
+    }
+    await act(async () => receive(request))
+    await waitFor(() =>
+      expect(complete).toHaveBeenCalledWith({ requestId: 'request', created: true })
+    )
+    expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'peer',
+        initialPosition: { x: expect.any(Number), y: expect.any(Number) }
+      })
+    )
+    await act(async () => receive({ ...request, requestId: 'stale', workspaceId: 'another' }))
+    await waitFor(() =>
+      expect(complete).toHaveBeenCalledWith({ requestId: 'stale', created: false })
+    )
+    expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledTimes(1)
+  })
+
   beforeEach(() => {
     stubReducedMotionPreference()
     reactFlowSpies.setCenter.mockClear()

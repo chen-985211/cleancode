@@ -14,23 +14,16 @@ import type {
 } from '../dto/AgentToolProtocol'
 import { createAgentToolFailedResult } from '../dto/AgentToolFailure'
 import { parseAgentToolInput } from '../dto/AgentToolInputValidation'
+import { agentToolAuditInput } from '../dto/AgentToolAuditInput'
 import type { AgentToolApprovalTarget } from '../dto/AgentSessionProtocol'
 import type { AgentAuditRepository } from '../ports/AgentAuditRepository'
 import type { AgentBlockGraphToolPort } from '../ports/AgentBlockGraphToolPort'
 import type { AgentCanvasLayoutRegion } from '../ports/AgentBlockGraphToolPort'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
+import type { AgentCollaborationTools } from '../services/AgentCollaborationTools'
+import type { ExecuteAgentToolCommand } from '../dto/AgentToolInvocation'
 
-export interface ExecuteAgentToolCommand {
-  readonly agentId: string
-  readonly approved?: boolean
-  readonly input: unknown
-  readonly projectDirectory: string
-  readonly projectId: string
-  readonly sessionId: string
-  readonly toolCallId: string
-  readonly toolName: AgentToolName
-  readonly workspaceId: string
-}
+export type { ExecuteAgentToolCommand } from '../dto/AgentToolInvocation'
 
 type AwaitingAgentToolApprovalResult = {
   readonly approval: {
@@ -62,7 +55,8 @@ export class ExecuteAgentToolUseCase {
   constructor(
     private readonly blockGraphTools: AgentBlockGraphToolPort,
     private readonly auditRepository: AgentAuditRepository,
-    private readonly agentSessionRepository: AgentSessionRepository
+    private readonly agentSessionRepository: AgentSessionRepository,
+    private readonly collaboration?: AgentCollaborationTools
   ) {}
 
   async execute(command: ExecuteAgentToolCommand): Promise<AgentToolExecutionResult> {
@@ -131,6 +125,22 @@ export class ExecuteAgentToolUseCase {
     }
 
     switch (invocation.toolName) {
+      case 'list_agents':
+      case 'list_agent_providers':
+      case 'create_agent':
+      case 'send_agent_message':
+      case 'wait_agent_message':
+        if (!this.collaboration)
+          throw createExpectedAppError(
+            'AGENT_TOOL_UNAVAILABLE',
+            'Agent collaboration is unavailable.'
+          )
+        return {
+          status: 'completed',
+          graphChanged: false,
+          output: await this.collaboration.execute({ ...command, input: invocation.input }),
+          toolCallId: command.toolCallId
+        }
       case 'inspect_graph':
         return completedGraphResult(
           command.toolCallId,
@@ -375,7 +385,7 @@ export class ExecuteAgentToolUseCase {
     await this.auditRepository.append({
       createdAt: new Date().toISOString(),
       id: command.toolCallId,
-      input: command.input,
+      input: agentToolAuditInput(command.toolName, command.input),
       projectDirectory: command.projectDirectory,
       requiresApproval,
       sessionId: command.sessionId,

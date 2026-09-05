@@ -27,6 +27,7 @@ export async function createManagedAgentLaunchPlan(command: {
   session.launchArtifacts = artifacts
   try {
     const plan = await provider.launcher.createLaunchPlan({
+      ...(session.initialPrompt ? { initialPrompt: session.initialPrompt } : {}),
       artifacts,
       cleancodeMcp: session.mcpRegistration
         ? {

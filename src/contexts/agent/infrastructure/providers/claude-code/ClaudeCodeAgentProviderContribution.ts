@@ -43,6 +43,7 @@ export class ClaudeCodeAgentProviderContribution implements AgentProviderContrib
   readonly descriptor = {
     capabilities: {
       activityTracking: true,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
@@ -214,7 +215,8 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
         ...(command.launchProfile?.arguments ?? []),
         ...sessionArgs,
         ...capability.args,
-        ...telemetry.args
+        ...telemetry.args,
+        ...(command.initialPrompt ? ['--', command.initialPrompt] : [])
       ],
       env: {
         ...(command.launchProfile?.environment ?? {}),

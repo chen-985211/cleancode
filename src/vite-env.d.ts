@@ -14,6 +14,10 @@ import type {
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type {
+  AgentPeerCanvasRequest,
+  AgentPeerCanvasResponse
+} from './contexts/agent/application/dto/AgentCollaborationProtocol'
+import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
 } from './contexts/project/application/dto/WorkspaceExternalOpen'
@@ -171,6 +175,8 @@ declare global {
         readonly workspaceDirectory: string
         readonly workspaceId: string
       }): Promise<WorkspaceAgentSnapshot>
+      onAgentPeerCreationRequested(listener: (event: AgentPeerCanvasRequest) => void): () => void
+      completeAgentPeerCreation(command: AgentPeerCanvasResponse): Promise<boolean>
       renameWorkspaceAgent(command: {
         readonly agentId: string
         readonly name: string

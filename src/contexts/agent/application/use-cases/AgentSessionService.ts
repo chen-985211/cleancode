@@ -165,6 +165,7 @@ export class AgentSessionService {
       return toAgentSessionSnapshot(existingSession)
     }
     if (existingSession?.isTerminalRunning) {
+      existingSession.initialPrompt ??= command.initialPrompt
       existingSession.callbacks = createAgentSessionCallbacks(command)
       if (command.restartMode === 'new' && existingSession.shouldPersist) {
         await this.persistence.clear(existingSession)
@@ -234,6 +235,7 @@ export class AgentSessionService {
     const providerSessionRef = persistedSession?.boundProviderSessionRef?.toSnapshot() ?? null
     const cleancodeMcpEnabled = workspaceAgent?.cleancodeMcpEnabled ?? mcpSupported
     const session: ManagedAgentSession = {
+      initialPrompt: command.initialPrompt,
       agentId: command.agentId,
       agentName: command.agentName ?? workspaceAgent?.name,
       callbacks: createAgentSessionCallbacks(command),

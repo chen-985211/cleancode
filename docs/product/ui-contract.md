@@ -391,13 +391,13 @@ Agent 控制台必须：
 - 切换独立 worktree 工作区时连接该物理工作区对应的 Agent；默认工作区分支 checkout 继续连接原 Agent 与对话，不串用其他工作区或其他 Agent 状态。
 - 应用重开时恢复 Agent 的固定 Provider、数量、名称、位置、大小、MCP 偏好和单一 Provider 对话绑定；Agent terminal 本身当前不跨应用保留。
 
-一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时必须原子持久化一个已初始化的空 Agent 列表，不检测 Provider、不创建默认 Agent，也不得在以后仅因 Provider 安装状态或偏好改变而自动补建。Agent 列表缺失或仍在加载时，界面必须按空列表呈现，不得合成默认 Codex Agent 或启动 Provider。只有用户明确执行“新建 Agent”才能创建首个及后续 Agent；其 MCP 初始值读取应用级“新 Agent 默认启用 CleanCode MCP”。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
+一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时必须原子持久化一个已初始化的空 Agent 列表，不检测 Provider、不创建默认 Agent，也不得在以后仅因 Provider 安装状态或偏好改变而自动补建。Agent 列表缺失或仍在加载时，界面必须按空列表呈现，不得合成默认 Codex Agent 或启动 Provider。用户明确执行“新建 Agent”，或当前工作区的 Agent 调用原生 MCP `create_agent`，才能创建首个及后续 Agent；其 MCP 初始值读取应用级“新 Agent 默认启用 CleanCode MCP”。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
 “新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 且没有被用户禁用的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 会修改后续创建使用的默认值，并在同一步立即用该 Provider 创建一个 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
 
-用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。MCP 创建复用同一位置预留、提交、聚焦和输入激活流程，必须来自仍打开的同一工作区；忙或作用域失效时返回失败，使用原稳定 ID 重试，不能误插入其他画布。
 
 Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code、OpenCode 和 Gemini 提供正式会话引用与恢复；四者都支持 CleanCode MCP。Codex、Claude Code 和 OpenCode 还提供 launch instructions；Claude Code 和 OpenCode 提供精确活动跟踪。其他目录项当前只声明基础终端能力；各 Provider 未声明的可选能力不得由 UI 猜测或展示。
 

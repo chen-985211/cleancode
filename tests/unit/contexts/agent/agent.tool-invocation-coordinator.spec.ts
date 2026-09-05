@@ -2,6 +2,29 @@ import { AgentToolInvocationCoordinator } from '../../../../src/contexts/agent/a
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 
 describe('Agent tool invocation coordinator', () => {
+  it('does not hold the workspace queue while waiting and aborts waits before draining a session', async () => {
+    const execute = vi.fn(async (input) => {
+      if (input.toolName === 'wait_agent_message') {
+        await new Promise<void>((resolve) =>
+          input.signal.addEventListener('abort', () => resolve(), { once: true })
+        )
+      }
+      return completedResult(input.toolCallId)
+    })
+    const coordinator = new AgentToolInvocationCoordinator({ cancel: vi.fn(), execute })
+    const waiting = coordinator.runSessionToolCall('session-1', () =>
+      coordinator.execute({
+        ...command('wait', 'session-1', 'main'),
+        toolName: 'wait_agent_message'
+      })
+    )
+    await coordinator.execute(command('send', 'session-2', 'main'))
+    expect(execute.mock.calls.map(([input]) => input.toolCallId)).toEqual(['wait', 'send'])
+    coordinator.beginSessionClosing('session-1')
+    await coordinator.waitForSession('session-1')
+    await waiting
+  })
+
   it('serializes tool execution across Agents in one workspace', async () => {
     let finishFirst: (result: AgentToolExecutionResult) => void = () => undefined
     const execute = vi

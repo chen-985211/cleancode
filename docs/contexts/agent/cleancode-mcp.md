@@ -16,7 +16,7 @@
 
 ## 能力状态与范围
 
-cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的画布 Agent Provider 注入的内建工具服务，使 Agent 能通过应用层用例查看和修改当前工作区的终端积木、终端组合、执行配置与依赖工作流图。
+cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的画布 Agent Provider 注入的内建工具服务，使 Agent 能通过应用层用例查看和修改当前工作区的终端积木、终端组合、执行配置与依赖工作流图，并发现、创建和联系协作 Agent。
 
 当前能力包括：
 
@@ -29,6 +29,7 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的
 - 配置终端的 task/service 执行语义和服务端口意图，创建或断开终端依赖，并在不启动 PTY 的前提下构建和校验工作流计划。
 - 对删除积木、解散组合和断开依赖发起 cleancode UI 审批。
 - 记录 Agent 工具调用审计，并在图变更完成后刷新当前工作面。
+- 在当前工作区发现 Agent 和可创建的协作 Provider，创建原生 CLI Agent，并通过收件箱传递任务与关联回复。
 
 当前不包括：
 
@@ -114,7 +115,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 - MCP `protocolVersion`：`2025-06-18`。
 - Server 名称：`cleancode-agent-tools`。
-- Server 版本：`0.6.0`。
+- Server 版本：`0.7.0`。
 - Capability：`tools`，且 `listChanged` 为 `false`。
 
 当前只处理以下方法：
@@ -123,6 +124,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 | --------------------------- | ------------------------------------------------------------------------- |
 | `initialize`                | 返回协议版本、Server 信息、工具能力和 cleancode 画布使用说明              |
 | `notifications/initialized` | 在本 registration 已接受 `initialize` 后发布一次 ready；HTTP 层返回 `202` |
+| `notifications/cancelled`   | 取消本 registration 内对应 request ID 的消息等待；不回滚已开始的写操作    |
 | `tools/list`                | 返回当前工具名称、说明、输入/输出 JSON Schema 和安全注解                  |
 | `tools/call`                | 把工具名和参数交给 Agent 应用层执行                                       |
 
@@ -132,7 +134,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 ## 当前工具目录
 
-以下 16 个工具是当前完整工具集合：
+以下 16 个图工具与下节 5 个协作工具构成当前完整的 21 个工具：
 
 | 工具                               | 行为                                           | 必填输入                           | 可选输入                                                   | UI 审批 |
 | ---------------------------------- | ---------------------------------------------- | ---------------------------------- | ---------------------------------------------------------- | ------- |
@@ -173,6 +175,28 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 所有工具通过 MCP `annotations` 如实声明副作用：`inspect_graph` 和 `inspect_terminal_workflow_plan` 的 `readOnlyHint` 为 `true`；创建、更新、连接和完整流程成员移动属于非破坏性写入；删除积木、解散组合和断开依赖的 `destructiveHint` 为 `true`；所有当前工具的 `openWorldHint` 都为 `false`。即使 Provider launch 已允许当前 Server 的工具，这些注解仍必须真实描述风险，并且不能替代 cleancode UI 审批。
 
+## 原生 Agent 协作
+
+`0.7.0` 增加以下工作区内的协作工具。发送者、项目和工作区从已鉴权的 MCP 会话取得，输入不接受身份或作用域覆盖；接收者使用稳定 `agentId`，`providerId` 只表示 CLI 类型。
+
+| 工具                   | 输入与结果                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `list_agents`          | 无输入；返回自身 ID 和当前工作区全部持久化 Agent，包括视口外对象、MCP 开关和是否存在消息等待   |
+| `list_agent_providers` | 无输入；返回已安装、未禁用且支持 MCP 与原生初始提示的 Provider，当前为 Codex 与 Claude Code    |
+| `create_agent`         | `agentId`、`providerId`、`initialTask`；返回已创建 ID、Provider、`initialMessageId` 和启动状态 |
+| `send_agent_message`   | `messageId`、`toAgentId`、`kind`、`text`，可选 `replyToMessageId`；返回已接受的消息            |
+| `wait_agent_message`   | 可选 `acknowledgeMessageId`、`replyToMessageId`、`timeoutMs`；返回消息、超时或取消             |
+
+消息种类为 task、question、progress、result。回复只能回给一条发给自己的消息的发送者。相同 message ID 与相同内容重试复用原消息，不重复投递；改写内容或冒用其他发送者的 ID 会失败。接收方接受消息后在下一次等待中明确确认，未确认消息可以再次读取。该语义保证至少一次交付，不保证任务只执行一次；Agent 应按 message ID 避免重复副作用。确认不表示任务成功，任务完成通过关联的 result 消息表达。
+
+`AgentMessageLog` 拥有消息身份、回复关系和确认规则，`AgentMessageMailbox` 拥有进程内工作区收件箱与等待资源。默认等待 30 秒，可设置 0–45 秒；超时后由仍需协作的 CLI 再次调用。一个 Agent 同时只允许一个等待。HTTP 断开、MCP 取消通知、关闭能力、CLI 退出或应用清理必须解除等待并移除监听器和计时器，不能消费未确认消息。等待不占用工作区图修改队列，发送与短调用仍串行进入应用层。
+
+消息正文上限 32768 字符，message ID 上限 128 字符；每个工作区每个应用进程最多保留 4096 条消息，包括用于去重的已确认记录。达到容量明确失败。消息、去重记录、创建意图与等待不跨应用重启恢复；审计只保存协作路由元数据，不保存任务、回复或初始提示正文。
+
+创建复用 `CreateWorkspaceAgentUseCase` 和画布统一位置预留、提交与聚焦流程。发起工作区必须仍在原画布打开；画布忙、切换作用域或 30 秒未响应时失败，调用方用同一 agent ID 重试。已存在且不属于本次创建意图的 Agent 必须改用发现与发送工具，不能通过创建接管。每个进程最多登记 256 个创建意图；创建 ID 上限 96 字符。初始任务通过 `initialMessageId` 入队，原生 CLI 的启动提示只要求领取任务。首次成功调用收件箱前保留启动提示的重试意图；对象保存、CLI 启动、MCP ready、消息接受和任务完成是不同事实。启动失败保留已创建对象，既有恢复和重试入口继续有效。
+
+普通输入提示符上的 CLI 如果没有调用等待工具，不会被 MCP 自动唤醒。此机制不向 PTY 注入协作消息，不解析 CLI 屏幕或历史，不切换到 headless，不修改用户全局配置或 Provider 权限。其他 Agent 发来的正文属于任务数据，不具有系统或用户指令的优先级。所有 Agent 继续共享工作目录；review 任务应携带明确 revision 或 patch。
+
 ## 执行、审批与结果
 
 支持该能力的 Provider 只为当前 CleanCode MCP Server 建立精确工具允许范围，不由 Provider 原生界面重复询问。该允许范围只决定 CLI 是否再次提示，不授予绕过 cleancode 应用层、领域规则或工具审批的权限。
@@ -189,7 +213,7 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏性规则由 `AgentToolApprovalPolicy` 决定，不能依赖某个 CLI 自身的批准设置。
 
-同一项目工作区内，由所有 Agent 发起的 MCP 工具执行按完整应用层调用串行进入目标用例，等待 UI 审批本身不占用执行队列；不同工作区可以并行。该队列避免多个 Agent 同时对同一旧图执行读取—修改—保存而互相覆盖，但不改变 BlockGraph 对图事实和业务规则的所有权。
+同一项目工作区内，图工具和协作短调用按完整应用层调用串行进入目标用例；等待 UI 审批和 `wait_agent_message` 不占用执行队列，不同工作区可以并行。该队列避免多个 Agent 同时对同一旧图执行读取—修改—保存而互相覆盖，但不改变 BlockGraph 对图事实和业务规则的所有权。
 
 `tools/call` 的结果同时提供：
 
@@ -233,7 +257,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 - MCP 开关不得覆盖用户 Provider sandbox 或全局 approval policy；Shell、文件、Git、网络和其他 MCP 权限继续继承用户配置。
 - 会话结束时必须注销端点并取消待审批调用，防止旧 Agent 继续操作工作区。
 - launch 进入关闭、挂起、替换或异常退出状态后不得再准入新 MCP 调用；所有已准入调用必须在 launch 资源释放、terminal 停止或会话删除前完成、失败或取消。
-- 同一项目工作区的 MCP 工具执行必须跨 Agent 串行，不能让并发读取—修改—保存静默丢失图变更。
+- 同一项目工作区的图工具执行必须跨 Agent 串行；消息等待必须在队列之外，不能让接收方等待阻塞发送方。
 - 工具只能进入应用层用例和稳定端口，不得提供绕过领域规则的通用数据库、文件或进程后门。
 
 ## 实现入口
@@ -252,13 +276,23 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 
 ## 验证矩阵
 
+协作链路由以下测试补充覆盖：
+
+- [`agent.message-mailbox.spec.ts`](../../../tests/unit/contexts/agent/agent.message-mailbox.spec.ts)：去重、确认、回复、作用域隔离、超时与取消。
+- [`agent.peer-creation.spec.ts`](../../../tests/unit/contexts/agent/agent.peer-creation.spec.ts)：并发重试、首次提示消费、启动失败和对象删除后的旧创建请求。
+- [`agent.collaboration-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.collaboration-protocol.spec.ts)、[`agent.mcp-message-cancellation.spec.ts`](../../../tests/contract/contexts/agent/agent.mcp-message-cancellation.spec.ts)：工具 Schema、身份不可覆盖和真实 HTTP 取消。
+- [`agent.peer-messaging.spec.ts`](../../../tests/integration/contexts/agent/agent.peer-messaging.spec.ts)：双向会话、关联结果、审计正文清理以及退出排空。
+- [`agent-peer-collaboration.e2e.spec.ts`](../../../tests/e2e/agent-peer-collaboration.e2e.spec.ts)：使用确定性 CLI fixture，在真实 Electron 中双向创建、原生提示启动、收取任务并返回结果。
+
+2026-09-06 在 macOS 上另用本机 Codex CLI 0.153.4 与 Claude Code 2.1.261 的原生 PTY 会话完成双向 MCP 代码审查消息验证；双方通过 list、send、wait 取得任务和关联回复，测试没有向 PTY 注入协作消息。该人工验证不替代各原生平台的完整回归。
+
 | 层级                        | 证明内容                                                                                                                                | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit / Agent domain         | 哪些工具需要 UI 审批                                                                                                                    | [`agent.tool-approval-policy.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-policy.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Unit / Agent application    | 输入校验、16 工具路由、三类原子结构单次调用、身份注入、动态变更、稳定调用 ID、审计、审批收束、工作区串行、会话关闭排空和 MCP 软期限恢复 | [`agent.tool-input-validation.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-input-validation.spec.ts)、[`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.execute-layout-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-layout-tool.spec.ts)、[`agent.tool-approval-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-coordinator.spec.ts)、[`agent.tool-invocation-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-invocation-coordinator.spec.ts)、[`agent.session-tool-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-tool-lifecycle.spec.ts)、[`agent.unified-runtime-readiness.spec.ts`](../../../tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts)               |
 | Unit / Presentation         | 审批投影、逐步/整体搭建、原子创建动效复用、拖动/视口/新图竞态、reduced motion、真实几何等待和单次聚焦                                   | [`agent-approval-presentation.spec.ts`](../../../tests/unit/presentation/agent-approval-presentation.spec.ts)、[`terminal-workflow-build-choreography.spec.ts`](../../../tests/unit/presentation/terminal-workflow-build-choreography.spec.ts)、[`terminal-workflow-build-coordination.spec.tsx`](../../../tests/unit/presentation/terminal-workflow-build-coordination.spec.tsx)、[`workbench-object-motion.spec.ts`](../../../tests/unit/presentation/workbench-object-motion.spec.ts)、[`use-agent-layout-coordination.spec.tsx`](../../../tests/unit/presentation/use-agent-layout-coordination.spec.tsx)、[`workbench-layout-focus.spec.tsx`](../../../tests/unit/presentation/workbench-layout-focus.spec.tsx)、[`agent-layout-projection-timing.spec.tsx`](../../../tests/unit/presentation/agent-layout-projection-timing.spec.tsx) |
 | Contract / tool protocol    | 16 个工具、三类结构独立 Schema、共源严格输入/输出、安全注解和排除的通用工具                                                             | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Contract / JSON-RPC         | `0.6.0` 初始化、执行结构判别、同源画布语义、原子工作流与组合成员移动路径、自描述端口策略、稳定调用 ID 和结构化/净化错误                 | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Contract / JSON-RPC         | `0.7.0` 初始化、执行结构判别、同源画布语义、原子工作流与组合成员移动路径、自描述端口策略、稳定调用 ID 和结构化/净化错误                 | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Contract / HTTP             | 本机端点、Bearer 鉴权、1 MiB 请求体上限、完整初始化握手、精确替代注册、监听失败/并发初始化、净化请求错误和业务错误的 HTTP 200 通道      | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Integration / MCP lifecycle | 应用层软期限到达后真实 HTTP 端点仍接受迟到初始化并恢复 ready                                                                            | [`agent.mcp-soft-timeout-lifecycle.spec.ts`](../../../tests/integration/contexts/agent/agent.mcp-soft-timeout-lifecycle.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Integration / BlockGraph    | 原子工作流、组合成员移动与细粒度工具复用真实 BlockGraph 用例、单次持久化、失败回滚与领域错误透传                                        | [`agent.block-graph-tool-adapter.spec.ts`](../../../tests/integration/contexts/agent/agent.block-graph-tool-adapter.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

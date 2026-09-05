@@ -10,6 +10,7 @@ import type {
   AgentToolApprovalRequest
 } from '../dto/AgentSessionProtocol'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
+import type { AgentPeerCreationPort } from '../ports/AgentPeerCreationPort'
 import type {
   AgentMcpRegistration,
   AgentMcpServerPort,
@@ -45,6 +46,7 @@ interface ManagedAgentMcpRegistration extends AgentMcpRegistration {
 }
 
 export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
+  readonly initialPrompt?: string
   readonly agentId: string
   readonly agentName?: string
   readonly columns?: number
@@ -61,12 +63,14 @@ export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
 }
 
 export interface AgentSessionCallbacks {
+  readonly peerCreation?: AgentPeerCreationPort
   readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly onRuntimeChanged?: (event: AgentRuntimeChangedEvent) => void
   readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
 }
 
 export interface ManagedAgentSession {
+  initialPrompt?: string
   readonly agentId: string
   agentName?: string
   callbacks: AgentSessionCallbacks
@@ -95,6 +99,7 @@ export interface ManagedAgentSession {
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {
   return {
+    peerCreation: command.peerCreation,
     onGraphUpdated: command.onGraphUpdated,
     onRuntimeChanged: command.onRuntimeChanged,
     onToolApprovalRequested: command.onToolApprovalRequested
@@ -338,6 +343,7 @@ export function createAgentLaunchRuntimeController(command: {
         status: 'running'
       }
     })
+    command.session.initialPrompt = undefined
     command.onStartedAccepted?.()
   }
 
