@@ -80,7 +80,7 @@ describe('application diagnostics', () => {
           code: 'UNEXPECTED_ERROR',
           isExpected: false,
           message:
-            'Failed at <HOME>/Development/private/file.ts with token=<REDACTED> password=<REDACTED>'
+            'Failed at <HOME>/Development/private/file.ts with token=<REDACTED> password="<REDACTED>"'
         },
         level: 'error',
         operation: 'openWorkspace',
@@ -140,4 +140,70 @@ describe('application diagnostics', () => {
     expect(snapshot.collection.truncated).toBe(true)
     expect(snapshot.collection.includedRecordCount).toBeLessThan(80)
   })
+
+  it.each([
+    {
+      expected: 'Authorization: <REDACTED>',
+      message: 'Authorization: Basic dXNlcjpwYXNz',
+      name: 'a complete Basic authorization header',
+      sensitiveText: 'dXNlcjpwYXNz'
+    },
+    {
+      expected: 'details={"token":"<REDACTED>"}',
+      message: 'details={"token":"secret-value"}',
+      name: 'a credential with a quoted JSON key',
+      sensitiveText: 'secret-value'
+    },
+    {
+      expected: "Cannot open '<PATH>'",
+      message: "Cannot open '/Volumes/Company/private project/config.json'",
+      name: 'a quoted POSIX path containing spaces',
+      sensitiveText: '/Volumes/Company/private project/config.json'
+    },
+    {
+      expected: 'Cannot open "<PATH>"',
+      message: 'Cannot open "C:\\Users\\alice\\private project\\config.json"',
+      name: 'a quoted Windows path containing spaces',
+      sensitiveText: 'C:\\Users\\alice\\private project\\config.json'
+    }
+  ])(
+    'redacts $name through the shared diagnostic text policy',
+    ({ expected, message, sensitiveText }) => {
+      const snapshot = createSnapshotWithErrorMessage(message)
+
+      expect(snapshot.logs[0]?.error?.message).toBe(expected)
+      expect(serializeApplicationDiagnosticsSnapshot(snapshot)).not.toContain(sensitiveText)
+    }
+  )
 })
+
+function createSnapshotWithErrorMessage(message: string) {
+  return createApplicationDiagnosticsSnapshot({
+    application: { isPackaged: false, name: 'CleanCode', version: '0.1.15' },
+    generatedAt,
+    logs: [
+      {
+        contents: JSON.stringify({
+          timestamp: '2026-09-05T11:59:00.000Z',
+          level: 'error',
+          scope: 'platform.application',
+          operation: 'diagnosticFailure',
+          error: { message }
+        }),
+        source: 'main'
+      }
+    ],
+    redaction: {
+      appStateDirectory: '/Users/alice/Library/Application Support/CleanCode',
+      homeDirectory: '/Users/alice'
+    },
+    runtime: {
+      architecture: 'arm64',
+      chromiumVersion: '152.0.0',
+      electronVersion: '43.0.0',
+      nodeVersion: '24.0.0',
+      osRelease: '25.0.0',
+      platform: 'darwin'
+    }
+  })
+}

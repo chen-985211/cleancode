@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -99,6 +99,27 @@ describe('platform application diagnostics', () => {
     })
 
     await expect(writeApplicationDiagnosticsFile(directory, snapshot)).rejects.toThrow()
+  })
+
+  it('replaces an existing diagnostic file with private output', async () => {
+    const snapshot = await collectApplicationDiagnostics({
+      ...environment(),
+      appStateDirectory: directory,
+      generatedAt: '2026-09-05T12:00:00.000Z',
+      providerStateDirectory: join(directory, 'missing-provider')
+    })
+    const destination = join(directory, 'existing-diagnostics.json')
+    await writeFile(destination, 'old contents', 'utf8')
+    if (process.platform !== 'win32') await chmod(destination, 0o644)
+
+    await writeApplicationDiagnosticsFile(destination, snapshot)
+
+    await expect(readFile(destination, 'utf8')).resolves.toBe(
+      serializeApplicationDiagnosticsSnapshot(snapshot)
+    )
+    if (process.platform !== 'win32') {
+      expect((await stat(destination)).mode & 0o777).toBe(0o600)
+    }
   })
 })
 

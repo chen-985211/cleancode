@@ -1,5 +1,6 @@
-import { open, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { open, rename, rm, type FileHandle } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 const applicationDiagnosticsWindowMinutes = 30
 export const applicationDiagnosticsMaxBytes = 5 * 1024 * 1024
@@ -105,10 +106,24 @@ export async function writeApplicationDiagnosticsFile(
   path: string,
   snapshot: ApplicationDiagnosticsSnapshot
 ): Promise<void> {
-  await writeFile(path, serializeApplicationDiagnosticsSnapshot(snapshot), {
-    encoding: 'utf8',
-    mode: 0o600
-  })
+  const temporaryPath = join(
+    dirname(path),
+    `.cleancode-diagnostics-${process.pid}-${randomUUID()}.tmp`
+  )
+  let temporaryFile: FileHandle | null = null
+
+  try {
+    temporaryFile = await open(temporaryPath, 'wx', 0o600)
+    await temporaryFile.writeFile(serializeApplicationDiagnosticsSnapshot(snapshot), 'utf8')
+    await temporaryFile.sync()
+    await temporaryFile.close()
+    temporaryFile = null
+    await rename(temporaryPath, path)
+  } catch (error) {
+    await temporaryFile?.close().catch(() => undefined)
+    await rm(temporaryPath, { force: true }).catch(() => undefined)
+    throw error
+  }
 }
 
 export function createApplicationDiagnosticsSnapshot(
@@ -232,15 +247,37 @@ function sanitizeDiagnosticText(
   }
 
   sanitized = sanitized
-    .replace(/(?:[A-Za-z]:\\|\\\\)[^\s"']+/g, '<PATH>')
-    .replace(/(^|[\s(])\/(?:[^/\s]+\/)*[^/\s),;]+/g, '$1<PATH>')
+    .replace(/(["'])((?:[A-Za-z]:\\|\\\\|\/)[^\r\n]*?)\1/g, '$1<PATH>$1')
+    .replace(/\bfile:\/\/\/[^\s"',;]+/gi, 'file:///<PATH>')
+    .replace(/(?:[A-Za-z]:\\|\\\\)[^\s"',;)}\]]+/g, '<PATH>')
+    .replace(/(^|[\s("'=:[{,])\/(?!\/)(?:[^/\s"'<>]+\/)*[^/\s"'<>),;}\]]+/g, '$1<PATH>')
     .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer <REDACTED>')
     .replace(
-      /\b(token|password|secret|api[_-]?key|authorization)(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
-      '$1$2<REDACTED>'
+      /(["']?)\b(authorization|proxy-authorization|cookie|set-cookie)\1(\s*[:=]\s*)("[^"\r\n]*"|'[^'\r\n]*'|[^\r\n]+)/gi,
+      redactCredentialMatch
+    )
+    .replace(
+      /(["']?)\b(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|password|passwd|client[_-]?secret|secret|private[_-]?key|api[_-]?key)\1(\s*[:=]\s*)("[^"\r\n]*"|'[^'\r\n]*'|[^\s,;}\]]+)/gi,
+      redactCredentialMatch
     )
 
   return sanitized.slice(0, maximumDiagnosticTextLength)
+}
+
+function redactCredentialMatch(
+  _match: string,
+  keyQuote: string,
+  key: string,
+  separator: string,
+  value: string
+): string {
+  const valueQuote =
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+      ? value[0]
+      : ''
+  return `${keyQuote}${key}${keyQuote}${separator}${valueQuote}<REDACTED>${valueQuote}`
 }
 
 async function readLogSeries(
