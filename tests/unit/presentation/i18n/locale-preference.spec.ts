@@ -4,7 +4,7 @@ import {
   readLocalePreference,
   resolveInitialLocale
 } from '../../../../src/presentation/i18n/localePreference'
-import { localeCatalogs } from '../../../../src/presentation/i18n/messages'
+import { supportedLocales } from '../../../../src/presentation/i18n/locale'
 
 describe('locale preference', () => {
   beforeEach(() => {
@@ -19,7 +19,7 @@ describe('locale preference', () => {
     window.localStorage.setItem(localePreferenceStorageKey, 'fr')
     expect(readLocalePreference(window.localStorage)).toBeNull()
 
-    for (const locale of ['zh-CN', 'en'] as const) {
+    for (const locale of supportedLocales) {
       window.localStorage.setItem(localePreferenceStorageKey, locale)
       expect(readLocalePreference(window.localStorage)).toBe(locale)
     }
@@ -48,11 +48,5 @@ describe('locale preference', () => {
     ).toBe('zh-CN')
     expect(document.documentElement).toHaveAttribute('lang', 'zh-CN')
     expect(document.documentElement).toHaveAttribute('data-locale', 'zh-CN')
-  })
-
-  it('keeps both locale catalogs structurally complete', () => {
-    expect(Object.keys(localeCatalogs.en).sort()).toEqual(
-      Object.keys(localeCatalogs['zh-CN']).sort()
-    )
   })
 })

@@ -106,7 +106,7 @@ function isProductionUiFile(filePath) {
 }
 
 function isLocaleCatalog(filePath) {
-  return /(?:^|\/)i18n\/catalogs\/[^/]+\.tsx?$/u.test(filePath)
+  return /^src\/presentation\/i18n\/catalogs\/[^/]+\/[^/]+\.ts$/u.test(filePath)
 }
 
 function findFileViolations(cwd, filePath) {

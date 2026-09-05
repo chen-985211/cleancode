@@ -1,4 +1,10 @@
-import { isSupportedLocale, type Locale } from './locale'
+import {
+  fallbackLocale,
+  isSupportedLocale,
+  localeDefinitions,
+  supportedLocales,
+  type Locale
+} from './locale'
 
 export const localePreferenceStorageKey = 'cleancode:locale-preference'
 
@@ -24,7 +30,12 @@ export function resolveInitialLocale(
     return preference
   }
 
-  return systemLanguages[0]?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'
+  const systemLanguage = systemLanguages[0]?.toLowerCase()
+  return (
+    supportedLocales.find((locale) =>
+      systemLanguage?.startsWith(localeDefinitions[locale].systemLanguagePrefix)
+    ) ?? fallbackLocale
+  )
 }
 
 export function applyLocale(locale: Locale, root: HTMLElement = document.documentElement): void {

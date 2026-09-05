@@ -89,10 +89,11 @@ describe('i18n quality gate', () => {
 
     try {
       const presentationDirectory = join(directory, 'src', 'presentation', 'app-shell')
-      const catalogDirectory = join(presentationDirectory, 'i18n', 'catalogs')
+      const catalogDirectory = join(directory, 'src', 'presentation', 'i18n', 'catalogs', 'zh-CN')
       await mkdir(catalogDirectory, { recursive: true })
+      await mkdir(presentationDirectory, { recursive: true })
       await writeFile(
-        join(catalogDirectory, 'zh-CN.ts'),
+        join(catalogDirectory, 'workflow.ts'),
         "export const zhCNMessages = { action: '运行流程', detail: 'Workflow detail' }\n"
       )
       await writeFile(
@@ -119,6 +120,45 @@ describe('i18n quality gate', () => {
       )
 
       expect(collectI18nViolations({ cwd: directory })).toEqual([])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    {
+      location: 'flat catalog',
+      segments: ['src', 'presentation', 'i18n', 'catalogs', 'mixed.ts']
+    },
+    {
+      location: 'app-shell dictionary',
+      segments: ['src', 'presentation', 'app-shell', 'i18n', 'catalogs', 'zh-CN.ts']
+    },
+    {
+      location: 'context dictionary',
+      segments: [
+        'src',
+        'contexts',
+        'sample',
+        'presentation',
+        'i18n',
+        'catalogs',
+        'zh-CN',
+        'copy.ts'
+      ]
+    }
+  ])('rejects copy outside the canonical per-locale catalog: $location', async ({ segments }) => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-i18n-'))
+
+    try {
+      const fileName = segments.at(-1)!
+      const sourceDirectory = join(directory, ...segments.slice(0, -1))
+      await mkdir(sourceDirectory, { recursive: true })
+      await writeFile(join(sourceDirectory, fileName), "export const copy = '运行流程'\n")
+
+      expect(collectI18nViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ rule: 'no-hardcoded-ui-copy' })
+      ])
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
