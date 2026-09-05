@@ -37,21 +37,22 @@ describe.each([1, 1.25, 1.5, 2])(
         ]
       })
       if (process.env.CLEANCODE_RASTER_WINDOW_MODE !== 'hidden') {
-        await expect
-          .poll(() =>
-            application!.evaluate(({ BrowserWindow, screen }) => {
-              const window = BrowserWindow.getAllWindows()[0]
-              const rightEdge = Math.max(
-                ...screen.getAllDisplays().map(({ bounds }) => bounds.x + bounds.width)
-              )
-              return {
-                visible: window?.isVisible(),
-                focused: window?.isFocused(),
-                outsideDisplay: (window?.getBounds().x ?? 0) >= rightEdge
-              }
-            })
+        await application.firstWindow()
+        const windowState = await application.evaluate(async ({ BrowserWindow, screen }) => {
+          const window = BrowserWindow.getAllWindows()[0]!
+          if (!window.isVisible()) {
+            await new Promise<void>((resolve) => window.once('show', resolve))
+          }
+          const rightEdge = Math.max(
+            ...screen.getAllDisplays().map(({ bounds }) => bounds.x + bounds.width)
           )
-          .toEqual({ visible: true, focused: false, outsideDisplay: true })
+          return {
+            visible: window.isVisible(),
+            focused: window.isFocused(),
+            outsideDisplay: window.getBounds().x >= rightEdge
+          }
+        })
+        expect(windowState).toEqual({ visible: true, focused: false, outsideDisplay: true })
       }
     }, 30_000)
 

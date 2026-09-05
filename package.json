@@ -54,7 +54,7 @@
     "test:core:ci": "pnpm test:contract && pnpm test:unit && pnpm test:integration:ci",
     "test:full": "pnpm test:core && pnpm test:e2e",
     "test:unit": "vitest run --config vitest.unit.config.ts --reporter=default --reporter=json --outputFile=test-results/timings/unit.json",
-    "test:integration": "vitest run tests/integration --environment node --reporter=default --reporter=json --outputFile=test-results/timings/integration.json",
+    "test:integration": "vitest run tests/integration --environment node --maxWorkers=2 --reporter=default --reporter=json --outputFile=test-results/timings/integration.json",
     "test:integration:ci": "vitest run tests/integration --environment node --no-file-parallelism --reporter=default --reporter=json --outputFile=test-results/timings/integration.json",
     "test:contract": "vitest run tests/contract --environment node --passWithNoTests --reporter=default --reporter=json --outputFile=test-results/timings/contract.json",
     "test:e2e": "vitest run --config vitest.e2e.config.ts --no-file-parallelism",

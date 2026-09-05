@@ -18,9 +18,7 @@ app.whenReady().then(async () => {
     enableLargerThanScreen: true,
     webPreferences: { backgroundThrottling: false }
   })
-  const readyToShow = new Promise((resolve) => window.once('ready-to-show', resolve))
   await window.loadURL('about:blank')
-  await readyToShow
   if (process.env.CLEANCODE_RASTER_WINDOW_MODE !== 'hidden') {
     const rightEdge = Math.max(
       ...screen.getAllDisplays().map(({ bounds }) => bounds.x + bounds.width)

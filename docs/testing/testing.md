@@ -119,7 +119,7 @@ pnpm test:integration
 pnpm test:e2e:smoke
 ```
 
-底层测试必须先失败先反馈。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
+底层测试必须先失败先反馈。本地 integration 最多并行两个测试文件，限制真实子进程、PTY 和 Electron 的同时启动量；CI integration 保持文件串行。并发数需要结合首轮失败率和墙钟时间调整，不能把 worker 数直接等同于可用 CPU 核数。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
 
 `pnpm test:full` 按相同顺序运行 contract、unit、integration 和完整 `pnpm test:e2e`，并由高风险完整门禁 `pnpm verify:full` 调用。完整 Electron E2E 也由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时可以单独使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
 
