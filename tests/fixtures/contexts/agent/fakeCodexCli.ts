@@ -365,12 +365,14 @@ function beginColorQueryProbe() {
   if (colorQueryProbeState !== 'idle') return
   colorQueryProbeBuffer = ''
   colorQueryProbeState = 'awaiting'
+  // This is a failure deadline; the E2E keeps the view offscreen until the response.
+  // Host scheduling latency is not the protocol oracle.
   colorQueryProbeTimer = setTimeout(() => {
     colorQueryProbeTimer = null
     if (colorQueryProbeState !== 'awaiting') return
     colorQueryProbeState = 'timed-out'
     report('color-query-timeout')
-  }, 100)
+  }, 5_000)
   process.stdout.write(OSC + '10;?' + ST + OSC + '11;?' + ST)
 }
 

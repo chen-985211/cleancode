@@ -29,6 +29,7 @@ import {
 } from '../support/e2eTerminal'
 import { stopAgentLaunchForShellSetup, writeAgentTerminalInput } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
+import { panCanvasLeft } from '../support/e2eCanvasActions'
 import { pollUntilState } from '../support/e2ePolling'
 import {
   ensureTerminalDomRenderer,
@@ -201,7 +202,7 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
-    'keeps terminal color-query responses out of Codex input while visual output is deferred',
+    'keeps terminal color-query responses out of Codex input while its view is offscreen',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -211,14 +212,12 @@ describe('workspace Agents e2e', () => {
       const terminal = page.locator('.agent-terminal-viewport').first()
       await waitForTerminalDomText(terminal, 'CC_E2E_CODEX_READY')
 
-      await page.getByRole('button', { name: '收起侧边栏' }).click()
-      await page
-        .locator('.project-sidebar__motion-surface[data-project-sidebar-motion-state="closing"]')
-        .waitFor()
+      // Keep the view hidden for the whole query instead of racing a short animation.
+      await panCanvasLeft(page)
       await page.waitForFunction(
         () =>
           document.querySelector<HTMLElement>('[data-agent-console-node]')?.dataset
-            .terminalSurfacePriority === 'visible'
+            .terminalSurfacePriority === 'hidden'
       )
       await writeAgentTerminalInput(page, terminal, '/color-query\r')
 
@@ -238,6 +237,11 @@ describe('workspace Agents e2e', () => {
       expect(reports.some((report) => report.kind === 'unexpected-color-response-input')).toBe(
         false
       )
+      expect(
+        await page
+          .locator('[data-agent-console-node]')
+          .getAttribute('data-terminal-surface-priority')
+      ).toBe('hidden')
     },
     electronScenarioTimeoutMs
   )
