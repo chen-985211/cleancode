@@ -86,7 +86,24 @@ describe('application diagnostics settings', () => {
 
     expect(screen.getByRole('button', { name: '复制诊断摘要' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '导出诊断文件' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: '前往 GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/chen-985211/cleancode/issues/new?template=bug_report.yml'
+    )
     expect(screen.getByRole('status')).toHaveTextContent('诊断导出仅在桌面应用中可用。')
+  })
+
+  it('opens the repository defect form as an explicit external action', () => {
+    installRuntime({})
+
+    render(<ApplicationDiagnosticsPane />)
+
+    expect(screen.getByRole('link', { name: '前往 GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/chen-985211/cleancode/issues/new?template=bug_report.yml'
+    )
+    expect(screen.getByRole('link', { name: '前往 GitHub' })).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: '前往 GitHub' })).toHaveAttribute('rel', 'noreferrer')
   })
 })
 

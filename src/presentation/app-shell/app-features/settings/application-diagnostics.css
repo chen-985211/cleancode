@@ -74,7 +74,7 @@
   line-height: 1.4;
 }
 
-.application-diagnostics-action button {
+.application-diagnostics-action__control {
   display: inline-flex;
   min-width: 154px;
   min-height: 36px;
@@ -90,6 +90,7 @@
   font: inherit;
   font-size: 12px;
   font-weight: 620;
+  text-decoration: none;
   transition:
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
@@ -99,24 +100,24 @@
     transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
-.application-diagnostics-action button:hover:not(:disabled) {
+.application-diagnostics-action__control:hover:not(:disabled) {
   border-color: var(--cc-primary-border);
   background: var(--cc-primary-wash);
   color: var(--cc-primary);
   transform: translateY(-1px);
 }
 
-.application-diagnostics-action button:active:not(:disabled) {
+.application-diagnostics-action__control:active:not(:disabled) {
   box-shadow: none;
   transform: translateY(0);
 }
 
-.application-diagnostics-action button:focus-visible {
+.application-diagnostics-action__control:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 2px;
 }
 
-.application-diagnostics-action button:disabled {
+.application-diagnostics-action__control:disabled {
   opacity: 0.52;
   cursor: not-allowed;
 }
@@ -136,7 +137,7 @@
     gap: 12px;
   }
 
-  .application-diagnostics-action button {
+  .application-diagnostics-action__control {
     justify-self: start;
   }
 }

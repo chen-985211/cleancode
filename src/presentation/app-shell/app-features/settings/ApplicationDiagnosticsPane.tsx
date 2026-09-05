@@ -1,3 +1,4 @@
+import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
 import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy'
 import { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple'
 import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck'
@@ -5,6 +6,9 @@ import { useState } from 'react'
 
 import { useI18n } from '../../../i18n/useI18n'
 import { formatApplicationDiagnosticsSummary } from './applicationDiagnosticsSummary'
+
+const cleancodeBugReportUrl =
+  'https://github.com/chen-985211/cleancode/issues/new?template=bug_report.yml'
 
 type DiagnosticsOperation = 'copying' | 'exporting' | 'idle'
 type DiagnosticsFeedback =
@@ -79,6 +83,7 @@ export function ApplicationDiagnosticsPane() {
             <p>{t('settings.diagnostics.copyDescription')}</p>
           </div>
           <button
+            className="application-diagnostics-action__control"
             type="button"
             disabled={!isAvailable || isBusy}
             onClick={() => void copySummary()}
@@ -95,6 +100,7 @@ export function ApplicationDiagnosticsPane() {
             <p>{t('settings.diagnostics.exportDescription')}</p>
           </div>
           <button
+            className="application-diagnostics-action__control"
             type="button"
             disabled={!isAvailable || isBusy}
             onClick={() => void exportDiagnostics()}
@@ -104,6 +110,21 @@ export function ApplicationDiagnosticsPane() {
               ? t('settings.diagnostics.exporting')
               : t('settings.diagnostics.export')}
           </button>
+        </section>
+        <section className="application-diagnostics-action">
+          <div>
+            <h3>{t('settings.diagnostics.report')}</h3>
+            <p>{t('settings.diagnostics.reportDescription')}</p>
+          </div>
+          <a
+            className="application-diagnostics-action__control"
+            href={cleancodeBugReportUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <ArrowSquareOutIcon size={16} weight="bold" aria-hidden="true" />
+            {t('settings.diagnostics.openGitHub')}
+          </a>
         </section>
       </div>
       {!isAvailable ? (
