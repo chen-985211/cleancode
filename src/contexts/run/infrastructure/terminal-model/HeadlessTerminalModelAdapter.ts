@@ -32,6 +32,7 @@ import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalOscColorResponse } from './terminalSourcePalette'
+import { TerminalParserContinuation } from './TerminalParserContinuation'
 
 const nodeRequire = createRequire(import.meta.url)
 const { Terminal: HeadlessTerminal } = nodeRequire('@xterm/headless') as {
@@ -179,6 +180,7 @@ class ManagedTerminalModel {
   readonly identity: TerminalRunScope
   private readonly terminal: HeadlessTerminalInstance
   private readonly serializeAddon: SerializeAddonInstance
+  private readonly parserContinuation = new TerminalParserContinuation()
   private readonly onQueryResponse: (response: string) => void
   private readonly onFlowControlChange: (isPaused: boolean) => void
   private readonly onWorkingDirectoryChanged?: (workingDirectory: string) => void
@@ -252,6 +254,7 @@ class ManagedTerminalModel {
 
     this.terminal.write(data, () => {
       if (this.disposed) return
+      this.parserContinuation.accept(data)
       this.parsedSequence = output.sequence
       this.pendingOutputBytes = Math.max(0, this.pendingOutputBytes - byteLength)
       if (this.pendingOutputBytes <= pendingOutputLowWatermarkBytes) {
@@ -285,7 +288,10 @@ class ManagedTerminalModel {
     this.workingDirectory = checkpoint.workingDirectory
     await new Promise<void>((resolve) => {
       this.terminal.write(checkpoint.content, () => {
-        if (!this.disposed) this.parsedSequence = checkpoint.sequence
+        if (!this.disposed) {
+          this.parserContinuation.accept(checkpoint.content)
+          this.parsedSequence = checkpoint.sequence
+        }
         resolve()
       })
     })
@@ -296,9 +302,10 @@ class ManagedTerminalModel {
     this.setFlowControlReason('view-handoff', true)
     try {
       await this.flush()
+      const snapshot = this.createSnapshot(command.viewId)
       this.terminal.options.disableStdin = true
       this.activeView = command
-      return this.createSnapshot(command.viewId)
+      return snapshot
     } finally {
       this.setFlowControlReason('view-handoff', false)
     }
@@ -379,13 +386,14 @@ class ManagedTerminalModel {
 
   private createCheckpoint(): TerminalModelCheckpoint {
     const scrollbackRows = this.terminal.options.scrollback ?? defaultTerminalScrollbackRows
+    const continuation = this.parserContinuation.read()
     return {
       schemaVersion: 1,
       identity: this.identity,
       sequence: this.parsedSequence,
       scrollbackRows,
       unicodeVersion: '11',
-      content: this.serializeAddon.serialize({ scrollback: scrollbackRows }),
+      content: this.serializeAddon.serialize({ scrollback: scrollbackRows }) + continuation,
       normalContent: this.serializeAddon.serialize({
         excludeAltBuffer: true,
         scrollback: scrollbackRows
