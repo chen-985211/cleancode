@@ -1,3 +1,5 @@
+import { join, resolve } from 'node:path'
+
 import type { Logger } from '../../../src/platform/logging/Logger'
 import type { IpcInvokeResult } from '../../../src/platform/ipc/registerIpcHandler'
 import { applicationDiagnosticsChannels } from '../../../src/platform/ipc/applicationDiagnosticsChannels'
@@ -27,6 +29,8 @@ class FakeIpcMain {
     return handler(event, command) as Promise<IpcInvokeResult<TResult>>
   }
 }
+
+const downloadsDirectory = resolve('diagnostics-downloads')
 
 const silentLogger: Logger = {
   debug: vi.fn(),
@@ -67,9 +71,10 @@ describe('application diagnostics IPC contract', () => {
 
   it('uses a native save dialog and writes only after the user chooses a file', async () => {
     const fixture = createFixture()
+    const filePath = join(downloadsDirectory, 'cleancode-diagnostics.json')
     fixture.showSaveDialog.mockResolvedValue({
       canceled: false,
-      filePath: '/downloads/cleancode-diagnostics.json'
+      filePath
     })
     const command = { buttonLabel: '导出', dialogTitle: '导出诊断信息' }
 
@@ -81,16 +86,13 @@ describe('application diagnostics IPC contract', () => {
     })
     expect(fixture.showSaveDialog).toHaveBeenCalledWith('window', {
       buttonLabel: '导出',
-      defaultPath: '/downloads/cleancode-diagnostics-20260905-120000.json',
+      defaultPath: join(downloadsDirectory, 'cleancode-diagnostics-20260905-120000.json'),
       filters: [{ extensions: ['json'], name: 'JSON' }],
       properties: ['createDirectory', 'showOverwriteConfirmation'],
       title: '导出诊断信息'
     })
     expect(fixture.collect).toHaveBeenCalledWith('2026-09-05T12:00:00.000Z')
-    expect(fixture.write).toHaveBeenCalledWith(
-      '/downloads/cleancode-diagnostics.json',
-      diagnosticSnapshot
-    )
+    expect(fixture.write).toHaveBeenCalledWith(filePath, diagnosticSnapshot)
   })
 
   it('treats cancellation as a completed no-op without collecting or writing logs', async () => {
@@ -133,7 +135,7 @@ function createFixture() {
   const write = vi.fn(async () => undefined)
   registerApplicationDiagnosticsIpc({
     collect,
-    defaultDirectory: '/downloads',
+    defaultDirectory: downloadsDirectory,
     ipcMain,
     logger: silentLogger,
     now: () => new Date('2026-09-05T12:00:00.000Z'),
