@@ -123,7 +123,7 @@ await expectAuthoritativeResult(currentIdentity)
 
 ## 共享不可变成本，隔离可变状态
 
-单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 通过平台 reusable workflow 在每个操作系统分别构建一次，每个平台的测试只等待自己的构建；同一系统的分片可以共享对应 build job 上传的不可变 `out`、Electron runtime 和 native artifact，但 Electron/`node-pty` 产物不能跨系统复用。Windows native artifact 必须精确匹配平台、架构、Electron 和 `node-pty` 版本，恢复后重新执行真实 Electron probe；cache 只减少后续运行的重建成本，run-scoped artifact 才是当前分片的直接事实来源。packaged smoke 可以消费相同不可变产物并与源码 shards 并行，但不能共享 Electron 进程、PTY 或测试 profile。只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
+单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 通过可复用构建流程在每个操作系统分别构建一次，入口 workflow 保证每个平台的测试只等待自己的构建；同一系统的分片可以共享对应 build job 上传的不可变 `out`、Electron runtime 和 native artifact，但 Electron/`node-pty` 产物不能跨系统复用。Windows native artifact 必须精确匹配平台、架构、Electron 和 `node-pty` 版本，恢复后重新执行真实 Electron probe；cache 只减少后续运行的重建成本，run-scoped artifact 才是当前分片的直接事实来源。packaged smoke 可以消费相同不可变产物并与源码 shards 并行，但不能共享 Electron 进程、PTY 或测试 profile。只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
 
 - Electron 应用进程和 PTY。
 - 项目目录、应用状态目录、Electron `userData` profile 和持久化 fixture。

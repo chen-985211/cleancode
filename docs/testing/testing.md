@@ -137,7 +137,7 @@ pnpm test:e2e:smoke
 | Ubuntu 24.04 | node-pty + POSIX PTY/shell   | 与 macOS 相同，并使用 Linux `/proc` 证明监听 PID 和进程祖先关系                              |
 | Windows 2025 | node-pty + ConPTY/PowerShell | 全量静态与低层测试、构建、npm `.cmd` CLI、`Ctrl+C`、退出码、端口所有权和外层 PowerShell 可写 |
 
-[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过 platform reusable workflow 在每个平台分别构建一次原生产物，再运行该平台三个独立 shard，共九个完整 E2E 任务。每个平台 E2E 只依赖自己的 build，不等待其他平台的构建矩阵。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，三个 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过可复用的构建和分片测试流程，在每个平台分别构建一次原生产物，再运行该平台三个独立 shard，共九个完整 E2E 任务。入口 workflow 显式连接每个平台自己的 build 与 E2E，不等待其他平台的构建矩阵；Windows packaged smoke 只在入口定义一次并依赖 Windows build，Linux/macOS 流程不声明 Windows 专用任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，三个 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
 
 ## 测试耗时与分片
 

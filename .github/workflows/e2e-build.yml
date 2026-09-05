@@ -1,0 +1,98 @@
+name: Build Platform Electron E2E
+
+on:
+  workflow_call:
+    inputs:
+      platform_id:
+        type: string
+        required: true
+      runner:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Electron / ${{ inputs.platform_id }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - name: Install Electron binary with retry
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js; then
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                if test -x node_modules/electron/dist/electron; then
+                  exit 0
+                fi
+              elif pnpm exec electron --version; then
+                exit 0
+              fi
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+      - run: pnpm build
+      - name: Restore prepared Windows node-pty cache
+        id: windows-node-pty-cache
+        if: runner.os == 'Windows'
+        uses: actions/cache@v5
+        with:
+          path: .cache/windows-node-pty-electron
+          key: windows-node-pty-electron-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'electron-builder.yml', 'scripts/prepare-native-dependencies.mjs', 'scripts/prepare-packaging.mjs', 'scripts/verify-node-pty-native.mjs', 'scripts/windows-node-pty-native-artifact.mjs') }}
+      - name: Rebuild patched node-pty for Electron
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm prepare:native
+      - name: Export prepared Windows node-pty artifact
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm native:artifact:export
+      - name: Restore cached Windows node-pty artifact
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit == 'true'
+        run: pnpm native:artifact:restore
+      - name: Verify prepared Windows node-pty artifact
+        if: runner.os == 'Windows'
+        run: pnpm verify:native
+      - name: Package Electron binary
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -c -k --sequesterRsrc --keepParent \
+              node_modules/electron/dist electron-e2e-runtime-${{ inputs.platform_id }}.zip
+            cp node_modules/electron/path.txt electron-e2e-path-${{ inputs.platform_id }}.txt
+          else
+            tar -czf electron-e2e-runtime-${{ inputs.platform_id }}.tgz \
+              -C node_modules/electron \
+              dist \
+              path.txt
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: electron-e2e-application-${{ inputs.platform_id }}
+          path: |
+            out
+            electron-e2e-runtime-${{ inputs.platform_id }}.*
+            electron-e2e-path-${{ inputs.platform_id }}.txt
+          retention-days: 1
+      - name: Upload prepared Windows node-pty artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: electron-e2e-native-windows
+          path: .cache/windows-node-pty-electron
+          retention-days: 1

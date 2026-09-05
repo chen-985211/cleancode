@@ -65,9 +65,6 @@ describe('Codex Agent session e2e', () => {
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
     await configureCodexExecutable(page, fakeCodex.executablePath)
-    // Direct IPC setup does not refresh the renderer's Provider availability store.
-    // Bootstrap it from the saved override before registering scenario listeners.
-    await page.reload({ waitUntil: 'domcontentloaded' })
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {

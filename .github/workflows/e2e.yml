@@ -14,19 +14,166 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  platform:
-    name: Electron / ${{ matrix.id }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: linux
-            os: ubuntu-24.04
-          - id: macos
-            os: macos-15
-          - id: windows
-            os: windows-2025
+  build_linux:
+    name: Electron / linux
+    uses: ./.github/workflows/e2e-build.yml
+    with:
+      platform_id: linux
+      runner: ubuntu-24.04
+
+  e2e_linux:
+    name: Electron / linux
+    needs: build_linux
     uses: ./.github/workflows/e2e-platform.yml
     with:
-      platform_id: ${{ matrix.id }}
-      runner: ${{ matrix.os }}
+      platform_id: linux
+      runner: ubuntu-24.04
+
+  build_macos:
+    name: Electron / macos
+    uses: ./.github/workflows/e2e-build.yml
+    with:
+      platform_id: macos
+      runner: macos-15
+
+  e2e_macos:
+    name: Electron / macos
+    needs: build_macos
+    uses: ./.github/workflows/e2e-platform.yml
+    with:
+      platform_id: macos
+      runner: macos-15
+
+  build_windows:
+    name: Electron / windows
+    uses: ./.github/workflows/e2e-build.yml
+    with:
+      platform_id: windows
+      runner: windows-2025
+
+  e2e_windows:
+    name: Electron / windows
+    needs: build_windows
+    uses: ./.github/workflows/e2e-platform.yml
+    with:
+      platform_id: windows
+      runner: windows-2025
+
+  packaged_windows:
+    name: Electron / windows / Packaged Windows smoke
+    needs: build_windows
+    runs-on: windows-2025
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - name: Install dependencies without downloading Electron again
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: electron-e2e-application-windows
+          path: .
+      - uses: actions/download-artifact@v8
+        with:
+          name: electron-e2e-native-windows
+          path: .cache/windows-node-pty-electron
+      - name: Restore prebuilt Electron binary
+        shell: bash
+        run: |
+          electron_package_directory=$(cd node_modules/electron && pwd -P)
+          tar -C "$electron_package_directory" \
+            -xzf electron-e2e-runtime-windows.tgz
+          rm electron-e2e-runtime-windows.tgz
+          pnpm exec electron --version
+      - name: Restore prepared Windows node-pty artifact
+        run: pnpm native:artifact:restore
+      - name: Verify prepared Windows node-pty artifact
+        run: pnpm verify:native
+      - name: Package Windows application without rebuilding native dependencies
+        shell: bash
+        run: |
+          pnpm prepare:packaging
+          pnpm exec electron-builder --dir --win --x64 --publish never \
+            --config.npmRebuild=false
+      - name: Resolve packaged Windows executable
+        shell: bash
+        run: |
+          packaged_relative_path=$(find release \
+            -path '*unpacked/CleanCode.exe' \
+            -type f -print -quit)
+
+          if [ -z "$packaged_relative_path" ]; then
+            echo "Packaged Windows executable was not found." >&2
+            exit 1
+          fi
+
+          packaged_executable_path=$(node -e \
+            "process.stdout.write(require('node:path').resolve(process.argv[1]))" \
+            "$packaged_relative_path")
+          echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
+      - name: Run packaged Windows terminal smoke test
+        shell: bash
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+          DEBUG: 'pw:browser*'
+        run: |
+          pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts \
+            -t "runs shell commands from the active project workspace" \
+            --outputFile=test-results/timings/packaged-terminal.json
+      - name: Prepare packaged Windows install replacement fixture
+        shell: bash
+        run: |
+          node -e '
+            const { appendFileSync, cpSync } = require("node:fs")
+            const { basename, dirname, join } = require("node:path")
+            const replacement = process.env.CLEANCODE_E2E_EXECUTABLE_PATH
+            const fixture = join(
+              process.env.RUNNER_TEMP,
+              `cleancode-e2e-old-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`
+            )
+            cpSync(dirname(replacement), fixture, { recursive: true })
+            appendFileSync(
+              process.env.GITHUB_ENV,
+              `CLEANCODE_E2E_REPLACEMENT_EXECUTABLE_PATH=${replacement}\n` +
+                `CLEANCODE_E2E_EXECUTABLE_PATH=${join(fixture, basename(replacement))}\n`
+            )
+          '
+      - name: Run packaged Windows Provider install-replacement smoke test
+        shell: bash
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+          DEBUG: 'pw:browser*'
+        run: |
+          pnpm test:e2e tests/e2e/terminal-runtime-recovery.e2e.spec.ts \
+            -t "warm-attaches the same retained PTY after a normal application restart" \
+            --outputFile=test-results/timings/packaged-recovery.json
+      - name: Summarize test timings
+        if: always()
+        run: pnpm report:test-timings
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-packaged-windows
+          path: test-results/timings
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload packaged Windows smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: ignore
+          name: electron-e2e-packaged-diagnostics-windows
+          path: test-results/e2e
+          retention-days: 7
