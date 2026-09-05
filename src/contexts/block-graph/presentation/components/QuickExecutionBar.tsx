@@ -107,6 +107,7 @@ export function QuickExecutionBar({
   const [isNearBlackHole, setIsNearBlackHole] = useState(false)
   const [clearAnimation, setClearAnimation] = useState<DragAnimation | null>(null)
   const [returnAnimation, setReturnAnimation] = useState<DragAnimation | null>(null)
+  const isBlackHoleVisible = draggedNumber !== null || clearAnimation !== null
   const completeClearAnimation = (motionId: string): void => {
     setClearAnimation((current) => (current?.motion.id === motionId ? null : current))
     if (blackHoleMotionRef.current) blackHoleMotionRef.current.playbackRate = 1
@@ -593,7 +594,7 @@ export function QuickExecutionBar({
         ref={blackHoleTargetRef}
         className={[
           'quick-execution__black-hole',
-          draggedNumber || clearAnimation ? 'quick-execution__black-hole--visible' : '',
+          isBlackHoleVisible ? 'quick-execution__black-hole--visible' : '',
           isClearTarget || clearAnimation ? 'quick-execution__black-hole--target' : '',
           clearAnimation ? 'quick-execution__black-hole--clearing' : ''
         ]
@@ -638,30 +639,33 @@ export function QuickExecutionBar({
             {t('quickExecution.releaseDropTarget', { number: draggedNumber })}
           </span>
         ) : null}
-        <span className="quick-execution__black-hole-visual" aria-hidden="true">
-          <img
-            className="quick-execution__black-hole-image"
-            data-quick-execution-black-hole
-            src={blackHoleAssetUrl}
-            alt=""
-            draggable={false}
-          />
-          <video
-            ref={blackHoleMotionRef}
-            className="quick-execution__black-hole-motion"
-            data-quick-execution-black-hole-motion
-            src={blackHoleMotionUrl}
-            poster={blackHoleAssetUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            onCanPlay={(event) => {
-              event.currentTarget.playbackRate = isClearTarget || clearAnimation ? 1.75 : 1
-            }}
-          />
-        </span>
+        {/* Keep hidden media out of the compositor during the bar's entrance. */}
+        {isBlackHoleVisible ? (
+          <span className="quick-execution__black-hole-visual" aria-hidden="true">
+            <img
+              className="quick-execution__black-hole-image"
+              data-quick-execution-black-hole
+              src={blackHoleAssetUrl}
+              alt=""
+              draggable={false}
+            />
+            <video
+              ref={blackHoleMotionRef}
+              className="quick-execution__black-hole-motion"
+              data-quick-execution-black-hole-motion
+              src={blackHoleMotionUrl}
+              poster={blackHoleAssetUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              onCanPlay={(event) => {
+                event.currentTarget.playbackRate = isClearTarget || clearAnimation ? 1.75 : 1
+              }}
+            />
+          </span>
+        ) : null}
       </div>
     </AnchoredSurfaceMotion>
   )
