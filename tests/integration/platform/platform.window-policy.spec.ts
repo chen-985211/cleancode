@@ -5,7 +5,7 @@ describe('Electron window policy', () => {
     const expectedPolicy = {
       backgroundThrottling: true,
       mode: 'normal',
-      show: true
+      show: false
     }
 
     expect(resolveElectronWindowPolicy({ backgroundE2eMarker: undefined })).toEqual(expectedPolicy)

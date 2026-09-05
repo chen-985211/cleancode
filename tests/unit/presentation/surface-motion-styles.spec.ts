@@ -100,6 +100,17 @@ describe('surface motion styles', () => {
       expect(rule).toContain('will-change: transform')
     }
   )
+
+  it('defers quick execution backdrop filtering until the bottom spring settles', () => {
+    const slotRule = readRule(quickExecutionStyles, '.quick-execution__slot')
+    const settledRule = readRule(
+      quickExecutionStyles,
+      ".quick-execution[data-surface-spring-state='open'] .quick-execution__slot"
+    )
+
+    expect(slotRule).not.toContain('backdrop-filter')
+    expect(settledRule).toContain('backdrop-filter: blur(10px)')
+  })
 })
 
 function readRule(styles: string, selector: string): string {

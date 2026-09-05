@@ -92,15 +92,21 @@ export function createMainWindow(input: {
 
   if (startupState.displayMode === 'maximized') mainWindow.maximize()
 
-  if (input.policy.mode === 'offscreen-inactive') {
-    const { position } = input.policy
-    mainWindow.once('ready-to-show', () => {
-      if (mainWindow.isDestroyed()) return
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow.isDestroyed()) return
 
+    if (input.policy.mode === 'offscreen-inactive') {
+      const { position } = input.policy
       mainWindow.setPosition(position.x, position.y, false)
       mainWindow.showInactive()
-    })
-  }
+      return
+    }
+
+    // Do not expose an uninitialised renderer surface. On Windows the native
+    // window can otherwise present a stale/black compositor tile for one or
+    // more frames while React Flow restores the persisted canvas viewport.
+    mainWindow.show()
+  })
 
   const loadRenderer = () => {
     if (mainWindow.isDestroyed()) return

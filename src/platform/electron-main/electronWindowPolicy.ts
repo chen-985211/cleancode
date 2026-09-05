@@ -1,7 +1,12 @@
 interface NormalElectronWindowPolicy {
   readonly backgroundThrottling: true
   readonly mode: 'normal'
-  readonly show: true
+  /**
+   * Keep the native window hidden until Electron has a first composited frame.
+   * Showing it immediately can expose an uninitialised renderer surface on
+   * Windows while the restored canvas is still being painted.
+   */
+  readonly show: false
 }
 
 interface OffscreenElectronWindowPolicy {
@@ -26,7 +31,7 @@ export function resolveElectronWindowPolicy(input: {
     return {
       backgroundThrottling: true,
       mode: 'normal',
-      show: true
+      show: false
     }
   }
 
