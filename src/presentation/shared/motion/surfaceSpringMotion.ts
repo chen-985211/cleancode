@@ -5,6 +5,7 @@ import {
 } from './springProgressMotion'
 
 export type SurfaceSpringPreset =
+  | 'anchored'
   | 'anchored-bottom-left'
   | 'anchored-top-right'
   | 'bottom-control'
@@ -46,6 +47,7 @@ export function createSurfaceSpringMotionController({
   const controller = createSpringProgressMotionController({
     clear: clearPresentation,
     dynamics: { dampingRatio: 1, response: responseForPreset(preset) },
+    retargetPolicy: preset === 'anchored' ? 'preserve' : 'toward-target-only',
     scheduler,
     settlementThresholds: preset === 'bottom-control' ? { speed: 0.25, value: 0.007 } : undefined,
     stateAttribute
@@ -77,6 +79,15 @@ function presentSurface(
 }
 
 function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
+  if (preset === 'anchored') {
+    return {
+      contentOpacity: 1,
+      opacity: 1 - remaining,
+      scale: 1 - 0.16 * remaining,
+      translateX: `calc(var(--cc-anchored-surface-offset-x) * ${round(remaining)})`,
+      translateY: `calc(var(--cc-anchored-surface-offset-y) * ${round(remaining)})`
+    }
+  }
   if (preset === 'anchored-bottom-left') {
     return {
       contentOpacity: 1,
@@ -123,6 +134,7 @@ function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
 }
 
 function responseForPreset(preset: SurfaceSpringPreset): number {
+  if (preset === 'anchored') return 0.28
   if (preset === 'anchored-bottom-left') return 0.18
   if (preset === 'anchored-top-right') return 0.24
   if (preset === 'bottom-control') return 0.16
