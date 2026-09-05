@@ -16,7 +16,6 @@ interface CreationIntent {
   readonly input: CreatePeerAgentInput
   admitted: boolean
   created: boolean
-  bootstrapAccepted: boolean
   launchStatus: AgentPeerCreatedSnapshot['launchStatus']
   pending?: Promise<AgentPeerCreatedSnapshot>
 }
@@ -59,7 +58,6 @@ export class AgentPeerCreationRegistry {
         input: { ...input },
         admitted: false,
         created: false,
-        bootstrapAccepted: false,
         launchStatus: 'pending'
       }
       this.intents.set(key, intent)
@@ -93,13 +91,6 @@ export class AgentPeerCreationRegistry {
     }
   }
 
-  initialPrompt(identity: AgentIdentity): string | undefined {
-    const intent = this.intents.get(identityKey(identity))
-    return intent?.admitted && !intent.bootstrapAccepted
-      ? 'You were created for a delegated task in this CleanCode workspace. Call the cleancode MCP wait_agent_message tool now to receive the task. Complete it, send a result to its fromAgentId with replyToMessageId set to its messageId, then acknowledge it on your next wait. Respect the user instructions and your existing permissions.'
-      : undefined
-  }
-
   markStarted(identity: AgentIdentity): void {
     const intent = this.intents.get(identityKey(identity))
     if (intent?.admitted) intent.launchStatus = 'running'
@@ -108,11 +99,6 @@ export class AgentPeerCreationRegistry {
   markStopped(identity: AgentIdentity, status: 'failed' | 'stopped'): void {
     const intent = this.intents.get(identityKey(identity))
     if (intent?.admitted) intent.launchStatus = status
-  }
-
-  markBootstrapAccepted(identity: AgentIdentity): void {
-    const intent = this.intents.get(identityKey(identity))
-    if (intent?.admitted) intent.bootstrapAccepted = true
   }
 
   private async requireCreatedAgent(

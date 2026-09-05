@@ -5,6 +5,7 @@ import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/applicat
 import { AgentWorkspaceTransactionCoordinator } from '../../contexts/agent/application/services/AgentWorkspaceTransactionCoordinator'
 import { AgentPeerCreationRegistry } from '../../contexts/agent/application/services/AgentPeerCreationRegistry'
 import { AgentCollaborationTools } from '../../contexts/agent/application/services/AgentCollaborationTools'
+import { AgentMessageMailbox } from '../../contexts/agent/application/services/AgentMessageMailbox'
 import type { AgentSessionRepository } from '../../contexts/agent/application/ports/AgentSessionRepository'
 import type { AgentWorkspaceInitializer } from '../../contexts/agent/application/ports/AgentWorkspaceInitializer'
 import type { AgentProviderRegistryPort } from '../../contexts/agent/application/ports/AgentProviderRegistryPort'
@@ -21,14 +22,16 @@ export function createAgentWorkspaceRuntime(
 ) {
   const transactions = new AgentWorkspaceTransactionCoordinator()
   const peerCreationRegistry = new AgentPeerCreationRegistry(repository)
+  const messageMailbox = new AgentMessageMailbox()
   return {
+    messageMailbox,
     peerCreationRegistry,
     collaborationTools: new AgentCollaborationTools(
       repository,
       providers,
       availability,
       preferences,
-      peerCreationRegistry
+      messageMailbox
     ),
     createWorkspaceAgentUseCase: new CreateWorkspaceAgentUseCase(
       repository,

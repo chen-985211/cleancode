@@ -70,6 +70,14 @@ export class AgentMessageLog {
         (!replyToMessageId || message.replyToMessageId === replyToMessageId)
     )
   }
+
+  pendingIds(agentId: string): readonly string[] {
+    return [...this.messages.values()]
+      .filter(
+        (message) => message.toAgentId === agentId && !this.acknowledged.has(message.messageId)
+      )
+      .map((message) => message.messageId)
+  }
 }
 
 function invalidMessage(message: string) {

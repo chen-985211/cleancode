@@ -140,6 +140,7 @@ describe('Agent session Provider environment', () => {
 
     expect(contribution.launcher.createLaunchPlan).toHaveBeenCalledWith(
       expect.objectContaining({
+        providerVersion: undefined,
         launchProfile: {
           arguments: ['--base', '--yolo', '--profile', 'Clean Code'],
           environment: { BASE: '2', CUSTOM: 'yes', TRUSTED: '1' },

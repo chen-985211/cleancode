@@ -1,11 +1,11 @@
 import type { AgentBlockGraphSnapshot } from './AgentBlockGraphProtocol'
 import type { AgentToolErrorSnapshot } from './AgentToolProtocol'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
+import type { AgentActivityStatus } from './AgentActivityStatus'
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 
 export type AgentTerminalSourceTheme = 'dark' | 'light'
-export type AgentActivityStatus =
-  'unavailable' | 'idle' | 'working' | 'waiting_input' | 'waiting_approval'
+export type { AgentActivityStatus } from './AgentActivityStatus'
 
 export interface AgentTerminalViewIdentity {
   readonly blockId: string

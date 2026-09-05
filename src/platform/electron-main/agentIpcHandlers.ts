@@ -235,7 +235,6 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => vo
       const sender = readIpcSender(event)
 
       return input.attachAgentSession({
-        initialPrompt: input.peerCreationRegistry?.initialPrompt(command),
         peerCreation: input.peerCreationRegistry
           ? {
               create: (peer) =>

@@ -1,3 +1,4 @@
+import { AgentMessageMailbox } from '../../../../src/contexts/agent/application/services/AgentMessageMailbox'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import { ExecuteAgentToolUseCase } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
@@ -32,11 +33,13 @@ describe('Native Agent peer messaging through session-scoped MCP', () => {
       const repository = memoryRepository(agents)
       const audit: AgentAuditRecord[] = []
       const availability = new AgentProviderAvailabilityService(providers)
+      const mailbox = new AgentMessageMailbox()
       const collaboration = new AgentCollaborationTools(
         repository,
         providers,
         availability,
-        defaultAgentProviderPreferencesRepository
+        defaultAgentProviderPreferencesRepository,
+        mailbox
       )
       const toolExecution = new ExecuteAgentToolUseCase(
         unavailableGraphTools(),
@@ -56,7 +59,12 @@ describe('Native Agent peer messaging through session-scoped MCP', () => {
         toolExecution,
         repository,
         providers,
-        from
+        from,
+        undefined,
+        availability,
+        undefined,
+        undefined,
+        mailbox
       )
       try {
         await service.attach(attach('author', from))
@@ -66,7 +74,10 @@ describe('Native Agent peer messaging through session-scoped MCP', () => {
         const peers = await call(author, 'list_agents', {})
         expect(peers.output).toMatchObject({
           selfAgentId: 'author',
-          agents: [{ agentId: 'author' }, { agentId: 'reviewer' }]
+          agents: [
+            { agentId: 'author', deliveryStatus: 'pull_only' },
+            { agentId: 'reviewer', deliveryStatus: 'pull_only' }
+          ]
         })
         const waiting = call(reviewer, 'wait_agent_message', {})
         await call(author, 'send_agent_message', {

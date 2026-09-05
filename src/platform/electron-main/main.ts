@@ -286,6 +286,7 @@ const agentWorkspaceCreationScope = new AgentWorkspaceCreationScopeAdapter(
 )
 const {
   collaborationTools,
+  messageMailbox,
   peerCreationRegistry,
   createWorkspaceAgentUseCase,
   listWorkspaceAgentsUseCase,
@@ -338,7 +339,8 @@ const agentSessionService = new AgentSessionService(
   ),
   agentProviderAvailability,
   agentProviderPreferencesRepository,
-  agentActivityRuntime.registry
+  agentActivityRuntime.registry,
+  messageMailbox
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {

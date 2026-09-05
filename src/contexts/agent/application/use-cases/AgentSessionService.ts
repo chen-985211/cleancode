@@ -17,18 +17,16 @@ import {
   type AgentProviderPreferencesRepository
 } from '../ports/AgentProviderPreferencesRepository'
 import type { AgentSession } from '../../domain/aggregates/AgentSession'
-import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
-import { resolvePersistedAgentProviderLaunchProfile } from '../services/AgentProviderLaunchProfileResolver'
 import {
   AgentToolApprovalCoordinator,
   type AgentToolExecutionOperations
 } from './AgentToolApprovalCoordinator'
 import { AgentApplicationShutdownCoordinator } from './AgentApplicationShutdownCoordinator'
 import { AgentProviderLaunchShutdownCoordinator } from './AgentProviderLaunchShutdownCoordinator'
-import { createManagedAgentLaunchPlan } from './AgentProviderLaunchPlanFactory'
+import { AgentProviderLaunchCoordinator } from './AgentProviderLaunchCoordinator'
 import { AgentActivityRegistry } from '../services/AgentActivityRegistry'
 import { ManagedAgentActivityRegistry } from './ManagedAgentActivityRegistry'
 import * as Interaction from './AgentSessionInteractionCoordinator'
@@ -45,9 +43,6 @@ import {
 } from './AgentSessionRuntimeCoordinator'
 import {
   beginAgentTerminalRuntime,
-  beginAgentMcpInitializationTimeout,
-  canLaunchAgentProvider,
-  createAgentLaunchRuntimeController,
   createAgentSessionCallbacks,
   createAgentConversationScope,
   createInitialAgentRuntime,
@@ -65,20 +60,21 @@ import {
   registerAgentMcpEndpoint,
   requireManagedAgentSession,
   toAgentSessionSnapshot,
-  transitionAgentRuntime,
   unregisterAgentMcpEndpoint,
-  validateAgentProviderAvailability,
   validateAgentRuntimeScope,
   validateManagedAgentRuntimeScope,
   type AttachAgentSessionCommand,
   type ManagedAgentSession
 } from './AgentSessionRuntimeState'
 
+import { AgentMessageMailbox } from '../services/AgentMessageMailbox'
+
 export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
   private readonly applicationShutdown: AgentApplicationShutdownCoordinator
   private readonly persistence: AgentProviderSessionPersistenceCoordinator
+  private readonly providerLaunch: AgentProviderLaunchCoordinator
   private readonly providerLaunchShutdown: AgentProviderLaunchShutdownCoordinator
   private readonly managedActivity: ManagedAgentActivityRegistry
   private readonly interactions: Interaction.Coordinator
@@ -95,8 +91,9 @@ export class AgentSessionService {
     private readonly defaultProviderId: string,
     private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope,
     private readonly providerAvailability = new AgentProviderAvailabilityService(providers),
-    private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
-    activityRegistry: AgentActivityRegistry = new AgentActivityRegistry()
+    providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
+    activityRegistry: AgentActivityRegistry = new AgentActivityRegistry(),
+    mailbox = new AgentMessageMailbox()
   ) {
     this.managedActivity = new ManagedAgentActivityRegistry(activityRegistry)
     this.interactions = new Interaction.Coordinator(
@@ -110,6 +107,19 @@ export class AgentSessionService {
     )
     this.persistence = new AgentProviderSessionPersistenceCoordinator(sessionRepository, providers)
     this.providerLaunchShutdown = new AgentProviderLaunchShutdownCoordinator(terminalRuntime)
+    this.providerLaunch = new AgentProviderLaunchCoordinator(
+      terminalRuntime,
+      providers,
+      scopeValidation,
+      providerAvailability,
+      providerPreferences,
+      this.managedActivity,
+      this.persistence,
+      this.providerLaunchShutdown,
+      mailbox,
+      (session) => this.beginSessionToolClosing(session),
+      (session) => this.settleSessionToolCalls(session)
+    )
     this.applicationShutdown = new AgentApplicationShutdownCoordinator({
       beginClosing: (session) => this.beginSessionToolClosing(session),
       clearRuntime: () => this.runtimeCoordinator.clear(),
@@ -174,7 +184,7 @@ export class AgentSessionService {
       this.toolInvocations.reopenSession(existingSession.sessionId)
       try {
         await this.registerMcpEndpoint(existingSession)
-        await this.launchManagedProvider(existingSession)
+        await this.providerLaunch.launch(existingSession)
       } catch {
         recordAgentSessionStartFailure(existingSession)
         this.beginSessionToolClosing(existingSession)
@@ -559,90 +569,7 @@ export class AgentSessionService {
       recordAgentTerminalStartFailure(session)
       throw error
     }
-    await this.launchManagedProvider(session, false)
-  }
-  private async launchManagedProvider(session: ManagedAgentSession, refresh = true): Promise<void> {
-    await validateManagedAgentRuntimeScope(session, this.scopeValidation)
-    const providerLaunchGeneration = ++session.providerLaunchGeneration
-    await disposeAgentLaunchArtifacts(session)
-    await this.persistence.waitForIdle()
-    const processSessionId = session.sessionId
-    if (!canLaunchAgentProvider(session, processSessionId)) return
-    const provider = this.providers.require(session.providerId)
-    await validateAgentProviderAvailability(provider, this.providerAvailability, refresh)
-    const launchProfile = await resolvePersistedAgentProviderLaunchProfile(
-      provider.descriptor.launch,
-      this.providerPreferences,
-      session.providerId
-    )
-    transitionAgentRuntime(session, {
-      activity: 'unavailable',
-      launch: { exitCode: null, failureKind: null, launchId: null, status: 'launching' }
-    })
-    const managedActivity = this.managedActivity.beginProviderLaunch(
-      session,
-      providerLaunchGeneration,
-      provider.descriptor.capabilities.activityTracking
-    )
-    const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot): void => {
-      if (!managedActivity.isCurrent()) return
-      this.persistence.persist(session, sessionRef, providerLaunchGeneration)
-    }
-    const plan = await createManagedAgentLaunchPlan({
-      ...(launchProfile ? { launchProfile } : {}),
-      onActivityChanged: managedActivity.recordStatus,
-      onProviderSessionIdentified: persistProviderSessionRef,
-      onTurnCompleted: managedActivity.recordTurnCompleted,
-      provider,
-      session
-    })
-    try {
-      if (plan.discardProviderSessionRef) await this.persistence.clear(session)
-      if (!canLaunchAgentProvider(session, processSessionId)) {
-        managedActivity.recordExit()
-        await disposeAgentLaunchArtifacts(session)
-        return
-      }
-      const lifecycle = createAgentLaunchRuntimeController({
-        attempt: providerLaunchGeneration,
-        onStartedAccepted: () => {
-          if (provider.descriptor.capabilities.activityTracking) {
-            managedActivity.recordStatus('idle')
-          }
-          if (plan.providerSessionRefOnStarted) {
-            persistProviderSessionRef(plan.providerSessionRefOnStarted)
-          }
-          beginAgentMcpInitializationTimeout(session)
-        },
-        onUnexpectedExit: () => {
-          this.beginSessionToolClosing(session)
-          void this.settleSessionToolCalls(session)
-        },
-        session,
-        sessionId: processSessionId
-      })
-      const markProviderLaunchExited = this.providerLaunchShutdown.trackLaunch(
-        session,
-        providerLaunchGeneration,
-        plan.gracefulShutdown
-      )
-      const launch = this.terminalRuntime.launch({
-        onExit: (event) => {
-          managedActivity.recordExit()
-          markProviderLaunchExited()
-          lifecycle.onExit(event)
-        },
-        onStarted: lifecycle.onStarted,
-        plan,
-        sessionId: processSessionId
-      })
-      lifecycle.bind(launch)
-    } catch (error) {
-      managedActivity.recordExit()
-      this.providerLaunchShutdown.forget(session)
-      await disposeAgentLaunchArtifacts(session)
-      throw error
-    }
+    await this.providerLaunch.launch(session, false)
   }
 
   private async registerMcpEndpoint(session: ManagedAgentSession): Promise<void> {
@@ -689,6 +616,7 @@ export class AgentSessionService {
   }
   private beginSessionToolClosing(session: ManagedAgentSession): void {
     session.isStopping = true
+    session.messageDelivery?.close()
     this.toolInvocations.beginSessionClosing(session.sessionId)
     unregisterAgentMcpEndpoint(session)
   }

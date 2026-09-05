@@ -10,7 +10,6 @@ import type { AgentProviderPreferencesRepository } from '../ports/AgentProviderP
 import { AgentMessageMailbox, type WaitAgentMessageInput } from './AgentMessageMailbox'
 import type { ExecuteAgentToolCommand } from '../dto/AgentToolInvocation'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import type { AgentPeerCreationRegistry } from './AgentPeerCreationRegistry'
 
 export class AgentCollaborationTools {
   constructor(
@@ -18,7 +17,6 @@ export class AgentCollaborationTools {
     private readonly providers: AgentProviderRegistryPort,
     private readonly availability: AgentProviderAvailabilityService,
     private readonly preferences: AgentProviderPreferencesRepository,
-    private readonly bootstrap?: AgentPeerCreationRegistry,
     private readonly mailbox = new AgentMessageMailbox()
   ) {}
 
@@ -39,6 +37,7 @@ export class AgentCollaborationTools {
             name: agent.name,
             providerId: agent.providerId,
             mcpEnabled: agent.cleancodeMcpEnabled,
+            deliveryStatus: this.mailbox.deliveryStatus({ ...command, agentId: agent.id }),
             waitingForMessage: this.mailbox.isWaiting({ ...command, agentId: agent.id })
           }))
         }
@@ -50,7 +49,6 @@ export class AgentCollaborationTools {
           providers: providers
             .filter(
               ({ descriptor }) =>
-                descriptor.capabilities.initialPrompt === true &&
                 descriptor.capabilities.cleancodeMcp &&
                 !preferences.disabledProviderIds.includes(descriptor.id)
             )
@@ -60,11 +58,7 @@ export class AgentCollaborationTools {
       case 'create_agent': {
         const input = command.input as CreatePeerAgentInput
         const provider = this.providers.require(input.providerId)
-        if (
-          !provider.descriptor.capabilities.initialPrompt ||
-          !provider.descriptor.capabilities.cleancodeMcp ||
-          !command.peerCreation
-        ) {
+        if (!provider.descriptor.capabilities.cleancodeMcp || !command.peerCreation) {
           throw unavailable('Native peer creation is unavailable for this Provider or canvas.')
         }
         if (!(await this.preferences.load()).defaultCleancodeMcpEnabled) {
@@ -79,14 +73,22 @@ export class AgentCollaborationTools {
           kind: 'task',
           text: input.initialTask
         })
-        return { type: 'agent_created', ...created }
+        return {
+          type: 'agent_created',
+          ...created,
+          deliveryStatus: this.mailbox.deliveryStatus({ ...command, agentId: created.agentId })
+        }
       }
       case 'send_agent_message': {
         const input = command.input as AgentMessageInput
         const recipient = agents.find((agent) => agent.id === input.toAgentId)
         if (!recipient?.cleancodeMcpEnabled)
           throw unavailable('The recipient does not exist here or has CleanCode MCP disabled.')
-        return { type: 'agent_message_sent', message: this.mailbox.send(command, input) }
+        return {
+          type: 'agent_message_sent',
+          message: this.mailbox.send(command, input),
+          deliveryStatus: this.mailbox.deliveryStatus({ ...command, agentId: input.toAgentId })
+        }
       }
       case 'wait_agent_message': {
         const waiting = this.mailbox.wait(
@@ -94,7 +96,6 @@ export class AgentCollaborationTools {
           command.input as WaitAgentMessageInput,
           command.signal
         )
-        if (!command.signal?.aborted) this.bootstrap?.markBootstrapAccepted(command)
         return { type: 'agent_message_wait', result: await waiting }
       }
       default:

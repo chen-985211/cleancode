@@ -101,6 +101,8 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 
 增加基础 Agent CLI 时，只需在 Provider 模块实现包含图标的 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。任意已注册 descriptor 都必须沿同一 Provider-neutral IPC 和 Presentation 投影；安装后会自动进入可创建发现，未安装时仍只存在于支持 catalog。新增 Provider 不得要求修改 `AgentConsole`、选择器或其他表现层组件。可选能力通过 contribution 增加；确需新的通用用户能力时，必须先扩展 capability 契约，并让所有现有 Provider 明确声明支持或诚实降级，不得在 Agent domain、Run domain、通用 IPC 或 Presentation 中按 Provider ID 分支。
 
+原生消息通知由 `nativeMessages` capability 声明适配能力，但实际可用性按本次 CLI 版本、平台、启动参数与正式就绪信号决定。Agent 应用层为每个 launch 建立独立收件箱投递 lease；手动 attach、MCP 创建及恢复共用该机制。launch 替换、退出、MCP 撤销时先同步关闭 lease，再等待原生通知取消与 LIFO 资源清理。通知成功不改变消息确认事实，也不代表任务完成。Codex 的临时原生 launcher 在既有 PTY 中启动同环境的 TUI 与独立 app-server，并通过官方队列通知；Claude 使用不覆盖动态 watchPaths 的临时 FileChanged Hook。版本、兼容性降级和投递状态由[原生 MCP](cleancode-mcp.md)维护。
+
 ## 工作区身份与 Git 元数据
 
 - Agent 画布身份遵循 `projectId + workspaceId + agent + agentId`，其中对象类型使用 Shared Kernel 的规范值。

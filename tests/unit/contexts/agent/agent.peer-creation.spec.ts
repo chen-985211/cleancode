@@ -4,7 +4,7 @@ const caller = { agentId: 'author', projectId: 'p', workspaceId: 'w' }
 const input = { agentId: 'reviewer', providerId: 'codex', initialTask: 'Review commit abc' }
 
 describe('Agent peer creation', () => {
-  it('shares concurrent retries, rejects changed intent, and consumes the initial prompt only after startup', async () => {
+  it('shares concurrent retries, rejects changed intent, and tracks startup separately from task delivery', async () => {
     const findAgent = vi.fn().mockResolvedValue(null)
     const registry = new AgentPeerCreationRegistry({ findAgent })
     const create = vi.fn(async () => {
@@ -16,14 +16,10 @@ describe('Agent peer creation', () => {
     ])
     expect(create).toHaveBeenCalledTimes(1)
     const target = { ...caller, agentId: input.agentId }
-    expect(registry.initialPrompt(target)).toContain('wait_agent_message')
     await expect(
       registry.create(caller, { ...input, initialTask: 'Different' }, create)
     ).rejects.toThrow()
     registry.markStarted(target)
-    expect(registry.initialPrompt(target)).toContain('wait_agent_message')
-    registry.markBootstrapAccepted(target)
-    expect(registry.initialPrompt(target)).toBeUndefined()
     expect(await registry.create(caller, input, create)).toMatchObject({
       agentId: 'reviewer',
       launchStatus: 'running'
@@ -36,7 +32,7 @@ describe('Agent peer creation', () => {
     expect(create).toHaveBeenCalledTimes(1)
   })
 
-  it('retains the same identity and bootstrap after a canvas failure without commandeering existing agents', async () => {
+  it('retains the same creation intent after a canvas failure without commandeering existing agents', async () => {
     const findAgent = vi.fn().mockResolvedValue(null)
     const registry = new AgentPeerCreationRegistry({ findAgent })
     const create = vi

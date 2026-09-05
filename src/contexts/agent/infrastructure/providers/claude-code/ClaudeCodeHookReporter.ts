@@ -7,6 +7,8 @@ import type { AgentActivityStatus } from '../../../application/dto/AgentSessionP
 import type { AgentRuntimeArtifact } from '../../../application/ports/AgentProviderContribution'
 
 interface ClaudeCodeHookPayload {
+  readonly agent_id?: unknown
+  readonly file_path?: unknown
   readonly cwd?: unknown
   readonly hook_event_name?: unknown
   readonly notification_type?: unknown
@@ -24,11 +26,14 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
   static async start(input: {
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
     readonly onSessionIdentified: (sessionId: string) => void
+    readonly onFileChanged?: (path: unknown) => string | undefined
+    readonly onSessionStarted?: () => void
     readonly workspaceDirectory: string
   }): Promise<ClaudeCodeHookReporter> {
     const token = randomBytes(24).toString('hex')
     const expectedDirectory = await resolveRealPath(input.workspaceDirectory)
     let lastReportedSessionId: string | null = null
+    let activeSessionId: string | null = null
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -41,9 +46,14 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
       })
       request.on('end', async () => {
         const payload = parsePayload(body)
+        let reminder: string | undefined
         if (payload) {
-          await acceptPayload(payload, expectedDirectory, {
+          reminder = await acceptPayload(payload, expectedDirectory, {
             ...input,
+            acceptSession: (event, sessionId) => {
+              if (event === 'SessionStart') activeSessionId = sessionId
+              return activeSessionId === null || activeSessionId === sessionId
+            },
             onSessionIdentified: (sessionId) => {
               if (lastReportedSessionId === sessionId) return
               lastReportedSessionId = sessionId
@@ -51,7 +61,8 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
             }
           })
         }
-        response.writeHead(204).end()
+        if (reminder) response.writeHead(200).end(reminder)
+        else response.writeHead(204).end()
       })
     })
     try {
@@ -87,23 +98,44 @@ async function acceptPayload(
   input: {
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
     readonly onSessionIdentified: (sessionId: string) => void
+    readonly onFileChanged?: (path: unknown) => string | undefined
+    readonly onSessionStarted?: () => void
+    readonly acceptSession: (event: string, sessionId: string) => boolean
   }
-): Promise<void> {
+): Promise<string | undefined> {
   if (
+    payload.agent_id !== undefined ||
     typeof payload.cwd !== 'string' ||
     (await resolveRealPath(payload.cwd)) !== expectedDirectory ||
     typeof payload.hook_event_name !== 'string'
   ) {
     return
   }
+  if (
+    payload.hook_event_name === 'SessionStart' &&
+    !['startup', 'resume', 'clear', 'compact', 'fork'].includes(String(payload.source))
+  )
+    return
+  if (
+    !isUuid(payload.session_id) ||
+    !input.acceptSession(payload.hook_event_name, payload.session_id)
+  )
+    return
   if (payload.hook_event_name === 'SessionStart') {
     if (isUuid(payload.session_id) && isResumableSessionStartSource(payload.source)) {
       input.onSessionIdentified(payload.session_id)
     }
     input.onActivityChanged('idle')
+    input.onSessionStarted?.()
     return
   }
-  if (payload.hook_event_name === 'UserPromptSubmit' && isUuid(payload.session_id)) {
+  if (payload.hook_event_name === 'FileChanged' && isUuid(payload.session_id)) {
+    return input.onFileChanged?.(payload.file_path)
+  }
+  if (
+    ['UserPromptSubmit', 'PreToolUse'].includes(payload.hook_event_name) &&
+    isUuid(payload.session_id)
+  ) {
     input.onSessionIdentified(payload.session_id)
   }
   const activity = mapActivity(payload)

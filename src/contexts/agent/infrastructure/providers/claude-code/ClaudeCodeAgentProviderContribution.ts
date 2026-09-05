@@ -19,9 +19,14 @@ import {
 import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
 import { claudeCodeProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
-import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
+import {
+  NodeAgentProviderCliDetector,
+  supportsAgentProviderVersion
+} from '../shared/NodeAgentProviderCliDetector'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import { ClaudeCodeHookReporter } from './ClaudeCodeHookReporter'
+import { ClaudeCodeInboxSignal } from './ClaudeCodeInboxSignal'
+import { mergeClaudeCodeLaunchSettings } from './ClaudeCodeLaunchSettings'
 
 export const claudeCodeInstallCommands = {
   linux: 'curl -fsSL https://claude.ai/install.sh | bash',
@@ -43,6 +48,7 @@ export class ClaudeCodeAgentProviderContribution implements AgentProviderContrib
   readonly descriptor = {
     capabilities: {
       activityTracking: true,
+      nativeMessages: true,
       initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: true,
@@ -149,8 +155,17 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
 
   constructor(private readonly runtimeExecutable: string) {}
 
-  async prepare(command: Parameters<AgentTelemetryContribution['prepare']>[0]) {
+  async prepare(command: CreateAgentLaunchPlanCommand) {
+    const inbox =
+      command.messageDelivery && supportsAgentProviderVersion(command.providerVersion, '2.1.261')
+        ? command.artifacts.track('claude-inbox-signal', await ClaudeCodeInboxSignal.create())
+        : undefined
+    if (!inbox) command.messageDelivery?.(null)
     const reporter = await ClaudeCodeHookReporter.start({
+      onFileChanged: (path) => inbox?.claim(path),
+      onSessionStarted: () => {
+        if (inbox) command.messageDelivery?.(inbox)
+      },
       onActivityChanged: command.onActivityChanged ?? (() => undefined),
       onSessionIdentified: (sessionId) =>
         command.onProviderSessionIdentified({
@@ -171,7 +186,9 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
     const settings = await createTemporaryProviderConfig(
       'cleancode-claude-settings-',
       'settings.json',
-      JSON.stringify({ hooks: createClaudeHooks(this.runtimeExecutable, [relay.path]) })
+      JSON.stringify({
+        hooks: createClaudeHooks(this.runtimeExecutable, [relay.path], inbox?.path)
+      })
     )
     command.artifacts.track('claude-hook-settings', settings)
     return {
@@ -200,6 +217,11 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
 
   async createLaunchPlan(command: CreateAgentLaunchPlanCommand) {
     const telemetry = await this.options.telemetry.prepare(command)
+    const userArgs = await mergeClaudeCodeLaunchSettings(
+      [...this.options.baseArgs, ...(command.launchProfile?.arguments ?? [])],
+      telemetry.args[telemetry.args.indexOf('--settings') + 1]!,
+      command.workspaceDirectory
+    )
     const sessionArgs = command.providerSessionRef
       ? this.options.resume.createResumeArgs(command.providerSessionRef)
       : this.createSessionArgs()
@@ -211,8 +233,7 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
       : { args: [], env: {} }
     return {
       args: [
-        ...this.options.baseArgs,
-        ...(command.launchProfile?.arguments ?? []),
+        ...userArgs,
         ...sessionArgs,
         ...capability.args,
         ...telemetry.args,
@@ -238,9 +259,17 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
   }
 }
 
-function createClaudeHooks(command: string, args: readonly string[]) {
+function createClaudeHooks(command: string, args: readonly string[], signalPath?: string) {
   const handler = { hooks: [{ args, command, type: 'command' }] }
   return {
+    ...(signalPath
+      ? {
+          FileChanged: [
+            { matcher: signalPath, ...handler },
+            { hooks: [{ args, command, type: 'command', asyncRewake: true, timeout: 5 }] }
+          ]
+        }
+      : {}),
     Notification: [handler],
     PermissionRequest: [handler],
     PreToolUse: [handler],
@@ -254,11 +283,12 @@ function createClaudeHooks(command: string, args: readonly string[]) {
 const claudeHookRelayScript = [
   "let body='';",
   'for await (const chunk of process.stdin) body+=chunk;',
-  'await fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL,{',
+  'const response=await fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL,{',
   'method:"POST",',
   'headers:{authorization:`Bearer ${process.env.CLEANCODE_CLAUDE_HOOK_TOKEN}`},',
-  'body',
-  '}).catch(()=>{});'
+  'body,signal:AbortSignal.timeout(3000)',
+  '}).catch(()=>null);',
+  'if(response?.status===200){process.stderr.write(await response.text());process.exitCode=2;}'
 ].join('')
 
 function isUuid(value: string): boolean {

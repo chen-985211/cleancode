@@ -4,6 +4,13 @@ import {
   type AgentMessageInput
 } from '../../domain/entities/AgentMessageLog'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { AgentInboxDelivery } from './AgentInboxDelivery'
+import type {
+  AgentMessageDeliveryLease,
+  AgentMessageDeliveryState,
+  AgentMessageDeliveryStatus,
+  AgentMessageIdentity
+} from '../ports/AgentMessageDeliveryPort'
 
 export interface AgentMessageCaller {
   readonly agentId: string
@@ -31,10 +38,35 @@ interface MessageWaiter {
 export class AgentMessageMailbox {
   private readonly logs = new Map<string, AgentMessageLog>()
   private readonly waiters = new Map<string, MessageWaiter>()
+  private readonly deliveries = new Map<string, AgentInboxDelivery>()
+
+  registerDelivery(
+    identity: AgentMessageIdentity,
+    state: () => AgentMessageDeliveryState
+  ): AgentMessageDeliveryLease {
+    const key = this.inboxKey(identity)
+    this.deliveries.get(key)?.close()
+    const delivery = new AgentInboxDelivery(
+      state,
+      () => this.log(identity).pendingIds(identity.agentId),
+      () => this.waiters.has(key),
+      () => {
+        if (this.deliveries.get(key) === delivery) this.deliveries.delete(key)
+      }
+    )
+    this.deliveries.set(key, delivery)
+    return delivery
+  }
+
+  deliveryStatus(identity: AgentMessageIdentity): AgentMessageDeliveryStatus {
+    if (this.waiters.has(this.inboxKey(identity))) return 'waiting'
+    return this.deliveries.get(this.inboxKey(identity))?.status ?? 'offline'
+  }
 
   send(caller: AgentMessageCaller, input: AgentMessageInput): AgentMessage {
     const message = this.log(caller).append(caller.agentId, input)
     this.waiters.get(this.inboxKey({ ...caller, agentId: input.toAgentId }))?.deliver()
+    this.deliveries.get(this.inboxKey({ ...caller, agentId: input.toAgentId }))?.refresh()
     return message
   }
 
@@ -62,13 +94,19 @@ export class AgentMessageMailbox {
     if (input.acknowledgeMessageId) log.acknowledge(caller.agentId, input.acknowledgeMessageId)
     const next = () => log.next(caller.agentId, input.replyToMessageId)
     const available = next()
-    if (available) return Promise.resolve({ message: available, status: 'message' })
+    if (available) {
+      this.deliveries.get(key)?.markReceived(available.messageId)
+      return Promise.resolve({ message: available, status: 'message' })
+    }
     if (timeoutMs === 0) return Promise.resolve({ status: 'timeout' })
     return new Promise((resolve) => {
       const finish = (result: AgentMessageWaitResult) => {
         clearTimeout(timer)
         signal?.removeEventListener('abort', cancel)
         this.waiters.delete(key)
+        if (result.status === 'message')
+          this.deliveries.get(key)?.markReceived(result.message.messageId)
+        else this.deliveries.get(key)?.refresh()
         resolve(result)
       }
       const cancel = () => finish({ status: 'canceled' })
@@ -95,7 +133,7 @@ export class AgentMessageMailbox {
     return this.waiters.has(this.inboxKey(caller))
   }
 
-  private log(caller: AgentMessageCaller): AgentMessageLog {
+  private log(caller: AgentMessageIdentity): AgentMessageLog {
     const key = JSON.stringify([caller.projectId, caller.workspaceId])
     let log = this.logs.get(key)
     if (!log) {
@@ -105,7 +143,7 @@ export class AgentMessageMailbox {
     return log
   }
 
-  private inboxKey(caller: AgentMessageCaller): string {
+  private inboxKey(caller: AgentMessageIdentity): string {
     return JSON.stringify([caller.projectId, caller.workspaceId, caller.agentId])
   }
 }

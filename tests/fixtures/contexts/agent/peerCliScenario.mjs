@@ -50,11 +50,22 @@ export async function runPeerScenario(providerId, args) {
       const providers = await call('list_agent_providers', {})
       if (!providers.providers.some((provider) => provider.providerId === target))
         throw new Error('Target provider not creatable.')
-      const created = await call('create_agent', {
-        agentId: 'peer-reviewer',
-        providerId: target,
-        initialTask: 'Review fixture revision abc and report the result.'
-      })
+      let created
+      if (process.env.CLEANCODE_FAKE_PEER_MANUAL === '1') {
+        const peers = await call('list_agents', {})
+        const peer = peers.agents.find(agent => agent.providerId === target)
+        if (!peer) throw new Error('Manual peer was not discovered.')
+        created = { initialMessageId: 'existing-peer-review' }
+        await call('send_agent_message', {
+          messageId: created.initialMessageId, toAgentId: peer.agentId,
+          kind: 'task', text: 'Review fixture revision abc and report the result.'
+        })
+      } else {
+        created = await call('create_agent', {
+          agentId: 'peer-reviewer', providerId: target,
+          initialTask: 'Review fixture revision abc and report the result.'
+        })
+      }
       const reply = await call('wait_agent_message', { replyToMessageId: created.initialMessageId })
       if (reply.result.status !== 'message') throw new Error('Peer did not reply.')
       await call('wait_agent_message', {
@@ -71,8 +82,8 @@ export async function runPeerScenario(providerId, args) {
       )
       process.stdout.write('PEER_REVIEW_COMPLETE\n')
     } else {
-      if (!args.at(-1)?.includes('wait_agent_message'))
-        throw new Error('Native initial prompt was not supplied.')
+      // These legacy-version fixtures exercise the common MCP pull protocol.
+      // Native wakeup transports are verified by the Provider integration tests.
       const received = await call('wait_agent_message', {})
       if (received.result.status !== 'message') throw new Error('No initial task was delivered.')
       const task = received.result.message

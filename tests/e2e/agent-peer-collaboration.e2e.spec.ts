@@ -30,7 +30,7 @@ describe('Native Agent collaboration on the canvas', () => {
   })
 
   it.each(['claude-code', 'codex'] as const)(
-    'creates a peer from %s, receives its result, and shows both native consoles',
+    'hands off from %s to a peer and shows both native consoles',
     async (source) => {
       resources = {}
       const workbench = await createE2eWorkbench('cleancode-peer-agents')
@@ -55,6 +55,7 @@ describe('Native Agent collaboration on the canvas', () => {
             import.meta.url
           ).href,
           CLEANCODE_FAKE_PEER_SOURCE: source,
+          CLEANCODE_FAKE_PEER_MANUAL: source === 'codex' ? '1' : '0',
           CLEANCODE_FAKE_PEER_REPORT: report
         }
       })
@@ -62,6 +63,10 @@ describe('Native Agent collaboration on the canvas', () => {
       const page = await app.firstWindow()
       resources.page = page
       await page.getByRole('button', { name: '添加项目' }).click()
+      if (source === 'codex') {
+        await waitForAgentProviderInstalled(page, 'claude-code')
+        await selectAgentProviderFromCreateMenu(page, 'Claude Code')
+      }
       await waitForAgentProviderInstalled(page, source)
       await selectAgentProviderFromCreateMenu(page, source === 'codex' ? 'Codex' : 'Claude Code')
       const result = await pollUntilState({
@@ -80,7 +85,7 @@ describe('Native Agent collaboration on the canvas', () => {
       expect(result, JSON.stringify(result)).toMatchObject({
         status: 'completed',
         source,
-        replyToMessageId: 'initial:peer-reviewer'
+        replyToMessageId: source === 'codex' ? 'existing-peer-review' : 'initial:peer-reviewer'
       })
       await page.waitForFunction(
         () => document.querySelectorAll('[data-agent-console-node]').length === 2

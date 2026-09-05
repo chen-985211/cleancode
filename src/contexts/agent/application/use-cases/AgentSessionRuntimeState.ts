@@ -11,6 +11,7 @@ import type {
 } from '../dto/AgentSessionProtocol'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import type { AgentPeerCreationPort } from '../ports/AgentPeerCreationPort'
+import type { AgentMessageDeliveryLease } from '../ports/AgentMessageDeliveryPort'
 import type {
   AgentMcpRegistration,
   AgentMcpServerPort,
@@ -70,6 +71,7 @@ export interface AgentSessionCallbacks {
 }
 
 export interface ManagedAgentSession {
+  messageDelivery?: AgentMessageDeliveryLease
   initialPrompt?: string
   readonly agentId: string
   agentName?: string
@@ -168,6 +170,7 @@ export function transitionAgentRuntime(
     revision: runtime.revision + 1,
     terminal: nextTerminal
   }
+  session.messageDelivery?.refresh()
   try {
     session.callbacks.onRuntimeChanged?.({
       agentId: session.agentId,
@@ -385,6 +388,7 @@ export function createAgentLaunchRuntimeController(command: {
 }
 
 export async function disposeAgentLaunchArtifacts(session: ManagedAgentSession): Promise<void> {
+  session.messageDelivery?.close()
   const artifacts = session.launchArtifacts
   if (!artifacts) return
   await artifacts.dispose()
@@ -577,6 +581,7 @@ export function beginAgentMcpInitializationTimeout(session: ManagedAgentSession)
 }
 
 export function unregisterAgentMcpEndpoint(session: ManagedAgentSession): void {
+  session.messageDelivery?.close()
   const registration = session.mcpRegistration
   session.mcpRegistration = undefined
   registration?.dispose()
