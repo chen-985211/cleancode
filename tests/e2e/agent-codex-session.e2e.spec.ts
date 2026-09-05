@@ -27,7 +27,8 @@ import {
   waitForAgentProviderInstalled,
   waitForAgentTerminalReady,
   stopAgentLaunchForShellSetup,
-  writeAgentTerminalInput
+  writeAgentTerminalInput,
+  type AgentLaunchReadySnapshot
 } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
@@ -118,14 +119,10 @@ describe('Codex Agent session e2e', () => {
     'keeps the Agent WebGL surface visible while raising its backing density',
     async () => {
       await expectDesktopRuntime(page)
-      const launchReady = waitForAgentLaunchReady(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'codex')
-      await selectAgentProviderFromCreateMenu(page, 'Codex')
-      await waitForAgentCount(page, 1)
-      await waitForAgentTerminals(page, 1)
-      await launchReady
+      await createCodexAgentAndWaitForLaunch(page)
 
       const terminal = page.locator('[data-agent-console-node] .agent-terminal-viewport').first()
       await stopAgentLaunchForShellSetup(page, terminal)
@@ -217,14 +214,10 @@ describe('Codex Agent session e2e', () => {
     'restores a Codex session selected through /resume even when no later turn completes',
     async () => {
       await expectDesktopRuntime(page)
-      const firstLaunchReady = waitForAgentLaunchReady(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'codex')
-      await selectAgentProviderFromCreateMenu(page, 'Codex')
-      await waitForAgentCount(page, 1)
-      await waitForAgentTerminals(page, 1)
-      const firstLaunchRuntime = await firstLaunchReady
+      const firstLaunchRuntime = await createCodexAgentAndWaitForLaunch(page)
 
       const firstLaunch = await waitForCodexLaunch(
         fakeCodex.reportPath,
@@ -405,6 +398,21 @@ async function waitForCodexResumeSelection(reportPath: string, sessionId: string
       reports.find((report) => report.kind === 'resume' && report.sessionId === sessionId),
     `Codex /resume selection ${sessionId}`
   )
+}
+
+async function createCodexAgentAndWaitForLaunch(page: Page): Promise<AgentLaunchReadySnapshot> {
+  await page.getByRole('button', { name: '选择默认 Agent' }).click()
+  const providerOption = page
+    .getByRole('menu', { name: '选择默认 Agent' })
+    .getByRole('menuitemradio', { name: 'Codex', exact: true })
+  await providerOption.waitFor({ state: 'visible' })
+
+  // Provider discovery and menu preparation must not consume the launch deadline.
+  const launchReady = waitForAgentLaunchReady(page)
+  await providerOption.click()
+  await waitForAgentCount(page, 1)
+  await waitForAgentTerminals(page, 1)
+  return launchReady
 }
 
 async function waitForCodexSessionEnd(reportPath: string, sessionId: string): Promise<void> {

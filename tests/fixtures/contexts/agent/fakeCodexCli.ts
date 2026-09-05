@@ -95,10 +95,14 @@ export async function readFakeCodexCliReports(
   try {
     const contents = await readFile(reportPath, 'utf8')
 
-    return contents
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as FakeCodexCliReport)
+    return (
+      contents
+        .split('\n')
+        // A concurrent append may expose the final record before its newline is written.
+        .slice(0, -1)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as FakeCodexCliReport)
+    )
   } catch (error) {
     if (isMissingFileError(error)) {
       return []
