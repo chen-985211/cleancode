@@ -1,0 +1,106 @@
+name: Platform Electron E2E
+
+on:
+  workflow_call:
+    inputs:
+      platform_id:
+        type: string
+        required: true
+      runner:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Electron E2E / ${{ inputs.platform_id }} / shard ${{ matrix.shard }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - name: Install dependencies without downloading Electron again
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: electron-e2e-application-${{ inputs.platform_id }}
+          path: .
+      - uses: actions/download-artifact@v8
+        if: runner.os == 'Windows'
+        with:
+          name: electron-e2e-native-windows
+          path: .cache/windows-node-pty-electron
+      - name: Restore prebuilt Electron binary
+        shell: bash
+        run: |
+          electron_package_directory=$(cd node_modules/electron && pwd -P)
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -x -k \
+              electron-e2e-runtime-${{ inputs.platform_id }}.zip "$electron_package_directory"
+            cp electron-e2e-path-${{ inputs.platform_id }}.txt "$electron_package_directory/path.txt"
+            rm electron-e2e-runtime-${{ inputs.platform_id }}.zip
+            rm electron-e2e-path-${{ inputs.platform_id }}.txt
+            pnpm exec electron --version
+          else
+            tar -C "$electron_package_directory" \
+              -xzf electron-e2e-runtime-${{ inputs.platform_id }}.tgz
+            rm electron-e2e-runtime-${{ inputs.platform_id }}.tgz
+          fi
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            test -x node_modules/electron/dist/electron
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            pnpm exec electron --version
+          fi
+      - name: Restore prepared Windows node-pty artifact
+        if: runner.os == 'Windows'
+        run: pnpm native:artifact:restore
+      - name: Verify prepared Windows node-pty artifact
+        if: runner.os == 'Windows'
+        run: pnpm verify:native
+      - name: Run E2E shard on Linux
+        if: runner.os == 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: xvfb-run --auto-servernum pnpm test:e2e --shard=${{ matrix.shard }}/3
+      - name: Run E2E shard
+        if: runner.os != 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/3
+
+      - name: Summarize test timings
+        if: always()
+        run: pnpm report:test-timings
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-e2e-${{ inputs.platform_id }}-${{ matrix.shard }}
+          path: test-results/timings
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: ignore
+          name: electron-e2e-diagnostics-${{ inputs.platform_id }}-${{ matrix.shard }}
+          path: test-results/e2e
+          retention-days: 7

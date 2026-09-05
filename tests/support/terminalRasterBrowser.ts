@@ -15,6 +15,7 @@ export function renderTerminalRasterFixture(
   }
 ) {
   return page.evaluate(async (input) => {
+    const startedAt = performance.now()
     const { addonSource, entry, columns, theme, xtermSource, zoom, rasterScale } = input
     const fixtureWindow = window as Window & { rasterFixtureTerminal?: Terminal }
     fixtureWindow.rasterFixtureTerminal?.dispose()
@@ -38,6 +39,7 @@ export function renderTerminalRasterFixture(
         ? addonSource
         : `${addonSource}\nexport const WebglAddon = globalThis.WebglAddon.WebglAddon;`
     )) as { WebglAddon: typeof WebglAddon }
+    const modulesLoadedAt = performance.now()
     const container = document.createElement('div')
     container.style.cssText = `position:absolute;left:19.3px;top:21.7px;transform:scale(${zoom});transform-origin:0 0;width:600px;height:300px;`
     document.body.append(container)
@@ -69,19 +71,24 @@ export function renderTerminalRasterFixture(
     const screenWidth = Number.parseFloat(screen.style.width)
     const screenHeight = Number.parseFloat(screen.style.height)
     addon.setRasterScale(rasterScale)
+    const preparedAt = performance.now()
+    let renderedAt = preparedAt
     await new Promise<void>((resolve) => {
       const subscription = terminal.onRender(() => {
         subscription.dispose()
+        renderedAt = performance.now()
         requestAnimationFrame(() => resolve())
       })
       terminal.refresh(0, terminal.rows - 1)
     })
+    const frameReadyAt = performance.now()
     const canvas = Array.from(container.querySelectorAll('canvas')).find((candidate) =>
       candidate.getContext('webgl2')
     )!
     const gl = canvas.getContext('webgl2')!
     const pixels = new Uint8Array(canvas.width * canvas.height * 4)
     gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+    const pixelsReadAt = performance.now()
     const glyphs = new Set<string>()
     let referenceGlyph: number[] | undefined
     let glyphMaximumDifference = 0
@@ -118,6 +125,14 @@ export function renderTerminalRasterFixture(
     container.style.top = '21.7px'
     addon.refreshRasterAlignment()
     return {
+      timings: {
+        moduleLoadMs: modulesLoadedAt - startedAt,
+        prepareMs: preparedAt - modulesLoadedAt,
+        renderWaitMs: renderedAt - preparedAt,
+        nextFrameWaitMs: frameReadyAt - renderedAt,
+        readPixelsMs: pixelsReadAt - frameReadyAt,
+        totalMs: performance.now() - startedAt
+      },
       backingWidth: canvas.width,
       backingHeight: canvas.height,
       screenWidth,

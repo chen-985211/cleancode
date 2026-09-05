@@ -46,6 +46,30 @@ export async function selectBlankCanvasAction(
     .click()
 }
 
+export async function panCanvasLeft(page: Page): Promise<void> {
+  const pane = await page.locator('.react-flow__pane').boundingBox()
+  if (!pane) throw new Error('The canvas pane is unavailable.')
+  for (let pan = 0; pan < 3; pan += 1) {
+    const point = await findVisibleBlankCanvasPoint(page)
+    if (!point) throw new Error('No blank canvas point is available for panning.')
+    const viewport = page.locator('.react-flow__viewport')
+    const previousTransform = await viewport.getAttribute('style')
+    await page.mouse.move(point.x, point.y)
+    await page.mouse.down()
+    try {
+      await page.mouse.move(pane.x + 12, point.y, { steps: 4 })
+    } finally {
+      await page.mouse.up()
+    }
+    await pollUntilState({
+      description: 'canvas pan to move the Agent out of view',
+      observe: () => viewport.getAttribute('style'),
+      accept: (transform) => transform !== previousTransform,
+      timeoutMs: 5_000
+    })
+  }
+}
+
 async function findVisibleBlankCanvasPoint(
   page: Page
 ): Promise<{ readonly x: number; readonly y: number } | null> {

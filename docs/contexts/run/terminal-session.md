@@ -115,6 +115,8 @@ Run 仍是 terminal 生命周期 owner。终端自然退出、显式关闭、rep
 
 每个模型使用与可见终端一致的行列、Unicode 11 宽度规则、会话源主题和当前滚动历史预算，维护 ANSI 屏幕、光标、颜色、alternate buffer、已支持模式、标题、工作目录和可读 transcript。滚动历史预算只接受 1000、5000 或 10000 行，默认 1000 行；设置变更同步到当前及后续模型和视图，并随 snapshot 明确传递。`TerminalSnapshot.sequence`、`terminalSourceTheme` 与 `RestoreMarker` 表示快照已经包含到哪个输出、应采用哪套 canonical palette；renderer 只接受同一 `viewId` 和完整运行身份的后续事件，并按序丢弃重复、检测缺口。
 
+屏幕序列化不会自动保存 xterm 尚未完成的解析状态。Run 必须在 snapshot 和完整 checkpoint 的 `content` 末尾补入尚未结束的 VT 控制序列与 UTF-16 高位代理项，让新视图和 checkpoint 恢复后的模型继续消费下一块输出；CSI 内已经执行的 C0 控制字符不得重复回放。该前缀按模型解析完成的 sequence 更新，最多保留 1,048,576 个 UTF-16 code unit，超限时以 `TERMINAL_RECOVERY_STORAGE_LIMIT` 拒绝本次快照，保留已有视图与输出响应权并解除交接暂停；控制序列结束或取消后恢复快照能力。只读冷历史使用的 `normalContent` 不携带未完成前缀，因为它不会继续同一条实时输出流。
+
 视图生命周期遵守：
 
 1. `AttachView` 暂停 PTY 输出，等待模型完成已接受写入，生成 snapshot，并把 terminal query 响应权从隐藏模型交给该视图后恢复输出。

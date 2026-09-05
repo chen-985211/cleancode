@@ -64,6 +64,7 @@ describe('Codex Agent session e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
+    await configureCodexExecutable(page, fakeCodex.executablePath)
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -80,7 +81,6 @@ describe('Codex Agent session e2e', () => {
     'reopens the same empty Agent without resuming an unmaterialized thread',
     async () => {
       await writeFile(fakeCodex.savedThreadsPath, '[]', 'utf8')
-      await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentProviderInstalled(page, 'codex')
       await selectAgentProviderFromCreateMenu(page, 'Codex')
@@ -119,7 +119,6 @@ describe('Codex Agent session e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       const launchReady = waitForAgentLaunchReady(page)
-      await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'codex')
@@ -219,7 +218,6 @@ describe('Codex Agent session e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       const firstLaunchReady = waitForAgentLaunchReady(page)
-      await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'codex')

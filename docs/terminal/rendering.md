@@ -186,6 +186,8 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 隐藏普通终端不再持续接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见视图取得定向租约后才接收带 sequence 的低延迟事件。各平台隐藏时由模型响应 terminal query、可见时由 renderer xterm 响应，attach/detach 使用 PTY pause、模型 flush 和确认后销毁，保证同一查询不会由两端重复响应；Windows 随包 ConPTY DLL 保留这类查询。Agent foreground 与普通 Codex shim 的 ConsoleColor bridge 只改变同一 Console 的短期 Win32 probe 事实，私有输出 gate 在这条唯一输出流进入模型前消费 host 控制 span，不建立第二套响应权。
 
+快照还必须包含尚未结束的控制序列前缀：例如切走时输出停在 `ESC [`，重新挂载后必须把下一块的 `2;1H` 接成光标指令，不能把它绘制成文字。这个前缀由 Run 模型统一维护，已执行的控制字符不重复回放；相关跨块与恢复矩阵由 [`run.terminal-view-stream-continuity.spec.ts`](../../tests/integration/contexts/run/run.terminal-view-stream-continuity.spec.ts) 使用真实 xterm 与未中断输出对比验证。
+
 8192 字符尾部仍用于无障碍文本、诊断和非 xterm 回退，不是屏幕恢复来源。新 snapshot 额外提供由模型 buffer 导出的有界 transcript，表现层可以用它更新无障碍投影；不得把裁剪后的文本重新送入 xterm parser。
 
 重挂载完成后的 `fit` 可能立即产生 resize。Presentation 必须保留完整运行身份；主进程对已退出 session 的 resize 幂等返回该快照，renderer 随即收敛为 `exited`。退出事件先于启动响应时也必须先建立终态投影，避免迟到的启动 Promise 把旧 PTY 重新标成运行中。

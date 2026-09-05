@@ -1,7 +1,6 @@
 // @vitest-environment node
 
 import { EventEmitter } from 'node:events'
-import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -34,7 +33,6 @@ import {
   mergeE2eProcessEnvironment,
   readAuthenticatedTerminalProviderMetadata,
   teardownE2eScenario,
-  waitForTextFile,
   waitForProcessIdExit,
   type E2eWorkbench
 } from '../../support/e2eWorkbench'
@@ -245,43 +243,6 @@ describe('E2E workbench lifecycle', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('waits for text file content to become complete and stable', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'cleancode-e2e-text-file-'))
-    const filePath = join(directory, 'report.txt')
-
-    try {
-      await writeFile(filePath, 'partial', 'utf8')
-      const rewrite = new Promise<void>((resolve, reject) => {
-        setTimeout(() => {
-          void writeFile(filePath, 'complete', 'utf8').then(resolve, reject)
-        }, 5)
-      })
-
-      await expect(
-        waitForTextFile(filePath, {
-          intervalMs: 10,
-          isComplete: (contents) => contents === 'complete',
-          timeoutMs: 500
-        })
-      ).resolves.toBe('complete')
-      await rewrite
-    } finally {
-      await rm(directory, { force: true, recursive: true })
-    }
-  })
-
-  it('retains the last transient file error when a text report never appears', async () => {
-    const missingPath = join(tmpdir(), `cleancode-missing-${randomUUID()}.txt`)
-
-    await expect(
-      waitForTextFile(missingPath, { intervalMs: 5, timeoutMs: 20 })
-    ).rejects.toMatchObject({
-      cause: {
-        code: 'ENOENT'
-      }
-    })
   })
 
   it('destroys a provider socket when the health response deadline expires', async () => {

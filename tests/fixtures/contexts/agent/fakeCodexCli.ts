@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { execFile } from 'node:child_process'
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
 
 export interface FakeCodexCliFixture {
   readonly binDirectory: string
@@ -58,6 +62,28 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   } else {
     await writeFile(executablePath, createPosixNodeCliLauncher(programPath), 'utf8')
     await chmod(executablePath, 0o755)
+  }
+
+  // Finish the newly written executable's first launch before Electron starts discovery.
+  // A version probe that is still cold can exceed the application's inspection deadline.
+  const { stdout } = await execFileAsync(
+    process.platform === 'win32' ? 'powershell.exe' : executablePath,
+    process.platform === 'win32'
+      ? [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          join(binDirectory, 'codex.ps1'),
+          '--version'
+        ]
+      : ['--version'],
+    { timeout: 10_000 }
+  )
+  if (stdout.trim() !== 'codex-cli fake-e2e') {
+    throw new Error(`Fake Codex CLI returned an unexpected version: ${JSON.stringify(stdout)}`)
   }
 
   return { binDirectory, executablePath, reportPath, savedThreadsPath, sessionId, switchSessionId }
@@ -339,12 +365,14 @@ function beginColorQueryProbe() {
   if (colorQueryProbeState !== 'idle') return
   colorQueryProbeBuffer = ''
   colorQueryProbeState = 'awaiting'
+  // This is a failure deadline; the E2E keeps the view offscreen until the response.
+  // Host scheduling latency is not the protocol oracle.
   colorQueryProbeTimer = setTimeout(() => {
     colorQueryProbeTimer = null
     if (colorQueryProbeState !== 'awaiting') return
     colorQueryProbeState = 'timed-out'
     report('color-query-timeout')
-  }, 100)
+  }, 5_000)
   process.stdout.write(OSC + '10;?' + ST + OSC + '11;?' + ST)
 }
 
@@ -497,15 +525,17 @@ function startSession() {
 }
 
 function createWindowsCmdLauncher(programPath: string): string {
-  return `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
+  return `@echo off\r\nif "%~1" == "--version" (\r\n  echo codex-cli fake-e2e\r\n  exit /b 0\r\n)\r\n"${process.execPath}" "${programPath}" %*\r\n`
 }
 
 function createWindowsPowerShellLauncher(programPath: string): string {
-  return `& ${quotePowerShellWord(process.execPath)} ${quotePowerShellWord(programPath)} @args\nexit $LASTEXITCODE\n`
+  return `if ($args[0] -eq '--version') { Write-Output 'codex-cli fake-e2e'; exit 0 }\n& ${quotePowerShellWord(process.execPath)} ${quotePowerShellWord(programPath)} @args\nexit $LASTEXITCODE\n`
 }
 
 function createPosixNodeCliLauncher(programPath: string): string {
-  return `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
+  // Discovery probes the whole catalog concurrently. Keep the fixed version response
+  // independent of Node cold-start contention; session/app-server still run real processes.
+  return `#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf '%s\\n' 'codex-cli fake-e2e'\n  exit 0\nfi\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
 }
 
 function quotePosixWord(value: string): string {

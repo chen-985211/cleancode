@@ -131,7 +131,7 @@ Electron Platform 在应用数据目录根部使用独立的 `window-state-v1.js
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
 - Unit 测试通过 Vitest projects 按运行时需求分组：Presentation 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境，避免为不消费 DOM 的文件重复创建浏览器模拟环境。
-- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台只等待自身 build，再按已审查的平台历史耗时分到三个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
@@ -147,7 +147,7 @@ Electron Platform 在应用数据目录根部使用独立的 `window-state-v1.js
 - `check:test-stability`：使用 TypeScript AST 阻止 Electron E2E 固定等待、原始 timer sleep、直接 `expect.poll` / `vi.waitUntil`、自动重试和捕获后重复场景动作；Node 侧状态轮询统一由测试支撑收口并保留最后观测诊断。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
-本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和完整 Electron E2E。CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
+本地普通改动门禁通过 `pnpm pre-commit` 执行，覆盖静态检查、全部 contract/unit/integration 和关键路径 smoke；高风险改动通过 `pnpm verify:full` 执行全部静态检查和完整 Electron E2E，风险规则由开发协作规范维护。执行顺序以根目录 `package.json` 为准，contract 优先反馈。CI 对每个 Pull Request 和 `main` 完整运行三平台快速质量检查、独立原生 integration 和 E2E 分片，不使用路径过滤；每个平台的 `pnpm build` 只在 E2E build job 执行一次，原生产物被该平台消费者复用。Vitest JSON 耗时报告和栅格阶段计时通过 `pnpm report:test-timings` 汇总，CI 保留首轮结果，不以 retry 隐藏失败。
 
 ## 候选技术与触发条件
 
