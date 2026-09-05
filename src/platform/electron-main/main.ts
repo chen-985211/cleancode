@@ -106,6 +106,7 @@ import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { configureApplicationQuitConfirmation as configureQuitConfirmation } from './applicationQuitConfirmation'
+import { configureApplicationDiagnostics } from './applicationDiagnosticsRuntime'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
@@ -160,6 +161,7 @@ const terminalProviderRuntimeImage = new TerminalProviderRuntimeImageManager({
   onFailure: logProviderRuntimeImageMaterializationError
 })
 consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
+configureApplicationDiagnostics(appStateDirectoryPath, terminalProviderStateDirectoryPath)
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)

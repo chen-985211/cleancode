@@ -11,9 +11,14 @@ import {
   type ApplicationQuitRequest
 } from '../ipc/applicationQuitChannels'
 import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChannels'
+import { applicationDiagnosticsChannels } from '../ipc/applicationDiagnosticsChannels'
 
 const cleancodeApi = {
   appName: 'cleancode',
+  exportApplicationDiagnostics: (command: unknown) =>
+    invokeCleancode(applicationDiagnosticsChannels.export, command),
+  getApplicationDiagnosticsSummary: () =>
+    invokeCleancode(applicationDiagnosticsChannels.getSummary),
   showApplicationQuitConfirmation: (command: ApplicationQuitConfirmationCommand) =>
     invokeCleancode<boolean>(applicationQuitChannels.show, command),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),

@@ -1,5 +1,6 @@
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise'
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft'
+import { BugIcon } from '@phosphor-icons/react/dist/csr/Bug'
 import { EraserIcon } from '@phosphor-icons/react/dist/csr/Eraser'
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix'
 import { KeyboardIcon } from '@phosphor-icons/react/dist/csr/Keyboard'
@@ -42,6 +43,7 @@ import type { AgentProviderPreferencesSnapshot } from '../../../../contexts/agen
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
+import { ApplicationDiagnosticsPane } from './ApplicationDiagnosticsPane'
 import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 import { useInterruptibleSurfaceFocusRestore } from '../../../shared/hooks/useInterruptibleSurfaceFocusRestore'
 import {
@@ -225,6 +227,15 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               <RobotIcon size={17} aria-hidden="true" />
               <span>{t('settings.agents.title')}</span>
             </button>
+            <button
+              type="button"
+              data-selection-motion-option="diagnostics"
+              aria-current={activePane === 'diagnostics' ? 'page' : undefined}
+              onClick={() => setSelectedPane('diagnostics')}
+            >
+              <BugIcon size={17} aria-hidden="true" />
+              <span>{t('settings.diagnostics.title')}</span>
+            </button>
           </nav>
           <main className="application-settings-content">
             <ApplicationSettingsPaneTransition activePane={activePane}>
@@ -250,6 +261,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                   terminalWorkflowBuildMode={props.terminalWorkflowBuildMode}
                   onTerminalWorkflowBuildModeChange={props.onTerminalWorkflowBuildModeChange}
                 />
+              ) : activePane === 'diagnostics' ? (
+                <ApplicationDiagnosticsPane />
               ) : (
                 <div className="shortcut-settings-pane">
                   <header className="shortcut-settings-pane__header">

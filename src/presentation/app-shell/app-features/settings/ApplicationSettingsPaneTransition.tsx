@@ -142,7 +142,9 @@ export function ApplicationSettingsPaneTransition({
               if (element) layerRootsRef.current.set(layer.id, element)
               else layerRootsRef.current.delete(layer.id)
             }}
-            className="application-settings-pane-transition__layer"
+            className={`application-settings-pane-transition__layer${
+              isCurrent ? '' : ' application-settings-pane-transition__layer--overlay'
+            }`}
             data-application-settings-pane={layer.pane}
             data-application-settings-pane-role={layer.role}
             aria-hidden={isCurrent ? undefined : true}

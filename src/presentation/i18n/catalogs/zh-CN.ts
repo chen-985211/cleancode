@@ -1,3 +1,5 @@
+import { zhCNApplicationDiagnosticsMessages } from './applicationDiagnostics'
+
 export const zhCNMessages = {
   'app.settings': '应用设置',
   'app.windowNavigation': '窗口导航',
@@ -114,6 +116,7 @@ export const zhCNMessages = {
   'settings.terminal.workflowBuild.simultaneous': '整体搭建',
   'settings.terminal.workflowBuild.simultaneousDescription':
     '同时显示全部终端与依赖，更快完成搭建。',
+  ...zhCNApplicationDiagnosticsMessages,
   'settings.agents.title': 'Agent',
   'settings.agents.preferences': 'Agent 默认设置',
   'settings.agents.permission': '智能体权限',

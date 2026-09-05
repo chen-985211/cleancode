@@ -5,6 +5,7 @@
 @import '../app-features/settings/theme-settings.css';
 @import '../../../contexts/block-graph/presentation/styles/block-template-library.css';
 @import '../app-features/settings/application-settings.css';
+@import '../app-features/settings/application-diagnostics.css';
 @import '../app-features/settings/canvas-settings.css';
 @import '../app-features/settings/language-settings.css';
 @import '../../shared/styles/toolbar-utility-button-motion.css';

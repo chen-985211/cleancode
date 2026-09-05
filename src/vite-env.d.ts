@@ -68,6 +68,11 @@ import type {
   ApplicationQuitConfirmationCommand,
   ApplicationQuitRequest
 } from './platform/ipc/applicationQuitChannels'
+import type {
+  ApplicationDiagnosticsExportCommand,
+  ApplicationDiagnosticsExportResult,
+  ApplicationDiagnosticsSummary
+} from './platform/ipc/applicationDiagnosticsChannels'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -82,6 +87,10 @@ declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      exportApplicationDiagnostics(
+        command: ApplicationDiagnosticsExportCommand
+      ): Promise<ApplicationDiagnosticsExportResult>
+      getApplicationDiagnosticsSummary(): Promise<ApplicationDiagnosticsSummary>
       showApplicationQuitConfirmation(command: ApplicationQuitConfirmationCommand): Promise<boolean>
       getPathForFile(file: File): string
       getWindowFullScreenState(): Promise<boolean>
