@@ -91,11 +91,11 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 应用开发测试必须纳入本地统一质量门禁。
 
-`pnpm pre-commit` 必须执行 `pnpm test:full`，确保 AI 或开发者每次修改生产代码、测试代码、构建配置、工具配置或依赖后都会运行全部低层测试和完整 Electron E2E。
+本地普通改动通过 `pnpm pre-commit` 执行全部静态检查、全部低层测试和现有关键路径 smoke；高风险改动通过 `pnpm verify:full` 执行全部静态检查和完整 Electron E2E。具体风险分级由开发协作规范维护。完整门禁包含普通门禁的测试集合，同一内容无需重复运行两者。
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
-`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、动效、国际化、可移植路径、测试稳定性、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。`pnpm test:unit` 通过独立 Vitest projects 让 `tests/unit/presentation` 和 `tests/unit/contexts/**/*.presentation.spec.ts(x)` 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争。Linux runner 通过 `xvfb-run --auto-servernum` 运行这组低层测试；专用 Electron/WebGL raster fixture 在 hosted runner 上显式启用 Chromium SwiftShader WebGL 后端，确保没有硬件 GPU 时仍执行图形集成验证。完整 E2E 保持应用自己的 renderer 选择与回退行为。Windows CI 可以把 unit、integration 和 contract 文件确定性地分到两个独立 runner；每个 runner 内的 integration 仍须串行，两个 shard 的并集必须覆盖全部测试文件。
+`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、动效、国际化、可移植路径、测试稳定性、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 contract、unit 和 integration。`pnpm test:unit` 通过独立 Vitest projects 让 `tests/unit/presentation` 和 `tests/unit/contexts/**/*.presentation.spec.ts(x)` 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境。CI 的快速检查先运行 contract，再执行静态检查和 unit；原生 integration 在独立 job 中通过 `pnpm test:integration:ci` 串行运行文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争。`pnpm test:core:ci` 保留为同一 runner 串行执行全部低层测试的入口。Linux integration 使用 `xvfb-run --auto-servernum`；专用 Electron/WebGL raster fixture 在 hosted runner 上显式启用 Chromium SwiftShader WebGL 后端，确保没有硬件 GPU 时仍执行图形集成验证。完整 E2E 保持应用自己的 renderer 选择与回退行为。Windows 的静态检查、contract/unit 分片和 integration 分片分别运行；每层两个 shard 的并集必须覆盖全部测试文件，每个 integration shard 内仍须串行。
 
 国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
 
@@ -107,21 +107,21 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 Agent Provider-neutral Presentation 门禁必须通过 `pnpm check:agent-provider-boundary` 执行。它必须从内建 contribution 的静态 descriptor 自动发现当前和未来 Provider ID，拒绝生产表现层中的品牌 ID 与具体 Provider infrastructure 引用，并在无法发现 ID 时失败关闭；`tests/unit/support/check-agent-provider-boundary.spec.ts` 锁定未知 Provider、TSX/CSS、import、legacy 例外和发现失败边界。Provider registry 与组件仍须分别使用行为测试证明未知 descriptor 能沿通用路径工作，静态门禁不能替代 capability 降级与 attach/retry 测试。
 
-`pnpm test` 是本地快速测试门禁，必须按测试金字塔从低层到高层串行执行：
+`pnpm test` 是本地快速测试门禁，优先执行快速契约边界，再运行其他低层测试和 smoke：
 
 ```txt
+pnpm test:contract
+  ↓
 pnpm test:unit
   ↓
 pnpm test:integration
-  ↓
-pnpm test:contract
   ↓
 pnpm test:e2e:smoke
 ```
 
 底层测试必须先失败先反馈。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
 
-`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`，并由本地统一门禁 `pnpm pre-commit` 调用。完整 Electron E2E 也由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时可以单独使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
+`pnpm test:full` 按相同顺序运行 contract、unit、integration 和完整 `pnpm test:e2e`，并由高风险完整门禁 `pnpm verify:full` 调用。完整 Electron E2E 也由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时可以单独使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
 
 任何新增测试类型、调整测试目录或改变快速/完整门禁时，都必须同步维护 `package.json`、对应 CI workflow 和本文档。
 
@@ -129,7 +129,7 @@ pnpm test:e2e:smoke
 
 ### 全量跨平台门禁
 
-桌面应用的支持矩阵是 macOS、Linux 和 Windows，平台条件分支或在其他系统上生成 PowerShell 文本不算 Windows 验收。[Full cross-platform quality workflow](../../.github/workflows/agent-terminal-platform.yml) 不使用路径过滤，每个 Pull Request 和 `main` 都必须在三个原生平台上执行 `pnpm check:quality`、全部 unit/integration/contract 和 `pnpm build`。Linux 与 macOS 各使用一个完整 runner；Windows 将静态检查与构建、两个低层测试 shard 并行执行，再由稳定的汇总 job 要求三者全部成功：
+桌面应用的支持矩阵是 macOS、Linux 和 Windows，平台条件分支或在其他系统上生成 PowerShell 文本不算 Windows 验收。[Full cross-platform quality workflow](../../.github/workflows/agent-terminal-platform.yml) 不使用路径过滤，每个 Pull Request 和 `main` 都必须在三个原生平台上执行 `pnpm check:quality`、全部 unit/integration/contract 和 `pnpm build`。Linux 与 macOS 的快速质量检查（contract、静态、unit）与串行原生 integration 分别在独立 runner 执行；Windows 保留独立静态检查、两个 contract/unit shard 和两个串行 integration shard。快速检查不等待 Electron/native 准备，contract 先于 unit。稳定的汇总 job 要求所有平台与分片成功，取消或遗漏不能视为通过。三平台构建由 Electron E2E workflow 的各平台 build job 执行 `pnpm build`，同时完成类型与原生产物验证，质量 workflow 不再重复构建：
 
 | Runner       | 原生边界                     | 必须证明                                                                                     |
 | ------------ | ---------------------------- | -------------------------------------------------------------------------------------------- |
@@ -137,7 +137,15 @@ pnpm test:e2e:smoke
 | Ubuntu 24.04 | node-pty + POSIX PTY/shell   | 与 macOS 相同，并使用 Linux `/proc` 证明监听 PID 和进程祖先关系                              |
 | Windows 2025 | node-pty + ConPTY/PowerShell | 全量静态与低层测试、构建、npm `.cmd` CLI、`Ctrl+C`、退出码、端口所有权和外层 PowerShell 可写 |
 
-[Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个平台分别构建原生产物，再运行三个独立 shard，共九个完整 E2E 任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，三个 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过 platform reusable workflow 在每个平台分别构建一次原生产物，再运行该平台三个独立 shard，共九个完整 E2E 任务。每个平台 E2E 只依赖自己的 build，不等待其他平台的构建矩阵。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，三个 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+
+## 测试耗时与分片
+
+Vitest 命令保留标准控制台结果，并把 JSON 报告写入被 Git 忽略的 `test-results/timings/`。`pnpm report:test-timings` 输出最慢文件、通过/失败/跳过数量和栅格阶段耗时；CI 无论成功或失败都上传各 runner 的报告，保留 14 天。文件耗时可能包含 hooks，不能把并行文件时长相加当作墙钟耗时。性能判断需要同时比较首轮失败率、整体墙钟时间和 runner 总分钟数，不允许靠自动 retry 或删除测试改善数字。
+
+E2E 分片由 `tests/support/e2eSequencer.ts` 使用同一份平台历史样本 `tests/fixtures/e2eDurations.json` 确定性分配。历史记录只提供耗时权重；测试集合始终来自 Vitest 实际发现结果。新文件使用历史中位数估算，已删除文件不得复活，输入顺序不影响分配，分片并集必须完整且无重复。更新权重时记录来源 commit/run，不能从未审查的远程 cache 直接决定测试是否执行。`test-shard-assignment.spec.ts` 覆盖多种分片数、未知文件、失效权重、输入顺序和完整当前套件。
+
+栅格测试保留 DPR × ESM/CJS × zoom/raster/theme/columns 的全部参数和同一个像素断言。`terminalRasterBrowser` 分别记录模块加载、准备、渲染事件、下一帧和像素读取耗时。默认使用屏幕外非激活窗口；`CLEANCODE_RASTER_WINDOW_MODE=hidden` 仅用于定向诊断旧隐藏窗口调度。窗口配置不构成性能或可见性证据，仍须在三个原生平台检查完成结果和实际耗时。
 
 ## 标准目录结构
 

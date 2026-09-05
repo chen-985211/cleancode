@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -10,6 +10,16 @@ import { renderTerminalRasterFixture } from '../../../support/terminalRasterBrow
 const require = createRequire(import.meta.url)
 const xtermDirectory = dirname(require.resolve('@xterm/xterm'))
 const webglDirectory = dirname(require.resolve('@xterm/addon-webgl'))
+const rasterTimings: unknown[] = []
+
+afterAll(async () => {
+  const output = join(process.cwd(), 'test-results', 'timings')
+  await mkdir(output, { recursive: true })
+  await writeFile(
+    join(output, `terminal-raster-${process.platform}.json`),
+    `${JSON.stringify(rasterTimings, null, 2)}\n`
+  )
+})
 
 describe.each([1, 1.25, 1.5, 2])(
   'terminal raster at device pixel ratio %s',
@@ -26,6 +36,23 @@ describe.each([1, 1.25, 1.5, 2])(
           `--force-device-scale-factor=${deviceScaleFactor}`
         ]
       })
+      if (process.env.CLEANCODE_RASTER_WINDOW_MODE !== 'hidden') {
+        await expect
+          .poll(() =>
+            application!.evaluate(({ BrowserWindow, screen }) => {
+              const window = BrowserWindow.getAllWindows()[0]
+              const rightEdge = Math.max(
+                ...screen.getAllDisplays().map(({ bounds }) => bounds.x + bounds.width)
+              )
+              return {
+                visible: window?.isVisible(),
+                focused: window?.isFocused(),
+                outsideDisplay: (window?.getBounds().x ?? 0) >= rightEdge
+              }
+            })
+          )
+          .toEqual({ visible: true, focused: false, outsideDisplay: true })
+      }
     }, 30_000)
 
     afterEach(async () => {
@@ -74,6 +101,7 @@ describe.each([1, 1.25, 1.5, 2])(
             zoom,
             rasterScale
           })
+          rasterTimings.push({ deviceScaleFactor, entry, zoom, rasterScale, ...projection.timings })
           const capture = process.env.CLEANCODE_CAPTURE_RASTER
           if (capture) {
             const output = join(process.cwd(), 'test-results', 'terminal-raster', capture)

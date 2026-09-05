@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   quality:
-    name: Full quality / ${{ matrix.id }}
+    name: Fast quality / ${{ matrix.id }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -39,15 +39,121 @@ jobs:
           node-version: 24
 
       - run: pnpm install --frozen-lockfile
+      - name: Run contract tests first
+        run: pnpm test:contract
+      - run: pnpm check:quality
+      - run: pnpm test:unit
+      - name: Summarize test timings
+        if: always()
+        run: pnpm report:test-timings
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-fast-${{ matrix.id }}
+          path: test-results/timings
+          retention-days: 14
+          if-no-files-found: ignore
+
+  windows-static:
+    name: Fast quality / windows / static
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:quality
+
+  windows-core:
+    name: Fast quality / windows / core shard ${{ matrix.shard }}
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - name: Run contract test shard first
+        run: pnpm test:contract --shard=${{ matrix.shard }}/2
+      - name: Run unit test shard
+        run: pnpm test:unit --shard=${{ matrix.shard }}/2
+      - name: Summarize test timings
+        if: always()
+        run: pnpm report:test-timings
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-fast-windows-${{ matrix.shard }}
+          path: test-results/timings
+          retention-days: 14
+          if-no-files-found: ignore
+
+  integration:
+    name: Native integration / ${{ matrix.id }} / shard ${{ matrix.shard }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            os: ubuntu-24.04
+            shard: 1
+            total: 1
+          - id: macos
+            os: macos-15
+            shard: 1
+            total: 1
+          - id: windows
+            os: windows-2025
+            shard: 1
+            total: 2
+          - id: windows
+            os: windows-2025
+            shard: 2
+            total: 2
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
       - name: Install Electron binary with retry
         shell: bash
         run: |
           for attempt in 1 2 3 4; do
             if node node_modules/electron/install.js; then
               if [ "$RUNNER_OS" = "Linux" ]; then
-                if test -x node_modules/electron/dist/electron; then
-                  exit 0
-                fi
+                test -x node_modules/electron/dist/electron && exit 0
               elif pnpm exec electron --version; then
                 exit 0
               fi
@@ -74,104 +180,39 @@ jobs:
       - name: Verify prepared Windows node-pty artifact
         if: runner.os == 'Windows'
         run: pnpm verify:native
-      - name: Run every static and structural quality gate
-        run: pnpm check:quality
-      - name: Run all unit, integration, and contract tests with a Linux display
+      - name: Run native integration tests on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum pnpm test:core:ci
-      - name: Run all unit, integration, and contract tests
+        run: xvfb-run --auto-servernum pnpm test:integration:ci --shard=${{ matrix.shard }}/${{ matrix.total }}
+      - name: Run native integration tests
         if: runner.os != 'Linux'
-        run: pnpm test:core:ci
-      - run: pnpm build
-
-  windows-static:
-    name: Full quality / windows / static and build
-    runs-on: windows-2025
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
+        run: pnpm test:integration:ci --shard=${{ matrix.shard }}/${{ matrix.total }}
+      - name: Summarize test timings
+        if: always()
+        run: pnpm report:test-timings
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          run_install: false
-          version: 10.33.0
-      - uses: actions/setup-node@v6
-        with:
-          cache: pnpm
-          node-version: 24
+          name: test-timings-integration-${{ matrix.id }}-${{ matrix.shard }}
+          path: test-results/timings
+          retention-days: 14
+          if-no-files-found: ignore
 
-      - run: pnpm install --frozen-lockfile
-      - name: Run every static and structural quality gate
-        run: pnpm check:quality
-      - run: pnpm build
-
-  windows-core:
-    name: Full quality / windows / core shard ${{ matrix.shard }}
-    runs-on: windows-2025
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-          version: 10.33.0
-      - uses: actions/setup-node@v6
-        with:
-          cache: pnpm
-          node-version: 24
-
-      - run: pnpm install --frozen-lockfile
-      - name: Install Electron binary with retry
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4; do
-            if node node_modules/electron/install.js && pnpm exec electron --version; then
-              exit 0
-            fi
-            sleep $((attempt * 10))
-          done
-          exit 1
-      - name: Restore prepared Windows node-pty cache
-        id: windows-node-pty-cache
-        uses: actions/cache@v5
-        with:
-          path: .cache/windows-node-pty-electron
-          key: windows-node-pty-electron-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'electron-builder.yml', 'scripts/prepare-native-dependencies.mjs', 'scripts/prepare-packaging.mjs', 'scripts/verify-node-pty-native.mjs', 'scripts/windows-node-pty-native-artifact.mjs') }}
-      - name: Rebuild patched node-pty from source
-        if: steps.windows-node-pty-cache.outputs.cache-hit != 'true'
-        run: pnpm prepare:native
-      - name: Export prepared Windows node-pty artifact
-        if: steps.windows-node-pty-cache.outputs.cache-hit != 'true'
-        run: pnpm native:artifact:export
-      - name: Restore cached Windows node-pty artifact
-        if: steps.windows-node-pty-cache.outputs.cache-hit == 'true'
-        run: pnpm native:artifact:restore
-      - name: Verify prepared Windows node-pty artifact
-        run: pnpm verify:native
-      - name: Run unit test shard
-        run: pnpm test:unit --shard=${{ matrix.shard }}/2
-      - name: Run integration test shard serially
-        run: pnpm test:integration:ci --shard=${{ matrix.shard }}/2
-      - name: Run contract test shard
-        run: pnpm test:contract --shard=${{ matrix.shard }}/2
-
-  windows:
-    name: Full quality / windows
+  quality-complete:
+    name: Full cross-platform quality
     if: ${{ always() }}
-    needs: [windows-static, windows-core]
+    needs: [quality, windows-static, windows-core, integration]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-
     steps:
-      - name: Require every Windows quality job
+      - name: Require every platform and test shard
         env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
           STATIC_RESULT: ${{ needs.windows-static.result }}
           CORE_RESULT: ${{ needs.windows-core.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
         run: |
+          test "$QUALITY_RESULT" = "success"
           test "$STATIC_RESULT" = "success"
           test "$CORE_RESULT" = "success"
+          test "$INTEGRATION_RESULT" = "success"

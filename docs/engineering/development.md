@@ -398,15 +398,19 @@ Large Change 或运行时风险变更必须显式检查以下事项，并在最�
 
 ## 质量门禁规则
 
-开发协作 AI 修改生产代码、测试代码、构建配置、工具配置或依赖后，必须运行 `pnpm pre-commit`。
+开发协作 AI 修改生产代码、测试代码、构建配置、工具配置或依赖后，普通改动必须运行 `pnpm pre-commit`，覆盖全部静态检查、contract、unit、integration 和现有关键路径 Electron smoke。
+
+以下高风险变更必须运行 `pnpm verify:full`：PTY/Provider 生命周期、持久化与恢复、IPC/preload 或运行时协议、构建/打包/依赖与 Electron 边界、跨上下文核心用户流程，以及 E2E fixture、测试运行支撑、分片、CI workflow 和门禁规则。`pnpm verify:full` 覆盖全部静态检查和完整测试套件，结果可替代同一工作区内容的 `pnpm pre-commit`，无需先重复运行 smoke。测试支撑中的纯注释或纯格式化不升级风险。
+
+开发过程先运行能证明本次改动的目标测试；这不能替代完成阶段门禁。每个 PR 和 main 仍由 CI 在三个原生平台完整验收；本地相关测试选择不能替代 IPC、动态加载、外部 fixture 等完整边界验证。
 
 仅修改根目录 `package.json` 顶层 `version` 时，该字段不视为本节所称的构建配置、工具配置或依赖变更，不要求运行 `pnpm pre-commit` 或 `pnpm build`。这类改动必须至少确认 `package.json` 可以解析、版本值与目标一致，并执行 `git diff --check`；如果同一变更还修改依赖、脚本、锁文件、构建/打包配置、发布 workflow、生产代码或测试代码，例外失效并恢复对应完整门禁。版本号改动不会让同一工作区内的纯 Markdown 改动失去下述文档验证例外。
 
-`pnpm pre-commit` 是本地统一质量门禁。门禁的可执行事实来源是根目录 `package.json` 的 `pre-commit` 脚本。
+`pnpm pre-commit` 是本地普通改动门禁，`pnpm verify:full` 是高风险改动的完整门禁。两者的可执行事实来源是根目录 `package.json`。
 
-`pnpm pre-commit` 的结果绑定到执行时的相关工作区内容。门禁通过后，如果生产代码、测试代码、构建配置、工具配置和依赖均未再变化，后续暂存、提交或新的协作回合必须复用该结果，不得仅因任务进入提交阶段而重复运行。上述任一内容发生变化时，已有结果失效，必须重新执行完整门禁。开发过程中单独运行门禁内的子命令可以用于快速反馈，但不能替代生产改动完成后的完整 `pnpm pre-commit`。
+本地门禁的结果绑定到执行时的相关工作区内容及其验证层级。门禁通过后，如果生产代码、测试代码、构建配置、工具配置和依赖均未再变化，后续暂存、提交或新的协作回合必须复用该结果，不得仅因任务进入提交阶段而重复运行。上述任一内容发生变化时，已有结果失效，必须重新执行适用层级的门禁。开发过程中单独运行门禁内的子命令可以用于快速反馈，但不能替代改动完成后的 `pnpm pre-commit` 或高风险 `pnpm verify:full`。
 
-仅修改 Markdown 文档，且没有同时修改生产代码、测试代码、构建配置、工具配置或依赖时，不要求运行 `pnpm pre-commit`。纯文档改动必须运行 `pnpm check:docs`、对改动文档执行 Prettier 格式检查，并执行 `git diff --check`；如果同一工作区已有尚未通过完整门禁的非文档改动，仍须按前述规则完成 `pnpm pre-commit`。
+仅修改 Markdown 文档，且没有同时修改生产代码、测试代码、构建配置、工具配置或依赖时，不要求运行 `pnpm pre-commit`。纯文档改动必须运行 `pnpm check:docs`、对改动文档执行 Prettier 格式检查，并执行 `git diff --check`；如果同一工作区已有尚未通过适用层级门禁的非文档改动，仍须按前述规则完成对应门禁。
 
 主题静态门禁由 `pnpm check:theme` 执行；检查范围、允许项和可执行规则以 `scripts/check-theme.mjs` 为准。
 
@@ -420,7 +424,7 @@ Agent Provider-neutral Presentation 静态门禁由 `pnpm check:agent-provider-b
 
 依赖变更必须保持精确版本，并通过 `pnpm check:deps`。
 
-涉及构建、打包、Electron 入口、Vite 配置或运行时装配的变更，除 `pnpm pre-commit` 外还必须运行 `pnpm build`。
+涉及构建、打包、Electron 入口、Vite 配置或运行时装配的变更，除 `pnpm verify:full` 外还必须运行 `pnpm build`。
 
 ## 输出要求
 

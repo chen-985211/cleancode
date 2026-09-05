@@ -123,7 +123,7 @@ await expectAuthoritativeResult(currentIdentity)
 
 ## 共享不可变成本，隔离可变状态
 
-单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 在每个操作系统分别构建；同一系统的分片可以共享对应 build job 上传的不可变 `out`、Electron runtime 和 native artifact，但 Electron/`node-pty` 产物不能跨系统复用。Windows native artifact 必须精确匹配平台、架构、Electron 和 `node-pty` 版本，恢复后重新执行真实 Electron probe；cache 只减少后续运行的重建成本，run-scoped artifact 才是当前分片的直接事实来源。packaged smoke 可以消费相同不可变产物并与源码 shards 并行，但不能共享 Electron 进程、PTY 或测试 profile。只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
+单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 通过平台 reusable workflow 在每个操作系统分别构建一次，每个平台的测试只等待自己的构建；同一系统的分片可以共享对应 build job 上传的不可变 `out`、Electron runtime 和 native artifact，但 Electron/`node-pty` 产物不能跨系统复用。Windows native artifact 必须精确匹配平台、架构、Electron 和 `node-pty` 版本，恢复后重新执行真实 Electron probe；cache 只减少后续运行的重建成本，run-scoped artifact 才是当前分片的直接事实来源。packaged smoke 可以消费相同不可变产物并与源码 shards 并行，但不能共享 Electron 进程、PTY 或测试 profile。只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
 
 - Electron 应用进程和 PTY。
 - 项目目录、应用状态目录、Electron `userData` profile 和持久化 fixture。
@@ -192,9 +192,9 @@ E2E 失败诊断至少要回答：
 - **压力复跑**：每次首次失败都会立即暴露，用于估计改造后的稳定性。
 - **自动重试**：第一次失败后隐藏失败并再次执行，不能证明竞态已经消失。
 
-压力复跑通过后仍要执行统一门禁。若完整套件失败而单测稳定，应优先检查重复构建、资源残留、共享状态和运行顺序，不应直接扩大 timeout。
+压力复跑通过后仍要执行 `pnpm verify:full` 完整门禁。若完整套件失败而单测稳定，应优先检查重复构建、资源残留、共享状态和运行顺序，不应直接扩大 timeout。
 
-日常本地反馈使用 `pnpm test`，其 Electron 部分只执行标记为 `smoke` 的关键跨上下文路径；完整回归使用 `pnpm test:full`。每个 Pull Request 和 `main` 分支必须由 CI 在 macOS、Linux 和 Windows 的独立 runners 上分片运行完整 `pnpm test:e2e`，每个 shard 内仍关闭文件并行和自动重试。不能用增加 smoke 数量替代低层测试，也不能因为完整套件进入 CI 就降低首次失败的诊断要求。
+日常本地反馈使用 `pnpm test`，其 Electron 部分只执行标记为 `smoke` 的关键跨上下文路径；完整回归使用 `pnpm test:full`，高风险完整质量门禁使用 `pnpm verify:full`。每个 Pull Request 和 `main` 分支必须由 CI 在 macOS、Linux 和 Windows 的独立 runners 上分片运行完整 `pnpm test:e2e`，每个 shard 内仍关闭文件并行和自动重试。不能用增加 smoke 数量替代低层测试，也不能因为完整套件进入 CI 就降低首次失败的诊断要求。
 
 ## 何时提取测试支撑代码
 
