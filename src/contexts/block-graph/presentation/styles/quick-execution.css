@@ -35,10 +35,19 @@
   border: 1px solid var(--cc-border);
   border-radius: 8px;
   background: var(--cc-surface-translucent);
-  backdrop-filter: blur(10px);
   transition:
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+/*
+ * Do not promote the translucent slots while the bottom-control spring is
+ * entering or leaving. Chromium on Windows can paint an uninitialised
+ * backdrop surface as a black rectangle for one compositor frame while the
+ * parent is being transformed. The settled state keeps the intended blur.
+ */
+.quick-execution[data-surface-spring-state='open'] .quick-execution__slot {
+  backdrop-filter: blur(10px);
 }
 
 .quick-execution__slot--filled {

@@ -4,6 +4,29 @@ import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/ap
 import { QuickExecutionBar } from '../../../../src/contexts/block-graph/presentation/components/QuickExecutionBar'
 
 describe('quick execution bar', () => {
+  it.each([false, true])(
+    'keeps hidden black-hole media unmounted after workspace restoration (external drop: %s)',
+    (isExternalDropTarget) => {
+      const props = {
+        graph: createGraph(),
+        isExternalDropTarget,
+        onAdd: vi.fn(),
+        onBind: vi.fn(),
+        onClear: vi.fn(),
+        onFocus: vi.fn(),
+        onReorder: vi.fn()
+      }
+      const { rerender } = render(<QuickExecutionBar {...props} />)
+
+      expectBlackHoleMediaAbsent()
+
+      rerender(<QuickExecutionBar {...props} open={false} />)
+      rerender(<QuickExecutionBar {...props} open />)
+
+      expectBlackHoleMediaAbsent()
+    }
+  )
+
   it('keeps the bottom surface inert through exit and reuses it when the handoff reverses', () => {
     const props = {
       graph: createGraph(),
@@ -201,6 +224,7 @@ describe('quick execution bar', () => {
     fireEvent.drop(destination)
 
     expect(onReorder).toHaveBeenCalledWith(2, 1)
+    expectBlackHoleMediaAbsent()
   })
 
   it('keeps only rebind in the filled-slot menu', () => {
@@ -254,7 +278,7 @@ describe('quick execution bar', () => {
     expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBe(popover)
   })
 
-  it('clears a filled slot while its intact proxy springs into the black hole', () => {
+  it('clears a filled slot while its intact proxy springs into the black hole', async () => {
     const onClear = vi.fn()
     render(
       <QuickExecutionBar
@@ -369,6 +393,13 @@ describe('quick execution bar', () => {
       'quick-execution__black-hole--target',
       'quick-execution__black-hole--clearing'
     )
+    fireEvent.dragEnd(source)
+    expect(blackHole.querySelector('[data-quick-execution-black-hole-motion]')).toBe(
+      blackHoleMotion
+    )
+
+    await waitFor(() => expect(clearAnimation).not.toBeInTheDocument(), { timeout: 2_000 })
+    expectBlackHoleMediaAbsent()
   })
 
   it('starts returning the source slot when a black-hole drag is cancelled', () => {
@@ -393,6 +424,11 @@ describe('quick execution bar', () => {
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
     expect(source).toHaveClass('quick-execution__slot--dragging')
     expect(document.querySelector('[data-quick-execution-return-animation]')).toBeInTheDocument()
+    expectBlackHoleMediaAbsent()
+
+    fireEvent.dragStart(source)
+    expect(document.querySelector('[data-quick-execution-black-hole]')).toBeInTheDocument()
+    expect(document.querySelector('[data-quick-execution-black-hole-motion]')).toBeInTheDocument()
   })
 
   it('returns a cancelled drag proxy to its source without changing the binding', () => {
@@ -432,6 +468,7 @@ describe('quick execution bar', () => {
 
     expect(onClear).not.toHaveBeenCalled()
     expect(onReorder).not.toHaveBeenCalled()
+    expectBlackHoleMediaAbsent()
     expect(document.querySelector('[data-quick-execution-drag-proxy]')).not.toBeInTheDocument()
     expect(source).toHaveClass('quick-execution__slot--dragging')
     expect(document.querySelector('[data-quick-execution-trash]')).toHaveAttribute(
@@ -477,6 +514,12 @@ describe('quick execution bar', () => {
     }
   })
 })
+
+function expectBlackHoleMediaAbsent(): void {
+  const blackHole = document.querySelector<HTMLElement>('[data-quick-execution-trash]')!
+  expect(blackHole).toHaveAttribute('aria-hidden', 'true')
+  expect(blackHole.querySelector('img, video')).not.toBeInTheDocument()
+}
 
 function createGraph(): BlockGraphSnapshot {
   return {
