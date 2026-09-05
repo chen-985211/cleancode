@@ -1,0 +1,56 @@
+import type { zhCNWorkflowMessages } from '../zh-CN/workflow'
+
+export const enWorkflowMessages = {
+  'workflow.status.waiting': 'Waiting',
+  'workflow.status.running': 'Running',
+  'workflow.status.ready': 'Ready',
+  'workflow.status.succeeded': 'Succeeded',
+  'workflow.status.failed': 'Failed',
+  'workflow.status.blocked': 'Blocked',
+  'workflow.status.stopped': 'Stopped',
+  'service.label': 'Service',
+  'service.actualAddress': 'Actual service address',
+  'service.fallback': 'Preferred port {requestedPort} was busy; using {port}',
+  'service.releasing': 'Stopping and releasing the port',
+  'service.quarantined': 'Port cleanup was not confirmed; quarantined',
+  'service.copyAddress': 'Copy actual service address',
+  'service.openAddress': 'Open actual service address',
+  'service.portConflict': 'Port conflict',
+  'service.locateOwner': 'Locate service using this port',
+  'service.openOwner': 'Open service using this port',
+  'service.editPort': 'Edit port settings',
+  'service.dismissConflict': 'Dismiss port conflict',
+  'service.dismiss': 'Dismiss message',
+  'service.conflictReleasing': 'The service on port {port} is stopping and cleaning up',
+  'service.conflictQuarantined':
+    'The previous cleanup for port {port} was not confirmed and is quarantined',
+  'service.conflictStarting':
+    'Port {port} is being started by {projectName} / {workspaceName} / {terminalName}',
+  'service.conflictManaged':
+    'Port {port} is used by {projectName} / {workspaceName} / {terminalName}',
+  'service.conflictExhausted':
+    'No available port could be assigned. Edit the port settings and retry.',
+  'service.conflictOtherManaged': 'Port {port} is used by another cleancode service',
+  'service.conflictExternal': 'Port {port} is used by an external service',
+  'service.conflictUnknown': 'The owner of the listener on port {port} could not be verified',
+  'workflow.operationFailedTitle': 'Workflow action failed',
+  'workflow.operationFailed': 'The workflow action failed. Try again later.',
+  'workflow.failureTitle': 'Workflow failed',
+  'workflow.focusNode': 'Focus workflow node “{terminalName}”',
+  'workflow.inspectOutput': 'Check this terminal’s output.',
+  'workflow.exitCodeOutput': 'Exit code {exitCode}. Check the terminal output.',
+  'workflow.singleFailure': 'Terminal “{terminalName}” failed. {detail}',
+  'workflow.multipleFailures': '{count} terminals failed. Check the failed nodes’ terminal output.',
+  'workflow.generalFailure':
+    'The workflow did not complete. Check the failed nodes’ terminal output.',
+  'workflow.succeededTitle': 'Workflow succeeded',
+  'workflow.stoppedTitle': 'Workflow stopped',
+  'workflow.stopAction': 'Stop this run',
+  'workflow.stoppingAction': 'Stopping…',
+  'workflow.readyTitle': 'Workflow services are ready',
+  'workflow.runningTitle': 'Workflow running',
+  'workflow.scopeSingle': 'Starting from “{rootName}” · {count} terminals',
+  'workflow.scopeMultiple': '{rootCount} starting points · {count} terminals',
+  'workflow.scopeCount': '{count} terminals',
+  'workflow.scopeEmpty': 'This run contains no terminals'
+} as const satisfies { readonly [Key in keyof typeof zhCNWorkflowMessages]: string }

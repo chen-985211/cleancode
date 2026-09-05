@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useI18n } from '../../../i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../shell/AppShellSurfaceMotion'
 import { TooltipLabel } from '../../../shared/components/Tooltip'
-import { supportedLocales, type Locale } from '../../../i18n/locale'
+import { localeDefinitions, supportedLocales, type Locale } from '../../../i18n/locale'
 import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {
@@ -82,7 +82,7 @@ export function LanguageSettingsRoot() {
             onClick={() => chooseLocale(optionLocale)}
             onKeyDown={(event) => handleOptionKeyDown(event, index)}
           >
-            <span>{languageLabel(optionLocale)}</span>
+            <span>{t(localeDefinitions[optionLocale].labelKey)}</span>
             {locale === optionLocale ? (
               <CheckIcon size={17} weight="bold" aria-hidden="true" />
             ) : null}
@@ -91,10 +91,6 @@ export function LanguageSettingsRoot() {
       </AnchoredSurfaceMotion>
     </div>
   )
-
-  function languageLabel(optionLocale: Locale): string {
-    return optionLocale === 'zh-CN' ? t('language.simplifiedChinese') : t('language.english')
-  }
 
   function chooseLocale(nextLocale: Locale): void {
     selectLocale(nextLocale)
