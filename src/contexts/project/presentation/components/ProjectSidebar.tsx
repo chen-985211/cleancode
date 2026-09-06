@@ -45,7 +45,10 @@ interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
-  readonly onCreateBranchWorkspace: (workbench: TWorkbench, branchName: string) => void
+  readonly onCreateBranchWorkspace: (
+    workbench: TWorkbench,
+    branchName: string
+  ) => void | Promise<boolean>
   readonly onRemoveProject: (workbench: TWorkbench) => void
   readonly onReorderProject: (workbench: TWorkbench, beforeProjectDirectory: string | null) => void
   readonly onSelectWorkspace: (workbench: TWorkbench, workspaceId: string) => void
@@ -160,7 +163,10 @@ interface ProjectCardProps<TWorkbench extends ProjectWorkbenchViewModel> {
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
-  readonly onCreateBranchWorkspace: (workbench: TWorkbench, branchName: string) => void
+  readonly onCreateBranchWorkspace: (
+    workbench: TWorkbench,
+    branchName: string
+  ) => void | Promise<boolean>
   readonly onRemoveProject: (workbench: TWorkbench) => void
   readonly isDragging: boolean
   readonly canReorder: boolean
@@ -217,6 +223,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     completeClose: completeBranchWorkspaceFormClose,
     formRef,
     isOpen: isBranchWorkspaceFormOpen,
+    isSubmitting,
     open: openBranchWorkspaceForm,
     setBranchName,
     submit: submitBranchWorkspace,
@@ -362,6 +369,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
       </div>
       <ProjectSidebarBranchWorkspaceForm
         branchName={branchName}
+        isSubmitting={isSubmitting}
         formRef={formRef}
         open={isBranchWorkspaceFormOpen}
         projectId={workbench.project.id}

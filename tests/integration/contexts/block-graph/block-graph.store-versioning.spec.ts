@@ -20,7 +20,7 @@ describe('block graph versioned store', () => {
     await rm(projectDirectory, { force: true, recursive: true })
   })
 
-  it('writes new graphs in the version 4 envelope', async () => {
+  it('writes new graphs in the version 5 envelope', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       id: 'graph-1',
@@ -32,8 +32,27 @@ describe('block graph versioned store', () => {
 
     await expect(readStore(appStateDirectory)).resolves.toEqual({
       graph: graph.toSnapshot(),
-      version: 4
+      version: 5
     })
+  })
+
+  it('reads version 4 without inventing receipts and upgrades only on a write', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graphPath = await initializeAndFindGraphPath(
+      repository,
+      appStateDirectory,
+      projectDirectory
+    )
+    const graph = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
+    const contents = JSON.stringify({ version: 4, graph })
+    await writeFile(graphPath, contents)
+    const restored = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
+    expect(restored?.templateApplications).toBeUndefined()
+    expect(await readFile(graphPath, 'utf8')).toBe(contents)
+    await repository.transactDefaultGraph(projectDirectory, 'main', (current) =>
+      current.updateViewport({ x: 64 })
+    )
+    expect(await readStore(appStateDirectory)).toMatchObject({ version: 5 })
   })
 
   it('reads version 2 with five empty slots and rewrites only on the next transaction', async () => {
@@ -67,11 +86,11 @@ describe('block graph versioned store', () => {
 
     await expect(readStore(appStateDirectory)).resolves.toMatchObject({
       graph: { quickExecutionSlots: restored?.quickExecutionSlots },
-      version: 4
+      version: 5
     })
   })
 
-  it('repairs legacy cross-space workflows on read and persists version 4 on the next transaction', async () => {
+  it('repairs legacy cross-space workflows on read and persists version 5 on the next transaction', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graphPath = await initializeAndFindGraphPath(
       repository,
@@ -139,7 +158,7 @@ describe('block graph versioned store', () => {
         ],
         terminalGroups: [expect.objectContaining({ id: 'legacy-group', memberBlockIds: [] })]
       },
-      version: 4
+      version: 5
     })
   })
 

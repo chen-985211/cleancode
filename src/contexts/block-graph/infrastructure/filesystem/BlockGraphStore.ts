@@ -27,7 +27,12 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
 
   if (!isRecord(parsed)) throwCorruptedStore(path)
 
-  if (parsed.version !== 2 && parsed.version !== 3 && parsed.version !== 4) {
+  if (
+    parsed.version !== 2 &&
+    parsed.version !== 3 &&
+    parsed.version !== 4 &&
+    parsed.version !== 5
+  ) {
     throw createExpectedAppError(
       'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED',
       'Persisted block graph snapshot version is unsupported.',
@@ -41,7 +46,7 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
 }
 
 export function serializeBlockGraphStore(graph: BlockGraphSnapshot): string {
-  return `${JSON.stringify({ version: 4, graph }, null, 2)}\n`
+  return `${JSON.stringify({ version: 5, graph }, null, 2)}\n`
 }
 
 function restoreGraph(

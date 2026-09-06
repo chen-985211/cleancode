@@ -6,8 +6,78 @@ import type { BlockTemplateRepository } from '../../../../src/contexts/block-gra
 import { SaveBlockTemplateUseCase } from '../../../../src/contexts/block-graph/application/use-cases/SaveBlockTemplateUseCase'
 import { ListBlockTemplatesUseCase } from '../../../../src/contexts/block-graph/application/use-cases/ListBlockTemplatesUseCase'
 import { InstantiateBlockTemplateUseCase } from '../../../../src/contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
+import { PrepareBlockTemplateUseCase } from '../../../../src/contexts/block-graph/application/use-cases/PrepareBlockTemplateUseCase'
 
 describe('block template use cases', () => {
+  it('freezes a selected template independently of later source deletion', async () => {
+    const templates = new InMemoryTemplateRepository()
+    await new SaveBlockTemplateUseCase(
+      new InMemoryGraphRepository(createGraph('project-1')),
+      templates,
+      { createId: () => 'startup', now: () => '2026-09-06T00:00:00.000Z' }
+    ).execute({
+      name: 'Startup',
+      description: '',
+      projectDirectory: '/project',
+      workspaceId: 'workspace-1',
+      scope: { type: 'project', projectId: 'project-1' },
+      selectedBlockIds: ['install', 'build']
+    })
+    const prepared = new InMemoryTemplateRepository()
+    const prepare = new PrepareBlockTemplateUseCase(templates, prepared)
+    const command = { operationId: 'request:item', templateId: 'startup', projectId: 'project-1' }
+    const frozen = await prepare.execute(command)
+    templates.snapshot = BlockTemplateLibrary.empty().toSnapshot()
+    expect(await new PrepareBlockTemplateUseCase(templates, prepared).execute(command)).toEqual(
+      frozen
+    )
+    await expect(prepare.execute({ ...command, projectId: 'other-project' })).rejects.toMatchObject(
+      { code: 'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID' }
+    )
+  })
+  it('commits a workspace initialization template once across retries and object deletion', async () => {
+    const source = createGraph('project-1')
+    const templates = new InMemoryTemplateRepository()
+    await new SaveBlockTemplateUseCase(new InMemoryGraphRepository(source), templates, {
+      createId: () => 'startup',
+      now: () => '2026-09-06T00:00:00.000Z'
+    }).execute({
+      name: 'Startup',
+      description: '',
+      projectDirectory: '/project',
+      workspaceId: 'workspace-1',
+      scope: { type: 'project', projectId: 'project-1' },
+      selectedBlockIds: ['install', 'build']
+    })
+    const target = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceId: 'new-workspace'
+    })
+    const command = {
+      projectDirectory: '/project',
+      workspaceId: 'new-workspace',
+      templateId: 'startup',
+      origin: { x: 0, y: 0 },
+      operationId: 'initialization-1:template-1'
+    }
+    const instantiate = new InstantiateBlockTemplateUseCase(
+      new InMemoryGraphRepository(target),
+      templates
+    )
+    const first = await instantiate.execute(command)
+    const repeated = await instantiate.execute(command)
+    expect(repeated.instance).toEqual(first.instance)
+    expect(target.blocks).toHaveLength(2)
+    for (const id of first.instance.blockIds) target.deleteBlock(id)
+    const restored = BlockGraph.fromSnapshot(target.toSnapshot())
+    const afterDeletion = await new InstantiateBlockTemplateUseCase(
+      new InMemoryGraphRepository(restored),
+      templates
+    ).execute(command)
+    expect(afterDeletion.instance).toEqual(first.instance)
+    expect(restored.blocks).toHaveLength(0)
+  })
+
   it('saves from the authoritative graph and lists only the requested scope', async () => {
     const graph = createGraph('project-1')
     const templates = new InMemoryTemplateRepository()

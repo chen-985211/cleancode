@@ -4,6 +4,7 @@ import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { useBranchWorkspaceFormSpring } from '../motion/useBranchWorkspaceFormSpring'
 
 interface ProjectSidebarBranchWorkspaceFormProps {
+  readonly isSubmitting?: boolean
   readonly branchName: string
   readonly formRef: RefObject<HTMLFormElement | null>
   readonly open: boolean
@@ -16,6 +17,7 @@ interface ProjectSidebarBranchWorkspaceFormProps {
 
 export function ProjectSidebarBranchWorkspaceForm({
   branchName,
+  isSubmitting = false,
   formRef,
   open,
   projectId,
@@ -44,10 +46,11 @@ export function ProjectSidebarBranchWorkspaceForm({
         <input
           id={`${projectId}-branch-name`}
           value={branchName}
+          disabled={isSubmitting}
           onChange={(event) => onBranchNameChange(event.target.value)}
           placeholder={t('branchWorkspace.newBranchPlaceholder')}
         />
-        <button type="submit">
+        <button type="submit" disabled={isSubmitting || !branchName.trim()}>
           <FoldersIcon size={13} weight="bold" aria-hidden="true" />
           <span>{t('branchWorkspace.createWorktree')}</span>
         </button>

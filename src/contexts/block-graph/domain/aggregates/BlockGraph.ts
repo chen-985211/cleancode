@@ -74,6 +74,7 @@ import {
   restoreQuickExecutionSlots
 } from '../services/QuickExecutionSlotRules'
 import { resolveTerminalRemovalBlockIds } from '../services/TerminalRemovalRules'
+import { BlockTemplateApplications } from '../services/BlockTemplateApplications'
 
 export type * from './BlockGraphTypes'
 
@@ -101,7 +102,8 @@ export class BlockGraph {
     private blockSnapshots: TerminalBlockSnapshot[],
     private terminalConnectionSnapshots: TerminalConnectionSnapshot[],
     private terminalGroupSnapshots: TerminalGroupSnapshot[],
-    private quickExecutionSlotSnapshots: QuickExecutionSlotSnapshot[]
+    private quickExecutionSlotSnapshots: QuickExecutionSlotSnapshot[],
+    private readonly templateApplications = new BlockTemplateApplications()
   ) {}
 
   static createDefault(input: CreateDefaultGraphInput): BlockGraph {
@@ -136,7 +138,8 @@ export class BlockGraph {
       blocks,
       connections,
       [...scopeMigration.terminalGroups],
-      restoreQuickExecutionSlots(snapshot.quickExecutionSlots)
+      restoreQuickExecutionSlots(snapshot.quickExecutionSlots),
+      new BlockTemplateApplications(snapshot.templateApplications)
     )
   }
 
@@ -238,8 +241,13 @@ export class BlockGraph {
 
   instantiateBlockTemplate(
     sourceTemplate: BlockTemplateSnapshot,
-    origin: BlockPositionSnapshot
+    origin: BlockPositionSnapshot,
+    operationId?: string
   ): InstantiatedBlockTemplateSnapshot {
+    if (operationId)
+      return this.templateApplications.apply(operationId, sourceTemplate, () =>
+        this.instantiateBlockTemplate(sourceTemplate, origin)
+      )
     const template = normalizeBlockTemplate(sourceTemplate)
     const blockIdByTemplateNodeId = new Map<string, string>()
 
@@ -609,6 +617,9 @@ export class BlockGraph {
 
   toSnapshot(): BlockGraphSnapshot {
     return {
+      ...(this.templateApplications.snapshot().length
+        ? { templateApplications: this.templateApplications.snapshot() }
+        : {}),
       id: this.id,
       projectId: this.projectId,
       workspaceId: this.workspaceId,

@@ -6,6 +6,8 @@ import type {
   WorkspaceExternalOpenTarget
 } from '../../contexts/project/application/dto/WorkspaceExternalOpen'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import type { CreateInitializedWorkspaceCommand } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
+import { normalizeWorkspaceDefaults } from '../../contexts/project/domain/value-objects/WorkspaceDefaults'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -25,10 +27,9 @@ export interface ProjectIpcHandlersInput {
     readonly directory: string
     readonly name: string
   }) => Promise<ProjectSnapshot>
-  readonly createBranchWorkspace: (command: {
-    readonly projectDirectory: string
-    readonly branchName: string
-  }) => Promise<ProjectSnapshot>
+  readonly createBranchWorkspace: (
+    command: CreateInitializedWorkspaceCommand
+  ) => Promise<ProjectSnapshot>
   readonly switchBranchWorkspace: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
@@ -125,7 +126,13 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     handler: async (command) => {
       const project = await input.createBranchWorkspace({
         projectDirectory: readStringField(command, 'projectDirectory'),
-        branchName: readStringField(command, 'branchName')
+        branchName: readStringField(command, 'branchName'),
+        ...(isRecord(command) && command.requestId !== undefined
+          ? { requestId: readStringField(command, 'requestId') }
+          : {}),
+        ...(isRecord(command) && command.defaults !== undefined
+          ? { defaults: normalizeWorkspaceDefaults(command.defaults) }
+          : {})
       })
 
       return loadAndSelectWorkbench(input, project)

@@ -5,7 +5,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useMemo, useRef, useState } from 'react'
 import type { TerminalBlockSnapshot } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import * as derived from './appShellDerived'
-import { ProjectSidebar } from '../../../contexts/project/presentation/components/ProjectSidebar'
+import { useWorkspaceInitialization } from '../coordinators/useWorkspaceInitialization'
 import { useBranchWorkspaceActions } from '../coordinators/useBranchWorkspaceActions'
 import { useTerminalGroupActions } from '../coordinators/useTerminalGroupActions'
 import { useTerminalGroupDragActions } from '../coordinators/useTerminalGroupDragActions'
@@ -59,7 +59,7 @@ import { useTerminalLaunchCommandRequest } from '../workbench/nodes/terminal/use
 import { useAppShellNodeDragActions } from '../coordinators/useAppShellNodeDragActions'
 import { useCanvasViewportActions } from '../workbench/viewport/useCanvasViewportActions'
 import { useCanvasSelectionViewport } from '../workbench/viewport/useCanvasSelectionViewport'
-import { ProjectSidebarToggle } from './project-sidebar/ProjectSidebarToggle'
+import { AppShellSidebar } from './project-sidebar/AppShellSidebar'
 import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
 import { useAgentActivityNotificationNavigation } from '../coordinators/useAgentActivityNotificationNavigation'
 import { useProjectSidebarVisibility } from './project-sidebar/useProjectSidebarVisibility'
@@ -353,9 +353,22 @@ export function AppShell({
     setCurrentGraph,
     terminalWorkflowBuildMode
   })
+  const workspaceInitialization = useWorkspaceInitialization({
+    currentWorkbench,
+    createWorkspace: branchWorkspaceActions.createBranchWorkspace,
+    nodeStore,
+    protectedNodeIds: protectedLayoutNodeIds,
+    reactFlowInstanceRef,
+    setCurrentWorkbench,
+    setWorkbenches
+  })
+  const cancelAllLayoutFocus = () => {
+    cancelLayoutFocus()
+    workspaceInitialization.cancelFocus()
+  }
   const selectionViewport = useCanvasSelectionViewport({
     canvasSizeRef,
-    onUserAction: cancelLayoutFocus,
+    onUserAction: cancelAllLayoutFocus,
     reactFlowInstanceRef
   })
   const workbenchNodeSelection = useWorkbenchNodeSelection({
@@ -389,7 +402,7 @@ export function AppShell({
   })
   const { selectTerminalFromTitle } = workbenchNodeSelection
   const { fitCanvas, zoomCanvasIn, zoomCanvasOut } = useCanvasViewportActions({
-    onUserAction: cancelLayoutFocus,
+    onUserAction: cancelAllLayoutFocus,
     reactFlowInstanceRef
   })
   const minimapNodeInteraction = derived.useMinimapNodeInteraction(
@@ -564,62 +577,48 @@ export function AppShell({
   return (
     <AppShellProviders {...{ notifications, onAgentActivityNavigate, terminalSurfaceRegistry }}>
       <main
-        className={[
-          'app-shell',
-          shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
-          isWindowFullScreen ? 'app-shell--window-full-screen' : '',
-          isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        className={derived.appShellClassName(
+          shortcutPlatform,
+          isWindowFullScreen,
+          isProjectSidebarCollapsed
+        )}
         aria-label={t('app.workspace')}
       >
         <AppShellSettings
-          agentCreation={agentCreation}
-          applicationSettings={applicationSettings}
-          bindings={bindings}
-          blockTemplates={blockTemplates}
+          workspaceDefaultsSettings={workspaceInitialization.renderSettings(
+            workbenches,
+            applicationSettings.close
+          )}
+          {...{ agentCreation, applicationSettings, bindings, blockTemplates }}
           changeBinding={changeBinding}
           changeFollowQuickExecutionTarget={quickExecution.changeFollowQuickExecutionTarget}
           changeReduceVisualNoise={changeReduceVisualNoise}
           changeTerminalScrollback={changeTerminalScrollback}
           changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
-          currentWorkbench={currentWorkbench}
+          {...{ currentWorkbench, isDesktopRuntime }}
           followQuickExecutionTarget={quickExecution.followQuickExecutionTarget}
-          isDesktopRuntime={isDesktopRuntime}
-          resetAllBindings={resetAllBindings}
-          reduceVisualNoise={reduceVisualNoise}
-          shortcutPlatform={shortcutPlatform}
-          terminalScrollbackRows={terminalScrollbackRows}
-          terminalWorkflowBuildMode={terminalWorkflowBuildMode}
+          {...{ resetAllBindings, reduceVisualNoise, shortcutPlatform }}
+          {...{ terminalScrollbackRows, terminalWorkflowBuildMode }}
         />
-        <div className="project-sidebar-column">
-          <ProjectSidebarToggle
-            buttonRef={projectSidebarToggleRef}
-            isCollapsed={isProjectSidebarCollapsed}
-            motionSurfaceRef={projectSidebarMotion.titlebarRef}
-            shortcutTooltip={shortcutTooltips.toggleSidebar}
-            onToggle={toggleProjectSidebar}
-          />
-          <ProjectSidebar
-            workbenches={workbenches}
-            currentWorkbench={currentWorkbench}
-            isCollapsed={isProjectSidebarCollapsed}
-            isDesktopRuntime={isDesktopRuntime}
-            motionSurfaceRef={projectSidebarMotion.sidebarRef}
-            intent={shortcutNavigation.projectSidebarIntent}
-            shortcutTooltips={shortcutTooltips}
-            isReorderPending={isReorderingProject}
-            onAddProject={addProject}
-            onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
-            onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
-            onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-            onRemoveProject={removeProject}
-            onReorderProject={reorderProject}
-            onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
-          />
-        </div>
+        <AppShellSidebar
+          {...{ workbenches, currentWorkbench, isDesktopRuntime, shortcutTooltips }}
+          isCollapsed={isProjectSidebarCollapsed}
+          toggleRef={projectSidebarToggleRef}
+          motion={projectSidebarMotion}
+          toggleTooltip={shortcutTooltips.toggleSidebar}
+          onToggle={toggleProjectSidebar}
+          intent={shortcutNavigation.projectSidebarIntent}
+          isReorderPending={isReorderingProject}
+          onAddProject={addProject}
+          onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+          onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+          onCreateBranchWorkspace={workspaceInitialization.createBranchWorkspace}
+          onRemoveProject={removeProject}
+          onReorderProject={reorderProject}
+          onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
+        />
         <WorkbenchCanvas
+          initializationControls={workspaceInitialization.canvasControls}
           approvalIntents={agentToolApprovals.approvals}
           agentProviders={enabledCreatableAgentProviders}
           defaultAgentProviderId={effectiveAgentProviderId}
@@ -686,7 +685,7 @@ export function AppShell({
           onCancelNodeDrag={cancelNodeDrag}
           onNodeDragStop={commitWorkbenchNodeDrag}
           onViewportChange={updateGraphViewport}
-          onViewportInteractionStart={cancelLayoutFocus}
+          onViewportInteractionStart={cancelAllLayoutFocus}
           terminalZoomRasterCoordinator={terminalRendering}
           onMinimapNodeClick={focusWorkbenchNode}
           getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}

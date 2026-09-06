@@ -1,3 +1,10 @@
+export interface BlockTemplateApplicationSnapshot {
+  readonly operationId: string
+  readonly templateId: string
+  readonly blockIds: readonly string[]
+  readonly terminalGroupId: string | null
+}
+
 export interface BlockPositionSnapshot {
   readonly x: number
   readonly y: number
@@ -130,6 +137,7 @@ export interface QuickExecutionSlotSnapshot {
 }
 
 export interface BlockGraphSnapshot {
+  readonly templateApplications?: readonly BlockTemplateApplicationSnapshot[]
   readonly id: string
   readonly projectId: string
   readonly workspaceId: string

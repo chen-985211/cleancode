@@ -38,10 +38,11 @@ Project 上下文当前负责：
 
 ## 聚合与事实所有权
 
-Project 上下文有两个聚合根：
+Project 上下文拥有以下聚合根：
 
 - `Project`：拥有项目目录、稳定工作区身份、工作区类型、目录、显示名、Git 绑定和当前工作区选择。
 - `ProjectRegistry`：拥有最近项目目录列表、当前项目选择和添加项目时使用的目录选择器位置；它不复制项目业务状态。
+- `WorkspaceInitialization`：拥有一次工作区内容初始化的目标、冻结选择、逐项创建进度与启动请求凭据；项目默认内容是按 `projectId` 保存的独立配置值，不是现有画布的来源。
 
 `Project.create` 总是创建一个具有随机稳定 `workspaceId`、`workspaceKind = default`、显示名 `main` 的当前工作区；其目录等于项目目录，初始 Git 绑定为 `null`。打开项目或执行同步后，应用层再根据真实 Git 状态更新绑定与 worktree 列表。`main` 是显示名而不是身份。
 
@@ -71,6 +72,18 @@ VS Code 可用性来自操作系统当前注册的 `vscode://` 协议处理程�
 ### 创建分支工作区
 
 创建前必须确认当前目录是 Git 仓库、存在当前分支，且目标分支尚不存在。应用层先计算 worktree 目录并通过聚合校验名称与绑定，再调用 Git 端口创建分支 worktree，成功后保存项目。
+
+### 默认内容与初始化恢复
+
+应用设置的“工作区”分类按项目保存默认内容；每个项目可以配置零个或多个项目/全局终端模板，以及多个 Provider 类型的 Agent。Agent 默认内容按 Provider 分组保存正整数数量，同一类型只保留一个配置行；初始化时展开为独立请求项和独立 Agent 身份。每个工作区的自动创建总数最多 100，以限制初始化请求的资源规模。每个模板的“自动运行”独立保存且默认关闭。设置中的增删、数量和开关更改实时保存，按项目串行写入；未提交草稿及失败状态跨设置视图切换保留，新建请求直接使用项目的最新设置。创建表单只填写分支名称，不提供临时覆盖或空白画布选择；项目默认内容为空时，创建空白工作区。
+
+显式新建 worktree 先保存稳定请求 ID、预留工作区 ID 和项目默认内容快照，再由 BlockGraph 冻结模板内容。Git 成功、画布对象提交、运行启动是三个独立阶段。Git 创建完成后先保存创建凭据，再保存 Project；模板或 Agent 失败不回滚已经存在的 worktree 或成功项。只有创建结果显式触发一次内容应用；读取、切换、checkout、同步发现外部 worktree 或用户删除对象，都不自动创建内容。
+
+显式空画布初始化命令使用独立请求，在开始准备及首次实际放置前检查终端、组合与 Agent 都为空；准入结果持久化后，部分成功的请求可以继续，不能把已有成功项误判成冲突。不同请求对同一空工作区串行准入。每个项目的未完成创建可以从设置中的默认内容编辑器继续或跳过；继续会再次验证真实 Git 和已登记项目。只有存在本次 Git 创建凭据且尚未提交对象时，才允许把初始化关联到同步已发现的同目录、同分支空工作区，保留该工作区既有身份，并在实际放置前再检查空画布。没有创建凭据的外部 worktree 不自动接管。
+
+初始化按请求串行、按项提交。BlockGraph 与 Agent 在各自仓储原子保存对象及创建凭据；Project 只保存返回的对象身份与精确执行作用域。重试仅重试失败项，跳过单独持久化；成功对象后来被删除也不重新生成。冻结快照不随原模板编辑或删除改变；原模板不可用的失败项可以在修复来源后重试，或跳过后通过模板库另行放置。
+
+运行前先持久化请求，再调用 Run；未知启动响应或重启后的在途请求标为不确定，不能自动重放。用户在已经放置的终端检查并手动运行。每次副作用前检查项目登记、项目/工作区身份与物理目录，归档和移除项目会使未完成初始化失效。编排不得持有 Project 写事务再等待 Agent 队列，避免与 Agent 保存时的作用域验证形成锁顺序反转。
 
 ### 归档分支工作区
 
@@ -111,6 +124,10 @@ Agent 运行时如何按稳定工作区身份复用，见 [Agent 与会话生命
 
 项目登记簿保存有序项目目录、当前项目目录和可选的项目目录选择器位置，不拥有项目名称、工作区或 Git 绑定。目录选择器位置是跨重启导航提示；旧登记簿缺少该字段时按无历史位置处理，已记录目录失效时由 Platform 回退到系统默认位置。手动排序通过“把项目移动到另一项目之前”的相对命令表达，目标为空时移动到末尾；该写事务与 remember、forget、select 共享全局登记簿事务协调器，避免旧整表快照覆盖并发更新。应用启动时优先恢复登记簿中的当前项目；旧版登记簿缺少当前项目字段、已选项目无法加载或选择无效时，回退到首个可加载项目并立即修复登记簿；没有可加载项目时清空当前项目。删除登记项不会删除项目目录、Git 分支或 worktree；删除登记前仍须释放项目内 Agent 与 Run 资源，包括明确保留的 Provider session 和 checkpoint，并把两类 lifecycle lease 持有到登记簿保存完成。保存失败时释放 lease，但已经停止的终端不会自动重启。
 
+默认内容与初始化记录使用独立的 `workspace-initialization.json` schema v2；读取 v1 时将单个 `providerId` 转为数量 1，空值转为空列表。读取不重写文件，下次写入升级 v2，既有初始化请求项及创建凭据保持原身份。缺失按无默认内容处理，畸形或未知版本拒绝读取且不覆盖。Project 元数据与初始化记录均使用临时文件、文件同步和原子重命名。BlockGraph 拥有的冻结模板保存在独立私有模板库中，不把模板正文复制到 Project。
+
+初始化用例由 [`PrepareWorkspaceInitializationUseCase`](../../../src/contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase.ts) 和 [`InitializeWorkspaceContentUseCase`](../../../src/contexts/project/application/use-cases/InitializeWorkspaceContentUseCase.ts) 实现，跨上下文适配在 [`workspaceInitializationRuntime`](../../../src/platform/electron-main/workspaceInitializationRuntime.ts) 中装配。
+
 ## 实现入口
 
 | 层级           | 入口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -131,6 +148,8 @@ Agent 运行时如何按稳定工作区身份复用，见 [Agent 与会话生命
 | Contract        | Git 状态同步 IPC 的输入输出                                                               | [`project.git-state-synchronization-ipc.spec.ts`](../../../tests/contract/contexts/project/project.git-state-synchronization-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Unit / Contract | 外部打开的工作区目录解析、协议编码、系统能力和固定 IPC 目标                               | [`project.workspace-external-open.spec.ts`](../../../tests/unit/contexts/project/project.workspace-external-open.spec.ts)、[`project.electron-workspace-external-open.spec.ts`](../../../tests/unit/contexts/project/project.electron-workspace-external-open.spec.ts)、[`project.workspace-external-open-ipc.spec.ts`](../../../tests/contract/contexts/project/project.workspace-external-open-ipc.spec.ts)                                                                                                                                                                                                                 |
 | E2E             | 完整退出并重启后恢复最后选择的项目                                                        | [`project-workspaces.e2e.spec.ts`](../../../tests/e2e/project-workspaces.e2e.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+
+初始化的身份、最新配置快照、Git 保存中断与同步后恢复由 [`project.prepare-workspace-initialization.spec.ts`](../../../tests/unit/contexts/project/project.prepare-workspace-initialization.spec.ts) 证明；部分成功、空画布准入和启动不重放由 [`project.initialize-workspace-content.spec.ts`](../../../tests/unit/contexts/project/project.initialize-workspace-content.spec.ts) 证明。文件原子性见 [`project.workspace-initialization-persistence.spec.ts`](../../../tests/integration/contexts/project/project.workspace-initialization-persistence.spec.ts)，完整用户流程见 [`workspace-defaults.e2e.spec.ts`](../../../tests/e2e/workspace-defaults.e2e.spec.ts)。
 
 ## 维护规则
 

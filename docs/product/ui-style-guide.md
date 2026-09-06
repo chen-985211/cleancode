@@ -189,13 +189,15 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 应用右上角的收藏、语言、主题和设置入口属于同一组 utility button；按下必须在当前帧提供共同的短位移与缩放反馈，松开后由无回弹的临界阻尼 spring 从当前 presentation 恢复。触发后的 surface 同样必须表达来源：收藏与主题 Drawer 从所属右侧边缘进入并沿原路径退出，设置全屏表面从右侧短距离进入并退回，语言菜单从按钮的右下锚点生长并缩回。surface 的位移、缩放和透明度由同一条可反向的临界阻尼 spring 协调，不能在 JavaScript presentation 外再叠加 CSS transform transition。鼠标、触控笔与键盘激活必须复用同一反馈，非主按钮不得触发按压态；`prefers-reduced-motion` 下仍保留即时状态反馈，但直接投影静止端点。
 
-设置页的固定标题与左侧导航不参与分类切换；内容按 `快捷键 → 画布 → 终端 → Agent → 问题反馈` 的导航顺序建立空间关系，向后选择时新内容从右侧进入、旧内容向左退出，反向选择时镜像路径。新旧内容使用独立的 X 与透明度临界阻尼 spring；连续切换必须保留每一层当前 presentation，并只继承朝向新目标的速度。退出层立即 `inert` 且从可访问树隐藏，收敛后释放；`prefers-reduced-motion` 下直接投影当前分类并清理退出层。
+设置页的固定标题与左侧导航不参与分类切换；内容按 `快捷键 → 画布 → 工作区 → 终端 → Agent → 问题反馈` 的导航顺序建立空间关系，向后选择时新内容从右侧进入、旧内容向左退出，反向选择时镜像路径。新旧内容使用独立的 X 与透明度临界阻尼 spring；连续切换必须保留每一层当前 presentation，并只继承朝向新目标的速度。退出层立即 `inert` 且从可访问树隐藏，收敛后释放；`prefers-reduced-motion` 下直接投影当前分类并清理退出层。
 
 按钮组、分段控件、选项卡和开关的选择反馈由 `selectionMotion.ts` 与 `useSelectionMotion.ts` 统一拥有。语义选中状态和对应内容必须在输入提交后立即更新，motion 只拥有选中材质的临时 presentation，不得延迟业务状态。连续、相邻且等尺寸的选项复用一个真实选中材质，从当前 X/Y presentation 与速度收敛到目标；设置分类导航、收藏范围分段选择、终端设置选项和 Agent 权限分段属于该形态。彼此分离的卡片不得让高亮材质跨越空白飞行，主题卡片、开关、快捷键录制态和 Agent Provider 状态等消费者应以同一条无回弹临界阻尼 spring 在各自边界内投影描边、位移、轻微尺度或显露进度。延迟挂载或尚无有效几何时必须保留语义选中项的完整静态材质，不能出现只有文字颜色、没有选中底板的中间态；几何就绪后再无缝交给共享 spring。快速连续选择从当前 presentation 重定向，不重播、不排队；文字和图标只做状态颜色反馈，不参与装饰性弹跳。`prefers-reduced-motion` 下直接投影同一最终选择状态。
 
 新建分支工作区表单复用统一 surface presence，以所属项目的 “+” 按钮为固定来源，在按钮下方通过临界阻尼 spring 协调短位移、缩放和透明度，关闭时从当前 presentation 沿原路径收回；按钮必须通过 `aria-controls` 和 `aria-expanded` 表达控制关系。关闭意图发生后表单立即停止交互，spring 收敛后再清理草稿和释放 DOM；快速反向复用同一 live surface。Escape 或外部关闭手势都把焦点返回触发按钮；用于关闭表单的第一次画布手势只负责关闭，不得同时触发画布选择、平移或放置。
 
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/shared/motion/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；utility button、分支表单、通知图标与 surface 进出复用 `src/presentation/shared/motion/springProgressMotion.ts` 的逐帧生命周期和重定向，设置分类的多层重定向由 `src/presentation/app-shell/app-features/settings/applicationSettingsPaneMotion.ts` 负责，具体空间投影仍由各 owner 决定。各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
+
+工作区默认内容设置采用 Agent、模板两个同级小节和紧凑分隔行，不使用包围整页的大卡片或嵌套勾选表单。Provider 使用注册贡献中的图标；模板来源通过图标和文字表达。添加器复用锚定 surface spring 和键盘导航，外部点击通过共享 outside-pointer owner 在捕获阶段关闭，并允许同一次手势激活其他设置控件。已添加行的局部高度、透明度与短位移由 `WorkspaceDefaultsMotion.tsx` 命名 owner 使用临界阻尼 spring 协调，让相邻内容随添加与移除自然让位；只改变该设置列表局部几何，不参与主画布、React Flow 或 xterm 测量。快速移除后重新添加复用仍在退出的同一行，从当前 presentation 重定向；退出行立即 inert，焦点返回所属添加按钮。增减、添加和移除按钮复用 utility button 的即时按压和 spring 恢复；自动运行开关复用统一 selection motion。减少动态效果时直接呈现最终状态并清理退出行。
 
 普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
 

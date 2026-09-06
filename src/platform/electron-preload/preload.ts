@@ -28,6 +28,18 @@ const cleancodeApi = {
   onApplicationQuitRequested: (listener: (request: ApplicationQuitRequest) => void) =>
     subscribeRendererEvent(applicationQuitChannels.requested, listener),
   listWorkbenches: () => invokeCleancode('cleancode:list-workbenches'),
+  getWorkspaceDefaults: (command: unknown) =>
+    invokeCleancode('cleancode:get-workspace-defaults', command),
+  saveWorkspaceDefaults: (command: unknown) =>
+    invokeCleancode('cleancode:save-workspace-defaults', command),
+  cancelWorkspaceInitialization: (command: unknown) =>
+    invokeCleancode('cleancode:cancel-workspace-initialization', command),
+  listWorkspaceInitializations: (command: unknown) =>
+    invokeCleancode('cleancode:list-workspace-initializations', command),
+  beginWorkspaceInitialization: (command: unknown) =>
+    invokeCleancode('cleancode:begin-workspace-initialization', command),
+  applyWorkspaceInitialization: (command: unknown) =>
+    invokeCleancode('cleancode:apply-workspace-initialization', command),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
   reorderProject: (command: unknown) => invokeCleancode('cleancode:reorder-project', command),

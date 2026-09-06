@@ -145,7 +145,12 @@ function readInstantiateCommand(command: unknown): InstantiateBlockTemplateComma
   ) {
     invalidCommand()
   }
-  return command as unknown as InstantiateBlockTemplateCommand
+  return {
+    projectDirectory: command.projectDirectory,
+    workspaceId: command.workspaceId,
+    templateId: command.templateId,
+    origin: command.origin as InstantiateBlockTemplateCommand['origin']
+  }
 }
 
 function readScope(value: unknown): ListBlockTemplatesQuery['scope'] {

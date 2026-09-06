@@ -9,6 +9,7 @@ export const zhCNSettingsMessages = {
   'settings.open': '设置',
   'settings.title': '设置',
   'settings.back': '返回工作区',
+  'settings.workspace.title': '工作区',
   'settings.navigation': '设置导航',
   'settings.shortcuts.title': '快捷键',
   'settings.shortcuts.resetAll': '全部恢复默认',

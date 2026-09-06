@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type {
   ApplicationShortcutBindings,
   ShortcutPlatform
@@ -15,6 +16,7 @@ import { useI18n } from '../../../i18n/useI18n'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export function AppShellSettings({
+  workspaceDefaultsSettings,
   agentCreation,
   applicationSettings,
   bindings,
@@ -33,6 +35,7 @@ export function AppShellSettings({
   terminalScrollbackRows,
   terminalWorkflowBuildMode
 }: {
+  readonly workspaceDefaultsSettings: ReactNode
   readonly agentCreation: ReturnType<typeof useAgentCreationProviders>
   readonly applicationSettings: ReturnType<typeof useApplicationSettingsNavigation>
   readonly bindings: ApplicationShortcutBindings
@@ -65,6 +68,7 @@ export function AppShellSettings({
       <LanguageSettingsRoot />
       <ThemeSettingsRoot />
       <ApplicationSettingsRoot
+        workspaceDefaultsSettings={workspaceDefaultsSettings}
         agentProviderPreferences={agentCreation.agentProviderPreferences.state.preferences}
         agentProviderPreferencesStatus={agentCreation.agentProviderPreferences.state.status}
         bindings={bindings}

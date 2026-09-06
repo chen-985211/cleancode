@@ -1,4 +1,17 @@
 export const zhCNErrorsMessages = {
+  'error.AGENT_PROVIDER_UNAVAILABLE':
+    '此 Agent Provider 当前不可用，请检查安装和 Agent 设置后重试。',
+  'error.WORKSPACE_DEFAULTS_INVALID': '默认内容配置无效，请重新选择。',
+  'error.WORKSPACE_INITIALIZATION_INVALID': '工作区初始化记录无效。请重新打开项目后重试。',
+  'error.WORKSPACE_INITIALIZATION_CONFLICT': '此操作与已保存的进度冲突，请先处理未完成的内容。',
+  'error.WORKSPACE_INITIALIZATION_NOT_FOUND': '找不到这次工作区初始化记录。',
+  'error.WORKSPACE_INITIALIZATION_SCOPE_STALE': '目标工作区已改变或不再可用。',
+  'error.WORKSPACE_INITIALIZATION_CANVAS_NOT_EMPTY':
+    '画布已有内容。默认配置已保留，请在空画布中应用。',
+  'error.WORKSPACE_INITIALIZATION_INTERRUPTED': '准备过程已中断，可以继续处理未完成的内容。',
+  'error.BLOCK_TEMPLATE_NOT_FOUND': '模板已删除或不可用，请跳过后重新选择模板。',
+  'error.AGENT_PROVIDER_DISABLED': '此 Agent Provider 已停用，请在设置中启用后重试。',
+  'error.AGENT_PROVIDER_NOT_FOUND': '找不到此 Agent Provider，请检查 Agent 设置。',
   'error.TERMINAL_PROVIDER_AUTHENTICATION_FAILED': '无法验证终端运行时 Provider。',
   'error.TERMINAL_PROVIDER_CONTROLLER_BUSY':
     '另一个应用实例仍在接管终端运行时，请关闭重复实例后重试。',

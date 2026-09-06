@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { CreateWorkspaceAgentUseCase } from '../../../../src/contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 import { FileSystemAgentSessionRepository } from '../../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
@@ -23,6 +24,42 @@ describe('filesystem Agent session repository', () => {
 
   afterEach(async () => {
     await rm(storageDirectory, { recursive: true, force: true })
+  })
+
+  it('keeps an atomic creation receipt after deleting an initialized Agent', async () => {
+    const agent = createAgent('initialized-agent', 'Agent 1')
+    await repository.save(agent, 'initialization:agent')
+    const written = JSON.parse(await readFile(filePath, 'utf8'))
+    expect(written.workspaces[0].creations).toEqual([
+      expect.objectContaining({
+        operationId: 'initialization:agent',
+        agent: expect.objectContaining({ agentId: agent.id })
+      })
+    ])
+    await repository.deleteAgent('project-1', 'workspace-main', agent.id)
+    const reopened = new FileSystemAgentSessionRepository(filePath, createProviderRegistry())
+    const create = new CreateWorkspaceAgentUseCase(
+      reopened,
+      createProviderRegistry(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      reopened
+    )
+    await create.execute(
+      {
+        agentId: agent.id,
+        initialPosition: defaultLayout.position,
+        projectId: 'project-1',
+        projectDirectory: storageDirectory,
+        workspaceDirectory: storageDirectory,
+        workspaceId: 'workspace-main',
+        providerId: 'codex'
+      },
+      'initialization:agent'
+    )
+    expect(await reopened.findWorkspace('project-1', 'workspace-main')).toEqual([])
   })
 
   it('restores multiple Agents with one branch-independent Provider binding each', async () => {
@@ -48,7 +85,7 @@ describe('filesystem Agent session repository', () => {
     expect(agents?.[0]?.providerSessionRef?.value).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
     expect(agents?.[1]?.providerSessionRef?.value).toBe('0190d8a2-4f13-7e17-a0c1-64c303571909')
     expect(agents?.map((agent) => agent.cleancodeMcpEnabled)).toEqual([true, false])
-    expect(persisted.version).toBe(5)
+    expect(persisted.version).toBe(6)
     expect(persisted.workspaces[0]).toMatchObject({
       projectId: 'project-1',
       workspaceId: 'workspace-main'
@@ -133,6 +170,24 @@ describe('filesystem Agent session repository', () => {
     const reopened = await repository.findAgent('project-1', 'workspace-main', 'agent-1')
     expect(reopened).not.toBeNull()
     expect(reopened?.providerSessionRef).toBeNull()
+  })
+
+  it('reads version 5 without rewriting it and adds creation receipts on the next write', async () => {
+    const agent = createAgent('legacy-agent', 'Legacy')
+    await repository.save(agent)
+    const store = JSON.parse(await readFile(filePath, 'utf8'))
+    const contents = JSON.stringify({ ...store, version: 5 })
+    await writeFile(filePath, contents)
+    const reopened = new FileSystemAgentSessionRepository(filePath, createProviderRegistry())
+    expect((await reopened.findWorkspace('project-1', 'workspace-main'))?.[0]?.id).toBe(
+      'legacy-agent'
+    )
+    expect(await readFile(filePath, 'utf8')).toBe(contents)
+    await reopened.save(createAgent('initialized-agent', 'Initialized'), 'new-initialization')
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 6 })
+    expect(
+      await reopened.findCreation('project-1', 'workspace-main', 'new-initialization')
+    ).toMatchObject({ agentId: 'initialized-agent' })
   })
 
   it('rejects obsolete stores without migrating or rewriting them', async () => {

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { basename, join, resolve } from 'node:path'
+import { writeProjectStateFile } from './ProjectStateFile'
 
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { ProjectRepository } from '../../application/ports/ProjectRepository'
@@ -32,8 +33,7 @@ export class FileSystemProjectRepository implements ProjectRepository {
   async save(project: Project): Promise<void> {
     const metadataPath = getProjectMetadataPath(this.storageDirectory, project.directory)
 
-    await mkdir(dirname(metadataPath), { recursive: true })
-    await writeFile(metadataPath, serializeProject(project.toSnapshot()))
+    await writeProjectStateFile(metadataPath, serializeProject(project.toSnapshot()))
   }
 
   async findByDirectory(directory: string): Promise<ProjectSnapshot | null> {

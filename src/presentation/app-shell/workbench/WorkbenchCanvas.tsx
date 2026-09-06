@@ -135,7 +135,8 @@ export function WorkbenchCanvas({
   onMinimapNodeClick,
   getMiniMapNodeColor,
   getMiniMapNodeStrokeColor,
-  getMiniMapNodeClassName
+  getMiniMapNodeClassName,
+  initializationControls
 }: WorkbenchCanvasProps) {
   const { t } = useI18n()
   const motionEdgeProjectorRef = useRef<ReturnType<
@@ -593,6 +594,7 @@ export function WorkbenchCanvas({
               />
             ) : null}
           </div>
+          {initializationControls}
           {objectContextMenu.menu}
           {paneContextMenu.menu}
         </div>

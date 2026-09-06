@@ -108,6 +108,7 @@ export function createProjectLifecycleUseCases(input: {
   >
 
   return {
+    createBranchWorkspaceUseCase: createBranchWorkspace,
     createOrOpenProjectUseCase,
     projectIpcHandlers,
     rememberProjectUseCase,
