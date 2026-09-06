@@ -2,6 +2,7 @@
 
 import type { ElectronApplication, Page } from 'playwright'
 
+import { cleancodeMcpDeveloperInstructions } from '../../src/contexts/agent/application/dto/AgentToolProtocol'
 import {
   installFakeClaudeCli,
   readFakeClaudeCliReports,
@@ -89,6 +90,7 @@ describe('Claude Code Agent session e2e', () => {
       )
       expect(firstLaunch.args).toContain('--session-id')
       expect(firstLaunch.args).not.toContain('--resume')
+      expect(firstLaunch.appendedInstructions).toBe(cleancodeMcpDeveloperInstructions)
       expect(
         await page
           .locator('[data-agent-console-node] .agent-terminal-viewport')
@@ -116,6 +118,7 @@ describe('Claude Code Agent session e2e', () => {
       expect(restoredLaunch.args).toEqual(
         expect.arrayContaining(['--resume', fakeClaude.switchSessionId])
       )
+      expect(restoredLaunch.appendedInstructions).toBe(cleancodeMcpDeveloperInstructions)
       expect(
         await page
           .locator('[data-agent-console-node] .agent-terminal-viewport')

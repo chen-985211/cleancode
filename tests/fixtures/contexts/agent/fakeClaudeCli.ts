@@ -10,6 +10,7 @@ export interface FakeClaudeCliFixture {
 }
 
 export interface FakeClaudeCliReport {
+  readonly appendedInstructions?: string
   readonly args: readonly string[]
   readonly cwd: string
   readonly kind: 'exit' | 'inspection' | 'session' | 'session-start-hook' | 'user-prompt-hook'
@@ -57,19 +58,20 @@ export async function readFakeClaudeCliReports(
 }
 
 function createFakeClaudeProgram(): string {
-  return `import { appendFileSync } from 'node:fs'
+  return `import { appendFileSync, readFileSync } from 'node:fs'
 
 const args = process.argv.slice(2)
 const cwd = process.cwd()
 const reportPath = process.env.CLEANCODE_FAKE_CLAUDE_REPORT_PATH
 const sessionFlagIndex = args.findIndex((arg) => arg === '--session-id' || arg === '--resume')
 const sessionId = sessionFlagIndex >= 0 ? args[sessionFlagIndex + 1] : undefined
+let appendedInstructions
 
 function report(kind, reportedSessionId = sessionId) {
   if (!reportPath) return
   appendFileSync(
     reportPath,
-    JSON.stringify({ args, cwd, kind, pid: process.pid, sessionId: reportedSessionId }) + '\\n'
+    JSON.stringify({ args, cwd, kind, pid: process.pid, sessionId: reportedSessionId, appendedInstructions }) + '\\n'
   )
 }
 
@@ -77,6 +79,15 @@ if (args.includes('--version')) {
   report('inspection')
   process.stdout.write('2.1.217 (Claude Code)\\n')
   process.exit(0)
+}
+
+const instructionsIndex = args.indexOf('--append-system-prompt-file')
+if (instructionsIndex >= 0) {
+  if (args.includes('--append-system-prompt')) throw new Error('Conflicting append sources')
+  appendedInstructions = readFileSync(args[instructionsIndex + 1], 'utf8')
+} else {
+  const inlineIndex = args.indexOf('--append-system-prompt')
+  if (inlineIndex >= 0) appendedInstructions = args[inlineIndex + 1]
 }
 
 report('session')
@@ -121,6 +132,9 @@ function exitCleanly() {
 }
 
 await publishSessionStart(sessionId, args.includes('--resume') ? 'resume' : 'startup')
+if (process.env.CLEANCODE_FAKE_PEER_MODULE) {
+  void import(process.env.CLEANCODE_FAKE_PEER_MODULE).then((scenario) => scenario.runPeerScenario('claude-code', args))
+}
 
 process.stdin.setRawMode?.(true)
 process.stdin.resume()

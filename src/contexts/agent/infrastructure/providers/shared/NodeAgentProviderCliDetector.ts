@@ -108,6 +108,15 @@ export function resolveAgentProviderInspectionTimeout(
 
 type SemanticVersion = readonly [major: number, minor: number, patch: number]
 
+export function supportsAgentProviderVersion(
+  version: string | undefined,
+  minimum: string
+): boolean {
+  const parsed = version ? readSemanticVersion(version) : null
+  const required = readSemanticVersion(minimum)
+  return !!parsed && !!required && compareSemanticVersions(parsed, required) >= 0
+}
+
 function readSemanticVersion(value: string): SemanticVersion | null {
   const match = /(?:^|\D)(\d+)\.(\d+)\.(\d+)(?:\D|$)/.exec(value)
   if (!match) return null

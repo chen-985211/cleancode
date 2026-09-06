@@ -12,6 +12,11 @@ import {
 describe('agent tool protocol', () => {
   it('exposes the complete first-phase cleancode workflow authoring tool catalog', () => {
     expect(agentToolDefinitions.map((tool) => tool.name)).toEqual([
+      'list_agents',
+      'list_agent_providers',
+      'create_agent',
+      'send_agent_message',
+      'wait_agent_message',
       'inspect_graph',
       'create_block',
       'create_terminal',
@@ -423,6 +428,11 @@ describe('agent tool protocol', () => {
     expect(
       Object.fromEntries(agentToolDefinitions.map((tool) => [tool.name, tool.annotations] as const))
     ).toEqual({
+      list_agents: { destructiveHint: false, openWorldHint: false, readOnlyHint: true },
+      list_agent_providers: { destructiveHint: false, openWorldHint: false, readOnlyHint: true },
+      create_agent: { destructiveHint: false, openWorldHint: false, readOnlyHint: false },
+      send_agent_message: { destructiveHint: false, openWorldHint: false, readOnlyHint: false },
+      wait_agent_message: { destructiveHint: false, openWorldHint: false, readOnlyHint: false },
       create_block: {
         destructiveHint: false,
         openWorldHint: false,

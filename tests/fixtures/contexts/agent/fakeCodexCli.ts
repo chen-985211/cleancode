@@ -186,6 +186,9 @@ if (args.includes('app-server')) {
   })
 } else {
   startSession()
+  if (process.env.CLEANCODE_FAKE_PEER_MODULE) {
+    void import(process.env.CLEANCODE_FAKE_PEER_MODULE).then((scenario) => scenario.runPeerScenario('codex', args))
+  }
 }
 
 function handleAppServerRequest(line) {

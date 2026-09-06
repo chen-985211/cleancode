@@ -1,4 +1,9 @@
 export type AgentToolName =
+  | 'list_agents'
+  | 'list_agent_providers'
+  | 'create_agent'
+  | 'send_agent_message'
+  | 'wait_agent_message'
   | 'inspect_graph'
   | 'create_block'
   | 'create_terminal'

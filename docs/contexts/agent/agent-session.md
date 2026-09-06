@@ -101,6 +101,10 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 
 增加基础 Agent CLI 时，只需在 Provider 模块实现包含图标的 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。任意已注册 descriptor 都必须沿同一 Provider-neutral IPC 和 Presentation 投影；安装后会自动进入可创建发现，未安装时仍只存在于支持 catalog。新增 Provider 不得要求修改 `AgentConsole`、选择器或其他表现层组件。可选能力通过 contribution 增加；确需新的通用用户能力时，必须先扩展 capability 契约，并让所有现有 Provider 明确声明支持或诚实降级，不得在 Agent domain、Run domain、通用 IPC 或 Presentation 中按 Provider ID 分支。
 
+原生消息通知由 `nativeMessages` capability 声明适配能力，但实际可用性按本次 CLI 版本、平台、启动参数与正式就绪信号决定。Agent 应用层为每个 launch 建立独立收件箱投递 lease；手动 attach、MCP 创建及恢复共用该机制。launch 替换、退出、MCP 撤销时先同步关闭 lease，再等待原生通知取消与 LIFO 资源清理。通知成功不改变消息确认事实，也不代表任务完成。Codex 的临时原生 launcher 在既有 PTY 中启动同环境的 TUI 与独立 app-server，并通过官方队列通知；Claude 使用不覆盖动态 watchPaths 的临时 FileChanged Hook。版本、兼容性降级和投递状态由[原生 MCP](cleancode-mcp.md)维护。
+
+收件箱投递的领取过程在无过滤空读取或当前 launch 的正式完成/idle 回调后释放；前一轮无关任务的完成不能重复排队尚未领取的通知。该调度资源属于 Agent 应用层，不改变下述工作区和会话身份。
+
 ## 工作区身份与 Git 元数据
 
 - Agent 画布身份遵循 `projectId + workspaceId + agent + agentId`，其中对象类型使用 Shared Kernel 的规范值。
@@ -109,6 +113,8 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 - 物理工作区被归档、移除或目录重绑定时，Project 才通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
 
 ## 运行时生命周期
+
+原生协作创建通过应用层 `AgentPeerCreationPort` 请求当前画布，复用普通创建用例与位置协调。Codex 和 Claude Code contribution 声明 `initialPrompt` 能力，把首次任务入口作为单个原生交互 prompt 参数传入，不启动 headless 进程。首次提示只引导领取进程内收件箱任务；初始正文、去重和回复规则由[原生 MCP](cleancode-mcp.md)拥有。启动被接受后清理当前 launch 的提示参数，但只有首次有效收件箱调用才能消费创建意图中的 bootstrap，避免启动失败后无法重试领取任务。该临时状态不写入 Agent 持久化 schema。
 
 附加 Agent 时，应用层依次：
 
@@ -152,7 +158,7 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 ## 管理动作
 
 - 发现：刷新共享检测环境并从注册 catalog 中只返回当前 `installed` Provider；加载、空结果和重试是选择器的易失状态。
-- 创建：从可创建发现结果中选择一次，并在保存前刷新验证 Provider 仍为 `installed` 且没有被用户禁用；MCP 初始值读取应用级新建默认并受 Provider capability 限制。失败不保存 Agent 且保留选择流程，不提供 Provider 切换。
+- 创建：从可创建发现结果中选择一次，并在保存前刷新验证 Provider 仍为 `installed` 且没有被用户禁用；MCP 初始值读取应用级新建默认并受 Provider capability 限制。创建提交前失败不保存 Agent；提交后的 CLI 启动失败保留对象与稳定 ID，并使用既有重试入口，不提供 Provider 切换。
 - 列出：工作区从未初始化时原子建立空工作区；既有 Agent 不按 CLI 可用性或启用偏好过滤，只有显式创建命令会加入 Agent。
 - 重命名/布局：只修改目标 Agent 的稳定事实。
 - 视觉整理：CanvasArrangement 可以用稳定 Agent ID 把 Agent 控制台纳入跨类型堆叠，但整体拖动和展开/网格仍通过本上下文布局入口提交 Agent 位置；堆叠关系不改变 Agent 身份、Provider、会话或运行状态。

@@ -1,7 +1,10 @@
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentActivityStatus } from '../dto/AgentSessionProtocol'
+import type { AgentMessageWakeupPort } from './AgentMessageDeliveryPort'
 
 interface AgentProviderCapabilities {
+  readonly nativeMessages?: boolean
+  readonly initialPrompt?: boolean
   readonly activityTracking: boolean
   readonly cleancodeMcp: boolean
   readonly launchInstructions: boolean
@@ -124,6 +127,9 @@ export interface AgentLaunchPlan {
 }
 
 export interface CreateAgentLaunchPlanCommand {
+  readonly messageDelivery?: (wakeup: AgentMessageWakeupPort | null) => void
+  readonly providerVersion?: string
+  readonly initialPrompt?: string
   readonly artifacts: AgentLaunchArtifactRegistrar
   readonly cleancodeMcp?: {
     readonly bearerToken: string

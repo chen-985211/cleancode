@@ -6,10 +6,12 @@ export class AgentToolInvocationCoordinator implements AgentToolExecutionOperati
   private readonly activeSessionCalls = new Map<string, Set<Promise<unknown>>>()
   private readonly closingSessionIds = new Set<string>()
   private readonly workspaceTails = new Map<string, Promise<void>>()
+  private readonly waitingCalls = new Map<string, Set<AbortController>>()
 
   constructor(private readonly toolExecution: AgentToolExecutionOperations) {}
 
   execute(command: ExecuteAgentToolCommand) {
+    if (command.toolName === 'wait_agent_message') return this.waitOutsideWorkspaceQueue(command)
     return this.runInWorkspace(command, () => this.toolExecution.execute(command))
   }
 
@@ -46,6 +48,7 @@ export class AgentToolInvocationCoordinator implements AgentToolExecutionOperati
 
   beginSessionClosing(sessionId: string): void {
     this.closingSessionIds.add(sessionId)
+    for (const controller of this.waitingCalls.get(sessionId) ?? []) controller.abort()
   }
 
   reopenSession(sessionId: string): void {
@@ -85,5 +88,22 @@ export class AgentToolInvocationCoordinator implements AgentToolExecutionOperati
       if (this.workspaceTails.get(workspaceKey) === tail) this.workspaceTails.delete(workspaceKey)
     })
     return result
+  }
+
+  private async waitOutsideWorkspaceQueue(command: ExecuteAgentToolCommand) {
+    const controller = new AbortController()
+    const calls = this.waitingCalls.get(command.sessionId) ?? new Set<AbortController>()
+    this.waitingCalls.set(command.sessionId, calls)
+    calls.add(controller)
+    const abort = () => controller.abort()
+    command.signal?.addEventListener('abort', abort, { once: true })
+    if (command.signal?.aborted || !this.isSessionOpen(command.sessionId)) controller.abort()
+    try {
+      return await this.toolExecution.execute({ ...command, signal: controller.signal })
+    } finally {
+      command.signal?.removeEventListener('abort', abort)
+      calls.delete(controller)
+      if (calls.size === 0) this.waitingCalls.delete(command.sessionId)
+    }
   }
 }

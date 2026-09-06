@@ -4,21 +4,17 @@ import { stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
+import { createAgentWorkspaceRuntime } from './createAgentWorkspaceRuntime'
 import { DiscoverCreatableAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/DiscoverCreatableAgentProvidersUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
 import { AgentProviderAvailabilityService } from '../../contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../contexts/agent/application/services/AgentProviderRegistry'
-import { AgentWorkspaceTransactionCoordinator } from '../../contexts/agent/application/services/AgentWorkspaceTransactionCoordinator'
 import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
 import { ListAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/ListAgentProvidersUseCase'
-import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
 import { GetAgentProviderPreferencesUseCase } from '../../contexts/agent/application/use-cases/GetAgentProviderPreferencesUseCase'
 import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
-import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
 import { UpdateAgentProviderPreferencesUseCase } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
-import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
 import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
@@ -283,27 +279,25 @@ const agentSessionRepository = new FileSystemAgentSessionRepository(
   join(appStateDirectoryPath, 'agent-sessions.json'),
   agentProviderRegistry
 )
-const agentWorkspaceTransactions = new AgentWorkspaceTransactionCoordinator()
 const projectWorkspaceTransactions = new ProjectWorkspaceTransactionCoordinator()
 const agentWorkspaceCreationScope = new AgentWorkspaceCreationScopeAdapter(
   new ValidateProjectWorkspaceScopeUseCase(projectRepository, getProjectRegistryRepository()),
   projectWorkspaceTransactions
 )
-const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
-  agentSessionRepository,
-  agentWorkspaceTransactions
-)
-const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
+const {
+  collaborationTools,
+  messageMailbox,
+  peerCreationRegistry,
+  createWorkspaceAgentUseCase,
+  listWorkspaceAgentsUseCase,
+  renameWorkspaceAgentUseCase,
+  updateWorkspaceAgentLayoutUseCase
+} = createAgentWorkspaceRuntime(
   agentSessionRepository,
   agentProviderRegistry,
   agentProviderAvailability,
-  agentWorkspaceTransactions,
   agentWorkspaceCreationScope,
   agentProviderPreferencesRepository
-)
-const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
-const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
-  agentSessionRepository
 )
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   arrangeTerminalLayout: (command) => arrangeTerminalLayoutUseCase.execute(command),
@@ -328,7 +322,8 @@ const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
 const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
   agentBlockGraphToolAdapter,
   agentAuditRepository,
-  agentSessionRepository
+  agentSessionRepository,
+  collaborationTools
 )
 const agentSessionService = new AgentSessionService(
   new RunAgentTerminalRuntimeAdapter(terminalSessionService),
@@ -344,7 +339,8 @@ const agentSessionService = new AgentSessionService(
   ),
   agentProviderAvailability,
   agentProviderPreferencesRepository,
-  agentActivityRuntime.registry
+  agentActivityRuntime.registry,
+  messageMailbox
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
@@ -462,7 +458,8 @@ registerTerminalWorkflowIpcHandlers({
   workflowService: terminalWorkflowService
 })
 
-registerAgentIpcHandlers({
+const disposeAgentPeerRequests = registerAgentIpcHandlers({
+  peerCreationRegistry,
   approveAgentTool: (approvalId) => agentSessionService.approveTool({ approvalId }),
   attachAgentSession: (command) =>
     isAgentAutostartDisabledForTest
@@ -677,7 +674,10 @@ const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
   disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),
   disposeTerminalViews: () => terminalViewLifecycle.prepareApplicationShutdown(),
   logger: consoleLogger,
-  prepareAgentSessions: () => agentSessionService.prepareApplicationShutdown(),
+  prepareAgentSessions: () => {
+    disposeAgentPeerRequests()
+    return agentSessionService.prepareApplicationShutdown()
+  },
   prepareTerminalWorkflows: () => terminalWorkflowService.prepareApplicationShutdown()
 })
 

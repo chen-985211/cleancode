@@ -34,6 +34,8 @@ export class AgentToolApprovalCoordinator {
     command: AgentMcpToolCallCommand
   ): Promise<AgentToolExecutionResult> {
     const toolCommand: ExecuteAgentToolCommand = {
+      peerCreation: session.callbacks.peerCreation,
+      ...(command.signal ? { signal: command.signal } : {}),
       agentId: session.agentId,
       input: command.input,
       projectDirectory: session.projectDirectory,
