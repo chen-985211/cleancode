@@ -54,3 +54,18 @@ export function createGroupAtWindowCenter(
     instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
   )
 }
+
+export function appShellClassName(
+  platform: string,
+  isFullScreen: boolean,
+  isSidebarCollapsed: boolean
+): string {
+  return [
+    'app-shell',
+    platform === 'mac' ? 'app-shell--mac' : '',
+    isFullScreen ? 'app-shell--window-full-screen' : '',
+    isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+}

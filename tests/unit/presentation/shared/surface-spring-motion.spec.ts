@@ -94,6 +94,7 @@ describe('surface spring motion', () => {
   it.each([
     ['anchored-bottom-left', '--cc-surface-motion-translate-y', 1],
     ['anchored-top-right', '--cc-surface-motion-translate-x', 1],
+    ['anchored-top-left', '--cc-surface-motion-translate-y', -1],
     ['drawer-right', '--cc-surface-motion-translate-x', 1],
     ['fullscreen-right', '--cc-surface-motion-translate-x', 1]
   ] as const)('enters the %s surface from its trigger-side origin', (preset, property, sign) => {

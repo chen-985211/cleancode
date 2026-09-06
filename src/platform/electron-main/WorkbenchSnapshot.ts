@@ -3,8 +3,10 @@ import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
+import type { WorkspaceInitializationSnapshot } from '../../contexts/project/application/dto/WorkspaceInitializationDetails'
 
 export interface WorkbenchSnapshot {
+  readonly initialization?: WorkspaceInitializationSnapshot | null
   readonly agents: readonly WorkspaceAgentSnapshot[]
   readonly canvasArrangement: CanvasArrangementSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]

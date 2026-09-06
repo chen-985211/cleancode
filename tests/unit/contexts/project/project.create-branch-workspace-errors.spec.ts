@@ -68,6 +68,32 @@ class FakeBranchWorkspaceDirectoryPort implements BranchWorkspaceDirectoryPort {
 }
 
 describe('create branch workspace errors', () => {
+  it('uses the workspace identity reserved by a persisted initialization request', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    git.inspection = {
+      isGitRepository: true,
+      currentBranch: 'main',
+      localBranches: ['main'],
+      branches: []
+    }
+    await new CreateOrOpenProjectUseCase(repository, git).execute({
+      directory: '/work/app',
+      name: 'app'
+    })
+    const result = await new CreateBranchWorkspaceUseCase(
+      repository,
+      git,
+      new FakeBranchWorkspaceDirectoryPort()
+    ).execute({
+      projectDirectory: '/work/app',
+      branchName: 'feature',
+      workspaceId: 'reserved-workspace'
+    })
+    expect(
+      result.workspaces.find((workspace) => workspace.gitBranch === 'feature')?.workspaceId
+    ).toBe('reserved-workspace')
+  })
   it('rejects creating a branch workspace when the Git branch already exists with a stable code', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()

@@ -11,6 +11,7 @@ import type { BlockTemplateRepository } from '../ports/BlockTemplateRepository'
 import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface InstantiateBlockTemplateCommand {
+  readonly operationId?: string
   readonly projectDirectory: string
   readonly workspaceId: string
   readonly templateId: string
@@ -29,9 +30,13 @@ export class InstantiateBlockTemplateUseCase {
     private readonly templateRepository: BlockTemplateRepository
   ) {}
 
-  async execute(command: InstantiateBlockTemplateCommand): Promise<InstantiateBlockTemplateResult> {
-    const library = BlockTemplateLibrary.restore(await this.templateRepository.get())
-    const template = library.find(command.templateId)
+  async execute(
+    command: InstantiateBlockTemplateCommand,
+    frozenTemplate?: BlockTemplateSnapshot
+  ): Promise<InstantiateBlockTemplateResult> {
+    const template =
+      frozenTemplate ??
+      BlockTemplateLibrary.restore(await this.templateRepository.get()).find(command.templateId)
     if (!template) {
       throw createExpectedAppError('BLOCK_TEMPLATE_NOT_FOUND', 'Block template was not found.')
     }
@@ -46,7 +51,13 @@ export class InstantiateBlockTemplateUseCase {
           )
         }
 
-        return graph.instantiateBlockTemplate(template, command.origin)
+        if (template.id !== command.templateId) {
+          throw createExpectedAppError(
+            'WORKSPACE_INITIALIZATION_CONFLICT',
+            'Template operation conflicts with its recorded content.'
+          )
+        }
+        return graph.instantiateBlockTemplate(template, command.origin, command.operationId)
       }
     )
 

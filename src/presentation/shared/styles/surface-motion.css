@@ -71,6 +71,10 @@
   transform-origin: 0% 100%;
 }
 
+.anchored-surface-motion[data-surface-spring-preset='anchored-top-left'] {
+  transform-origin: 0% 0%;
+}
+
 .overlay-surface-motion[data-surface-spring-preset][data-surface-motion-state] {
   opacity: var(--cc-surface-motion-opacity, 1);
   transition: none;

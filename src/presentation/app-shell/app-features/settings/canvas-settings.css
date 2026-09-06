@@ -48,7 +48,9 @@
 }
 
 .canvas-settings-row__copy > span {
-  color: var(--cc-muted);
-  font-size: 11.5px;
-  line-height: 1.5;
+  max-width: 60ch;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  text-wrap: pretty;
 }

@@ -7,6 +7,7 @@ import type { ProjectRepository } from '../ports/ProjectRepository'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateBranchWorkspaceCommand {
+  readonly workspaceId?: string
   readonly projectDirectory: string
   readonly branchName: string
 }
@@ -19,14 +20,18 @@ export class CreateBranchWorkspaceUseCase {
     private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
   ) {}
 
-  async execute(command: CreateBranchWorkspaceCommand): Promise<ProjectSnapshot> {
+  async execute(
+    command: CreateBranchWorkspaceCommand,
+    onWorktreeCreated?: () => Promise<void>
+  ): Promise<ProjectSnapshot> {
     return this.transactionCoordinator.run(command.projectDirectory, () =>
-      this.executeTransaction(command)
+      this.executeTransaction(command, onWorktreeCreated)
     )
   }
 
   private async executeTransaction(
-    command: CreateBranchWorkspaceCommand
+    command: CreateBranchWorkspaceCommand,
+    onWorktreeCreated?: () => Promise<void>
   ): Promise<ProjectSnapshot> {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
@@ -58,6 +63,7 @@ export class CreateBranchWorkspaceUseCase {
       branchName
     })
     const updatedProject = project.addLinkedWorktreeWorkspace({
+      workspaceId: command.workspaceId,
       displayName: branchName,
       directory: worktreeDirectory,
       gitBranch: branchName
@@ -68,6 +74,7 @@ export class CreateBranchWorkspaceUseCase {
       branchName,
       worktreeDirectory
     })
+    await onWorktreeCreated?.()
     await this.projectRepository.save(updatedProject)
 
     return updatedProject.toSnapshot()

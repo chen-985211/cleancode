@@ -1,6 +1,7 @@
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
+import type { AgentCreationRepository } from '../ports/AgentCreationRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import {
   defaultAgentProviderPreferencesRepository,
@@ -32,13 +33,38 @@ export class CreateWorkspaceAgentUseCase {
     private readonly availability = new AgentProviderAvailabilityService(providers),
     private readonly transactions = new AgentWorkspaceTransactionCoordinator(),
     private readonly creationScope: AgentWorkspaceCreationScopePort = allowAgentWorkspaceCreationScope,
-    private readonly preferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository
+    private readonly preferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
+    private readonly creations?: AgentCreationRepository
   ) {}
 
-  async execute(command: CreateWorkspaceAgentCommand): Promise<WorkspaceAgentSnapshot> {
+  async execute(
+    command: CreateWorkspaceAgentCommand,
+    operationId?: string
+  ): Promise<WorkspaceAgentSnapshot> {
     const provider = this.providers.require(command.providerId)
     const agentId = command.agentId
     return this.transactions.run(command.projectId, command.workspaceId, async () => {
+      if (operationId) {
+        if (!this.creations)
+          throw createExpectedAppError(
+            'AGENT_CREATION_CONFLICT',
+            'Agent creation receipt repository is required.'
+          )
+        const receipt = await this.creations.findCreation(
+          command.projectId,
+          command.workspaceId,
+          operationId
+        )
+        if (receipt) {
+          if (receipt.providerId !== command.providerId || receipt.agentId !== command.agentId) {
+            throw createExpectedAppError(
+              'AGENT_CREATION_CONFLICT',
+              'Agent initialization was committed to different content.'
+            )
+          }
+          return receipt
+        }
+      }
       const existing = await this.repository.findAgent(
         command.projectId,
         command.workspaceId,
@@ -94,7 +120,7 @@ export class CreateWorkspaceAgentUseCase {
           providerId: command.providerId,
           workspaceId: command.workspaceId
         })
-        await this.repository.save(agent)
+        await this.repository.save(agent, operationId)
         return toWorkspaceAgentSnapshot(agent)
       })
     })

@@ -6,20 +6,25 @@
 
 ## 当前上下文
 
-| 上下文            | 状态   | 核心聚合                                          | 拥有的事实                                                                    |
-| ----------------- | ------ | ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Project           | 已实现 | `Project`、`ProjectRegistry`                      | 项目目录、稳定工作区身份、类型/目录/显示名/Git 绑定、当前工作区、最近项目目录 |
-| BlockGraph        | 已实现 | `BlockGraph`、`BlockTemplateLibrary`              | 终端积木、组合、布局、执行配置、依赖连接和应用级模板快照                      |
-| CanvasArrangement | 已实现 | `CanvasArrangement`                               | 跨类型画布对象的视觉堆叠身份、有序成员与锚点                                  |
-| Run               | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun` | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态             |
-| Agent             | 已实现 | `AgentSession`                                    | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计      |
-| Plugin            | 规划中 | 尚无                                              | 尚未形成当前领域模型、用例或持久化事实                                        |
+| 上下文            | 状态   | 核心聚合                                                | 拥有的事实                                                                                          |
+| ----------------- | ------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Project           | 已实现 | `Project`、`ProjectRegistry`、`WorkspaceInitialization` | 项目目录、稳定工作区身份、类型/目录/显示名/Git 绑定、当前工作区、最近项目目录、默认内容与初始化进度 |
+| BlockGraph        | 已实现 | `BlockGraph`、`BlockTemplateLibrary`                    | 终端积木、组合、布局、执行配置、依赖连接和应用级模板快照                                            |
+| CanvasArrangement | 已实现 | `CanvasArrangement`                                     | 跨类型画布对象的视觉堆叠身份、有序成员与锚点                                                        |
+| Run               | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun`       | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态                                   |
+| Agent             | 已实现 | `AgentSession`                                          | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计                            |
+| Plugin            | 规划中 | 尚无                                                    | 尚未形成当前领域模型、用例或持久化事实                                                              |
 
 `src/platform` 是最外层 composition root 与 Electron 适配层，不是限界上下文。`src/presentation` 负责跨上下文应用外壳与派生视图，也不拥有领域事实。
 
 ## 当前协作总览
 
 ```txt
+Project application
+  -> WorkspaceInitializationContentPort
+  -> Platform adapter
+  -> BlockGraph template preparation / instantiation, Agent creation, Run workflow start
+
 Project application
   -> WorkspaceAgentLifecyclePort
   -> Platform adapter
@@ -84,6 +89,12 @@ Agent application
 模板库虽然是应用级持久化数据，领域事实仍由 BlockGraph 上下文拥有。Platform 只提供独立 JSON 仓储和 IPC 装配；Presentation 只投影选择、放置与管理交互。Run 不读取模板，只接收模板实例化后由 BlockGraph 生成的既有工作流计划。
 
 CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对象身份，不读取两侧聚合或仓储。用户提交堆叠、展开、网格或整体拖动时，Presentation 先通过各 owner 的应用入口提交对象位置，再通过 CanvasArrangement 用例提交或移除视觉堆叠关系；部分失败执行补偿并只保留 owner 已提交事实。工作台恢复时，Platform 把当前 BlockGraph 与 Agent DTO 投影为仍有效的规范对象键，CanvasArrangement 在自己的事务中清理失效引用和不足两个成员的堆叠。详细规则见[画布视觉整理](../contexts/canvas-arrangement/canvas-arrangement.md)。
+
+## Project 到 BlockGraph、Agent 与 Run：工作区默认内容
+
+Project 拥有 `WorkspaceInitializationContentPort` 和逐项初始化用例，Platform 适配器调用 BlockGraph 的冻结/实例化、Agent 的显式创建以及 Run 的既有工作流启动服务。Project 只持有初始化选择、目标作用域、对象身份和启动请求进度，不拥有模板正文、Agent 会话或真实运行状态。
+
+BlockGraph 与 Agent 分别原子保存对象及创建凭据，避免调用方进度保存失败造成重复创建；Run 仍独占 PTY、计划、就绪和停止语义。App Shell 负责模板与 Agent 的联合落位、统一相机、应用设置中的默认内容配置和恢复操作；读取工作区可收敛已确认失效的初始化项，但不创建对象或启动进程。模板可用身份与私有冻结快照经 BlockGraph 应用查询提供，Project 用例统一拥有配置清理；App Shell 接收规范配置结果并复用全局通知。跨上下文装配见 [`workspaceInitializationRuntime.ts`](../../src/platform/electron-main/workspaceInitializationRuntime.ts)。
 
 ## Project 到 Agent：工作区所有权变更
 

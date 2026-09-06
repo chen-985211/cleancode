@@ -71,7 +71,7 @@ describe('application settings', () => {
       within(settingsNavigation)
         .getAllByRole('button')
         .map((button) => button.textContent)
-    ).toEqual(['快捷键', '画布', '终端', 'Agent', '问题反馈'])
+    ).toEqual(['快捷键', '画布', '工作区', '终端', 'Agent', '问题反馈'])
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(

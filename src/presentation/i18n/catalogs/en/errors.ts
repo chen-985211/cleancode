@@ -1,6 +1,25 @@
 import type { zhCNErrorsMessages } from '../zh-CN/errors'
 
 export const enErrorsMessages = {
+  'error.AGENT_PROVIDER_UNAVAILABLE':
+    'This Agent provider is unavailable. Check its installation and Agent settings, then retry.',
+  'error.WORKSPACE_DEFAULTS_INVALID': 'The defaults are invalid. Select the content again.',
+  'error.WORKSPACE_INITIALIZATION_INVALID':
+    'The initialization record is invalid. Reopen the project and try again.',
+  'error.WORKSPACE_INITIALIZATION_CONFLICT':
+    'This action conflicts with saved progress. Resolve the unfinished content first.',
+  'error.WORKSPACE_INITIALIZATION_NOT_FOUND': 'This workspace initialization could not be found.',
+  'error.WORKSPACE_INITIALIZATION_SCOPE_STALE':
+    'The target workspace has changed or is no longer available.',
+  'error.WORKSPACE_INITIALIZATION_CANVAS_NOT_EMPTY':
+    'The canvas already has content. Defaults are saved; apply them to an empty canvas.',
+  'error.WORKSPACE_INITIALIZATION_INTERRUPTED':
+    'Preparation was interrupted. You can continue the unfinished content.',
+  'error.BLOCK_TEMPLATE_NOT_FOUND':
+    'The template was deleted or is unavailable. Skip it and choose another template.',
+  'error.AGENT_PROVIDER_DISABLED':
+    'This Agent provider is disabled. Enable it in settings and retry.',
+  'error.AGENT_PROVIDER_NOT_FOUND': 'This Agent provider could not be found. Check Agent settings.',
   'error.TERMINAL_PROVIDER_AUTHENTICATION_FAILED':
     'The terminal runtime provider could not be authenticated.',
   'error.TERMINAL_PROVIDER_CONTROLLER_BUSY':

@@ -11,6 +11,7 @@ export const enSettingsMessages = {
   'settings.open': 'Settings',
   'settings.title': 'Settings',
   'settings.back': 'Back to workspace',
+  'settings.workspace.title': 'Workspaces',
   'settings.navigation': 'Settings navigation',
   'settings.shortcuts.title': 'Keyboard shortcuts',
   'settings.shortcuts.resetAll': 'Reset all',

@@ -36,22 +36,16 @@ import { ClearQuickExecutionSlotUseCase } from '../../contexts/block-graph/appli
 import { ReorderQuickExecutionSlotsUseCase } from '../../contexts/block-graph/application/use-cases/ReorderQuickExecutionSlotsUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
 import { DeleteTerminalScopeUseCase } from '../../contexts/block-graph/application/use-cases/DeleteTerminalScopeUseCase'
-import { DeleteBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockTemplateUseCase'
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { GetTerminalLaunchPlanUseCase } from '../../contexts/block-graph/application/use-cases/GetTerminalLaunchPlanUseCase'
-import { InstantiateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
-import { ListBlockTemplatesUseCase } from '../../contexts/block-graph/application/use-cases/ListBlockTemplatesUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
-import { MoveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockTemplateUseCase'
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
 import { MoveTerminalWorkflowToGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalWorkflowToGroupUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
-import { SaveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/SaveBlockTemplateUseCase'
 import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
-import { UpdateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/UpdateBlockTemplateUseCase'
 import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import { UpdateTerminalExecutionConfigUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
@@ -87,7 +81,8 @@ import { createMainWindow } from './createMainWindow'
 import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
-import { registerBlockTemplateIpcHandlers } from './blockTemplateIpcHandlers'
+import { createBlockTemplateRuntime } from './blockTemplateRuntimeComposition'
+import { createWorkspaceInitializationRuntime } from './workspaceInitializationRuntime'
 import { createCanvasArrangementRuntime } from './canvasArrangementRuntimeComposition'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { openProjectDirectoryPicker, resolveProjectPickerDirectory } from './projectDirectoryPicker'
@@ -199,18 +194,7 @@ const updateTerminalExecutionConfigUseCase = new UpdateTerminalExecutionConfigUs
   graphRepository
 )
 const updateTerminalDefinitionUseCase = new UpdateTerminalDefinitionUseCase(graphRepository)
-const listBlockTemplatesUseCase = new ListBlockTemplatesUseCase(blockTemplateRepository)
-const saveBlockTemplateUseCase = new SaveBlockTemplateUseCase(
-  graphRepository,
-  blockTemplateRepository
-)
-const updateBlockTemplateUseCase = new UpdateBlockTemplateUseCase(blockTemplateRepository)
-const moveBlockTemplateUseCase = new MoveBlockTemplateUseCase(blockTemplateRepository)
-const deleteBlockTemplateUseCase = new DeleteBlockTemplateUseCase(blockTemplateRepository)
-const instantiateBlockTemplateUseCase = new InstantiateBlockTemplateUseCase(
-  graphRepository,
-  blockTemplateRepository
-)
+const blockTemplates = createBlockTemplateRuntime(graphRepository, blockTemplateRepository)
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
 const agentActivityRuntime = createMainAgentActivityRuntime({
@@ -297,7 +281,8 @@ const {
   agentProviderRegistry,
   agentProviderAvailability,
   agentWorkspaceCreationScope,
-  agentProviderPreferencesRepository
+  agentProviderPreferencesRepository,
+  agentSessionRepository
 )
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   arrangeTerminalLayout: (command) => arrangeTerminalLayoutUseCase.execute(command),
@@ -344,6 +329,7 @@ const agentSessionService = new AgentSessionService(
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
+  createBranchWorkspaceUseCase,
   createOrOpenProjectUseCase,
   projectIpcHandlers,
   rememberProjectUseCase,
@@ -356,6 +342,21 @@ const {
   projectRegistry: getProjectRegistryRepository(),
   projects: projectRepository,
   workspaceTransactions: projectWorkspaceTransactions
+})
+const workspaceInitialization = createWorkspaceInitializationRuntime({
+  appStateDirectory: appStateDirectoryPath,
+  projects: projectRepository,
+  registry: getProjectRegistryRepository(),
+  git: gitWorkspaceAdapter,
+  directories: branchWorkspaceDirectoryResolver,
+  transactions: projectWorkspaceTransactions,
+  createWorkspace: (command, onCreated) => createBranchWorkspaceUseCase.execute(command, onCreated),
+  templates: blockTemplateRepository,
+  graphs: getDefaultGraphUseCase,
+  instantiate: blockTemplates.instantiate,
+  agents: listWorkspaceAgentsUseCase,
+  createAgent: createWorkspaceAgentUseCase,
+  workflow: terminalWorkflowService
 })
 const updateWorkspaceAgentMcpCapabilityUseCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
   agentSessionRepository,
@@ -378,6 +379,7 @@ registerWindowFullScreenStateIpc({
 })
 registerProjectIpcHandlers({
   ...projectIpcHandlers,
+  ...workspaceInitialization.wrapLifecycle(projectIpcHandlers),
   inferProjectName,
   ipcMain,
   loadRememberedWorkbenches,
@@ -414,16 +416,8 @@ registerBlockGraphIpcHandlers({
   updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command)
 })
 
-registerBlockTemplateIpcHandlers({
-  deleteBlockTemplate: (command) => deleteBlockTemplateUseCase.execute(command),
-  instantiateBlockTemplate: (command) => instantiateBlockTemplateUseCase.execute(command),
-  ipcMain,
-  listBlockTemplates: (query) => listBlockTemplatesUseCase.execute(query),
-  logger: consoleLogger,
-  moveBlockTemplate: (command) => moveBlockTemplateUseCase.execute(command),
-  saveBlockTemplate: (command) => saveBlockTemplateUseCase.execute(command),
-  updateBlockTemplate: (command) => updateBlockTemplateUseCase.execute(command)
-})
+blockTemplates.register(ipcMain, consoleLogger)
+workspaceInitialization.register(ipcMain, consoleLogger)
 canvasArrangementRuntime.registerIpcHandlers(ipcMain, consoleLogger)
 const terminalViewLifecycle = registerTerminalIpcHandlers({
   attachTerminalView: (command) => terminalSessionService.attachView(command),
@@ -558,7 +552,14 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
       projectDirectory: project.directory
     })
   ).branches
-  return { agents, canvasArrangement, project, gitBranches, graph }
+  return {
+    agents,
+    canvasArrangement,
+    project,
+    gitBranches,
+    graph,
+    initialization: await workspaceInitialization.load(project)
+  }
 }
 
 async function getDefaultGraphForAgent(command: {

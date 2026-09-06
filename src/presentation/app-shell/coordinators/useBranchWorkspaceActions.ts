@@ -8,6 +8,7 @@ import type {
 import type { Translate } from '../../i18n/messages'
 import { useI18n } from '../../i18n/useI18n'
 import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
+import type { WorkspaceDefaults } from '../../../contexts/project/application/dto/WorkspaceInitializationDetails'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 
 interface UseBranchWorkspaceActionsInput {
@@ -249,14 +250,19 @@ export function useBranchWorkspaceActions({
   )
 
   const createBranchWorkspace = useCallback(
-    async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
+    async (
+      workbench: WorkbenchSnapshot,
+      branchName: string,
+      options?: { readonly requestId: string; readonly defaults?: WorkspaceDefaults }
+    ): Promise<WorkbenchSnapshot | undefined> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'create')
       const occurrenceId = beginActionAttempt(key)
 
       try {
         const createdWorkbench = await window.cleancode?.createBranchWorkspace({
           projectDirectory: workbench.project.directory,
-          branchName
+          branchName,
+          ...options
         })
 
         if (!isCurrentActionAttempt(key, occurrenceId)) return
@@ -268,6 +274,7 @@ export function useBranchWorkspaceActions({
         clearCurrentBlockSelection()
         replaceWorkbench(createdWorkbench)
         completeActionAttempt(key, occurrenceId)
+        return createdWorkbench
       } catch (error) {
         publishActionError({
           error,

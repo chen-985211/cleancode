@@ -334,10 +334,12 @@
 }
 
 .agent-settings-launch-editor > p {
-  margin: -2px 0 0;
-  color: var(--cc-muted);
-  font-size: 9.5px;
-  line-height: 1.45;
+  margin: 0;
+  max-width: 60ch;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .agent-settings-launch-editor__error {

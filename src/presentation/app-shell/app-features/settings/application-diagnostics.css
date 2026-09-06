@@ -21,9 +21,11 @@
 .application-diagnostics-action p,
 .application-diagnostics-pane__feedback {
   margin: 0;
-  color: var(--cc-muted);
+  max-width: 60ch;
+  color: var(--cc-muted-strong);
   font-size: 12px;
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .application-diagnostics-pane__privacy {

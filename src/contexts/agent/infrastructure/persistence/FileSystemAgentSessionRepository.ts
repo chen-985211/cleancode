@@ -4,6 +4,9 @@ import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 import type { AgentSessionRepository } from '../../application/ports/AgentSessionRepository'
+import type { AgentCreationRepository } from '../../application/ports/AgentCreationRepository'
+import { toWorkspaceAgentSnapshot } from '../../application/dto/WorkspaceAgentSnapshot'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   AgentWorkspaceInitializer,
   InitializeAgentWorkspaceCommand
@@ -16,18 +19,22 @@ import {
 import type { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
 
 interface AgentWorkspaceSnapshot {
+  readonly creations?: readonly {
+    readonly operationId: string
+    readonly agent: PersistedAgentSessionSnapshot
+  }[]
   readonly agents: readonly PersistedAgentSessionSnapshot[]
   readonly projectId: string
   readonly workspaceId: string
 }
 
 interface AgentSessionStore {
-  readonly version: 5
+  readonly version: 6
   readonly workspaces: readonly AgentWorkspaceSnapshot[]
 }
 
 export class FileSystemAgentSessionRepository
-  implements AgentSessionRepository, AgentWorkspaceInitializer
+  implements AgentSessionRepository, AgentWorkspaceInitializer, AgentCreationRepository
 {
   private saveQueue = Promise.resolve()
 
@@ -63,11 +70,38 @@ export class FileSystemAgentSessionRepository
     return workspace ? workspace.agents.map((snapshot) => this.hydrate(snapshot)) : null
   }
 
-  async save(session: AgentSession): Promise<void> {
+  async findCreation(projectId: string, workspaceId: string, operationId: string) {
+    const workspace = findWorkspace((await this.readStore()).workspaces, projectId, workspaceId)
+    const record = workspace?.creations?.find((candidate) => candidate.operationId === operationId)
+    return record ? toWorkspaceAgentSnapshot(this.hydrate(record.agent)) : null
+  }
+
+  async save(session: AgentSession, creationOperationId?: string): Promise<void> {
     const snapshot = this.validateSnapshot(session.toSnapshot())
     await this.update((workspaces) => {
       const existing = findWorkspace(workspaces, snapshot.projectId, snapshot.workspaceId)
+      const creations = [...(existing?.creations ?? [])]
+      if (creationOperationId) {
+        const receipt = creations.find((record) => record.operationId === creationOperationId)
+        if (receipt) {
+          if (
+            receipt.agent.agentId !== snapshot.agentId ||
+            receipt.agent.providerId !== snapshot.providerId
+          ) {
+            throw createExpectedAppError(
+              'AGENT_CREATION_CONFLICT',
+              'Agent creation receipt conflicts with the requested Agent.'
+            )
+          }
+          return workspaces
+        }
+        creations.push({
+          operationId: creationOperationId,
+          agent: { ...snapshot, providerSessionRef: null }
+        })
+      }
       return replaceWorkspace(workspaces, {
+        creations,
         agents: replaceAgentSnapshot(existing?.agents ?? [], snapshot),
         projectId: snapshot.projectId,
         workspaceId: snapshot.workspaceId
@@ -152,7 +186,7 @@ export class FileSystemAgentSessionRepository
       .catch(() => undefined)
       .then(async () => {
         const store = await this.readStore()
-        await this.writeStore({ version: 5, workspaces: updateWorkspaces(store.workspaces) })
+        await this.writeStore({ version: 6, workspaces: updateWorkspaces(store.workspaces) })
       })
 
     this.saveQueue = update
@@ -161,19 +195,21 @@ export class FileSystemAgentSessionRepository
 
   private async readStore(): Promise<AgentSessionStore> {
     try {
-      const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<AgentSessionStore>
+      const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<
+        Omit<AgentSessionStore, 'version'> & { readonly version: 5 | 6 }
+      >
 
-      if (parsed.version !== 5 || !Array.isArray(parsed.workspaces)) {
+      if ((parsed.version !== 5 && parsed.version !== 6) || !Array.isArray(parsed.workspaces)) {
         throw new Error('Persisted Agent session store is invalid.')
       }
 
       return this.validateStore({
-        version: 5,
+        version: 6,
         workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[]
       })
     } catch (error) {
       if (isMissingFileError(error)) {
-        return { version: 5, workspaces: [] }
+        return { version: 6, workspaces: [] }
       }
 
       throw error
@@ -190,9 +226,10 @@ export class FileSystemAgentSessionRepository
 
   private validateStore(store: AgentSessionStore): AgentSessionStore {
     return {
-      version: 5,
+      version: 6,
       workspaces: store.workspaces.map((workspace) => ({
         ...workspace,
+        creations: validateCreationRecords(workspace.creations ?? []),
         agents: workspace.agents.map((agent) => this.validateSnapshot(agent))
       }))
     }
@@ -219,6 +256,17 @@ function findWorkspace(
   return workspaces.find(
     (candidate) => candidate.projectId === projectId && candidate.workspaceId === workspaceId
   )
+}
+
+function validateCreationRecords(records: NonNullable<AgentWorkspaceSnapshot['creations']>) {
+  if (
+    !Array.isArray(records) ||
+    records.some((record) => !record.operationId?.trim() || !record.agent?.agentId?.trim()) ||
+    new Set(records.map((record) => record.operationId)).size !== records.length
+  ) {
+    throw new Error('Persisted Agent creation records are invalid.')
+  }
+  return records
 }
 
 function replaceWorkspace(

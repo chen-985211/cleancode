@@ -343,7 +343,7 @@ describe('branch workspace action notifications', () => {
       }
     )
 
-    let nextRun!: Promise<void>
+    let nextRun!: Promise<unknown>
     act(() => {
       nextRun = result.current.createBranchWorkspace(workbench, 'feature/newer')
     })

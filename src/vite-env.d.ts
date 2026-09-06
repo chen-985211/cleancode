@@ -51,6 +51,15 @@ import type {
 import type { InstantiateBlockTemplateResult } from './contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
+import type {
+  WorkspaceDefaults,
+  WorkspaceDefaultsResolution,
+  WorkspaceInitializationSnapshot,
+  WorkspaceInitializationDetails,
+  WorkspaceInitializationResult
+} from './contexts/project/application/dto/WorkspaceInitializationDetails'
+import type { InitializeWorkspaceContentCommand } from './contexts/project/application/use-cases/InitializeWorkspaceContentUseCase'
+import type { BeginEmptyCanvasInitializationCommand } from './contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalSourceTheme } from './contexts/run/domain/aggregates/TerminalSession'
 import type { TerminalRuntimeAvailabilitySnapshot } from './contexts/run/application/dto/TerminalRuntimeAvailability'
@@ -79,6 +88,7 @@ import type {
 } from './platform/ipc/applicationDiagnosticsChannels'
 
 interface WorkbenchSnapshot {
+  readonly initialization?: WorkspaceInitializationSnapshot | null
   readonly agents: readonly WorkspaceAgentSnapshot[]
   readonly canvasArrangement: CanvasArrangementSnapshot
   readonly isCurrentProject?: boolean
@@ -101,6 +111,27 @@ declare global {
       onWindowFullScreenStateChange(listener: (isFullScreen: boolean) => void): () => void
       onApplicationQuitRequested(listener: (request: ApplicationQuitRequest) => void): () => void
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
+      getWorkspaceDefaults(command: {
+        readonly projectDirectory: string
+      }): Promise<WorkspaceDefaultsResolution>
+      saveWorkspaceDefaults(command: {
+        readonly projectDirectory: string
+        readonly defaults: WorkspaceDefaults
+      }): Promise<WorkspaceDefaultsResolution>
+      cancelWorkspaceInitialization(command: {
+        readonly projectDirectory: string
+        readonly initializationId: string
+      }): Promise<void>
+      listWorkspaceInitializations(command: {
+        readonly projectDirectory: string
+        readonly workspaceId?: string
+      }): Promise<readonly WorkspaceInitializationDetails[]>
+      beginWorkspaceInitialization(
+        command: BeginEmptyCanvasInitializationCommand
+      ): Promise<WorkspaceInitializationDetails>
+      applyWorkspaceInitialization(
+        command: InitializeWorkspaceContentCommand
+      ): Promise<WorkspaceInitializationResult>
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
       reorderProject(command: {
@@ -108,6 +139,8 @@ declare global {
         readonly beforeProjectDirectory: string | null
       }): Promise<WorkbenchSnapshot[]>
       createBranchWorkspace(command: {
+        readonly requestId?: string
+        readonly defaults?: WorkspaceDefaults
         readonly projectDirectory: string
         readonly branchName: string
       }): Promise<WorkbenchSnapshot>

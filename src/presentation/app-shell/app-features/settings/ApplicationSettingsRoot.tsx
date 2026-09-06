@@ -6,6 +6,7 @@ import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix'
 import { KeyboardIcon } from '@phosphor-icons/react/dist/csr/Keyboard'
 import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour'
+import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
 import {
   useCallback,
@@ -55,6 +56,7 @@ import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarU
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 
 interface ApplicationSettingsRootProps {
+  readonly workspaceDefaultsSettings?: ReactNode
   readonly agentProviderPreferences?: AgentProviderPreferencesSnapshot
   readonly agentProviderPreferencesStatus?: 'loading' | 'ready' | 'unavailable'
   readonly bindings: ApplicationShortcutBindings
@@ -211,6 +213,15 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             </button>
             <button
               type="button"
+              data-selection-motion-option="workspace"
+              aria-current={activePane === 'workspace' ? 'page' : undefined}
+              onClick={() => setSelectedPane('workspace')}
+            >
+              <GitBranchIcon size={17} aria-hidden="true" />
+              <span>{t('settings.workspace.title')}</span>
+            </button>
+            <button
+              type="button"
               data-selection-motion-option="terminal"
               aria-current={activePane === 'terminal' ? 'page' : undefined}
               onClick={() => setSelectedPane('terminal')}
@@ -246,6 +257,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                   reduceVisualNoise={props.reduceVisualNoise}
                   onReduceVisualNoiseChange={props.onReduceVisualNoiseChange}
                 />
+              ) : activePane === 'workspace' ? (
+                props.workspaceDefaultsSettings
               ) : activePane === 'agents' ? (
                 <AgentSettingsPane
                   defaultProviderId={props.defaultAgentProviderId ?? null}
