@@ -20,9 +20,17 @@ describe('Codex owned native session', () => {
   ] as const)(
     'probes capabilities for %s and cleans up its TUI and server',
     async (version, supported) => {
-      const directory = await realpath(await mkdtemp(join(tmpdir(), 'cc native $&-')))
+      const directory = await realpath(await mkdtemp(join(tmpdir(), 'cc native 中文 $&-')))
       const report = join(directory, 'report')
-      const executable = join(directory, process.platform === 'win32' ? 'codex.cmd' : 'codex')
+      const executable = join(directory, process.platform === 'win32' ? 'codex-验证.cmd' : 'codex')
+      const nativeArgs = [
+        '--sandbox',
+        'read-only',
+        '-a',
+        'on-request',
+        '--add-dir',
+        join(directory, '协作目录')
+      ]
       const fixture = fileURLToPath(
         new URL('../../../fixtures/contexts/agent/codexNativeMessageCli.mjs', import.meta.url)
       )
@@ -47,7 +55,7 @@ describe('Codex owned native session', () => {
             wakeup = value
           }
         },
-        nativePlan: { executable, args: ['--sandbox', 'read-only', '-a', 'on-request'], env: {} },
+        nativePlan: { executable, args: nativeArgs, env: {} },
         serverArgs: ['-c', 'model_provider="custom"'],
         runtimeExecutable: process.execPath,
         runtimePlatform: process.platform,
@@ -85,9 +93,7 @@ describe('Codex owned native session', () => {
             .trim()
             .split('\n')
             .map((line) => JSON.parse(line))
-          expect(records).toMatchObject([
-            { kind: 'tui', args: ['--sandbox', 'read-only', '-a', 'on-request'] }
-          ])
+          expect(records).toMatchObject([{ kind: 'tui', args: nativeArgs }])
           await artifacts.dispose()
           await exited
           return
@@ -113,9 +119,7 @@ describe('Codex owned native session', () => {
         expect(
           records.every((record) => record.inherited === 'from-shell' && record.cwd === directory)
         ).toBe(true)
-        expect(records[1].args).toEqual(
-          expect.arrayContaining(['--sandbox', 'read-only', '-a', 'on-request', '--remote'])
-        )
+        expect(records[1].args).toEqual(expect.arrayContaining([...nativeArgs, '--remote']))
         expect(records[2].args).toEqual(
           expect.arrayContaining(['--thread', threadId, '--message', agentInboxWakeupPrompt])
         )

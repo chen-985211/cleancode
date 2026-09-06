@@ -36,7 +36,7 @@ const invocation = args => {
   const argsPath = join(directory, 'argv-' + (++invocationId) + '.json');
   writeFileSync(argsPath, JSON.stringify({executable:config.executable,args}), {mode:0o600});
   const script = '$ErrorActionPreference="Stop"\n$spec=Get-Content -LiteralPath (' + decode(argsPath) +
-    ') -Raw | ConvertFrom-Json\n$cli=$spec.executable\n$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
+    ') -Raw -Encoding UTF8 | ConvertFrom-Json\n$cli=$spec.executable\n$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
   return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive',
     '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], argsPath };
 };

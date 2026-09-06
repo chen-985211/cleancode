@@ -50,8 +50,12 @@ export const CleanCodeOpenCodeReporterPlugin = async ({client,directory}) => {
           if (messages.error || !Array.isArray(messages.data)) return 503;
           const previous = messages.data.findLast(message => message.info?.role === 'user')?.info;
           if (closed || target !== activeSession) return 409;
+          // Newer messages nest variant in model; the prompt API still takes it separately.
+          const model = previous?.model;
           const body = {parts:[{type:'text',text:input.reminder}],
-            ...(previous ? {agent:previous.agent,model:previous.model,variant:previous.variant} : {})};
+            ...(previous ? {agent:previous.agent,
+              model:model && {providerID:model.providerID,modelID:model.modelID},
+              variant:model?.variant ?? previous.variant} : {})};
           const result = await client.session.promptAsync({path:{id:target},query:{directory},body,signal:lifetime.signal});
           if (result.error || (result.response && !result.response.ok)) return 503;
           accepted.add(key);
