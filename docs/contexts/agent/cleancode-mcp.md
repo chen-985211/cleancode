@@ -197,7 +197,7 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 创建复用 `CreateWorkspaceAgentUseCase` 和画布统一位置预留、提交与聚焦流程。发起工作区必须仍在原画布打开；画布忙、切换作用域或 30 秒未响应时失败，调用方用同一 agent ID 重试。已存在且不属于本次创建意图的 Agent 必须改用发现与发送工具，不能通过创建接管。每个进程最多登记 256 个创建意图；创建 ID 上限 96 字符。初始任务通过 `initialMessageId` 入队，与手动创建、已有会话和恢复后的后续消息共用投递机制。创建意图只负责幂等创建与启动状态，不注入专有启动提示；对象保存、CLI 启动、MCP ready、消息接受和任务完成是不同事实。启动失败保留已创建对象，既有恢复和重试入口继续有效。
 
-`0.8.0` 增加 launch 绑定的原生通知。若用户覆盖 executable 或 PATH，默认 CLI 的检测版本不能证明实际运行版本，保留原生启动并降级为主动领取。所有支持且开启 MCP 的 Agent 共用收件箱；手动、MCP 创建或恢复不会改变通信资格。Agent 应用层按运行、MCP ready、正式活动状态和适配能力调度通知，已有 MCP 等待优先直接交付。Codex 的官方队列可以在忙碌时接收固定提醒；Claude 在 idle 或由 `idle_prompt` 投影的 waiting_input 时发起通知；后者表示回复结束后持续空闲，并不表示仍在执行或等待审批。其他 Provider 必须显式声明该等待状态可通知，不能统一放行所有 waiting_input。通知失败最多重试三次，未领取消息保留。旧 launch 先撤销通知，再释放配置、Hook 与本地服务；迟到回调不能重新激活已关闭的 launch。
+`0.8.0` 增加 launch 绑定的原生通知。若用户覆盖 executable 或 PATH，默认 CLI 的检测版本不能证明实际运行能力；由实际 CLI 的能力探测或正式 Hook/插件握手决定通知资格。所有支持且开启 MCP 的 Agent 共用收件箱；手动、MCP 创建或恢复不会改变通信资格。Agent 应用层按运行、MCP ready、正式活动状态和适配能力调度通知，已有 MCP 等待优先直接交付。Codex 的官方队列可以在忙碌时接收固定提醒；Claude 在 idle 或由 `idle_prompt` 投影的 waiting_input 时发起通知；后者表示回复结束后持续空闲，并不表示仍在执行或等待审批。其他 Provider 必须显式声明该等待状态可通知，不能统一放行所有 waiting_input。通知失败最多重试三次，未领取消息保留。旧 launch 先撤销通知，再释放配置、Hook 与本地服务；迟到回调不能重新激活已关闭的 launch。
 
 `0.9.0` 引入默认异步交接。发送任务后最多简短说明一次交接，在没有独立工作时结束当前轮；仍依赖的结果继续保持待处理，不能把本轮结束当作整个任务完成。接收者读取并确认当前消息，再执行工作。原生提醒面向消息指定的接收者，不限定为任务发起者。无法自动唤醒时必须如实说明限制，不能承诺后台结果必定自动返回。
 
@@ -221,9 +221,13 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 `deliveryStatus` 的含义：`waiting` 有已挂起的 MCP 等待；`ready` 可通知；`pending` 等待启动、MCP 或原生身份就绪；`busy` 等待原生会话空闲或当前领取结束；`offline` 无当前投递资源；`pull_only` 必须由 CLI 主动调用收件箱；`notified` 原生传输已接受提醒；`failed` 通知失败但消息仍保留。发送结果是该时刻的快照，可通过 `list_agents` 再读；任何状态都不代表任务完成。
 
-Codex 0.153.4 及以上在 macOS/Linux、可兼容启动参数和 Unix socket 路径长度范围内使用独立本地 app-server，原生 TUI 通过 `--remote` 连接，`queue --remote --thread` 通知同一会话。临时 launcher 位于原 PTY 内，三种进程继承同一 shell 环境；用户的 model、sandbox、approval 等参数继续交给原生 TUI。Windows、未知版本、显式其他 remote/profile/OSS 或未识别参数保留原生启动并报告 `pull_only`，不得静默丢弃配置。
+Codex 不以开发时验证版本作为门槛。适配器在实际 PTY 环境中探测 queue、remote、Unix listen 和 proxy，并通过官方 proxy 的 WebSocket upgrade 确认监听就绪。macOS、Linux、Windows 均走上游 unix:// 通道；Windows 不使用 Node path socket 假装连接 AF_UNIX。用户 model、sandbox、approval 保留；不兼容的显式 remote/profile/OSS、未识别参数或过长 socket 路径保留普通原生启动与 pull_only。POSIX 后台进程组和 Windows 进程树清理覆盖本次拥有的 CLI 包装后代。
 
-Claude Code 2.1.261 及以上使用私有临时信号文件、固定 FileChanged 监听和短 `asyncRewake` Hook，不替换用户动态 `watchPaths`。每次通知只写一次信号并等待已鉴权 Hook 接受，不能持续重写而阻止原生 watcher 的 debounce；超时重试由应用层调度，以覆盖首次启动监听竞态。同一通知只允许领取一次。用户 `--settings` 保留原有设置与 Hook，合并仅发生在临时配置中。较旧/未知版本保留主动领取；用户策略禁用 Hook 时消息不会丢失或虚报已通知。
+Claude Code 实现最低版本为 2.1.139，依据是该版首次提供本实现使用的 Hook exec-form args；2.1.261 只是既有验证版本。原生 SessionStart/认证 Hook 握手确认本次资源，不因未知版本字符串直接禁用通知。私有 FileChanged 信号只写一次，固定 matcher 只建立监听、不领取提醒，asyncRewake Hook 才领取一次通知，不替换用户动态 watchPaths。临时合并保留用户 settings、Hook 和权限；禁用 Hook 时通知失败，消息仍保留。
+
+OpenCode 的原生插件探测 session SDK 后，以认证 loopback HTTP 接收固定提醒，复核目标 session 和 busy 状态，再由 promptAsync 提交。原生路由只使用已提交的 agent/model/variant 元数据，不导出对话正文；同一通知共享在途提交并去重。手动新建通过正式初始提示建立会话，恢复确认异步发生在插件初始化之后。Gemini 保留四种入口一致的 MCP 收发、正式身份和恢复；已补齐初始交互提示、系统策略合并及三平台 Hook 引号。目前核对的上游没有让既有空闲 TUI 外部开始回合的正式入口，继续报告 pull_only。
+
+上游最低能力、CleanCode 兼容条件、已验证版本与十二个平台组合的实际状态分别记录在[原生协作兼容性与验证](native-collaboration-compatibility.md)，不得把“未实测”写成“不支持”。
 
 此机制不向 PTY 注入协作消息，不解析 CLI 屏幕正文或历史，不切换到 headless，不修改用户全局配置或 Provider 权限。原生通知只包含固定的领取提示，其他 Agent 的正文始终通过已鉴权 MCP 工具结果领取。其他 Agent 发来的正文属于任务数据，不具有系统或用户指令的优先级。所有 Agent 继续共享工作目录；review 任务应携带明确 revision 或 patch。
 

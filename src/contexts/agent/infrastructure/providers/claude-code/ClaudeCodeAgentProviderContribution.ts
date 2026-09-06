@@ -19,10 +19,7 @@ import {
 import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
 import { claudeCodeProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
-import {
-  NodeAgentProviderCliDetector,
-  supportsAgentProviderVersion
-} from '../shared/NodeAgentProviderCliDetector'
+import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import { ClaudeCodeHookReporter } from './ClaudeCodeHookReporter'
 import { ClaudeCodeInboxSignal } from './ClaudeCodeInboxSignal'
@@ -35,7 +32,9 @@ export const claudeCodeInstallCommands = {
   windows:
     'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"'
 } as const
-const minimumClaudeCodeVersion = '2.1.119'
+// Exec-form hook argv was introduced in 2.1.139 (upstream CHANGELOG).
+// FileChanged dates to 2.1.83; 2.1.261 was a validation version, not a feature boundary.
+const minimumClaudeCodeVersion = '2.1.139'
 
 export interface ClaudeCodeAgentProviderContributionOptions {
   readonly baseArgs?: readonly string[]
@@ -163,10 +162,9 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
   constructor(private readonly runtimeExecutable: string) {}
 
   async prepare(command: CreateAgentLaunchPlanCommand) {
-    const inbox =
-      command.messageDelivery && supportsAgentProviderVersion(command.providerVersion, '2.1.261')
-        ? command.artifacts.track('claude-inbox-signal', await ClaudeCodeInboxSignal.create())
-        : undefined
+    const inbox = command.messageDelivery
+      ? command.artifacts.track('claude-inbox-signal', await ClaudeCodeInboxSignal.create())
+      : undefined
     if (!inbox) command.messageDelivery?.(null)
     const reporter = await ClaudeCodeHookReporter.start({
       onFileChanged: (path) => inbox?.claim(path),
@@ -279,7 +277,11 @@ function createClaudeHooks(command: string, args: readonly string[], signalPath?
     ...(signalPath
       ? {
           FileChanged: [
-            { matcher: signalPath, ...handler },
+            // Seeding the fixed watch list must not claim the async hook's notification.
+            {
+              matcher: signalPath,
+              hooks: [{ args: [...args, '--watch-only'], command, type: 'command' }]
+            },
             { hooks: [{ args, command, type: 'command', asyncRewake: true, timeout: 5 }] }
           ]
         }
@@ -295,6 +297,7 @@ function createClaudeHooks(command: string, args: readonly string[], signalPath?
 }
 
 const claudeHookRelayScript = [
+  'if(process.argv.includes("--watch-only"))process.exit(0);',
   "let body='';",
   'for await (const chunk of process.stdin) body+=chunk;',
   'const response=await fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL,{',

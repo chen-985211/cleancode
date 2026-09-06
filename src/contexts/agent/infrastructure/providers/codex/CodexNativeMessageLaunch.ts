@@ -9,7 +9,6 @@ import type {
   CreateAgentLaunchPlanCommand
 } from '../../../application/ports/AgentProviderContribution'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
-import { supportsAgentProviderVersion } from '../shared/NodeAgentProviderCliDetector'
 import { codexNativeMessageRelay } from './CodexNativeMessageRelay'
 
 /** Unrecognized options retain the ordinary TUI: never silently drop user configuration. */
@@ -52,11 +51,7 @@ export async function prepareCodexNativeMessageLaunch(input: {
 }): Promise<AgentLaunchPlan> {
   const { command, nativePlan } = input
   if (!command.messageDelivery) return nativePlan
-  if (
-    !input.serverArgs ||
-    input.runtimePlatform === 'win32' ||
-    !supportsAgentProviderVersion(command.providerVersion, '0.153.4')
-  ) {
+  if (!input.serverArgs) {
     command.messageDelivery(null)
     return nativePlan
   }
@@ -79,8 +74,10 @@ export async function prepareCodexNativeMessageLaunch(input: {
     command.messageDelivery(null)
     return nativePlan
   }
+  const observer: { readiness?: ReturnType<typeof watch> } = {}
   let closed = false
   let threadId: string | undefined
+  let supported = false
   let pending: Promise<void> | undefined
   const send = async (request: unknown): Promise<void> => {
     const temporary = join(directory, `request-${randomUUID()}`)
@@ -90,6 +87,7 @@ export async function prepareCodexNativeMessageLaunch(input: {
   command.artifacts.track('codex-native-session', {
     async dispose() {
       closed = true
+      observer.readiness?.close()
       await pending?.catch(() => undefined)
       if (
         (await exists(join(directory, 'started'))) &&
@@ -109,10 +107,16 @@ export async function prepareCodexNativeMessageLaunch(input: {
   command.artifacts.track('codex-native-relay', relay)
   const wakeup = {
     canQueueWhileBusy: true,
-    notify({ signal }: { signal: AbortSignal }): Promise<void> {
+    notify({
+      notificationId,
+      signal
+    }: {
+      notificationId: string
+      signal: AbortSignal
+    }): Promise<void> {
       if (closed || signal.aborted || !threadId)
         return Promise.reject(new Error('Codex native session unavailable.'))
-      const id = randomUUID()
+      const id = threadId + ':' + notificationId
       const operation = (async () => {
         const acknowledged = waitForFile(
           directory,
@@ -143,10 +147,29 @@ export async function prepareCodexNativeMessageLaunch(input: {
       return operation
     }
   }
+  // Probe the executable resolved inside the actual PTY environment, including overrides.
+  // A detector's version string cannot establish which CLI that shell will run.
+  const observeReadiness = async (): Promise<void> => {
+    try {
+      const status = JSON.parse(await readFile(join(directory, 'capability'), 'utf8'))
+      if (closed) return
+      supported = status.supported === true
+      if (!supported) command.messageDelivery?.(null)
+      else if (threadId) command.messageDelivery?.(wakeup)
+    } catch {
+      // The relay publishes the capability file atomically after its bounded probe.
+    }
+  }
+  observer.readiness = watch(directory, (_event, name) => {
+    if (name === 'capability') void observeReadiness()
+  })
+  observer.readiness.on('error', () => {
+    if (!closed) command.messageDelivery?.(null)
+  })
   input.bindIdentity((id) => {
     if (closed) return
     threadId = id
-    command.messageDelivery?.(wakeup)
+    if (supported) command.messageDelivery?.(wakeup)
   })
   return {
     ...nativePlan,

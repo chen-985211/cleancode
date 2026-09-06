@@ -66,14 +66,13 @@ describe('Agent Provider CLI detector', () => {
     })
   })
 
-  it('requires parseable semantic output when a minimum version is declared', async () => {
+  it('leaves a custom build available for launch-time capability checks', async () => {
     const detector = createCodexDetector(createCommandRunner('development build\n'), '0.143.0')
 
     await expect(detector.inspect()).resolves.toEqual({
       providerId: 'codex',
-      reason: 'invalid_output',
-      status: 'temporarily_unavailable',
-      version: null
+      status: 'installed',
+      version: 'development build'
     })
   })
 })

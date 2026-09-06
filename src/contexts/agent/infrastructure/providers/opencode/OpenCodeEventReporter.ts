@@ -27,6 +27,8 @@ export class OpenCodeEventReporter implements AgentRuntimeArtifact {
   ) {}
 
   static async start(input: {
+    readonly onNativeMessageUnavailable?: () => void
+    readonly onNativeMessageEndpoint?: (url: string, token: string) => void
     readonly expectedSessionId?: string
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
     readonly onSessionIdentified: (
@@ -65,6 +67,17 @@ export class OpenCodeEventReporter implements AgentRuntimeArtifact {
         if (payload) {
           try {
             await acceptPayload(payload, expectedDirectory, state, input)
+            if (
+              payload.event.type === 'cleancode.delivery.unavailable' &&
+              (await resolveRealPath(payload.directory)) === expectedDirectory
+            )
+              input.onNativeMessageUnavailable?.()
+            if (
+              payload.event.type === 'cleancode.delivery.register' &&
+              (await resolveRealPath(payload.directory)) === expectedDirectory &&
+              typeof payload.event.properties.url === 'string'
+            )
+              input.onNativeMessageEndpoint?.(payload.event.properties.url, token)
           } catch {
             // Provider telemetry must never affect the OpenCode event loop.
           }
@@ -101,6 +114,7 @@ export class OpenCodeEventReporter implements AgentRuntimeArtifact {
         return
       }
       this.server.close(() => resolveClosed())
+      this.server.closeAllConnections()
     }).then(() => {
       this.disposed = true
     })
@@ -118,7 +132,7 @@ function createReporterState(expectedSessionId: string | undefined): ReporterSta
   const activeSessionId = isOpenCodeSessionId(expectedSessionId) ? expectedSessionId : null
   return {
     activeSessionId,
-    lastReportedSessionId: activeSessionId
+    lastReportedSessionId: null
   }
 }
 

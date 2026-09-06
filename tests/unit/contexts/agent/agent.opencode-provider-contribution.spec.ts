@@ -51,6 +51,8 @@ describe('OpenCode Agent Provider contribution', () => {
     try {
       expect(contribution.descriptor.capabilities).toEqual({
         activityTracking: true,
+        nativeMessages: true,
+        initialPrompt: true,
         cleancodeMcp: true,
         launchInstructions: true,
         resume: true,

@@ -169,6 +169,11 @@ if (args.includes('--version')) {
   process.exit(0)
 }
 
+if (args.includes('--help')) {
+  process.stdout.write('Simulated CLI without native queue transport\\n')
+  process.exit(0)
+}
+
 if (args.includes('app-server')) {
   report('app-server')
   let protocolInput = ''
