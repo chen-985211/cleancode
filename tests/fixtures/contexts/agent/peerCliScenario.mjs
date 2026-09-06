@@ -66,7 +66,7 @@ export async function runPeerScenario(providerId, args) {
           initialTask: 'Review fixture revision abc and report the result.'
         })
       }
-      const reply = await call('wait_agent_message', { replyToMessageId: created.initialMessageId })
+      const reply = await call('wait_agent_message', { replyToMessageId: created.initialMessageId, timeoutMs: 30_000 })
       if (reply.result.status !== 'message') throw new Error('Peer did not reply.')
       await call('wait_agent_message', {
         acknowledgeMessageId: reply.result.message.messageId,
@@ -84,7 +84,7 @@ export async function runPeerScenario(providerId, args) {
     } else {
       // These legacy-version fixtures exercise the common MCP pull protocol.
       // Native wakeup transports are verified by the Provider integration tests.
-      const received = await call('wait_agent_message', {})
+      const received = await call('wait_agent_message', { timeoutMs: 30_000 })
       if (received.result.status !== 'message') throw new Error('No initial task was delivered.')
       const task = received.result.message
       await call('send_agent_message', {

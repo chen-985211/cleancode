@@ -10,69 +10,91 @@ import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/ap
 import { AgentMessageMailbox } from '../../../../src/contexts/agent/application/services/AgentMessageMailbox'
 
 describe('Agent session tool lifecycle', () => {
-  it('registers native inbox delivery for ordinary attach and revokes it when the launch exits', async () => {
-    const mailbox = new AgentMessageMailbox()
-    const terminal = new RecordingAgentTerminalRuntime()
-    const providers = new RecordingAgentProviderRegistry('codex', {
-      activityTracking: true,
-      nativeMessages: true
-    })
-    const notify = vi.fn(async () => undefined)
-    const createPlan = providers.contribution.launcher.createLaunchPlan
-    providers.contribution.launcher.createLaunchPlan = async (command) => {
-      command.messageDelivery?.({ notify })
-      return createPlan(command)
-    }
-    let initialize!: () => void
-    const mcp = createMcpServer()
-    const register = mcp.registerSession.bind(mcp)
-    mcp.registerSession = async (command) => {
-      initialize = command.onInitialized!
-      return register(command)
-    }
-    const service = new AgentSessionService(
-      terminal,
-      mcp,
-      { cancel: vi.fn(), execute: vi.fn(async () => completedResult('done')) },
-      createSessionRepository(),
-      providers,
-      'codex',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      mailbox
-    )
-    const session = await service.attach(attachCommand())
-    const identity = { ...attachCommand(), sessionId: session.sessionId }
-    mailbox.send(
-      { ...identity, agentId: 'writer' },
-      {
-        messageId: 'review',
-        toAgentId: identity.agentId,
-        text: 'Review',
-        kind: 'task'
+  it.each(['idle', 'completed'])(
+    'releases an inbox read on %s and revokes delivery when the launch exits',
+    async (boundary) => {
+      const mailbox = new AgentMessageMailbox()
+      const terminal = new RecordingAgentTerminalRuntime()
+      const providers = new RecordingAgentProviderRegistry('codex', {
+        activityTracking: true,
+        nativeMessages: true
+      })
+      const notify = vi.fn(async () => undefined)
+      const createPlan = providers.contribution.launcher.createLaunchPlan
+      providers.contribution.launcher.createLaunchPlan = async (command) => {
+        command.messageDelivery?.({ notify })
+        return createPlan(command)
       }
-    )
-    expect(notify).not.toHaveBeenCalled()
-    initialize()
-    await vi.waitFor(() => expect(notify).toHaveBeenCalledOnce())
-    expect(terminal.writes).toEqual([])
+      let initialize!: () => void
+      const mcp = createMcpServer()
+      const register = mcp.registerSession.bind(mcp)
+      mcp.registerSession = async (command) => {
+        initialize = command.onInitialized!
+        return register(command)
+      }
+      const service = new AgentSessionService(
+        terminal,
+        mcp,
+        { cancel: vi.fn(), execute: vi.fn(async () => completedResult('done')) },
+        createSessionRepository(),
+        providers,
+        'codex',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        mailbox
+      )
+      const session = await service.attach(attachCommand())
+      const identity = { ...attachCommand(), sessionId: session.sessionId }
+      mailbox.send(
+        { ...identity, agentId: 'writer' },
+        {
+          messageId: 'review',
+          toAgentId: identity.agentId,
+          text: 'Review',
+          kind: 'task'
+        }
+      )
+      expect(notify).not.toHaveBeenCalled()
+      initialize()
+      await vi.waitFor(() => expect(notify).toHaveBeenCalledOnce())
+      expect(terminal.writes).toEqual([])
 
-    terminal.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
-    expect(mailbox.deliveryStatus(identity)).toBe('offline')
-    mailbox.send(
-      { ...identity, agentId: 'writer' },
-      {
-        messageId: 'next-review',
-        toAgentId: identity.agentId,
-        text: 'Review again',
-        kind: 'task'
-      }
-    )
-    await service.disposeAll()
-    expect(notify).toHaveBeenCalledOnce()
-  })
+      await mailbox.wait(identity, {})
+      mailbox.send(
+        { ...identity, agentId: 'writer' },
+        {
+          messageId: 'during-review',
+          toAgentId: identity.agentId,
+          text: 'Review next revision',
+          kind: 'task'
+        }
+      )
+      expect(notify).toHaveBeenCalledOnce()
+      const callbacks = providers.launchCommands[0]!
+      if (boundary === 'idle') {
+        callbacks.onActivityChanged?.('working')
+        callbacks.onActivityChanged?.('idle')
+      } else callbacks.onTurnCompleted?.()
+      await vi.waitFor(() => expect(notify).toHaveBeenCalledTimes(2))
+
+      terminal.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+      callbacks.onTurnCompleted?.()
+      expect(mailbox.deliveryStatus(identity)).toBe('offline')
+      mailbox.send(
+        { ...identity, agentId: 'writer' },
+        {
+          messageId: 'next-review',
+          toAgentId: identity.agentId,
+          text: 'Review again',
+          kind: 'task'
+        }
+      )
+      await service.disposeAll()
+      expect(notify).toHaveBeenCalledTimes(2)
+    }
+  )
 
   it('closes the endpoint, rejects new calls, and drains an admitted write before disposal', async () => {
     let finishWrite: (result: AgentToolExecutionResult) => void = () => undefined

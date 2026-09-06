@@ -27,7 +27,7 @@ export interface WaitAgentMessageInput {
 
 export type AgentMessageWaitResult =
   | { readonly status: 'message'; readonly message: AgentMessage }
-  | { readonly status: 'timeout' | 'canceled' }
+  | { readonly status: 'empty' | 'timeout' | 'canceled' }
 
 interface MessageWaiter {
   readonly sessionId: string
@@ -83,13 +83,18 @@ export class AgentMessageMailbox {
       )
     }
     if (signal?.aborted) return Promise.resolve({ status: 'canceled' })
-    const timeoutMs = input.timeoutMs ?? 30_000
-    if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 45_000) {
+    const requestedTimeoutMs = input.timeoutMs ?? 0
+    if (
+      !Number.isInteger(requestedTimeoutMs) ||
+      requestedTimeoutMs < 0 ||
+      requestedTimeoutMs > 45_000
+    ) {
       throw createExpectedAppError(
         'AGENT_TOOL_INPUT_INVALID',
         'Message wait timeout must be between 0 and 45000 ms.'
       )
     }
+    const timeoutMs = this.deliveries.get(key)?.hasNativeWakeup ? 0 : requestedTimeoutMs
     const log = this.log(caller)
     if (input.acknowledgeMessageId) log.acknowledge(caller.agentId, input.acknowledgeMessageId)
     const next = () => log.next(caller.agentId, input.replyToMessageId)
@@ -98,7 +103,10 @@ export class AgentMessageMailbox {
       this.deliveries.get(key)?.markReceived(available.messageId)
       return Promise.resolve({ message: available, status: 'message' })
     }
-    if (timeoutMs === 0) return Promise.resolve({ status: 'timeout' })
+    if (timeoutMs === 0) {
+      if (!input.replyToMessageId) this.deliveries.get(key)?.completeRead()
+      return Promise.resolve({ status: 'empty' })
+    }
     return new Promise((resolve) => {
       const finish = (result: AgentMessageWaitResult) => {
         clearTimeout(timer)

@@ -9,7 +9,8 @@ import type {
 export class AgentInboxDelivery implements AgentMessageDeliveryLease {
   private wakeup?: AgentMessageWakeupPort | null
   private readonly received = new Set<string>()
-  private readonly notified = new Set<string>()
+  private notification?: { readonly cancellation: AbortController; accepted: boolean }
+  private reading = false
   private readonly cancellation = new AbortController()
   private pending?: Promise<void>
   private retry?: ReturnType<typeof setTimeout>
@@ -32,9 +33,13 @@ export class AgentInboxDelivery implements AgentMessageDeliveryLease {
     if (!state.running || !state.mcpReady || !this.wakeup) return 'pending'
     if (!canNotify(this.wakeup, state.activity)) return 'busy'
     if (this.failed) return 'failed'
-    return this.pendingIds().some((id) => this.notified.has(id) && !this.received.has(id))
-      ? 'notified'
-      : 'ready'
+    if (this.notification?.accepted) return 'notified'
+    if (this.pending) return 'pending'
+    return this.reading ? 'busy' : 'ready'
+  }
+
+  get hasNativeWakeup(): boolean {
+    return !!this.wakeup && !this.cancellation.signal.aborted
   }
 
   setWakeup(wakeup: AgentMessageWakeupPort | null): void {
@@ -45,11 +50,35 @@ export class AgentInboxDelivery implements AgentMessageDeliveryLease {
 
   markReceived(messageId: string): void {
     this.received.add(messageId)
+    this.reading = true
+  }
+
+  /** Only an unfiltered empty read or a formal turn boundary ends an inbox drain. */
+  completeRead(): void {
+    this.reading = false
+    this.notification?.cancellation.abort()
+    this.notification = undefined
+    clearTimeout(this.retry)
+    this.retry = undefined
+    this.failed = false
+    this.failures = 0
     this.refresh()
   }
 
+  completeTurn(): void {
+    // A completion from the turn preceding a queued reminder must not revoke it.
+    if (this.reading) this.completeRead()
+  }
+
   refresh(): void {
-    if (this.cancellation.signal.aborted || this.pending || this.isWaiting()) return
+    if (
+      this.cancellation.signal.aborted ||
+      this.pending ||
+      this.notification ||
+      this.reading ||
+      this.isWaiting()
+    )
+      return
     const state = this.state()
     if (
       !state.running ||
@@ -58,7 +87,7 @@ export class AgentInboxDelivery implements AgentMessageDeliveryLease {
       !canNotify(this.wakeup, state.activity)
     )
       return
-    const ids = this.pendingIds().filter((id) => !this.received.has(id) && !this.notified.has(id))
+    const ids = this.pendingIds().filter((id) => !this.received.has(id))
     if (this.failures >= 3 && ids.some((id) => !this.attemptedIds.has(id))) {
       this.failures = 0
       this.failed = false
@@ -66,23 +95,26 @@ export class AgentInboxDelivery implements AgentMessageDeliveryLease {
     if (!ids.length || this.retry || this.failures >= 3) return
     this.attemptedIds = new Set(ids)
     const wakeup = this.wakeup
+    const notification = { cancellation: new AbortController(), accepted: false }
+    this.notification = notification
+    const signal = AbortSignal.any([this.cancellation.signal, notification.cancellation.signal])
     this.pending = Promise.resolve()
       .then(async () => {
         const current = this.state()
-        if (this.cancellation.signal.aborted || !current.running || !current.mcpReady) return false
+        if (signal.aborted || !current.running || !current.mcpReady) return false
         if (!canNotify(wakeup, current.activity)) return false
         if (this.isWaiting() || ids.every((id) => this.received.has(id))) return false
-        await wakeup.notify({ notificationId: ids[0]!, signal: this.cancellation.signal })
+        await wakeup.notify({ notificationId: ids[0]!, signal })
         return true
       })
       .then((accepted) => {
-        if (!accepted || this.cancellation.signal.aborted) return
-        for (const id of ids) this.notified.add(id)
+        if (!accepted || signal.aborted || this.notification !== notification) return
+        notification.accepted = true
         this.failed = false
         this.failures = 0
       })
       .catch(() => {
-        if (this.cancellation.signal.aborted) return
+        if (signal.aborted) return
         this.failed = true
         this.failures++
         if (this.failures < 3) {
@@ -94,6 +126,8 @@ export class AgentInboxDelivery implements AgentMessageDeliveryLease {
         }
       })
       .finally(() => {
+        if (this.notification === notification && !notification.accepted)
+          this.notification = undefined
         this.pending = undefined
         if (!this.failed) this.refresh()
       })

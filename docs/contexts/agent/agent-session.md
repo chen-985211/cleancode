@@ -103,6 +103,8 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 
 原生消息通知由 `nativeMessages` capability 声明适配能力，但实际可用性按本次 CLI 版本、平台、启动参数与正式就绪信号决定。Agent 应用层为每个 launch 建立独立收件箱投递 lease；手动 attach、MCP 创建及恢复共用该机制。launch 替换、退出、MCP 撤销时先同步关闭 lease，再等待原生通知取消与 LIFO 资源清理。通知成功不改变消息确认事实，也不代表任务完成。Codex 的临时原生 launcher 在既有 PTY 中启动同环境的 TUI 与独立 app-server，并通过官方队列通知；Claude 使用不覆盖动态 watchPaths 的临时 FileChanged Hook。版本、兼容性降级和投递状态由[原生 MCP](cleancode-mcp.md)维护。
 
+收件箱投递的领取过程在无过滤空读取或当前 launch 的正式完成/idle 回调后释放；前一轮无关任务的完成不能重复排队尚未领取的通知。该调度资源属于 Agent 应用层，不改变下述工作区和会话身份。
+
 ## 工作区身份与 Git 元数据
 
 - Agent 画布身份遵循 `projectId + workspaceId + agent + agentId`，其中对象类型使用 Shared Kernel 的规范值。

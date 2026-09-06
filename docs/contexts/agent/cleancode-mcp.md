@@ -115,7 +115,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 - MCP `protocolVersion`：`2025-06-18`。
 - Server 名称：`cleancode-agent-tools`。
-- Server 版本：`0.8.0`。
+- Server 版本：`0.9.0`。
 - Capability：`tools`，且 `listChanged` 为 `false`。
 
 当前只处理以下方法：
@@ -185,11 +185,11 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 | `list_agent_providers` | 无输入；返回已安装、未禁用且支持 MCP 的 Provider；自动唤醒由本次 launch 能力决定                                 |
 | `create_agent`         | `agentId`、`providerId`、`initialTask`；返回已创建 ID、Provider、`initialMessageId`、启动状态和 `deliveryStatus` |
 | `send_agent_message`   | `messageId`、`toAgentId`、`kind`、`text`，可选 `replyToMessageId`；返回已接受的消息和 `deliveryStatus`           |
-| `wait_agent_message`   | 可选 `acknowledgeMessageId`、`replyToMessageId`、`timeoutMs`；返回消息、超时或取消                               |
+| `wait_agent_message`   | 可选 `acknowledgeMessageId`、`replyToMessageId`、`timeoutMs`；返回消息、空收件箱、超时或取消                     |
 
 消息种类为 task、question、progress、result。回复只能回给一条发给自己的消息的发送者。相同 message ID 与相同内容重试复用原消息，不重复投递；改写内容或冒用其他发送者的 ID 会失败。接收方接受消息后在下一次等待中明确确认，未确认消息可以再次读取。该语义保证至少一次交付，不保证任务只执行一次；Agent 应按 message ID 避免重复副作用。确认不表示任务成功，任务完成通过关联的 result 消息表达。
 
-`AgentMessageLog` 拥有消息身份、回复关系和确认规则，`AgentMessageMailbox` 拥有进程内工作区收件箱与等待资源。默认等待 30 秒，可设置 0–45 秒；超时后由仍需协作的 CLI 再次调用。一个 Agent 同时只允许一个等待。HTTP 断开、MCP 取消通知、关闭能力、CLI 退出或应用清理必须解除等待并移除监听器和计时器，不能消费未确认消息。等待不占用工作区图修改队列，发送与短调用仍串行进入应用层。
+`AgentMessageLog` 拥有消息身份、回复关系和确认规则，`AgentMessageMailbox` 拥有进程内工作区收件箱与等待资源。默认立即读取（`timeoutMs: 0`），没有消息返回 `empty`。已经注册原生唤醒适配器的会话即使请求正数 timeout 也立即返回；无法原生唤醒的会话可以在用户明确要求同步等待时显式设置 1–45 秒，实际等待到期才返回 `timeout`，不得默认循环轮询。一个 Agent 同时只允许一个等待。HTTP 断开、MCP 取消通知、关闭能力、CLI 退出或应用清理必须解除等待并移除监听器和计时器，不能消费未确认消息。等待不占用工作区图修改队列，发送与短调用仍串行进入应用层。
 
 消息正文上限 32768 字符，message ID 上限 128 字符；每个工作区每个应用进程最多保留 4096 条消息，包括用于去重的已确认记录。达到容量明确失败。消息、去重记录、创建意图与等待不跨应用重启恢复；审计只保存协作路由元数据，不保存任务、回复或初始提示正文。
 
@@ -197,7 +197,11 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 `0.8.0` 增加 launch 绑定的原生通知。若用户覆盖 executable 或 PATH，默认 CLI 的检测版本不能证明实际运行版本，保留原生启动并降级为主动领取。所有支持且开启 MCP 的 Agent 共用收件箱；手动、MCP 创建或恢复不会改变通信资格。Agent 应用层按运行、MCP ready、正式活动状态和适配能力调度通知，已有 MCP 等待优先直接交付。Codex 的官方队列可以在忙碌时接收固定提醒；Claude 在 idle 或由 `idle_prompt` 投影的 waiting_input 时发起通知；后者表示回复结束后持续空闲，并不表示仍在执行或等待审批。其他 Provider 必须显式声明该等待状态可通知，不能统一放行所有 waiting_input。通知失败最多重试三次，未领取消息保留。旧 launch 先撤销通知，再释放配置、Hook 与本地服务；迟到回调不能重新激活已关闭的 launch。
 
-`deliveryStatus` 的含义：`waiting` 有已挂起的 MCP 等待；`ready` 可通知；`pending` 等待启动、MCP 或原生身份就绪；`busy` 等待原生会话空闲；`offline` 无当前投递资源；`pull_only` 必须由 CLI 主动调用收件箱；`notified` 原生传输已接受提醒；`failed` 通知失败但消息仍保留。发送结果是该时刻的快照，可通过 `list_agents` 再读；任何状态都不代表任务完成。
+`0.9.0` 将协作指引收敛为异步交接。发起者发送任务后最多简短说明一次交接，在没有独立工作时结束当前轮；委派任务仍待结果，不能把本轮结束当作整个任务完成。接收者读取并确认当前消息，再执行工作并发送关联的 result，发起者收到原生提醒后汇总给用户。纯领取、确认和空收件箱不需要额外汇报；收到 result 不再发送礼貌确认或重复 result，以免形成回复循环。无法自动唤醒时必须如实说明限制，不能承诺后台结果必定自动返回。
+
+`AgentInboxDelivery` 按一次收件箱领取过程合并通知；原生传输尚在接受提醒、提醒已接受但尚未领取，以及 CLI 正在领取时到达的新消息都由同一轮处理，不逐条追加提醒。无过滤条件的空读取或当前 launch 的正式完成/idle 信号结束已开始的领取过程，随后未领取的新消息可以触发下一次通知。前一轮无关任务的完成不能撤销尚未开始领取的提醒。读取完成时取消多余重试和在途通知，迟到的旧通知回调不能覆盖下一轮。已被原生 CLI 接受的队列项不保证能撤回，因此极端主动抢先领取的竞态仍可能产生一次空读取；指引要求安静结束。固定提醒只保留一句领取提示，完整协作规则统一由 MCP 初始化和启动指引提供。
+
+`deliveryStatus` 的含义：`waiting` 有已挂起的 MCP 等待；`ready` 可通知；`pending` 等待启动、MCP 或原生身份就绪；`busy` 等待原生会话空闲或当前领取结束；`offline` 无当前投递资源；`pull_only` 必须由 CLI 主动调用收件箱；`notified` 原生传输已接受提醒；`failed` 通知失败但消息仍保留。发送结果是该时刻的快照，可通过 `list_agents` 再读；任何状态都不代表任务完成。
 
 Codex 0.153.4 及以上在 macOS/Linux、可兼容启动参数和 Unix socket 路径长度范围内使用独立本地 app-server，原生 TUI 通过 `--remote` 连接，`queue --remote --thread` 通知同一会话。临时 launcher 位于原 PTY 内，三种进程继承同一 shell 环境；用户的 model、sandbox、approval 等参数继续交给原生 TUI。Windows、未知版本、显式其他 remote/profile/OSS 或未识别参数保留原生启动并报告 `pull_only`，不得静默丢弃配置。
 

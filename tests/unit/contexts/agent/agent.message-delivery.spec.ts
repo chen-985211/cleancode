@@ -17,6 +17,162 @@ const task = {
 describe('Native Agent inbox delivery', () => {
   afterEach(() => vi.useRealTimers())
 
+  it.each([false, true])(
+    'returns an empty inbox immediately without a waiting timer: native=%s',
+    async (native) => {
+      vi.useFakeTimers()
+      const mailbox = new AgentMessageMailbox()
+      const lease = mailbox.registerDelivery(recipient, () => readyState)
+      lease.setWakeup(native ? { notify: async () => undefined } : null)
+      let result: unknown
+      const read = mailbox.wait(recipient, native ? { timeoutMs: 45_000 } : {}).then((value) => {
+        result = value
+      })
+      try {
+        await Promise.resolve()
+        expect(result).toEqual({ status: 'empty' })
+        expect(mailbox.isWaiting(recipient)).toBe(false)
+        expect(vi.getTimerCount()).toBe(0)
+      } finally {
+        mailbox.closeSession(recipient.sessionId)
+        await read
+        await lease.dispose()
+      }
+    }
+  )
+
+  it.each(['before reading', 'while reading'])(
+    'coalesces notifications for messages arriving %s',
+    async (arrival) => {
+      const mailbox = new AgentMessageMailbox()
+      const notify = vi.fn(async () => undefined)
+      const lease = mailbox.registerDelivery(recipient, () => readyState)
+      lease.setWakeup({ notify })
+      mailbox.send(sender, task)
+      await lease.settle()
+      if (arrival === 'while reading') await mailbox.wait(recipient, { timeoutMs: 0 })
+      mailbox.send(sender, { ...task, messageId: 'review-2' })
+      await lease.settle()
+      expect(notify).toHaveBeenCalledTimes(1)
+      await mailbox.wait(recipient, { timeoutMs: 0 })
+      expect(
+        await mailbox.wait(recipient, { acknowledgeMessageId: task.messageId, timeoutMs: 0 })
+      ).toMatchObject({ message: { messageId: 'review-2' } })
+      await mailbox.wait(recipient, { acknowledgeMessageId: 'review-2', timeoutMs: 0 })
+      mailbox.send(sender, { ...task, messageId: 'review-3' })
+      await lease.settle()
+      expect(notify).toHaveBeenCalledTimes(2)
+      await lease.dispose()
+    }
+  )
+
+  it('retains messages arriving during native notification without queuing another reminder', async () => {
+    const mailbox = new AgentMessageMailbox()
+    let accept!: () => void
+    const notify = vi
+      .fn<AgentMessageWakeupPort['notify']>()
+      .mockResolvedValue(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            accept = resolve
+          })
+      )
+    const lease = mailbox.registerDelivery(recipient, () => readyState)
+    lease.setWakeup({ notify })
+    mailbox.send(sender, task)
+    await Promise.resolve()
+    mailbox.send(sender, { ...task, messageId: 'review-2' })
+    accept()
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(1)
+    // The first notification covers the entire inbox, including the new message.
+    await mailbox.wait(recipient, { timeoutMs: 0 })
+    expect(
+      await mailbox.wait(recipient, { acknowledgeMessageId: task.messageId, timeoutMs: 0 })
+    ).toMatchObject({ message: { messageId: 'review-2' } })
+    await mailbox.wait(recipient, { acknowledgeMessageId: 'review-2', timeoutMs: 0 })
+    await lease.dispose()
+  })
+
+  it('releases an unfinished inbox read at turn completion so later work can wake the Agent', async () => {
+    const mailbox = new AgentMessageMailbox()
+    const notify = vi.fn(async () => undefined)
+    const lease = mailbox.registerDelivery(recipient, () => readyState)
+    lease.setWakeup({ notify })
+    mailbox.send(sender, task)
+    await lease.settle()
+    await mailbox.wait(recipient, { timeoutMs: 0 })
+    mailbox.send(sender, { ...task, messageId: 'after-turn' })
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(1)
+    lease.completeTurn()
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(2)
+    await lease.dispose()
+  })
+
+  it('does not queue a second reminder when the preceding unrelated turn completes', async () => {
+    const mailbox = new AgentMessageMailbox()
+    const notify = vi.fn(async () => undefined)
+    const lease = mailbox.registerDelivery(recipient, () => readyState)
+    lease.setWakeup({ notify, canQueueWhileBusy: true })
+    mailbox.send(sender, task)
+    await lease.settle()
+    lease.completeTurn()
+    mailbox.send(sender, { ...task, messageId: 'another-task' })
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(1)
+    await lease.dispose()
+  })
+
+  it('releases retries once the Agent has accepted the pending messages', async () => {
+    vi.useFakeTimers()
+    const mailbox = new AgentMessageMailbox()
+    const notify = vi
+      .fn<AgentMessageWakeupPort['notify']>()
+      .mockRejectedValue(new Error('transport failed'))
+    const lease = mailbox.registerDelivery(recipient, () => readyState)
+    lease.setWakeup({ notify })
+    mailbox.send(sender, task)
+    await lease.settle()
+    await mailbox.wait(recipient, {})
+    await mailbox.wait(recipient, { acknowledgeMessageId: task.messageId })
+    expect(vi.getTimerCount()).toBe(0)
+    notify.mockResolvedValue(undefined)
+    mailbox.send(sender, { ...task, messageId: 'after-drain' })
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(2)
+    await lease.dispose()
+  })
+
+  it('ignores late acceptance of a drained notification and wakes for the next task', async () => {
+    const mailbox = new AgentMessageMailbox()
+    let accept!: () => void
+    const notify = vi
+      .fn<AgentMessageWakeupPort['notify']>()
+      .mockResolvedValue(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            accept = resolve
+          })
+      )
+    const lease = mailbox.registerDelivery(recipient, () => readyState)
+    lease.setWakeup({ notify })
+    mailbox.send(sender, task)
+    await Promise.resolve()
+    await mailbox.wait(recipient, {})
+    await mailbox.wait(recipient, { acknowledgeMessageId: task.messageId })
+    expect(notify.mock.calls[0]![0].signal.aborted).toBe(true)
+    mailbox.send(sender, { ...task, messageId: 'next-task' })
+    accept()
+    await lease.settle()
+    expect(notify).toHaveBeenCalledTimes(2)
+    expect(await mailbox.wait(recipient, {})).toMatchObject({ message: { messageId: 'next-task' } })
+    await lease.dispose()
+  })
+
   it.each(['existing idle Agent', 'message before launch', 'restored launch'])(
     'delivers through the same inbox for %s',
     async (origin) => {
@@ -67,8 +223,8 @@ describe('Native Agent inbox delivery', () => {
     const mailbox = new AgentMessageMailbox()
     const notify = vi.fn(async () => undefined)
     const lease = mailbox.registerDelivery(recipient, () => readyState)
-    lease.setWakeup({ notify })
     const waiting = mailbox.wait(recipient, { timeoutMs: 1_000 })
+    lease.setWakeup({ notify })
     expect(mailbox.deliveryStatus(recipient)).toBe('waiting')
     mailbox.send(sender, task)
     expect(await waiting).toMatchObject({ status: 'message' })

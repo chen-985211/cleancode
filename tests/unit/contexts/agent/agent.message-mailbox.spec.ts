@@ -26,9 +26,9 @@ describe('Agent message mailbox', () => {
     expect(await mailbox.wait(recipient, { timeoutMs: 0 })).toEqual(delivered)
     expect(
       await mailbox.wait(recipient, { acknowledgeMessageId: task.messageId, timeoutMs: 0 })
-    ).toEqual({ status: 'timeout' })
+    ).toEqual({ status: 'empty' })
     expect(mailbox.send(sender, task)).toEqual(sent)
-    expect(await mailbox.wait(recipient, { timeoutMs: 0 })).toEqual({ status: 'timeout' })
+    expect(await mailbox.wait(recipient, { timeoutMs: 0 })).toEqual({ status: 'empty' })
     expect(() => mailbox.send(sender, { ...task, text: 'different task' })).toThrow()
   })
 
@@ -36,7 +36,7 @@ describe('Agent message mailbox', () => {
     const mailbox = new AgentMessageMailbox()
     mailbox.send(sender, task)
     expect(await mailbox.wait({ ...recipient, workspaceId: 'other' }, { timeoutMs: 0 })).toEqual({
-      status: 'timeout'
+      status: 'empty'
     })
     expect(() =>
       mailbox.send(
