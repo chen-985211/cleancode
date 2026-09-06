@@ -1,3 +1,9 @@
+import {
+  agentCollaborationInstructions,
+  agentCollaborationToolDefinitions,
+  type AgentCollaborationInputByName,
+  type AgentCollaborationOutput
+} from './AgentCollaborationProtocol'
 import type {
   AgentBlockGraphSnapshot,
   AgentBlockPositionSnapshot,
@@ -26,27 +32,16 @@ import {
   terminalWorkflowPlanScopeSchema
 } from './AgentToolProtocolSchemas'
 
-export interface AgentToolDefinition {
-  readonly annotations: AgentToolAnnotations
-  readonly description: string
-  readonly inputSchema: AgentToolObjectJsonSchema
-  readonly name: AgentToolName
-  readonly outputSchema: AgentToolObjectJsonSchema
-  readonly requiresApproval: boolean
-}
-
-interface AgentToolAnnotations {
-  readonly destructiveHint: boolean
-  readonly openWorldHint: boolean
-  readonly readOnlyHint: boolean
-}
+import type { AgentToolDefinition, AgentToolAnnotations } from './AgentToolDefinition'
+export type { AgentToolDefinition } from './AgentToolDefinition'
 
 export const cleancodeMcpDeveloperInstructions = [
   'CleanCode canvas routing is mandatory while the built-in cleancode MCP server is enabled. Treat unqualified requests about “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal dependencies, and specifically “启动项目的终端组合” as requests to create or modify persisted CleanCode canvas terminal blocks, groups, execution configuration, and dependency connections, not as requests to run project processes directly.',
   canvasExecutionSemanticInstructions,
   'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands and real execution stages. For one or more new configured terminals requested together, use exactly one atomic creation tool that arranges near existing canvas content: create_terminal for exactly one configured terminal, create_terminal_workflow only for one workflow containing at least two dependency-connected terminals, or create_terminal_set for multiple independent top-level terminals or workflows. When the user explicitly requests a workflow, you must use create_terminal_workflow and must not silently downgrade to create_terminal or create_terminal_set. For a start-project workflow, repository-supported dependency installation or setup followed by the development service are legitimate stages. If two real stages cannot be identified, ask the user which stages they intend and do not invent fake steps. Omit terminalGroup by default. Include it only when the user explicitly asks for a terminal group, combination, or container; multiple related terminals and dependencies alone do not imply a group. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group only when the user explicitly requests grouping; do not assemble existing membership through create_terminal_group memberBlockIds. Keep update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated create/configure/connect/arrange calls.',
   'When a terminal starts a local HTTP, HTTPS, or TCP development service, inspect its existing launch path before choosing a managed port. For parallel projects and worktrees, use preferred with the conventional port as the recommended default, or auto when no conventional port matters. Both require a verified binding: environment only when the existing project already reads that variable, or argument with a safe template such as --port {port} only when the existing CLI or task wrapper accepts it. Do not invent a variable or select fixed + none merely because logs or defaults mention a port; reserve fixed for an explicit immutable-port requirement. Run replaces the binding with the actual allocated port at launch, and readiness plus the displayed endpoint follow that actual port.',
-  'The current CleanCode MCP can author and inspect a terminal workflow but cannot start it. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects, and do not claim that a created workflow or terminal was started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.'
+  'The current CleanCode MCP can author and inspect a terminal workflow but cannot start it. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects, and do not claim that a created workflow or terminal was started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.',
+  agentCollaborationInstructions
 ].join('\n')
 
 export const cleancodeMcpInstructions = [
@@ -54,7 +49,8 @@ export const cleancodeMcpInstructions = [
   canvasExecutionSemanticInstructions,
   'For canvas work, inspect first. For one or more new configured terminals requested together, use exactly one atomic creation tool that arranges near existing canvas content: create_terminal for exactly one configured terminal, create_terminal_workflow only for one workflow containing at least two dependency-connected terminals, or create_terminal_set for multiple independent top-level terminals or workflows. When the user explicitly requests a workflow, you must use create_terminal_workflow and must not silently downgrade to create_terminal or create_terminal_set. For a start-project workflow, repository-supported dependency installation or setup followed by the development service are legitimate stages. If two real stages cannot be identified, ask the user which stages they intend and do not invent fake steps. Omit terminalGroup by default. Include it only when the user explicitly asks for a terminal group, combination, or container; multiple related terminals and dependencies alone do not imply a group. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group only when the user explicitly requests grouping; do not assemble existing membership through create_terminal_group memberBlockIds. Use update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated tool calls. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
   'For a local HTTP, HTTPS, or TCP development service that may run in parallel projects or worktrees, prefer preferred with its conventional port and a verified environment or argument binding; use auto when no conventional port matters. Environment injection is valid only when the existing project already reads the named variable, and an argument template such as --port {port} is valid only when the existing CLI or wrapper accepts it. Use fixed, especially fixed + none, only for an explicit immutable-port contract. At runtime CleanCode injects the actual allocated port and validates readiness against that actual port.',
-  'Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. The Provider launch integration may allow these CleanCode MCP tools directly when that Provider supports a tool allowlist. This does not change the Provider sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval, as does disconnecting a dependency.'
+  'Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. The Provider launch integration may allow these CleanCode MCP tools directly when that Provider supports a tool allowlist. This does not change the Provider sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval, as does disconnecting a dependency.',
+  agentCollaborationInstructions
 ].join('\n')
 
 const readOnlyToolAnnotations: AgentToolAnnotations = {
@@ -78,6 +74,7 @@ const destructiveWriteToolAnnotations: AgentToolAnnotations = {
 const unchangedGraphOutputSchema = blockGraphOutputSchema()
 
 export const agentToolDefinitions: readonly AgentToolDefinition[] = [
+  ...agentCollaborationToolDefinitions,
   graphTool({
     annotations: readOnlyToolAnnotations,
     description:
@@ -458,7 +455,7 @@ export interface ArrangeTerminalLayoutAgentToolInput {
   readonly blockIds: readonly string[]
 }
 
-export interface AgentToolInputByName {
+export interface AgentToolInputByName extends AgentCollaborationInputByName {
   readonly arrange_terminal_layout: ArrangeTerminalLayoutAgentToolInput
   readonly connect_terminal_blocks: ConnectTerminalBlocksAgentToolInput
   readonly create_block: CreateBlockAgentToolInput
@@ -478,6 +475,7 @@ export interface AgentToolInputByName {
 }
 
 export type AgentToolOutput =
+  | AgentCollaborationOutput
   | {
       readonly connectionId?: string
       readonly createdBlockId?: string
@@ -526,7 +524,7 @@ export type AgentToolStructuredContent =
       readonly graphChanged: false
       readonly output: Extract<
         AgentToolCompletedOutput,
-        { readonly type: 'terminal_workflow_plan' }
+        { readonly type: 'terminal_workflow_plan' } | AgentCollaborationOutput
       >
       readonly status: 'completed'
       readonly toolCallId: string

@@ -401,13 +401,13 @@ Agent 控制台必须：
 - 切换独立 worktree 工作区时连接该物理工作区对应的 Agent；默认工作区分支 checkout 继续连接原 Agent 与对话，不串用其他工作区或其他 Agent 状态。
 - 应用重开时恢复 Agent 的固定 Provider、数量、名称、位置、大小、MCP 偏好和单一 Provider 对话绑定；Agent terminal 本身当前不跨应用保留。
 
-一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时必须原子持久化一个已初始化的空 Agent 列表，不检测 Provider、不创建默认 Agent，也不得在以后仅因 Provider 安装状态或偏好改变而自动补建。Agent 列表缺失或仍在加载时，界面必须按空列表呈现，不得合成默认 Codex Agent 或启动 Provider。用户明确执行“新建 Agent”或应用自己配置的工作区默认内容时可以创建 Agent；其 MCP 初始值读取应用级“新 Agent 默认启用 CleanCode MCP”。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
+一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时必须原子持久化一个已初始化的空 Agent 列表，不检测 Provider、不创建默认 Agent，也不得在以后仅因 Provider 安装状态或偏好改变而自动补建。Agent 列表缺失或仍在加载时，界面必须按空列表呈现，不得合成默认 Codex Agent 或启动 Provider。用户明确执行“新建 Agent”、应用自己配置的工作区默认内容，或当前工作区的 Agent 调用原生 MCP `create_agent` 时可以创建 Agent；其 MCP 初始值读取应用级“新 Agent 默认启用 CleanCode MCP”。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
 “新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 且没有被用户禁用的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 会修改后续创建使用的默认值，并在同一步立即用该 Provider 创建一个 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
 
-用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。MCP 创建复用同一位置预留、提交、聚焦和输入激活流程，必须来自仍打开的同一工作区；忙或作用域失效时返回失败，使用原稳定 ID 重试，不能误插入其他画布。
 
 Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code、OpenCode 和 Gemini 提供正式会话引用与恢复；四者都支持 CleanCode MCP。Codex、Claude Code 和 OpenCode 还提供 launch instructions；Claude Code 和 OpenCode 提供精确活动跟踪。其他目录项当前只声明基础终端能力；各 Provider 未声明的可选能力不得由 UI 猜测或展示。
 
@@ -434,6 +434,10 @@ CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”
 移除 Agent 属于用户在当前 Agent 局部菜单中明确发起的破坏性操作，不再要求二次确认。用户选择“移除”后，菜单必须立即关闭并阻止重复提交；系统停止该 Agent、取消其未完成审批并删除 cleancode 中的 Agent 定义和对话绑定，但不会回滚项目文件、删除 Git 提交或影响其他 Agent。菜单用独立分组、危险图标和悬停/焦点状态表达破坏性，不让危险色在默认状态下压过普通动作。
 
 Agent 控制台不得展示终端端口，不得加入终端组合，也不得进入普通终端积木的创建、删除、组合或批量运行流程。
+
+内建 MCP 的 Agent 协作指引默认采用异步交接：发送任务后最多简短说明一次交接，在没有独立工作时结束当前轮。每个 Agent 都可以通过自己的原生对话直接向用户反馈结果或询问必要决策，沟通对象由用户要求和任务依赖决定；创建 Agent 或发送任务不建立固定汇报层级。用户明确要求某个 Agent 汇总时遵守该要求。仍有同伴依赖结果、请求回复或需要处理阻塞时，执行者必须同步必要结果和下一步，并说明是否已经告知用户或正在等待其决定；其他 Agent 避免重复汇报和提问。没有同伴需要结果时，可以直接反馈给用户并结束。
+
+收件箱默认立即读取，支持原生通知的会话不挂起工具等待；领取、确认、空收件箱和启动就绪不要求额外用户汇报或礼貌性消息，用户明确要求检查时除外。需要同步给同伴的任务完成通过关联结果表达，不从一次 CLI 回答结束或活动通知推断。沟通对象选择由统一模型指引提供，不由 UI 推导固定负责人或用户已读状态。原生控制台的工具调用展示继续由 Provider 控制，CleanCode 不过滤或改写终端输出以隐藏通信过程。
 
 正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；新建 Agent 的默认选择菜单同样不得展示 detector 版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，其他 Provider 不得因虚构的版本门槛显示升级要求。快捷菜单不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项，这些状态只进入 Agent 设置和既有 Agent 的诊断反馈。
 

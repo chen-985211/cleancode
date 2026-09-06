@@ -75,12 +75,16 @@ export class ManagedAgentActivityRegistry {
       recordStatus: (status) => {
         if (!isCurrent()) return false
         transitionAgentRuntime(session, { activity: status })
-        return record({ status, type: 'status_changed' })
+        const accepted = record({ status, type: 'status_changed' })
+        if (accepted && status === 'idle') session.messageDelivery?.completeTurn()
+        return accepted
       },
       recordTurnCompleted: () => {
         if (!isCurrent()) return false
         if (activityTracking) transitionAgentRuntime(session, { activity: 'idle' })
-        return record({ type: 'turn_completed' })
+        const accepted = record({ type: 'turn_completed' })
+        if (accepted) session.messageDelivery?.completeTurn()
+        return accepted
       }
     }
   }

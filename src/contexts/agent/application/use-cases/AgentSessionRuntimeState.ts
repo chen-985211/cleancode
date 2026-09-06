@@ -10,6 +10,8 @@ import type {
   AgentToolApprovalRequest
 } from '../dto/AgentSessionProtocol'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
+import type { AgentPeerCreationPort } from '../ports/AgentPeerCreationPort'
+import type { AgentMessageDeliveryLease } from '../ports/AgentMessageDeliveryPort'
 import type {
   AgentMcpRegistration,
   AgentMcpServerPort,
@@ -45,6 +47,7 @@ interface ManagedAgentMcpRegistration extends AgentMcpRegistration {
 }
 
 export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
+  readonly initialPrompt?: string
   readonly agentId: string
   readonly agentName?: string
   readonly columns?: number
@@ -61,12 +64,15 @@ export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
 }
 
 export interface AgentSessionCallbacks {
+  readonly peerCreation?: AgentPeerCreationPort
   readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly onRuntimeChanged?: (event: AgentRuntimeChangedEvent) => void
   readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
 }
 
 export interface ManagedAgentSession {
+  messageDelivery?: AgentMessageDeliveryLease
+  initialPrompt?: string
   readonly agentId: string
   agentName?: string
   callbacks: AgentSessionCallbacks
@@ -95,6 +101,7 @@ export interface ManagedAgentSession {
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {
   return {
+    peerCreation: command.peerCreation,
     onGraphUpdated: command.onGraphUpdated,
     onRuntimeChanged: command.onRuntimeChanged,
     onToolApprovalRequested: command.onToolApprovalRequested
@@ -163,6 +170,7 @@ export function transitionAgentRuntime(
     revision: runtime.revision + 1,
     terminal: nextTerminal
   }
+  session.messageDelivery?.refresh()
   try {
     session.callbacks.onRuntimeChanged?.({
       agentId: session.agentId,
@@ -338,6 +346,7 @@ export function createAgentLaunchRuntimeController(command: {
         status: 'running'
       }
     })
+    command.session.initialPrompt = undefined
     command.onStartedAccepted?.()
   }
 
@@ -379,6 +388,7 @@ export function createAgentLaunchRuntimeController(command: {
 }
 
 export async function disposeAgentLaunchArtifacts(session: ManagedAgentSession): Promise<void> {
+  session.messageDelivery?.close()
   const artifacts = session.launchArtifacts
   if (!artifacts) return
   await artifacts.dispose()
@@ -571,6 +581,7 @@ export function beginAgentMcpInitializationTimeout(session: ManagedAgentSession)
 }
 
 export function unregisterAgentMcpEndpoint(session: ManagedAgentSession): void {
+  session.messageDelivery?.close()
   const registration = session.mcpRegistration
   session.mcpRegistration = undefined
   registration?.dispose()

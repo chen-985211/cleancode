@@ -33,6 +33,7 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
     const bearerToken = createBearerToken()
     const registeredSession: RegisteredHttpMcpSession = {
       active: true,
+      requests: new Set(),
       bearerToken,
       bridge: new CleancodeAgentJsonRpcToolBridge({
         executeMcpTool: session.executeTool,
@@ -57,7 +58,10 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
   }
 
   dispose(): void {
-    for (const session of this.sessions.values()) session.active = false
+    for (const session of this.sessions.values()) {
+      session.active = false
+      for (const controller of session.requests) controller.abort()
+    }
     this.sessions.clear()
     this.server?.close()
     this.server = null
@@ -153,7 +157,19 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
         return
       }
 
-      const result = await session.bridge.handle(body)
+      const controller = new AbortController()
+      const abort = () => controller.abort()
+      session.requests.add(controller)
+      response.once('close', abort)
+      let result
+      try {
+        if (response.destroyed) controller.abort()
+        result = await session.bridge.handle(body, controller.signal)
+      } finally {
+        response.off('close', abort)
+        session.requests.delete(controller)
+      }
+      if (response.destroyed) return
 
       if (result === null) {
         response.statusCode = 202
@@ -194,6 +210,7 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
 
   private deactivateRegistration(sessionId: string, registration: RegisteredHttpMcpSession): void {
     registration.active = false
+    for (const controller of registration.requests) controller.abort()
     if (this.sessions.get(sessionId) === registration) this.sessions.delete(sessionId)
   }
 
@@ -205,6 +222,7 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
 }
 
 interface RegisteredHttpMcpSession {
+  readonly requests: Set<AbortController>
   active: boolean
   readonly bearerToken: string
   readonly bridge: CleancodeAgentJsonRpcToolBridge

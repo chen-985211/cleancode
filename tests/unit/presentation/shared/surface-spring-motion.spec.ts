@@ -5,6 +5,92 @@ import {
 import type { SpringProgressMotionFrameScheduler } from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('surface spring motion', () => {
+  it.each([true, false])(
+    'keeps an anchored surface visibly between its compact and full size during the transition: visible=%s',
+    (visible) => {
+      const scheduler = createFrameScheduler()
+      const root = createRoot()
+      const controller = createSurfaceSpringMotionController({ preset: 'anchored', scheduler })
+      const settled = vi.fn()
+      controller.intentChanged(root, {
+        onSettled: settled,
+        reducedMotion: false,
+        visible: true
+      })
+      const compactScale = readNumber(root, '--cc-surface-motion-scale')
+      expect.soft(compactScale).toBeGreaterThanOrEqual(0.7)
+      expect.soft(compactScale).toBeLessThan(0.9)
+      if (!visible) {
+        scheduler.advanceUntilIdle()
+        settled.mockClear()
+        controller.intentChanged(root, {
+          onSettled: settled,
+          reducedMotion: false,
+          visible: false
+        })
+      }
+
+      scheduler.advanceNextFrame(100)
+
+      const opacity = readNumber(root, '--cc-surface-motion-opacity')
+      const scale = readNumber(root, '--cc-surface-motion-scale')
+      expect.soft(opacity).toBeGreaterThan(0.2)
+      expect.soft(opacity).toBeLessThan(0.8)
+      expect.soft(scale).toBeGreaterThan(compactScale)
+      expect.soft(scale).toBeLessThan(0.97)
+      expect(settled).not.toHaveBeenCalled()
+
+      scheduler.advanceUntilIdle()
+      expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(visible ? 1 : 0)
+      expect(readNumber(root, '--cc-surface-motion-scale')).toBe(visible ? 1 : compactScale)
+      expect(settled).toHaveBeenCalledOnce()
+    }
+  )
+
+  it.each([false, true])(
+    'carries an anchored surface position and velocity into the new visible intent: %s',
+    (visible) => {
+      const scheduler = createFrameScheduler()
+      const root = createRoot()
+      const obsoleteSettled = vi.fn()
+      const settled = vi.fn()
+      const controller = createSurfaceSpringMotionController({ preset: 'anchored', scheduler })
+      controller.intentChanged(root, {
+        onSettled: obsoleteSettled,
+        reducedMotion: false,
+        visible: true
+      })
+      if (visible) {
+        scheduler.advanceUntilIdle()
+        obsoleteSettled.mockClear()
+        controller.intentChanged(root, {
+          onSettled: obsoleteSettled,
+          reducedMotion: false,
+          visible: false
+        })
+      }
+      scheduler.advanceNextFrame(40)
+      const previousOpacity = readNumber(root, '--cc-surface-motion-opacity')
+      scheduler.advanceNextFrame(1)
+      const currentOpacity = readNumber(root, '--cc-surface-motion-opacity')
+      const velocityBefore = currentOpacity - previousOpacity
+      const presentation = new Map(root.properties)
+
+      controller.intentChanged(root, { onSettled: settled, reducedMotion: false, visible })
+
+      expect(root.properties).toEqual(presentation)
+      scheduler.advanceNextFrame(1)
+      const velocityAfter = readNumber(root, '--cc-surface-motion-opacity') - currentOpacity
+      expect(Math.sign(velocityAfter)).toBe(Math.sign(velocityBefore))
+      expect(Math.abs(velocityAfter - velocityBefore)).toBeLessThan(Math.abs(velocityBefore) * 0.15)
+
+      scheduler.advanceUntilIdle()
+      expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(visible ? 1 : 0)
+      expect(obsoleteSettled).not.toHaveBeenCalled()
+      expect(settled).toHaveBeenCalledOnce()
+    }
+  )
+
   it.each([
     ['anchored-bottom-left', '--cc-surface-motion-translate-y', 1],
     ['anchored-top-right', '--cc-surface-motion-translate-x', 1],

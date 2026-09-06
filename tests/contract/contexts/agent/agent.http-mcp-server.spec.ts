@@ -47,13 +47,18 @@ describe('cleancode HTTP MCP server', () => {
       expect.objectContaining({
         result: expect.objectContaining({
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'cleancode-agent-tools', version: '0.6.0' }
+          serverInfo: { name: 'cleancode-agent-tools', version: '0.9.0' }
         })
       })
     )
 
     const toolsList = await postMcp(endpoint, { id: 2, jsonrpc: '2.0', method: 'tools/list' })
     expect(readToolNames(toolsList)).toEqual([
+      'list_agents',
+      'list_agent_providers',
+      'create_agent',
+      'send_agent_message',
+      'wait_agent_message',
       'inspect_graph',
       'create_block',
       'create_terminal',

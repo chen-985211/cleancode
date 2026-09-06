@@ -15,6 +15,10 @@ import { applicationDiagnosticsChannels } from '../ipc/applicationDiagnosticsCha
 
 const cleancodeApi = {
   appName: 'cleancode',
+  onAgentPeerCreationRequested: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-peer-creation-requested', listener),
+  completeAgentPeerCreation: (command: unknown) =>
+    invokeCleancode('cleancode:complete-agent-peer-creation', command),
   exportApplicationDiagnostics: (command: unknown) =>
     invokeCleancode(applicationDiagnosticsChannels.export, command),
   getApplicationDiagnosticsSummary: () =>

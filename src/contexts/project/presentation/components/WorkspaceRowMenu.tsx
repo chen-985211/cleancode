@@ -116,14 +116,12 @@ export function WorkspaceRowMenu({
           aria-haspopup="menu"
           aria-expanded={isOpen}
           onClick={() => {
-            setMenuPosition(null)
             pendingInitialFocusRef.current = !isOpen
             onToggle()
           }}
           onKeyDown={(event) => {
             if (isOpen || !['ArrowDown', 'ArrowUp'].includes(event.key)) return
             event.preventDefault()
-            setMenuPosition(null)
             pendingInitialFocusRef.current = true
             onToggle()
           }}
@@ -133,6 +131,8 @@ export function WorkspaceRowMenu({
       </TooltipLabel>
       <AnchoredSurfaceMotion
         open={isOpen}
+        springPreset="anchored"
+        onExitComplete={() => setMenuPosition(null)}
         portalContainer={document.body}
         id={menuId}
         className="workspace-row-menu anchored-surface-motion"
@@ -140,7 +140,11 @@ export function WorkspaceRowMenu({
         aria-labelledby={triggerId}
         data-side={menuPosition?.side ?? 'bottom'}
         onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          const nextTarget = event.relatedTarget as Node | null
+          if (
+            !event.currentTarget.contains(nextTarget) &&
+            !triggerRef.current?.contains(nextTarget)
+          ) {
             onClose()
           }
         }}

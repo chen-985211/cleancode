@@ -22,6 +22,10 @@ import { codexProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import {
+  prepareCodexNativeMessageLaunch,
+  projectCodexServerArguments
+} from './CodexNativeMessageLaunch'
+import {
   resolveCodexSessionEndHookTrust,
   type CodexSessionEndHookTrustResolver
 } from './CodexSessionEndHookTrustResolver'
@@ -76,6 +80,8 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   readonly descriptor = {
     capabilities: {
       activityTracking: false,
+      nativeMessages: true,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
@@ -133,6 +139,8 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
       cleancodeCapability: this.cleancodeCapability,
       command,
       inspectThread,
+      runtimeExecutable,
+      runtimePlatform,
       resume: this.resume,
       telemetry: this.telemetry
     })
@@ -267,6 +275,8 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       readonly cleancodeCapability: AgentCapabilityInjector
       readonly command: string
       readonly inspectThread: CodexThreadResumabilityInspector
+      readonly runtimeExecutable: string
+      readonly runtimePlatform: NodeJS.Platform
       readonly resume: AgentResumeStrategy
       readonly telemetry: CodexTelemetryContribution
     }
@@ -286,14 +296,24 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         threadId: resumeArgs[1]!,
         workspaceDirectory: command.workspaceDirectory
       })) === 'missing'
-    const telemetry = await this.options.telemetry.prepareForExecutable(command, executable)
+    let identify: ((threadId: string) => void) | undefined
+    const telemetry = await this.options.telemetry.prepareForExecutable(
+      {
+        ...command,
+        onProviderSessionIdentified: (ref) => {
+          command.onProviderSessionIdentified(ref)
+          identify?.(ref.value)
+        }
+      },
+      executable
+    )
     const capability = command.cleancodeMcp
       ? await this.options.cleancodeCapability.inject({
           ...command.cleancodeMcp,
           artifacts: command.artifacts
         })
       : { args: [], env: {} }
-    return {
+    const nativePlan = {
       args: [
         ...this.options.baseArgs,
         ...(command.launchProfile?.arguments ?? []),
@@ -302,7 +322,8 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         '-C',
         command.workspaceDirectory,
         ...capability.args,
-        ...telemetry.args
+        ...telemetry.args,
+        ...(command.initialPrompt ? ['--', command.initialPrompt] : [])
       ],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
@@ -321,6 +342,20 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       },
       onTerminalTitleChanged: telemetry.onTerminalTitleChanged
     }
+    const serverArgs = projectCodexServerArguments([
+      ...this.options.baseArgs,
+      ...(command.launchProfile?.arguments ?? [])
+    ])
+    return prepareCodexNativeMessageLaunch({
+      command,
+      nativePlan,
+      serverArgs: serverArgs ? [...serverArgs, ...capability.args, ...telemetry.args] : null,
+      runtimeExecutable: this.options.runtimeExecutable,
+      runtimePlatform: this.options.runtimePlatform,
+      bindIdentity: (listener) => {
+        identify = listener
+      }
+    })
   }
 }
 

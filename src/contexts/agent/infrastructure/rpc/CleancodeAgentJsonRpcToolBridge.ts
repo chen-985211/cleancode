@@ -36,12 +36,20 @@ type JsonRpcResponse =
     }
 
 export class CleancodeAgentJsonRpcToolBridge {
+  private readonly waitingRequests = new Map<number | string, AbortController>()
   private initializeAccepted = false
   private initializedPublished = false
 
   constructor(private readonly input: CleancodeAgentJsonRpcToolBridgeInput) {}
 
-  async handle(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
+  async handle(request: JsonRpcRequest, signal?: AbortSignal): Promise<JsonRpcResponse | null> {
+    if (request.method === 'notifications/cancelled') {
+      const requestId = isRecord(request.params) ? request.params.requestId : undefined
+      if (typeof requestId === 'string' || typeof requestId === 'number') {
+        this.waitingRequests.get(requestId)?.abort()
+      }
+      return null
+    }
     if (request.method === 'notifications/initialized') {
       if (this.initializeAccepted && !this.initializedPublished) {
         this.initializedPublished = true
@@ -56,7 +64,7 @@ export class CleancodeAgentJsonRpcToolBridge {
         capabilities: { tools: { listChanged: false } },
         instructions: cleancodeMcpInstructions,
         protocolVersion: '2025-06-18',
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.6.0' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.9.0' }
       })
     }
 
@@ -72,11 +80,11 @@ export class CleancodeAgentJsonRpcToolBridge {
       })
     }
 
-    if (request.method === 'tools/call') return this.callTool(request)
+    if (request.method === 'tools/call') return this.callTool(request, signal)
     return createError(request.id, -32601, `Unknown method: ${request.method}`)
   }
 
-  private async callTool(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+  private async callTool(request: JsonRpcRequest, signal?: AbortSignal): Promise<JsonRpcResponse> {
     const params = readToolCallParams(request.params)
     if (!params || !isAgentToolName(params.name)) {
       return createError(request.id, -32602, 'Invalid tool call.')
@@ -84,9 +92,19 @@ export class CleancodeAgentJsonRpcToolBridge {
 
     const toolCallId = createAgentToolCallId()
     let result: AgentToolExecutionResult
+    const controller = params.name === 'wait_agent_message' ? new AbortController() : undefined
+    const abort = () => controller?.abort()
+    if (controller && request.id !== undefined) {
+      if (this.waitingRequests.has(request.id))
+        return createError(request.id, -32602, 'Request id is already waiting.')
+      this.waitingRequests.set(request.id, controller)
+    }
+    if (signal?.aborted) abort()
+    signal?.addEventListener('abort', abort, { once: true })
 
     try {
       result = await this.input.executeMcpTool({
+        ...(controller ? { signal: controller.signal } : {}),
         input: params.arguments,
         sessionId: this.input.sessionId,
         toolCallId,
@@ -94,6 +112,9 @@ export class CleancodeAgentJsonRpcToolBridge {
       })
     } catch (error) {
       result = createAgentToolFailedResult(toolCallId, error)
+    } finally {
+      signal?.removeEventListener('abort', abort)
+      if (controller && request.id !== undefined) this.waitingRequests.delete(request.id)
     }
 
     return createResult(request.id, {
@@ -127,7 +148,7 @@ function createToolResultText(toolName: AgentToolName, result: AgentToolExecutio
   }
 
   if (!('graph' in result)) {
-    return `cleancode tool ${toolName} completed.`
+    return `cleancode tool ${toolName} completed: ${JSON.stringify(result.output)}`
   }
 
   return `cleancode tool ${toolName} completed: ${JSON.stringify({

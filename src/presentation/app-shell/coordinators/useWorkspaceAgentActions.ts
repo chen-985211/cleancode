@@ -51,6 +51,7 @@ export function useWorkspaceAgentActions({
 }) {
   const { t } = useI18n()
   const [isCreatingAgent, setIsCreatingAgent] = useState(false)
+  const creationBusyRef = useRef(false)
   const cancelScheduledCreationFocusRef = useRef<(() => void) | null>(null)
   const creationGenerationRef = useRef(0)
   const warnedWorkspaceScopesRef = useRef(new Set<string>())
@@ -63,6 +64,7 @@ export function useWorkspaceAgentActions({
 
   useEffect(() => {
     creationGenerationRef.current += 1
+    creationBusyRef.current = false
     setIsCreatingAgent(false)
     return () => {
       cancelScheduledCreationFocusRef.current?.()
@@ -87,8 +89,12 @@ export function useWorkspaceAgentActions({
   )
 
   const createWorkspaceAgent = useCallback(
-    async (providerId?: string) => {
-      if (!currentWorkbench || !currentWorkspace || isCreatingAgent) return
+    async (providerId?: string, requestedAgentId?: string) => {
+      if (!currentWorkbench || !currentWorkspace || creationBusyRef.current) return
+      const existing = requestedAgentId
+        ? currentWorkbench.agents?.find((agent) => agent.agentId === requestedAgentId)
+        : undefined
+      if (existing) return existing.providerId === providerId ? existing : undefined
       const selectedProviderId = providerId ?? defaultProviderId
       if (!selectedProviderId) {
         onConfigureAgentProviders()
@@ -101,6 +107,7 @@ export function useWorkspaceAgentActions({
       }
 
       const generation = ++creationGenerationRef.current
+      creationBusyRef.current = true
       const scopeKey = workspaceScopeKey
       let isCommitted = false
       setIsCreatingAgent(true)
@@ -120,7 +127,7 @@ export function useWorkspaceAgentActions({
       try {
         const created =
           (await window.cleancode?.createWorkspaceAgent({
-            agentId: createAgentId(),
+            agentId: requestedAgentId ?? createAgentId(),
             gitBranch: currentWorkspace.gitBranch,
             projectDirectory: currentWorkbench.project.directory,
             projectId: currentWorkbench.project.id,
@@ -133,7 +140,7 @@ export function useWorkspaceAgentActions({
           generation !== creationGenerationRef.current ||
           workspaceScopeKeyRef.current !== scopeKey
         ) {
-          return
+          return created ?? undefined
         }
         if (!created) throw new Error('Agent creation returned no snapshot.')
         nodeCreationCoordinator.commit(
@@ -155,6 +162,7 @@ export function useWorkspaceAgentActions({
             onWorkspaceAgentCreated(created)
           }
         })
+        return created
       } catch {
         if (
           generation === creationGenerationRef.current &&
@@ -170,14 +178,16 @@ export function useWorkspaceAgentActions({
         if (!isCommitted) {
           nodeCreationCoordinator.release(reservation.reservationId)
         }
-        if (generation === creationGenerationRef.current) setIsCreatingAgent(false)
+        if (generation === creationGenerationRef.current) {
+          creationBusyRef.current = false
+          setIsCreatingAgent(false)
+        }
       }
     },
     [
       currentWorkbench,
       currentWorkspace,
       defaultProviderId,
-      isCreatingAgent,
       nodeCreationCoordinator,
       notify,
       onConfigureAgentProviders,
@@ -188,6 +198,25 @@ export function useWorkspaceAgentActions({
       t,
       workspaceScopeKey
     ]
+  )
+
+  useEffect(
+    () =>
+      window.cleancode?.onAgentPeerCreationRequested?.((request) => {
+        void (async () => {
+          const isCurrent =
+            currentWorkbench?.project.id === request.projectId &&
+            currentWorkspace?.workspaceId === request.workspaceId
+          const created = isCurrent
+            ? await createWorkspaceAgent(request.providerId, request.agentId)
+            : undefined
+          await window.cleancode?.completeAgentPeerCreation({
+            requestId: request.requestId,
+            created: Boolean(created)
+          })
+        })().catch(() => undefined)
+      }),
+    [createWorkspaceAgent, currentWorkbench?.project.id, currentWorkspace?.workspaceId]
   )
 
   const updateAgentInWorkspace = useCallback(
@@ -292,8 +321,15 @@ export function useWorkspaceAgentActions({
     [setWorkspaceAgents]
   )
 
+  const createAgentManually = useCallback(
+    async (providerId?: string): Promise<void> => {
+      await createWorkspaceAgent(providerId)
+    },
+    [createWorkspaceAgent]
+  )
+
   return {
-    createWorkspaceAgent,
+    createWorkspaceAgent: createAgentManually,
     isCreatingAgent,
     moveWorkspaceAgent,
     removeWorkspaceAgent,

@@ -280,7 +280,7 @@ export function terminalWorkflowPlanResultSchema(): AgentToolObjectJsonSchema {
   }
 }
 
-function failedToolResultSchema(): AgentToolJsonSchema {
+export function failedToolResultSchema(): AgentToolJsonSchema {
   return objectSchema(
     {
       error: objectSchema(

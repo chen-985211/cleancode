@@ -7,6 +7,16 @@ import type { AgentToolName } from '../../../../src/contexts/agent/domain/value-
 describe('agent tool input validation', () => {
   it('accepts inputs described by every CleanCode tool schema', () => {
     const validInputs: { readonly [Name in AgentToolName]: AgentToolInputByName[Name] } = {
+      list_agents: {},
+      list_agent_providers: {},
+      create_agent: { agentId: 'reviewer', providerId: 'codex', initialTask: 'Review' },
+      send_agent_message: {
+        messageId: 'task',
+        toAgentId: 'reviewer',
+        kind: 'task',
+        text: 'Review'
+      },
+      wait_agent_message: { timeoutMs: 0 },
       arrange_terminal_layout: {
         blockIds: ['terminal-build', 'terminal-test']
       },
