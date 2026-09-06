@@ -26,6 +26,7 @@ import {
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import { ClaudeCodeHookReporter } from './ClaudeCodeHookReporter'
 import { ClaudeCodeInboxSignal } from './ClaudeCodeInboxSignal'
+import { mergeClaudeCodeLaunchInstructions } from './ClaudeCodeLaunchInstructions'
 import { mergeClaudeCodeLaunchSettings } from './ClaudeCodeLaunchSettings'
 
 export const claudeCodeInstallCommands = {
@@ -136,14 +137,20 @@ class ClaudeCodeCapabilityInjector implements AgentCapabilityInjector {
       })
     )
     command.artifacts.track('claude-mcp-config', config)
+    const instructions = await createTemporaryProviderConfig(
+      'cleancode-claude-instructions-',
+      'instructions.txt',
+      cleancodeMcpDeveloperInstructions
+    )
+    command.artifacts.track('claude-mcp-instructions', instructions)
     return {
       args: [
         '--mcp-config',
         config.path,
         '--allowedTools',
         'mcp__cleancode__*',
-        '--append-system-prompt',
-        cleancodeMcpDeveloperInstructions
+        '--append-system-prompt-file',
+        instructions.path
       ],
       env: { CLEANCODE_MCP_TOKEN: command.bearerToken }
     }
@@ -231,9 +238,16 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
           artifacts: command.artifacts
         })
       : { args: [], env: {} }
+    const launchArgs = command.cleancodeMcp
+      ? await mergeClaudeCodeLaunchInstructions(
+          userArgs,
+          capability.args[capability.args.indexOf('--append-system-prompt-file') + 1]!,
+          command.workspaceDirectory
+        )
+      : userArgs
     return {
       args: [
-        ...userArgs,
+        ...launchArgs,
         ...sessionArgs,
         ...capability.args,
         ...telemetry.args,

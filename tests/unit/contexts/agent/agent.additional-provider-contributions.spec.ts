@@ -240,8 +240,8 @@ describe('additional Agent Provider contributions', () => {
         expect.any(String),
         '--allowedTools',
         'mcp__cleancode__*',
-        '--append-system-prompt',
-        expect.stringContaining('CleanCode')
+        '--append-system-prompt-file',
+        expect.any(String)
       ])
     )
     expect(plan.args).toEqual(expect.arrayContaining(['--settings', expect.any(String)]))
