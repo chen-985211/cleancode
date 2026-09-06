@@ -1,5 +1,5 @@
 import type { Edge, NodeChange, NodeTypes, ReactFlowInstance } from '@xyflow/react'
-import type { MouseEvent, MutableRefObject, ReactNode, Ref } from 'react'
+import type { MouseEvent, MutableRefObject, Ref } from 'react'
 
 import type { CreatableAgentProviderSnapshot } from '../../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type {
@@ -27,7 +27,6 @@ import type { WorkbenchNodeStore } from './nodes/workbenchNodeStore'
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 export interface WorkbenchCanvasProps {
-  readonly initializationControls?: ReactNode
   readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]
   readonly approvalIntents?: readonly AgentToolApprovalViewState[]
   readonly isDesktopRuntime: boolean

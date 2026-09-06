@@ -62,3 +62,25 @@ export function normalizeWorkspaceDefaults(value: unknown): WorkspaceDefaults {
 function invalid(): never {
   throw createExpectedAppError('WORKSPACE_DEFAULTS_INVALID', 'Invalid workspace default contents.')
 }
+
+export interface WorkspaceDefaultsResolution {
+  readonly defaults: WorkspaceDefaults
+  readonly removedTemplateIds: readonly string[]
+}
+
+export function resolveWorkspaceDefaults(
+  value: WorkspaceDefaults,
+  availableTemplateIds: readonly string[]
+): WorkspaceDefaultsResolution {
+  const defaults = normalizeWorkspaceDefaults(value)
+  const available = new Set(availableTemplateIds)
+  return {
+    defaults: {
+      ...defaults,
+      templates: defaults.templates.filter((item) => available.has(item.templateId))
+    },
+    removedTemplateIds: defaults.templates
+      .filter((item) => !available.has(item.templateId))
+      .map((item) => item.templateId)
+  }
+}

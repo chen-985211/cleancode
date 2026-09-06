@@ -6,6 +6,70 @@ import type { WorkspaceInitializationContentPort } from '../../../../src/context
 import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('initialize workspace contents', () => {
+  it('reconciles a legacy missing template without creating or rerunning any content', async () => {
+    const f = setup()
+    const operation = WorkspaceInitialization.restore({
+      ...f.getSnapshot(),
+      items: f.getSnapshot().items.map((item) => ({ ...item, prepared: false }))
+    })
+    operation.fail(operation.toSnapshot().items[0].id, 'BLOCK_TEMPLATE_NOT_FOUND')
+    operation.created(operation.toSnapshot().items[1].id, {
+      objectIds: ['agent'],
+      executionTarget: null
+    })
+    await f.repository.save(operation.toSnapshot())
+    f.content.listTemplateIds.mockResolvedValue([])
+    const result = await f.useCase.inspect(f.command.initializationId)
+    expect(result?.stage).toBe('complete')
+    expect(result?.items.map((item) => item.status)).toEqual(['skipped', 'created'])
+    expect(f.content.createTemplate).not.toHaveBeenCalled()
+    expect(f.content.createAgent).not.toHaveBeenCalled()
+    expect(f.content.run).not.toHaveBeenCalled()
+    expect((await f.useCase.inspect(f.command.initializationId))?.items).toEqual(result?.items)
+  })
+
+  it.each(['source', 'frozen', 'unreadable'])(
+    'retains recoverable selections when %s is available',
+    async (availability) => {
+      const f = setup()
+      const snapshot = f.getSnapshot()
+      await f.repository.save({
+        ...snapshot,
+        items: snapshot.items.map((item) => ({ ...item, prepared: false }))
+      })
+      f.content.listTemplateIds.mockResolvedValue(availability === 'source' ? ['startup'] : [])
+      f.content.hasPreparedTemplate.mockResolvedValue(availability === 'frozen')
+      if (availability === 'unreadable')
+        f.content.listTemplateIds.mockRejectedValue(new Error('Unreadable'))
+      if (availability === 'unreadable')
+        await expect(f.useCase.inspect(f.command.initializationId)).rejects.toThrow('Unreadable')
+      else
+        expect((await f.useCase.inspect(f.command.initializationId))?.items[0].status).toBe(
+          'pending'
+        )
+      expect(f.getSnapshot().items[0].status).toBe('pending')
+    }
+  )
+
+  it('waits for active creation before reconciling so restored progress cannot overwrite success', async () => {
+    const f = setup()
+    let finish!: () => void
+    f.content.createAgent.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ objectIds: ['agent'], executionTarget: null })
+        })
+    )
+    const applying = f.useCase.execute(f.command)
+    await vi.waitFor(() => expect(finish).toBeDefined())
+    const inspected = f.useCase.inspect(f.command.initializationId)
+    finish()
+    await applying
+    expect((await inspected)?.items.map((item) => item.status)).toEqual(['created', 'created'])
+    expect(f.content.createAgent).toHaveBeenCalledOnce()
+    expect(f.content.run).toHaveBeenCalledOnce()
+  })
+
   it('prepares a previously missing template before requesting fresh placement geometry', async () => {
     const fixture = setup()
     const operation = WorkspaceInitialization.restore({
@@ -128,6 +192,8 @@ function setup() {
     }
   }
   const content = {
+    listTemplateIds: vi.fn(async (): Promise<readonly string[]> => ['startup']),
+    hasPreparedTemplate: vi.fn(async () => false),
     isEmpty: vi.fn(async () => true),
     prepareTemplate: vi.fn(async () => 'Startup'),
     createTemplate: vi.fn<WorkspaceInitializationContentPort['createTemplate']>(async () => ({
@@ -146,7 +212,12 @@ function setup() {
     content,
     validate,
     getSnapshot: () => structuredClone(snapshot),
-    useCase: new InitializeWorkspaceContentUseCase(repository, content, validate),
+    useCase: new InitializeWorkspaceContentUseCase(
+      repository,
+      content,
+      validate,
+      vi.fn(async () => undefined)
+    ),
     command: {
       initializationId: 'initialization',
       projectId: 'project',

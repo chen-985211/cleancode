@@ -12,7 +12,8 @@ import {
   type WorkspaceInitializationSnapshot
 } from '../../domain/aggregates/WorkspaceInitialization'
 import {
-  normalizeWorkspaceDefaults,
+  resolveWorkspaceDefaults,
+  type WorkspaceDefaultsResolution,
   type WorkspaceDefaults
 } from '../../domain/value-objects/WorkspaceDefaults'
 import {
@@ -52,17 +53,29 @@ export class PrepareWorkspaceInitializationUseCase {
   private readonly requests = new ProjectWorkspaceTransactionCoordinator()
   constructor(private readonly dependencies: WorkspaceInitializationPreparationDependencies) {}
 
-  async getDefaults(projectDirectory: string): Promise<WorkspaceDefaults> {
-    const project = await this.requireProject(projectDirectory)
-    return this.dependencies.repository.getDefaults(project.id)
+  async getDefaults(projectDirectory: string): Promise<WorkspaceDefaultsResolution> {
+    return this.reconcileDefaults(projectDirectory)
   }
-  async saveDefaults(projectDirectory: string, defaults: WorkspaceDefaults): Promise<void> {
-    await this.dependencies.transactions.run(projectDirectory, async () => {
+  async saveDefaults(
+    projectDirectory: string,
+    defaults: WorkspaceDefaults
+  ): Promise<WorkspaceDefaultsResolution> {
+    return this.reconcileDefaults(projectDirectory, defaults)
+  }
+  private async reconcileDefaults(
+    projectDirectory: string,
+    replacement?: WorkspaceDefaults
+  ): Promise<WorkspaceDefaultsResolution> {
+    return this.dependencies.transactions.run(projectDirectory, async () => {
       const project = await this.requireProject(projectDirectory)
-      await this.dependencies.repository.saveDefaults(
-        project.id,
-        normalizeWorkspaceDefaults(defaults)
+      const value = replacement ?? (await this.dependencies.repository.getDefaults(project.id))
+      const result = resolveWorkspaceDefaults(
+        value,
+        await this.dependencies.content.listTemplateIds(project.id)
       )
+      if (replacement || result.removedTemplateIds.length)
+        await this.dependencies.repository.saveDefaults(project.id, result.defaults)
+      return result
     })
   }
   async create(command: CreateInitializedWorkspaceCommand): Promise<ProjectSnapshot> {
@@ -111,6 +124,14 @@ export class PrepareWorkspaceInitializationUseCase {
       await this.dependencies.repository.save(operation.toSnapshot())
       return operation.toSnapshot()
     })
+  }
+
+  async list(
+    projectDirectory: string,
+    workspaceId?: string
+  ): Promise<readonly WorkspaceInitializationSnapshot[]> {
+    const project = await this.requireProject(projectDirectory)
+    return this.dependencies.repository.list(project.id, workspaceId)
   }
 
   async cancelOne(projectDirectory: string, initializationId: string): Promise<void> {
@@ -166,6 +187,7 @@ export class PrepareWorkspaceInitializationUseCase {
       await this.prepareItems(operation)
       snapshot = operation.toSnapshot()
     }
+    await this.getDefaults(project.directory)
     this.assertRequest(snapshot, project, snapshot.workspaceId)
     if (snapshot.branchName !== command.branchName.trim() || snapshot.mode !== 'new-workspace') {
       throw createExpectedAppError(
@@ -288,7 +310,8 @@ export class PrepareWorkspaceInitializationUseCase {
             : item.name
         operation.prepare(item.id, name)
       } catch (error) {
-        operation.fail(item.id, getAppErrorCode(error) ?? 'UNEXPECTED_ERROR')
+        const code = getAppErrorCode(error) ?? 'UNEXPECTED_ERROR'
+        if (!operation.discardUnavailableTemplate(item.id, code)) operation.fail(item.id, code)
       }
       await this.dependencies.repository.save(operation.toSnapshot())
     }

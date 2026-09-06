@@ -1,7 +1,8 @@
 import type {
   WorkspaceInitializationDetails,
   WorkspaceInitializationResult,
-  WorkspaceDefaults
+  WorkspaceDefaults,
+  WorkspaceDefaultsResolution
 } from '../../contexts/project/application/dto/WorkspaceInitializationDetails'
 import type { InitializeWorkspaceContentCommand } from '../../contexts/project/application/use-cases/InitializeWorkspaceContentUseCase'
 import type { BeginEmptyCanvasInitializationCommand } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
@@ -14,8 +15,11 @@ export interface WorkspaceInitializationIpcInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
   readonly cancel: (projectDirectory: string, initializationId: string) => Promise<void>
-  readonly getDefaults: (directory: string) => Promise<WorkspaceDefaults>
-  readonly saveDefaults: (directory: string, defaults: WorkspaceDefaults) => Promise<void>
+  readonly getDefaults: (directory: string) => Promise<WorkspaceDefaultsResolution>
+  readonly saveDefaults: (
+    directory: string,
+    defaults: WorkspaceDefaults
+  ) => Promise<WorkspaceDefaultsResolution>
   readonly list: (query: {
     readonly projectDirectory: string
     readonly workspaceId?: string
@@ -43,7 +47,7 @@ export function registerWorkspaceInitializationIpcHandlers(
     operation: 'cancelWorkspaceInitialization',
     scope: 'project.initialization'
   })
-  registerIpcHandler<unknown, WorkspaceDefaults>({
+  registerIpcHandler<unknown, WorkspaceDefaultsResolution>({
     channel: 'cleancode:get-workspace-defaults',
     handler: (command) => input.getDefaults(readString(command, 'projectDirectory')),
     ipcMain: input.ipcMain,
@@ -51,7 +55,7 @@ export function registerWorkspaceInitializationIpcHandlers(
     operation: 'getWorkspaceDefaults',
     scope: 'project.initialization'
   })
-  registerIpcHandler<unknown, void>({
+  registerIpcHandler<unknown, WorkspaceDefaultsResolution>({
     channel: 'cleancode:save-workspace-defaults',
     handler: (command) =>
       input.saveDefaults(readString(command, 'projectDirectory'), readDefaults(command)),

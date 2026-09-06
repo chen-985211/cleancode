@@ -1,3 +1,4 @@
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 import { PrepareWorkspaceInitializationUseCase } from '../../../../src/contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { CreateBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
@@ -18,6 +19,76 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it('removes only invalid template references and returns the canonical saved settings', async () => {
+    const f = fixture()
+    f.content.listTemplateIds.mockResolvedValue([])
+    expect(await f.prepare.getDefaults('/project')).toEqual({
+      defaults: { templates: [], agents: defaults.agents },
+      removedTemplateIds: ['dev']
+    })
+    expect(await f.prepare.getDefaults('/project')).toEqual({
+      defaults: { templates: [], agents: defaults.agents },
+      removedTemplateIds: []
+    })
+    expect(await f.prepare.saveDefaults('/project', defaults)).toEqual({
+      defaults: { templates: [], agents: defaults.agents },
+      removedTemplateIds: ['dev']
+    })
+  })
+
+  it('keeps settings intact when the authoritative template query fails', async () => {
+    const f = fixture()
+    f.content.listTemplateIds.mockRejectedValueOnce(new Error('Library unreadable'))
+    await expect(f.prepare.getDefaults('/project')).rejects.toThrow('Library unreadable')
+    expect((await f.prepare.getDefaults('/project')).defaults).toEqual(defaults)
+  })
+
+  it('cleans stale defaults during creation and leaves available Agents ready to create', async () => {
+    const f = fixture()
+    f.content.listTemplateIds.mockResolvedValue([])
+    f.content.prepareTemplate.mockRejectedValueOnce(
+      createExpectedAppError('BLOCK_TEMPLATE_NOT_FOUND', 'Removed')
+    )
+    await f.prepare.create({
+      projectDirectory: '/project',
+      branchName: 'feature',
+      requestId: 'cleaned'
+    })
+    expect(f.records.get('cleaned')?.items.map((item) => item.status)).toEqual([
+      'skipped',
+      'pending'
+    ])
+    expect((await f.prepare.getDefaults('/project')).defaults).toEqual({
+      templates: [],
+      agents: defaults.agents
+    })
+    expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+  })
+
+  it('serializes cleanup with a newer settings save and preserves the new quantities', async () => {
+    const f = fixture()
+    let release!: (ids: readonly string[]) => void
+    f.content.listTemplateIds.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve
+        })
+    )
+    const cleaning = f.prepare.getDefaults('/project')
+    await vi.waitFor(() => expect(release).toBeDefined())
+    const saving = f.prepare.saveDefaults('/project', {
+      ...defaults,
+      agents: [{ providerId: 'provider', count: 4 }]
+    })
+    f.content.listTemplateIds.mockResolvedValue([])
+    release([])
+    await Promise.all([cleaning, saving])
+    expect((await f.prepare.getDefaults('/project')).defaults).toEqual({
+      templates: [],
+      agents: [{ providerId: 'provider', count: 4 }]
+    })
+  })
+
   it('recovers into an empty workspace already discovered by Git synchronization after a metadata failure', async () => {
     const f = fixture()
     f.projects.save.mockRejectedValueOnce(new Error('Disk unavailable'))
@@ -67,7 +138,7 @@ describe('prepare workspace initialization', () => {
       defaults: { templates: [], agents: [] }
     })
     expect(f.records.get('blank')?.stage).toBe('complete')
-    expect(await f.prepare.getDefaults('/project')).toEqual(defaults)
+    expect((await f.prepare.getDefaults('/project')).defaults).toEqual(defaults)
     expect(f.content.prepareTemplate).not.toHaveBeenCalled()
   })
 
@@ -196,6 +267,8 @@ function fixture() {
   const transactions = new ProjectWorkspaceTransactionCoordinator()
   const base = new CreateBranchWorkspaceUseCase(projects, git, directories, transactions)
   const content = {
+    listTemplateIds: vi.fn(async (): Promise<readonly string[]> => ['dev']),
+    hasPreparedTemplate: vi.fn(async () => false),
     isEmpty: vi.fn(async () => true),
     prepareTemplate: vi.fn(async () => 'Dev'),
     createTemplate: vi.fn(),

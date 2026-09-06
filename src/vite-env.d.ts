@@ -49,6 +49,7 @@ import type { GitBranchNavigationItemSnapshot } from './contexts/project/applica
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type {
   WorkspaceDefaults,
+  WorkspaceDefaultsResolution,
   WorkspaceInitializationSnapshot,
   WorkspaceInitializationDetails,
   WorkspaceInitializationResult
@@ -108,11 +109,11 @@ declare global {
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       getWorkspaceDefaults(command: {
         readonly projectDirectory: string
-      }): Promise<WorkspaceDefaults>
+      }): Promise<WorkspaceDefaultsResolution>
       saveWorkspaceDefaults(command: {
         readonly projectDirectory: string
         readonly defaults: WorkspaceDefaults
-      }): Promise<void>
+      }): Promise<WorkspaceDefaultsResolution>
       cancelWorkspaceInitialization(command: {
         readonly projectDirectory: string
         readonly initializationId: string

@@ -24,20 +24,24 @@ export class InitializeWorkspaceContentUseCase {
   constructor(
     private readonly repository: WorkspaceInitializationRepository,
     private readonly content: WorkspaceInitializationContentPort,
-    private readonly validate: (scope: WorkspaceInitializationScope) => Promise<boolean>
+    private readonly validate: (scope: WorkspaceInitializationScope) => Promise<boolean>,
+    private readonly reconcileDefaults: (projectDirectory: string) => Promise<void>
   ) {}
 
   async execute(
     command: InitializeWorkspaceContentCommand
   ): Promise<WorkspaceInitializationSnapshot> {
-    const previous = this.operations.get(command.initializationId) ?? Promise.resolve()
-    const operation = previous.catch(() => undefined).then(() => this.apply(command))
-    this.operations.set(command.initializationId, operation)
+    return this.serialize(command.initializationId, () => this.apply(command))
+  }
+
+  private async serialize<T>(id: string, run: () => Promise<T>): Promise<T> {
+    const previous = this.operations.get(id) ?? Promise.resolve()
+    const operation = previous.catch(() => undefined).then(run)
+    this.operations.set(id, operation)
     try {
       return await operation
     } finally {
-      if (this.operations.get(command.initializationId) === operation)
-        this.operations.delete(command.initializationId)
+      if (this.operations.get(id) === operation) this.operations.delete(id)
     }
   }
 
@@ -55,8 +59,14 @@ export class InitializeWorkspaceContentUseCase {
     const operation = WorkspaceInitialization.restore(snapshot)
     await this.requireScope(operation)
     if (snapshot.stage === 'cancelled') stale()
+    await this.reconcileUnavailableTemplates(operation)
     operation.interrupt()
-    if (command.retryItemId) operation.retry(command.retryItemId)
+    if (
+      command.retryItemId &&
+      operation.toSnapshot().items.find((item) => item.id === command.retryItemId)?.status !==
+        'skipped'
+    )
+      operation.retry(command.retryItemId)
     if (command.skipItemId) {
       operation.skip(command.skipItemId)
       operation.activate()
@@ -74,7 +84,8 @@ export class InitializeWorkspaceContentUseCase {
         try {
           operation.prepare(item.id, await this.content.prepareTemplate(snapshot, item))
         } catch (error) {
-          operation.fail(item.id, getAppErrorCode(error) ?? 'UNEXPECTED_ERROR')
+          const code = getAppErrorCode(error) ?? 'UNEXPECTED_ERROR'
+          if (!operation.discardUnavailableTemplate(item.id, code)) operation.fail(item.id, code)
         }
         await this.repository.save(operation.toSnapshot())
       }
@@ -125,7 +136,9 @@ export class InitializeWorkspaceContentUseCase {
         operation.created(item.id, result)
         await this.repository.save(operation.toSnapshot())
       } catch (error) {
-        operation.fail(original.id, getAppErrorCode(error) ?? 'UNEXPECTED_ERROR')
+        const code = getAppErrorCode(error) ?? 'UNEXPECTED_ERROR'
+        if (!operation.discardUnavailableTemplate(original.id, code))
+          operation.fail(original.id, code)
         await this.repository.save(operation.toSnapshot())
       }
     }
@@ -157,14 +170,40 @@ export class InitializeWorkspaceContentUseCase {
   }
 
   async inspect(id: string): Promise<WorkspaceInitializationSnapshot | null> {
-    const snapshot = await this.repository.find(id)
-    if (!snapshot) return null
-    const operation = WorkspaceInitialization.restore(snapshot)
-    if (!this.operations.has(id) && snapshot.items.some((item) => item.runStatus === 'requested')) {
-      operation.interrupt()
-      await this.repository.save(operation.toSnapshot())
-    }
-    return operation.toSnapshot()
+    return this.serialize(id, async () => {
+      const snapshot = await this.repository.find(id)
+      if (!snapshot || snapshot.stage === 'cancelled') return snapshot
+      const operation = WorkspaceInitialization.restore(snapshot)
+      await this.reconcileUnavailableTemplates(operation)
+      if (snapshot.items.some((item) => item.runStatus === 'requested')) operation.interrupt()
+      const result = operation.toSnapshot()
+      if (JSON.stringify(result) !== JSON.stringify(snapshot)) await this.repository.save(result)
+      return result
+    })
+  }
+
+  private async reconcileUnavailableTemplates(operation: WorkspaceInitialization): Promise<void> {
+    const snapshot = operation.toSnapshot()
+    const candidates = snapshot.items.filter(
+      (item) =>
+        item.kind === 'template' &&
+        !item.prepared &&
+        !item.result &&
+        (item.status === 'pending' || item.status === 'failed')
+    )
+    if (!candidates.length) return
+    const frozen = await Promise.all(
+      candidates.map((item) => this.content.hasPreparedTemplate(item.id))
+    )
+    const unfrozen = candidates.filter((_item, index) => !frozen[index])
+    if (!unfrozen.length) return
+    const available = new Set(await this.content.listTemplateIds(snapshot.projectId))
+    const missing = unfrozen.filter((item) => !available.has(item.templateId!))
+    if (!missing.length) return
+    await this.reconcileDefaults(snapshot.projectDirectory)
+    missing.forEach((item) =>
+      operation.discardUnavailableTemplate(item.id, 'BLOCK_TEMPLATE_NOT_FOUND')
+    )
   }
 }
 

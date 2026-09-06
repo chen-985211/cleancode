@@ -1,5 +1,5 @@
 import { WorkspaceDefaultsAutosave } from './WorkspaceDefaultsAutosave'
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import type {
   WorkspaceDefaults,
@@ -7,7 +7,8 @@ import type {
   WorkspaceInitializationSnapshot,
   WorkspaceInitializationResult
 } from '../../../contexts/project/application/dto/WorkspaceInitializationDetails'
-import { WorkspaceInitializationProgress } from '../../../contexts/project/presentation/components/WorkspaceInitializationProgress'
+import type { AppNotificationController } from '../../shared/notifications/appNotifications'
+import { useWorkspaceInitializationNotifications } from './useWorkspaceInitializationNotifications'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
@@ -21,6 +22,7 @@ import { WorkspaceDefaultsSettingsPane } from './WorkspaceDefaultsSettingsPane'
 import { useI18n } from '../../i18n/useI18n'
 
 interface WorkspaceInitializationInput {
+  readonly notifications: AppNotificationController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly createWorkspace: (
     workbench: WorkbenchSnapshot,
@@ -39,6 +41,7 @@ interface WorkspaceInitializationInput {
 
 export function useWorkspaceInitialization({
   currentWorkbench,
+  notifications,
   createWorkspace,
   nodeStore,
   protectedNodeIds,
@@ -47,11 +50,19 @@ export function useWorkspaceInitialization({
   setWorkbenches
 }: WorkspaceInitializationInput) {
   const { t } = useI18n()
+  const feedback = useWorkspaceInitializationNotifications(
+    notifications,
+    async (workbench, action) => {
+      if (workbench.initialization) await apply(workbench, workbench.initialization.id, action)
+    }
+  )
   const [autosaveStore] = useState(
     () =>
-      new WorkspaceDefaultsAutosave(async (projectDirectory, defaults) => {
-        await window.cleancode!.saveWorkspaceDefaults({ projectDirectory, defaults })
-      })
+      new WorkspaceDefaultsAutosave(
+        (projectDirectory, defaults) =>
+          window.cleancode!.saveWorkspaceDefaults({ projectDirectory, defaults }),
+        (directory, result) => feedback.reportCleanup(directory, result.removedTemplateIds)
+      )
   )
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, unknown>>({})
@@ -164,6 +175,7 @@ export function useWorkspaceInitialization({
           update(result)
         }
       }
+      feedback.report(workbench, result.initialization, false, null, true)
       const current = currentRef.current
       if (
         epoch === cameraEpoch.current &&
@@ -199,6 +211,8 @@ export function useWorkspaceInitialization({
       }
     } catch (error) {
       setErrors((current) => ({ ...current, [initializationId]: error }))
+      if (workbench.initialization)
+        feedback.report(workbench, workbench.initialization, false, error)
       throw error
     } finally {
       active.current.delete(initializationId)
@@ -235,12 +249,25 @@ export function useWorkspaceInitialization({
   }
 
   const initialization = currentWorkbench?.initialization
+  const { report } = feedback
+  useEffect(() => {
+    if (currentWorkbench && initialization)
+      report(
+        currentWorkbench,
+        initialization,
+        pending.has(initialization.id),
+        errors[initialization.id]
+      )
+  }, [currentWorkbench, initialization, pending, errors, report, t])
   async function resume(workbench: WorkbenchSnapshot, operation: WorkspaceInitializationSnapshot) {
     const result = await createWorkspace(workbench, operation.branchName!, {
       requestId: operation.id
     })
     if (!result) throw new Error(t('workspaceDefaults.failed'))
-    if (result.initialization) await apply(result, result.initialization.id)
+    if (result.initialization) {
+      const failed = result.initialization.items.find((item) => item.status === 'failed')
+      await apply(result, result.initialization.id, failed ? { retryItemId: failed.id } : undefined)
+    }
   }
   async function cancel(operation: WorkspaceInitializationSnapshot) {
     await window.cleancode?.cancelWorkspaceInitialization({
@@ -267,17 +294,6 @@ export function useWorkspaceInitialization({
         }}
         onCancel={cancel}
       />
-    ),
-    canvasControls:
-      currentWorkbench && initialization && window.cleancode?.applyWorkspaceInitialization ? (
-        <WorkspaceInitializationProgress
-          initialization={initialization}
-          pending={pending.has(initialization.id)}
-          error={errors[initialization.id]}
-          onApply={(action) => {
-            void apply(currentWorkbench, initialization.id, action).catch(() => undefined)
-          }}
-        />
-      ) : null
+    )
   }
 }

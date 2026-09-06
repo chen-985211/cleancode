@@ -94,7 +94,7 @@ CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对�
 
 Project 拥有 `WorkspaceInitializationContentPort` 和逐项初始化用例，Platform 适配器调用 BlockGraph 的冻结/实例化、Agent 的显式创建以及 Run 的既有工作流启动服务。Project 只持有初始化选择、目标作用域、对象身份和启动请求进度，不拥有模板正文、Agent 会话或真实运行状态。
 
-BlockGraph 与 Agent 分别原子保存对象及创建凭据，避免调用方进度保存失败造成重复创建；Run 仍独占 PTY、计划、就绪和停止语义。App Shell 负责模板与 Agent 的联合落位、统一相机、应用设置中的默认内容配置和恢复操作；读取工作区只投影进度。跨上下文装配见 [`workspaceInitializationRuntime.ts`](../../src/platform/electron-main/workspaceInitializationRuntime.ts)。
+BlockGraph 与 Agent 分别原子保存对象及创建凭据，避免调用方进度保存失败造成重复创建；Run 仍独占 PTY、计划、就绪和停止语义。App Shell 负责模板与 Agent 的联合落位、统一相机、应用设置中的默认内容配置和恢复操作；读取工作区可收敛已确认失效的初始化项，但不创建对象或启动进程。模板可用身份与私有冻结快照经 BlockGraph 应用查询提供，Project 用例统一拥有配置清理；App Shell 接收规范配置结果并复用全局通知。跨上下文装配见 [`workspaceInitializationRuntime.ts`](../../src/platform/electron-main/workspaceInitializationRuntime.ts)。
 
 ## Project 到 Agent：工作区所有权变更
 

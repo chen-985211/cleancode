@@ -1,6 +1,7 @@
+import type { WorkspaceDefaults } from '../../../src/contexts/project/application/dto/WorkspaceInitializationDetails'
 import { WorkspaceDefaultsDialogLoader } from '../../../src/presentation/app-shell/coordinators/WorkspaceDefaultsControls'
 import { WorkspaceDefaultsAutosave } from '../../../src/presentation/app-shell/coordinators/WorkspaceDefaultsAutosave'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { WorkspaceDefaultsSettingsPane } from '../../../src/presentation/app-shell/coordinators/WorkspaceDefaultsSettingsPane'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
@@ -11,12 +12,21 @@ describe('workspace defaults in application settings', () => {
 
   it('loads the latest unsaved settings draft instead of overwriting it with persisted data', async () => {
     const workbench = createWorkbenchSnapshot('/project', 'Project')
-    const store = new WorkspaceDefaultsAutosave(async () => undefined)
+    let finishSave!: () => void
+    const store = new WorkspaceDefaultsAutosave(
+      (_directory, defaults) =>
+        new Promise((resolve) => {
+          finishSave = () => resolve({ defaults, removedTemplateIds: [] })
+        })
+    )
     store.edit('/project', { templates: [], agents: [{ providerId: 'test-agent', count: 2 }] })
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: {
-        getWorkspaceDefaults: vi.fn(async () => ({ templates: [], agents: [] })),
+        getWorkspaceDefaults: vi.fn(async () => ({
+          defaults: { templates: [], agents: [] },
+          removedTemplateIds: []
+        })),
         listBlockTemplates: vi.fn(async () => []),
         discoverCreatableAgentProviders: vi.fn(async () => [
           { descriptor: { id: 'test-agent', displayName: 'Test Agent', icon: null } }
@@ -34,17 +44,25 @@ describe('workspace defaults in application settings', () => {
       />
     )
     expect(await screen.findByRole('spinbutton', { name: 'Test Agent 数量' })).toHaveValue(2)
+    await act(async () => finishSave())
   })
 
   it('loads and saves the selected project without applying content to its existing canvas', async () => {
     const first = createWorkbenchSnapshot('/first', 'First')
     const second = createWorkbenchSnapshot('/second', 'Second')
-    const save = vi.fn<(input: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const saved = new Map<string, WorkspaceDefaults>()
+    const save = vi.fn(async (input: { projectDirectory: string; defaults: WorkspaceDefaults }) => {
+      saved.set(input.projectDirectory, input.defaults)
+      return { defaults: input.defaults, removedTemplateIds: [] }
+    })
     const apply = vi.fn()
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: {
-        getWorkspaceDefaults: vi.fn(async () => ({ templates: [], agents: [] })),
+        getWorkspaceDefaults: vi.fn(async ({ projectDirectory }: { projectDirectory: string }) => ({
+          defaults: saved.get(projectDirectory) ?? { templates: [], agents: [] },
+          removedTemplateIds: []
+        })),
         listBlockTemplates: vi.fn(async () => []),
         discoverCreatableAgentProviders: vi.fn(async () => [
           { descriptor: { id: 'test-agent', displayName: 'Test Agent', icon: null } }

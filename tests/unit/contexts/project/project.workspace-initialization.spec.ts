@@ -2,6 +2,28 @@ import { WorkspaceInitialization } from '../../../../src/contexts/project/domain
 import { normalizeWorkspaceDefaults } from '../../../../src/contexts/project/domain/value-objects/WorkspaceDefaults'
 
 describe('workspace initialization', () => {
+  it.each(['prepared', 'created', 'agent', 'transient'])(
+    'preserves %s items during automatic cleanup',
+    (state) => {
+      const operation = create({
+        templates: [{ templateId: 'dev', runAfterPlacement: true }],
+        agents: [{ providerId: 'provider', count: 1 }]
+      })
+      const [template, agent] = operation.toSnapshot().items
+      if (state === 'prepared') operation.prepare(template.id, 'Dev')
+      if (state === 'created')
+        operation.created(template.id, { objectIds: ['terminal'], executionTarget: null })
+      const before = operation.toSnapshot()
+      expect(
+        operation.discardUnavailableTemplate(
+          state === 'agent' ? agent.id : template.id,
+          state === 'transient' ? 'UNEXPECTED_ERROR' : 'BLOCK_TEMPLATE_NOT_FOUND'
+        )
+      ).toBe(false)
+      expect(operation.toSnapshot()).toEqual(before)
+    }
+  )
+
   it('expands each provider quantity into distinct durable identities', () => {
     const initialization = create({
       templates: [],

@@ -36,6 +36,7 @@ export function WorkspaceDefaultsDialogLoader({
     const api = window.cleancode
     if (!api) return
     let cancelled = false
+    const revision = autosaveStore.get(directory)?.revision
     void Promise.all([
       api.getWorkspaceDefaults({ projectDirectory: directory }),
       api.listBlockTemplates({ scope: { type: 'project', projectId } }),
@@ -46,18 +47,18 @@ export function WorkspaceDefaultsDialogLoader({
     ])
       .then(
         ([
-          defaults,
+          resolution,
           projectTemplates,
           globalTemplates,
           providers,
           preferences,
           initializations
         ]) => {
-          if (!cancelled) autosaveStore.seed(directory, defaults)
+          if (!cancelled) autosaveStore.refresh(directory, resolution, revision)
           if (!cancelled) setOperations(initializations.map((item) => item.initialization))
           if (!cancelled)
             setData({
-              defaults: autosaveStore.get(directory)?.value ?? defaults,
+              defaults: autosaveStore.get(directory)?.value ?? resolution.defaults,
               templates: [
                 ...projectTemplates.map((item) => ({ ...item, source: 'project' as const })),
                 ...globalTemplates.map((item) => ({ ...item, source: 'global' as const }))

@@ -225,6 +225,21 @@ export class WorkspaceInitialization {
     this.update(id, { status: 'failed', errorCode })
   }
 
+  discardUnavailableTemplate(id: string, errorCode: AppErrorCode): boolean {
+    const item = this.item(id)
+    if (
+      item.kind !== 'template' ||
+      item.prepared ||
+      item.result ||
+      (item.status !== 'pending' && item.status !== 'failed') ||
+      (errorCode !== 'BLOCK_TEMPLATE_NOT_FOUND' &&
+        errorCode !== 'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID')
+    )
+      return false
+    this.update(id, { status: 'skipped', runStatus: 'disabled', errorCode })
+    return true
+  }
+
   retry(id: string): void {
     if (this.item(id).status !== 'failed') conflict()
     this.update(id, { status: 'pending', errorCode: null, position: null })

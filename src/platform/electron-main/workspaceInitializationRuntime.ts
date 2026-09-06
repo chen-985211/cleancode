@@ -14,6 +14,7 @@ import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/app
 import { FileSystemWorkspaceInitializationRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemWorkspaceInitializationRepository'
 import type { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import type { InstantiateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
+import { ListBlockTemplatesUseCase } from '../../contexts/block-graph/application/use-cases/ListBlockTemplatesUseCase'
 import { PrepareBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/PrepareBlockTemplateUseCase'
 import type { BlockTemplateRepository } from '../../contexts/block-graph/application/ports/BlockTemplateRepository'
 import { FileSystemBlockTemplateRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockTemplateRepository'
@@ -50,7 +51,16 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     )
   )
   const validation = new ValidateProjectWorkspaceScopeUseCase(input.projects, input.registry)
+  const templateCatalog = new ListBlockTemplatesUseCase(input.templates)
   const content: WorkspaceInitializationContentPort = {
+    listTemplateIds: async (projectId) => {
+      const [project, global] = await Promise.all([
+        templateCatalog.execute({ scope: { type: 'project', projectId } }),
+        templateCatalog.execute({ scope: { type: 'global' } })
+      ])
+      return [...project, ...global].map((item) => item.id)
+    },
+    hasPreparedTemplate: async (itemId) => (await prepared.find(itemId)) !== null,
     isEmpty: async (scope) => {
       if (!(await validation.execute(scope))) stale()
       const [graph, agents] = await Promise.all([
@@ -132,8 +142,11 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     }
   }
   const preparation = new PrepareWorkspaceInitializationUseCase({ ...input, repository, content })
-  const initialize = new InitializeWorkspaceContentUseCase(repository, content, (scope) =>
-    validation.execute(scope)
+  const initialize = new InitializeWorkspaceContentUseCase(
+    repository,
+    content,
+    (scope) => validation.execute(scope),
+    (directory) => preparation.getDefaults(directory).then(() => undefined)
   )
   const details = async (
     snapshot: WorkspaceInitializationSnapshot
@@ -177,12 +190,10 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
         getDefaults: preparation.getDefaults.bind(preparation),
         cancel: preparation.cancelOne.bind(preparation),
         saveDefaults: preparation.saveDefaults.bind(preparation),
-        list: async (query) => {
-          await preparation.getDefaults(query.projectDirectory)
-          const project = await input.projects.findByDirectory(query.projectDirectory)
-          if (!project) stale()
-          return Promise.all((await repository.list(project.id, query.workspaceId)).map(details))
-        },
+        list: async (query) =>
+          Promise.all(
+            (await preparation.list(query.projectDirectory, query.workspaceId)).map(details)
+          ),
         begin: async (command) => details(await preparation.beginEmpty(command)),
         apply: async (command) => {
           const initialization = await initialize.execute(command)

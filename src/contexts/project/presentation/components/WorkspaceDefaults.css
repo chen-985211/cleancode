@@ -208,8 +208,7 @@
   justify-content: flex-end;
   padding-top: 24px;
 }
-.workspace-defaults-dialog footer button,
-.workspace-initialization-panel button {
+.workspace-defaults-dialog footer button {
   border: 1px solid var(--cc-border);
   border-radius: 6px;
   background: var(--cc-surface);
@@ -407,26 +406,6 @@
   .workspace-defaults-run > span {
     display: none;
   }
-}
-.workspace-initialization-panel {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 5;
-  width: min(350px, calc(100% - 40px));
-  max-height: 65%;
-  overflow: auto;
-  padding: 14px;
-  border: 1px solid var(--cc-border);
-  border-radius: 10px;
-  background: var(--cc-surface-overlay);
-  box-shadow: var(--cc-shadow-sm);
-  color: var(--cc-foreground);
-  font-size: 12px;
-}
-.workspace-initialization-panel summary {
-  cursor: pointer;
-  font-weight: 600;
 }
 .workspace-initialization-item {
   border-top: 1px solid var(--cc-border);

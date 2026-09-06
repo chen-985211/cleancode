@@ -1,4 +1,7 @@
-import type { WorkspaceDefaults } from '../../../contexts/project/application/dto/WorkspaceInitializationDetails'
+import type {
+  WorkspaceDefaults,
+  WorkspaceDefaultsResolution
+} from '../../../contexts/project/application/dto/WorkspaceInitializationDetails'
 
 interface SaveState {
   readonly value: WorkspaceDefaults
@@ -14,7 +17,11 @@ export class WorkspaceDefaultsAutosave {
   private readonly listeners = new Set<() => void>()
 
   constructor(
-    private readonly save: (directory: string, value: WorkspaceDefaults) => Promise<void>
+    private readonly save: (
+      directory: string,
+      value: WorkspaceDefaults
+    ) => Promise<WorkspaceDefaultsResolution>,
+    private readonly onResolved?: (directory: string, result: WorkspaceDefaultsResolution) => void
   ) {}
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -29,6 +36,25 @@ export class WorkspaceDefaultsAutosave {
   seed(directory: string, value: WorkspaceDefaults): void {
     if (!this.states.has(directory))
       this.set(directory, { value, status: 'idle', error: null, revision: 0 })
+  }
+  refresh(
+    directory: string,
+    result: WorkspaceDefaultsResolution,
+    revision: number | undefined
+  ): void {
+    const state = this.get(directory)
+    if (
+      !state ||
+      (state.revision === revision && (state.status === 'idle' || state.status === 'saved'))
+    ) {
+      this.set(directory, {
+        value: result.defaults,
+        status: 'idle',
+        error: null,
+        revision: state?.revision ?? 0
+      })
+    }
+    this.onResolved?.(directory, result)
   }
   edit(directory: string, value: WorkspaceDefaults): void {
     this.set(directory, {
@@ -66,14 +92,21 @@ export class WorkspaceDefaultsAutosave {
     for (;;) {
       const sent = this.get(directory)!
       let error: unknown = null
+      let result: WorkspaceDefaultsResolution | undefined
       try {
-        await this.save(directory, sent.value)
+        result = await this.save(directory, sent.value)
+        this.onResolved?.(directory, result)
       } catch (failure) {
         error = failure
       }
       const latest = this.get(directory)!
       if (latest.revision !== sent.revision) continue
-      this.set(directory, { ...latest, status: error ? 'error' : 'saved', error })
+      this.set(directory, {
+        ...latest,
+        value: result?.defaults ?? latest.value,
+        status: error ? 'error' : 'saved',
+        error
+      })
       return
     }
   }

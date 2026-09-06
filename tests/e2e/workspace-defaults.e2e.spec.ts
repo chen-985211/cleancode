@@ -138,7 +138,7 @@ describe('workspace default contents e2e', () => {
               window.cleancode!.getWorkspaceDefaults({ projectDirectory: directory }),
             workbench.projectDirectory
           ),
-        accept: (defaults) =>
+        accept: ({ defaults }) =>
           defaults.agents.length === 2 &&
           defaults.agents[0].count === 2 &&
           defaults.templates.length === 2 &&
@@ -262,7 +262,7 @@ describe('workspace default contents e2e', () => {
             (directory) => window.cleancode!.getWorkspaceDefaults({ projectDirectory: directory }),
             workbench.projectDirectory
           ),
-        accept: (defaults) => defaults.agents.length === 0 && defaults.templates.length === 0
+        accept: ({ defaults }) => defaults.agents.length === 0 && defaults.templates.length === 0
       })
       await page.getByRole('button', { name: '返回工作区', exact: true }).click()
       await editor.waitFor({ state: 'hidden' })
@@ -300,6 +300,64 @@ describe('workspace default contents e2e', () => {
         observe: () => page.locator('.react-flow__node').count(),
         accept: (count) => count === 5
       })
+    }
+  )
+
+  it(
+    'cleans a deleted default template during creation and uses the global notification surface',
+    { timeout: electronScenarioTimeoutMs },
+    async () => {
+      await openWorkspaceSettings()
+      const editor = page.getByRole('form', { name: '工作区默认内容', exact: true })
+      await editor.getByRole('button', { name: '添加 Agent', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Codex', exact: true }).click()
+      for (const name of ['Startup', 'Notes']) {
+        await editor.getByRole('button', { name: '添加模板', exact: true }).click()
+        await page.getByRole('menuitem', { name, exact: true }).click()
+      }
+      await pollUntilState({
+        timeoutMs: 10_000,
+        description: 'configured defaults saved',
+        observe: () => editor.getAttribute('aria-busy'),
+        accept: (busy) => busy === 'false'
+      })
+      await page.getByRole('button', { name: '返回工作区', exact: true }).click()
+      await page.locator('.application-settings-surface').waitFor({ state: 'detached' })
+      await page.evaluate(() => window.cleancode!.deleteBlockTemplate({ templateId: 'notes' }))
+      await createWorktree('feature/cleanup')
+      await pollUntilState({
+        timeoutMs: 15_000,
+        description: 'available defaults created and missing template skipped',
+        observe: readCurrentWorkspace,
+        accept: (value) =>
+          value?.initialization?.stage === 'complete' &&
+          value.graph.blocks.length === 1 &&
+          value.agents?.length === 1
+      })
+      await page.locator('.notification-card').filter({ hasText: '已清理 1 个失效模板' }).waitFor()
+      expect(await page.locator('.workspace-initialization-panel').count()).toBe(0)
+      await mkdir('test-results/workspace-defaults', { recursive: true })
+      await page.screenshot({ path: 'test-results/workspace-defaults/cleanup-notification.png' })
+      const resolution = await page.evaluate(
+        (directory) => window.cleancode!.getWorkspaceDefaults({ projectDirectory: directory }),
+        resources.workbench!.projectDirectory
+      )
+      expect(resolution.defaults.templates.map((item) => item.templateId)).toEqual(['startup'])
+      await openWorkspaceSettings()
+      await editor.getByRole('switch', { name: '自动运行 Startup', exact: true }).waitFor()
+      expect(await editor.getByText(/不可用/).count()).toBe(0)
+      expect(await editor.getByRole('switch').count()).toBe(1)
+      await page.getByRole('button', { name: '返回工作区', exact: true }).click()
+      await page.reload()
+      await pollUntilState({
+        timeoutMs: 15_000,
+        description: 'cleaned workspace restored without duplicate content',
+        observe: () => page.locator('.react-flow__node').count(),
+        accept: (count) => count === 2
+      })
+      expect(
+        await page.locator('.notification-card').filter({ hasText: '已清理 1 个失效模板' }).count()
+      ).toBe(0)
     }
   )
 

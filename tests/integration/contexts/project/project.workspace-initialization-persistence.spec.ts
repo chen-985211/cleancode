@@ -13,6 +13,42 @@ describe('workspace initialization persistence', () => {
     await rm(directory, { recursive: true, force: true })
   })
 
+  it('restores automatic cleanup receipts without changing successful object identities', async () => {
+    const path = join(directory, 'initialization.json')
+    const repository = new FileSystemWorkspaceInitializationRepository(path)
+    const operation = WorkspaceInitialization.create({
+      id: 'cleaned',
+      projectId: 'project',
+      projectDirectory: directory,
+      workspaceId: 'workspace',
+      workspaceDirectory: directory,
+      branchName: 'feature',
+      mode: 'new-workspace',
+      defaults: {
+        templates: [{ templateId: 'deleted', runAfterPlacement: true }],
+        agents: [{ providerId: 'provider', count: 1 }]
+      }
+    })
+    operation.activate()
+    const [template, agent] = operation.toSnapshot().items
+    operation.created(agent.id, { objectIds: ['existing-agent'], executionTarget: null })
+    operation.discardUnavailableTemplate(template.id, 'BLOCK_TEMPLATE_NOT_FOUND')
+    await repository.save(operation.toSnapshot())
+    const restored = await new FileSystemWorkspaceInitializationRepository(path).find('cleaned')
+    expect(restored).toMatchObject({
+      stage: 'complete',
+      items: [
+        {
+          id: template.id,
+          status: 'skipped',
+          runStatus: 'disabled',
+          errorCode: 'BLOCK_TEMPLATE_NOT_FOUND'
+        },
+        { id: agent.id, status: 'created', result: { objectIds: ['existing-agent'] } }
+      ]
+    })
+  })
+
   it('persists a verified rebind before content is created and forbids later identity changes', async () => {
     const repository = new FileSystemWorkspaceInitializationRepository(
       join(directory, 'initialization.json')

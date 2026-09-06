@@ -4,7 +4,10 @@ import type { BlockTemplateSnapshot } from '../../../block-graph/application/dto
 import type { WorkspaceInitializationSnapshot } from '../../domain/aggregates/WorkspaceInitialization'
 
 export type { WorkspaceInitializationSnapshot } from '../../domain/aggregates/WorkspaceInitialization'
-export type { WorkspaceDefaults } from '../../domain/value-objects/WorkspaceDefaults'
+export type {
+  WorkspaceDefaults,
+  WorkspaceDefaultsResolution
+} from '../../domain/value-objects/WorkspaceDefaults'
 
 export interface WorkspaceInitializationDetails {
   readonly initialization: WorkspaceInitializationSnapshot

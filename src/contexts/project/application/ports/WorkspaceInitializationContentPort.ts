@@ -10,6 +10,8 @@ export type WorkspaceInitializationScope = Pick<
 >
 
 export interface WorkspaceInitializationContentPort {
+  listTemplateIds(projectId: string): Promise<readonly string[]>
+  hasPreparedTemplate(itemId: string): Promise<boolean>
   isEmpty(scope: WorkspaceInitializationScope): Promise<boolean>
   prepareTemplate(
     scope: WorkspaceInitializationScope,

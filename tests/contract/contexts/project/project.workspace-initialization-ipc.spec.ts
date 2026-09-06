@@ -1,5 +1,6 @@
 import { registerWorkspaceInitializationIpcHandlers } from '../../../../src/platform/electron-main/workspaceInitializationIpcHandlers'
 import type { IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandler'
+import type { WorkspaceDefaults } from '../../../../src/contexts/project/application/dto/WorkspaceInitializationDetails'
 import type { Logger } from '../../../../src/platform/logging/Logger'
 
 describe('workspace initialization IPC', () => {
@@ -12,7 +13,9 @@ describe('workspace initialization IPC', () => {
         { providerId: 'another', count: 1 }
       ]
     }
-    await invoke('cleancode:save-workspace-defaults', { projectDirectory: '/project', defaults })
+    expect(
+      await invoke('cleancode:save-workspace-defaults', { projectDirectory: '/project', defaults })
+    ).toMatchObject({ ok: true, value: { defaults, removedTemplateIds: [] } })
     expect(saveDefaults).toHaveBeenCalledWith('/project', defaults)
     const command = {
       initializationId: 'request',
@@ -79,7 +82,10 @@ function setup() {
     }
   }
   const logger: Logger = { debug() {}, info() {}, warn() {}, error() {} }
-  const saveDefaults = vi.fn(async () => {})
+  const saveDefaults = vi.fn(async (_directory: string, defaults: WorkspaceDefaults) => ({
+    defaults,
+    removedTemplateIds: []
+  }))
   const apply = vi.fn()
   registerWorkspaceInitializationIpcHandlers({
     ipcMain,

@@ -355,6 +355,7 @@ export function AppShell({
   })
   const workspaceInitialization = useWorkspaceInitialization({
     currentWorkbench,
+    notifications,
     createWorkspace: branchWorkspaceActions.createBranchWorkspace,
     nodeStore,
     protectedNodeIds: protectedLayoutNodeIds,
@@ -618,7 +619,6 @@ export function AppShell({
           onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
         />
         <WorkbenchCanvas
-          initializationControls={workspaceInitialization.canvasControls}
           approvalIntents={agentToolApprovals.approvals}
           agentProviders={enabledCreatableAgentProviders}
           defaultAgentProviderId={effectiveAgentProviderId}
