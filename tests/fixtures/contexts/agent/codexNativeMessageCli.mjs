@@ -21,7 +21,11 @@ const report = (kind) =>
       descendantPid
     }) + '\n'
   )
-if (args.includes('--help') && process.env.NATIVE_MESSAGE_UNSUPPORTED === '1') {
+if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
+  // Keep actual probe processes alive until the launch owner explicitly shuts them down.
+  report('probe')
+  watch(dirname(process.env.NATIVE_MESSAGE_REPORT), () => {})
+} else if (args.includes('--help') && process.env.NATIVE_MESSAGE_UNSUPPORTED === '1') {
   process.stdout.write('Simulated CLI without the required capability')
 } else if (args.includes('--help')) {
   process.stdout.write(

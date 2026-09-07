@@ -4,6 +4,8 @@ import type { AgentRuntimeChangedEvent } from '../../src/contexts/agent/applicat
 import { pollUntilState } from './e2ePolling'
 
 export const agentLaunchReadyTimeoutMs = 15_000
+// Native CLI output follows the relay's bounded capability probe, after launch acceptance.
+export const agentCliReadyTimeoutMs = agentLaunchReadyTimeoutMs + 10_000
 
 export interface AgentLaunchReadySnapshot {
   readonly agentId: string

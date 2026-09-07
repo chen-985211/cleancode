@@ -133,6 +133,8 @@ Renderer 将首次 attach、重新启动和新对话请求投影为独立的 `me
 
 Provider CLI 自然退出或处理 `Ctrl+C` 后，Agent launch 状态变为 `exited`、activity 变为 `unavailable`，停止新的 MCP 调用并释放 launch 临时资源；Run terminal、权威屏幕和 shell 保留。用户可以继续使用 shell、恢复当前对话或开始新对话。shell/PTY 自身退出才清空 terminal identity 并使整个运行时不可输入。
 
+删除或挂起时先尝试 Provider 声明的原生退出输入；超过有界期限后，可调用该 Provider 的有界 `onTimeout` 收尾，再停止 PTY。Codex relay 复用现有关闭 IPC，并与后续 launch artifact 清理合并为同一次关闭，避免 CLI 尚在能力探测时先杀死 relay、随后永远等待其清理确认。平台进程与 IPC 细节仍由 Provider 适配器拥有。
+
 该基础终端能力必须同时支持 macOS、Linux 和 Windows。macOS/Linux 由 POSIX PTY/shell 承载，并在 Provider 检测前完成上述 login-shell PATH hydration；Windows 由 node-pty ConPTY 和 PowerShell/PowerShell Core 承载，并兼容 Provider 的 npm `.cmd` shim。平台模拟、PowerShell 脚本文本断言或 fake process 只能证明编码和契约，不能替代对应原生平台上的检测、PTY 中断、launch 退出和 shell 继续可写集成测试。
 
 应用层只发布带单调 `revision` 的 `AgentRuntimeSnapshot`，不再维护互相竞争的扁平状态。它包含五条独立事实轴：

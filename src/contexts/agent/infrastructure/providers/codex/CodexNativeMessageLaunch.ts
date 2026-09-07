@@ -79,13 +79,15 @@ export async function prepareCodexNativeMessageLaunch(input: {
   let threadId: string | undefined
   let supported = false
   let pending: Promise<void> | undefined
+  let shutdown: Promise<void> | undefined
   const send = async (request: unknown): Promise<void> => {
     const temporary = join(directory, `request-${randomUUID()}`)
     await writeFile(temporary, JSON.stringify(request), { mode: 0o600 })
     await rename(temporary, join(directory, 'request'))
   }
-  command.artifacts.track('codex-native-session', {
-    async dispose() {
+  const closeNativeSession = (): Promise<void> => {
+    if (shutdown) return shutdown
+    const operation = (async () => {
       closed = true
       observer.readiness?.close()
       await pending?.catch(() => undefined)
@@ -96,6 +98,16 @@ export async function prepareCodexNativeMessageLaunch(input: {
         await send({ kind: 'close' })
         await waitForFile(directory, 'closed', () => true, 3_000)
       }
+    })()
+    shutdown = operation
+    void operation.catch(() => {
+      if (shutdown === operation) shutdown = undefined
+    })
+    return operation
+  }
+  command.artifacts.track('codex-native-session', {
+    async dispose() {
+      await closeNativeSession()
       await config.dispose()
     }
   })
@@ -176,7 +188,16 @@ export async function prepareCodexNativeMessageLaunch(input: {
   return {
     ...nativePlan,
     executable: input.runtimeExecutable,
-    args: [relay.path, config.path]
+    args: [relay.path, config.path],
+    gracefulShutdown: {
+      inputs: nativePlan.gracefulShutdown?.inputs ?? [],
+      inputIntervalMs: nativePlan.gracefulShutdown?.inputIntervalMs ?? 0,
+      timeoutMs: nativePlan.gracefulShutdown?.timeoutMs ?? 0,
+      async onTimeout() {
+        await nativePlan.gracefulShutdown?.onTimeout?.()
+        await closeNativeSession()
+      }
+    }
   }
 }
 

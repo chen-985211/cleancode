@@ -23,6 +23,7 @@ import {
 } from '../support/e2eWorkbench'
 import {
   agentLaunchReadyTimeoutMs,
+  agentCliReadyTimeoutMs,
   waitForAgentLaunchReady,
   waitForAgentProviderInstalled,
   waitForAgentTerminalReady,
@@ -378,8 +379,7 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
 async function waitForCodexLaunch(
   reportPath: string,
   expectedCount: number,
-  // The relay adds a bounded 10s capability probe before the ordinary CLI starts.
-  timeoutMs = agentLaunchReadyTimeoutMs + 10_000
+  timeoutMs = agentCliReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
   return waitForCodexReport(
     reportPath,

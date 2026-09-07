@@ -24,7 +24,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { waitForAgentProviderInstalled } from '../support/e2eAgentRuntime'
+import { agentCliReadyTimeoutMs, waitForAgentProviderInstalled } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
 import {
@@ -321,7 +321,7 @@ async function waitForAgentTerminal(
   const viewport = page.locator(
     `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceDisplayName}"]`
   )
-  await waitForTerminalDomText(viewport, fakeCodexMarker, 15_000)
+  await waitForTerminalDomText(viewport, fakeCodexMarker, agentCliReadyTimeoutMs)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
   expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
   expect(visibleOutput).not.toContain('CLEANCODE_JOB:')

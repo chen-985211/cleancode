@@ -14,12 +14,13 @@ import { prepareCodexNativeMessageLaunch } from '../../../../src/contexts/agent/
 
 describe('Codex owned native session', () => {
   it.each([
-    ['codex-cli 0.149.0', true],
-    [undefined, true],
-    ['codex-cli 999.0.0', false]
+    ['codex-cli 0.149.0', true, false],
+    [undefined, true, false],
+    ['codex-cli 999.0.0', false, false],
+    [undefined, true, true]
   ] as const)(
-    'probes %s, retries failures without duplicate acceptance and cleans up its TUI and server',
-    async (version, supported) => {
+    'probes %s, supported=%s, early stop=%s, and cleans up all owned processes',
+    async (version, supported, stopDuringProbe) => {
       const directory = await realpath(await mkdtemp(join(tmpdir(), 'cc native 中文 $&-')))
       const report = join(directory, 'report')
       const rejectPath = join(directory, 'reject-queue')
@@ -86,6 +87,7 @@ describe('Codex owned native session', () => {
           NATIVE_MESSAGE_REJECT_PATH: rejectPath,
           NATIVE_MESSAGE_QUEUE_GATE: gatePath,
           NATIVE_MESSAGE_UNSUPPORTED: supported ? '0' : '1',
+          NATIVE_MESSAGE_HOLD_PROBES: stopDuringProbe ? '1' : '0',
           NATIVE_MESSAGE_SHELL_VALUE: 'from-shell'
         },
         stdio: ['pipe', 'pipe', 'pipe']
@@ -110,6 +112,25 @@ describe('Codex owned native session', () => {
         ])
       let scenarioFailure: unknown
       try {
+        if (stopDuringProbe) {
+          await pollUntilState({
+            observe: async () => readFile(report, 'utf8').catch(() => ''),
+            accept: (records) => records.includes('"kind":"probe"'),
+            timeoutMs: 5_000,
+            description: 'native capability probes entered before the TUI exists'
+          })
+          expect(relayOutput).not.toContain('NATIVE_TUI_READY')
+          await plan.gracefulShutdown!.onTimeout!()
+          await exited
+          const records = (await readFile(report, 'utf8'))
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line))
+          expect(records.every((record) => record.kind === 'probe')).toBe(true)
+          for (const record of records) expect(() => process.kill(record.pid, 0)).toThrow()
+          await artifacts.dispose()
+          return
+        }
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Native fixture did not start')), 5_000)
           child.stdout.on('data', (data) => {
