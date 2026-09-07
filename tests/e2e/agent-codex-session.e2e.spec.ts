@@ -378,7 +378,8 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
 async function waitForCodexLaunch(
   reportPath: string,
   expectedCount: number,
-  timeoutMs = agentLaunchReadyTimeoutMs
+  // The relay adds a bounded 10s capability probe before the ordinary CLI starts.
+  timeoutMs = agentLaunchReadyTimeoutMs + 10_000
 ): Promise<FakeCodexCliReport> {
   return waitForCodexReport(
     reportPath,
