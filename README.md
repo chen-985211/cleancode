@@ -31,6 +31,10 @@
 
 <p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
 
+<p align="center"><strong>▶ Multi-Agent Collaboration Demo (0:39)</strong></p>
+
+https://github.com/user-attachments/assets/9e157258-5604-4da6-83f9-65943c19efc5
+
 <p align="center"><strong>▶ Full demo (2:33, with sound)</strong></p>
 
 https://github.com/user-attachments/assets/cafe373f-97b7-4f8c-b4a4-dfbc88ab26c3

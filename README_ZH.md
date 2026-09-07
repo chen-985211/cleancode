@@ -31,6 +31,10 @@
 
 <p align="center"><sub>同一分支工作区中的 Coding Agent、终端任务、长驻服务与真实依赖连线。</sub></p>
 
+<p align="center"><strong>▶ 多 Agent 协作演示（0:39）</strong></p>
+
+https://github.com/user-attachments/assets/9e157258-5604-4da6-83f9-65943c19efc5
+
 <p align="center"><strong>▶ 完整演示（2:33，含声音）</strong></p>
 
 https://github.com/user-attachments/assets/cafe373f-97b7-4f8c-b4a4-dfbc88ab26c3
