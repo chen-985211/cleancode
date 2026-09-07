@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { chmod, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,10 +18,12 @@ describe('Codex owned native session', () => {
     [undefined, true],
     ['codex-cli 999.0.0', false]
   ] as const)(
-    'probes capabilities for %s and cleans up its TUI and server',
+    'probes %s, retries failures without duplicate acceptance and cleans up its TUI and server',
     async (version, supported) => {
       const directory = await realpath(await mkdtemp(join(tmpdir(), 'cc native 中文 $&-')))
       const report = join(directory, 'report')
+      const rejectPath = join(directory, 'reject-queue')
+      const gatePath = join(directory, 'queue-gate')
       const executable = join(directory, process.platform === 'win32' ? 'codex-验证.cmd' : 'codex')
       const nativeArgs = [
         '--sandbox',
@@ -69,13 +71,27 @@ describe('Codex owned native session', () => {
         env: {
           ...process.env,
           NATIVE_MESSAGE_REPORT: report,
+          NATIVE_MESSAGE_REJECT_PATH: rejectPath,
+          NATIVE_MESSAGE_QUEUE_GATE: gatePath,
           NATIVE_MESSAGE_UNSUPPORTED: supported ? '0' : '1',
           NATIVE_MESSAGE_SHELL_VALUE: 'from-shell'
         },
         stdio: ['pipe', 'pipe', 'pipe']
       })
+      let relayErrors = ''
+      child.stderr.on('data', (data) => {
+        relayErrors += String(data)
+      })
+      let serverPid: number | undefined
       let descendantPid: number | undefined
       const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+      const notify = (notificationId: string, signal: AbortSignal) =>
+        Promise.race([
+          wakeup!.notify({ notificationId, signal }),
+          exited.then(() => {
+            throw new Error(`Native relay exited before acceptance: ${relayErrors}`)
+          })
+        ])
       try {
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Native fixture did not start')), 5_000)
@@ -87,6 +103,13 @@ describe('Codex owned native session', () => {
           })
           child.once('error', reject)
         })
+        const server = (await readFile(report, 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+          .find((record) => record.kind === 'server')
+        serverPid = server?.pid
+        descendantPid = server?.descendantPid
         if (!supported) {
           await vi.waitFor(() => expect(wakeup).toBeNull())
           const records = (await readFile(report, 'utf8'))
@@ -107,15 +130,54 @@ describe('Codex owned native session', () => {
           description: 'Codex native readiness'
         })
         const signal = new AbortController().signal
-        await wakeup!.notify({ notificationId: 'one', signal })
-        await wakeup!.notify({ notificationId: 'one', signal })
-        await wakeup!.notify({ notificationId: 'two', signal })
+        await writeFile(rejectPath, '')
+        await expect(notify('one', signal)).rejects.toThrow(
+          'Codex did not accept the inbox notification.'
+        )
+        await rm(rejectPath)
+        await writeFile(gatePath, '')
+        let retryResult = 'pending'
+        const retry = notify('one', signal).then(
+          () => {
+            retryResult = 'accepted'
+          },
+          () => {
+            retryResult = 'rejected'
+          }
+        )
+        await pollUntilState({
+          observe: async () =>
+            (await readFile(report, 'utf8'))
+              .trim()
+              .split('\n')
+              .map((line) => JSON.parse(line))
+              .filter((record) => record.kind === 'queue').length,
+          accept: (count) => count === 2,
+          timeoutMs: 5_000,
+          description: 'retry entered the native queue but has not completed'
+        })
+        expect(retryResult).toBe('pending')
+        await rm(gatePath)
+        await retry
+        expect(retryResult).toBe('accepted')
+        await notify('one', signal)
+        await notify('two', signal)
+        const otherThreadId = '550e8400-e29b-41d4-a716-446655440001'
+        identify(otherThreadId)
+        await notify('one', signal)
         const records = (await readFile(report, 'utf8'))
           .trim()
           .split('\n')
           .map((line) => JSON.parse(line))
-        descendantPid = records[0].descendantPid
-        expect(records.map((record) => record.kind)).toEqual(['server', 'tui', 'queue', 'queue'])
+        expect(records.map((record) => record.kind)).toEqual([
+          'server',
+          'tui',
+          'queue',
+          'queue',
+          'queue',
+          'queue'
+        ])
+        expect(records.at(-1).args).toEqual(expect.arrayContaining(['--thread', otherThreadId]))
         expect(
           records.every((record) => record.inherited === 'from-shell' && record.cwd === directory)
         ).toBe(true)
@@ -133,9 +195,13 @@ describe('Codex owned native session', () => {
         try {
           await artifacts.dispose()
         } finally {
-          if (descendantPid) {
+          if (serverPid) {
             try {
-              process.kill(descendantPid, 'SIGKILL')
+              if (process.platform === 'win32') {
+                await new Promise<void>((resolve) =>
+                  execFile('taskkill.exe', ['/PID', String(serverPid), '/T', '/F'], () => resolve())
+                )
+              } else process.kill(-serverPid, 'SIGKILL')
             } catch {
               /* Already reaped by the relay. */
             }

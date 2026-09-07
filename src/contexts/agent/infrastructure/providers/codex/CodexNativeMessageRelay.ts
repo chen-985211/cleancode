@@ -76,7 +76,7 @@ const capture = async args => {
   return code === 0 ? output : '';
 };
 const publish = async (path, value) => {
-  const temporary = path + '.tmp';
+  const temporary = path + '.tmp-' + randomBytes(12).toString('hex');
   await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
   await rename(temporary, path);
 };
@@ -97,8 +97,9 @@ const receive = async () => {
   if (request.kind === 'close') { await shutdown(); return; }
   if (request.kind === 'cancel') { if (request.id === lastRequest) stopChild(queued, true); return; }
   if (closing || queued || request.kind !== 'notify') return;
-  if (accepted.has(request.id)) { await publish(responsePath, {id:request.id,ok:true}); return; }
-  if (typeof request.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(request.threadId)) return;
+  if (typeof request.id !== 'string' || typeof request.notificationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(request.threadId)) return;
+  const messageKey = request.threadId + ':' + request.notificationId;
+  if (accepted.has(messageKey)) { await publish(responsePath, {id:request.id,ok:true}); return; }
   lastRequest = request.id;
   queued = spawnOwned(['queue', ...remoteArgs(), '--thread', request.threadId, '--message', config.reminder], ['ignore', 'ignore', 'ignore']);
   const child = queued;
@@ -107,7 +108,7 @@ const receive = async () => {
   clearTimeout(timeout);
   exits.delete(child);
   queued = undefined;
-  if (code === 0) { accepted.add(request.id); if (accepted.size > 4096) accepted.delete(accepted.values().next().value); }
+  if (code === 0) { accepted.add(messageKey); if (accepted.size > 4096) accepted.delete(accepted.values().next().value); }
   if (!closing) await publish(responsePath, { id: request.id, ok: code === 0 }).catch(() => {});
 };
 const watcher = watch(directory, (_event, filename) => {

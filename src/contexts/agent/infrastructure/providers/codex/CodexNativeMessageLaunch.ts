@@ -116,7 +116,9 @@ export async function prepareCodexNativeMessageLaunch(input: {
     }): Promise<void> {
       if (closed || signal.aborted || !threadId)
         return Promise.reject(new Error('Codex native session unavailable.'))
-      const id = threadId + ':' + notificationId
+      // Responses and cancellation belong to an attempt; deduplication belongs to the message.
+      const id = randomUUID()
+      const targetThreadId = threadId
       const operation = (async () => {
         const acknowledged = waitForFile(
           directory,
@@ -136,7 +138,7 @@ export async function prepareCodexNativeMessageLaunch(input: {
           (error: unknown) => error
         )
         try {
-          await send({ kind: 'notify', id, threadId })
+          await send({ kind: 'notify', id, threadId: targetThreadId, notificationId })
           const error = await outcome
           if (error) throw error
         } finally {

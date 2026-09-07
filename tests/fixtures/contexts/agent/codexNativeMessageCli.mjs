@@ -1,8 +1,9 @@
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, watch, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
+import { dirname } from 'node:path'
 import process from 'node:process'
 import { spawn } from 'node:child_process'
-import { setInterval } from 'node:timers'
+import { clearTimeout, setInterval, setTimeout } from 'node:timers'
 import { URL } from 'node:url'
 import { createHash } from 'node:crypto'
 
@@ -63,8 +64,33 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_UNSUPPORTED === '1') {
     setInterval(() => {}, 1000)
   } else server.listen(endpoint.slice('unix://'.length), () => report('server'))
 } else if (args[0] === 'queue') {
+  const rejectPath = process.env.NATIVE_MESSAGE_REJECT_PATH
+  const rejected =
+    process.env.NATIVE_MESSAGE_REJECT === '1' || (rejectPath && existsSync(rejectPath))
   report('queue')
-  process.exitCode = process.env.NATIVE_MESSAGE_REJECT === '1' ? 1 : 0
+  // The test controls completion so a stale response cannot win a timing race.
+  const gatePath = process.env.NATIVE_MESSAGE_QUEUE_GATE
+  if (gatePath && existsSync(gatePath)) {
+    await new Promise((resolve, reject) => {
+      const finish = (error) => {
+        clearTimeout(deadline)
+        watcher.close()
+        if (error) reject(error)
+        else resolve()
+      }
+      const observe = () => {
+        if (!existsSync(gatePath)) finish()
+      }
+      const watcher = watch(dirname(gatePath), observe)
+      watcher.on('error', finish)
+      const deadline = setTimeout(
+        () => finish(new Error('Native queue gate was not released')),
+        5_000
+      )
+      observe()
+    })
+  }
+  process.exitCode = rejected ? 1 : 0
 } else {
   report('tui')
   process.stdout.write('NATIVE_TUI_READY\n')
