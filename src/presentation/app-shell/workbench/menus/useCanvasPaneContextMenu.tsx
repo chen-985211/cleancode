@@ -12,6 +12,7 @@ interface CanvasPaneContextMenuEvent {
 interface UseCanvasPaneContextMenuOptions {
   readonly canCreateTerminal: boolean
   readonly canGroupTerminals: boolean
+  readonly canOrganizeCanvas?: boolean
   readonly graphId: string | null
   readonly isBlocked: boolean
   readonly shortcutTooltips: Pick<
@@ -23,6 +24,7 @@ interface UseCanvasPaneContextMenuOptions {
   readonly onCreateTerminal: (position: { readonly x: number; readonly y: number }) => void
   readonly onCreateTerminalGroup?: (position: { readonly x: number; readonly y: number }) => void
   readonly onFitCanvas?: () => void
+  readonly onOrganizeCanvas?: () => void
 }
 
 interface CanvasPaneContextMenuState {
@@ -35,6 +37,7 @@ interface CanvasPaneContextMenuState {
 export function useCanvasPaneContextMenu({
   canCreateTerminal,
   canGroupTerminals,
+  canOrganizeCanvas = false,
   graphId,
   isBlocked,
   shortcutTooltips,
@@ -42,7 +45,8 @@ export function useCanvasPaneContextMenu({
   onBeginTerminalGroupSelection,
   onCreateTerminal,
   onCreateTerminalGroup,
-  onFitCanvas
+  onFitCanvas,
+  onOrganizeCanvas
 }: UseCanvasPaneContextMenuOptions) {
   const [position, setPosition] = useState<CanvasPaneContextMenuState | null>(null)
   const openIntentRef = useRef({ graphId, open: false })
@@ -75,6 +79,8 @@ export function useCanvasPaneContextMenu({
         <CanvasPaneContextMenu
           canCreateTerminal={canCreateTerminal}
           canGroupTerminals={canGroupTerminals}
+          canOrganizeCanvas={canOrganizeCanvas}
+          onOrganizeCanvas={onOrganizeCanvas}
           open={position.open}
           position={position}
           shortcutTooltips={shortcutTooltips}

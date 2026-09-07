@@ -63,5 +63,5 @@ export function useWorkbenchCanvasArrangement({
       )
   })
 
-  return { arrangement, dragging }
+  return { arrangement, dragging, items }
 }

@@ -1,3 +1,4 @@
+import { createGraph } from '../../fixtures/presentation/workbenchCanvasContextMenuGraph'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
@@ -15,6 +16,7 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
 import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/coordinators/useTerminalWorkflow'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
+import type { WorkbenchCanvasProps } from '../../../src/presentation/app-shell/workbench/workbenchCanvasProps'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
@@ -55,6 +57,34 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 })
 
 describe('workbench canvas object context menu', () => {
+  it('organizes every complete object from the pane menu without requiring selection', async () => {
+    const onOrganizeCanvas = vi.fn<NonNullable<WorkbenchCanvasProps['onOrganizeCanvas']>>(
+      async () => null
+    )
+    renderCanvas({ onOrganizeCanvas, selectedTerminalBlockIds: ['standalone'] })
+    act(() =>
+      reactFlowProps.latest?.onPaneContextMenu?.({
+        clientX: 320,
+        clientY: 240,
+        preventDefault: vi.fn()
+      })
+    )
+    const organize = screen.getByRole('menuitem', { name: '整理画布' })
+    expect(organize).toBeEnabled()
+    await act(async () => fireEvent.click(organize))
+    expect(onOrganizeCanvas).toHaveBeenCalledOnce()
+    expect(onOrganizeCanvas.mock.calls[0]?.[0].map((item) => item.reference)).toEqual(
+      expect.arrayContaining([
+        { kind: 'agent', agentId: 'reviewer' },
+        { kind: 'terminal', terminalId: 'standalone' },
+        { kind: 'workflow', terminalIds: ['workflow-a', 'workflow-b', 'workflow-c'] },
+        { kind: 'combination', terminalGroupId: 'combination' }
+      ])
+    )
+    expect(onOrganizeCanvas.mock.calls[0]?.[0]).toHaveLength(4)
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+  })
+
   beforeEach(() => {
     stubReducedMotionPreference()
     reactFlowProps.latest = null
@@ -357,6 +387,11 @@ interface MockReactFlowProps {
     node: WorkbenchFlowNode
   ) => void
   readonly onPaneClick?: () => void
+  readonly onPaneContextMenu?: (event: {
+    clientX: number
+    clientY: number
+    preventDefault: () => void
+  }) => void
   readonly onNodeDrag?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
@@ -379,6 +414,7 @@ function stubReducedMotionPreference(): void {
 }
 
 function renderCanvas({
+  onOrganizeCanvas,
   onNodeClick = vi.fn(),
   onPaneClick = vi.fn(),
   onRequestSaveBlockTemplate = vi.fn(),
@@ -390,6 +426,7 @@ function renderCanvas({
   terminalWorkflow,
   selectedTerminalBlockIds = []
 }: {
+  readonly onOrganizeCanvas?: WorkbenchCanvasProps['onOrganizeCanvas']
   readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
   readonly onPaneClick?: () => void
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
@@ -495,6 +532,7 @@ function renderCanvas({
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
       terminalWorkflow={terminalWorkflow ?? createTerminalWorkflow(graph)}
       onRequestSaveBlockTemplate={onRequestSaveBlockTemplate}
+      onOrganizeCanvas={onOrganizeCanvas}
       onDeleteTerminalScope={onDeleteTerminalScope}
       onAddQuickExecutionTarget={onAddQuickExecutionTarget}
       onBindQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}
@@ -621,64 +659,5 @@ function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof us
     stoppingRunIds: [],
     stop: vi.fn(async () => undefined),
     updateExecutionConfig: vi.fn(async () => undefined)
-  }
-}
-
-function createGraph(): BlockGraphSnapshot {
-  return {
-    id: 'graph-1',
-    projectId: 'project-1',
-    workspaceId: 'main',
-    viewport: { x: 0, y: 0, zoom: 1 },
-    blocks: [
-      createBlock('workflow-a', 0),
-      createBlock('workflow-b', 400),
-      createBlock('workflow-c', 800),
-      createBlock('standalone', 1200),
-      createBlock('combination-a', 1600),
-      createBlock('combination-b', 2000)
-    ],
-    connections: [
-      {
-        id: 'connection-a-b',
-        sourceBlockId: 'workflow-a',
-        targetBlockId: 'workflow-b'
-      },
-      {
-        id: 'connection-b-c',
-        sourceBlockId: 'workflow-b',
-        targetBlockId: 'workflow-c'
-      }
-    ],
-    terminalGroups: [
-      {
-        id: 'combination',
-        type: 'terminal-group',
-        name: 'Combination',
-        position: { x: 1580, y: -20 },
-        size: { width: 760, height: 340 },
-        isCollapsed: false,
-        memberBlockIds: ['combination-a', 'combination-b']
-      }
-    ],
-    quickExecutionSlots: [
-      { number: 1, target: null },
-      { number: 2, target: null },
-      { number: 3, target: null },
-      { number: 4, target: null },
-      { number: 5, target: null }
-    ]
-  }
-}
-
-function createBlock(id: string, x: number): BlockGraphSnapshot['blocks'][number] {
-  return {
-    id,
-    type: 'terminal',
-    name: id,
-    description: '',
-    launchCommand: `pnpm ${id}`,
-    position: { x, y: 0 },
-    size: { width: 320, height: 240 }
   }
 }

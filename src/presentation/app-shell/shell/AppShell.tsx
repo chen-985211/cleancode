@@ -650,6 +650,7 @@ export function AppShell({
           onRequestSaveBlockTemplate={blockTemplates.requestSave}
           isCanvasArrangementPending={canvasArrangement.isPending}
           onArrangeCanvasSelection={canvasArrangement.arrange}
+          onOrganizeCanvas={canvasArrangement.organize}
           onMoveCanvasStack={canvasArrangement.moveStack}
           onDeleteTerminalScope={blockActions.deleteTerminalScope}
           onAddQuickExecutionTarget={quickExecution.addTarget}

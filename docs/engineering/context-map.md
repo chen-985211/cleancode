@@ -74,6 +74,11 @@ Presentation canvas arrangement action
   -> BlockGraph / Agent layout use cases
   -> CanvasArrangement stack use cases
 
+Presentation canvas organization / grid
+  -> CommitCanvasLayoutUseCase
+  -> CanvasLayoutCommitPort
+  -> existing BlockGraph / Agent layout and CanvasArrangement stack use cases
+
 Platform workbench restore
   -> BlockGraph / Agent snapshot adapter
   -> ReconcileCanvasArrangementUseCase
@@ -88,7 +93,7 @@ Agent application
 
 模板库虽然是应用级持久化数据，领域事实仍由 BlockGraph 上下文拥有。Platform 只提供独立 JSON 仓储和 IPC 装配；Presentation 只投影选择、放置与管理交互。Run 不读取模板，只接收模板实例化后由 BlockGraph 生成的既有工作流计划。
 
-CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对象身份，不读取两侧聚合或仓储。用户提交堆叠、展开、网格或整体拖动时，Presentation 先通过各 owner 的应用入口提交对象位置，再通过 CanvasArrangement 用例提交或移除视觉堆叠关系；部分失败执行补偿并只保留 owner 已提交事实。工作台恢复时，Platform 把当前 BlockGraph 与 Agent DTO 投影为仍有效的规范对象键，CanvasArrangement 在自己的事务中清理失效引用和不足两个成员的堆叠。详细规则见[画布视觉整理](../contexts/canvas-arrangement/canvas-arrangement.md)。
+CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对象身份，不读取两侧聚合或仓储。用户提交整理时，先通过各 owner 的应用入口提交对象位置，再提交或移除视觉堆叠关系；部分失败执行补偿并只保留 owner 已提交事实。全画布整理与网格的提交和补偿由 `CommitCanvasLayoutUseCase` 统一编排，调用方 CanvasArrangement 拥有 `CanvasLayoutCommitPort`；App Shell 将公开 DTO 和布局计划转换为精确对象位置，并把端口操作适配到已经由 Platform 装配的 BlockGraph、Agent 和堆叠用例入口，不新增 IPC 或访问仓储。位置写入批次全部结束后才能补偿，恢复包含流程每个终端的原始坐标。工作台恢复时，Platform 把当前 BlockGraph 与 Agent DTO 投影为仍有效的规范对象键，CanvasArrangement 在自己的事务中清理失效引用和不足两个成员的堆叠。详细规则见[画布视觉整理](../contexts/canvas-arrangement/canvas-arrangement.md)。
 
 ## Project 到 BlockGraph、Agent 与 Run：工作区默认内容
 

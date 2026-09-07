@@ -37,7 +37,7 @@ export function createStackedCanvasLayout(
   input: readonly CanvasArrangementLayoutItem[],
   existingAnchor?: { readonly x: number; readonly y: number }
 ): StackedCanvasLayoutPlan {
-  const items = normalizeItems(input, existingAnchor === undefined)
+  const items = normalizeCanvasArrangementItems(input, existingAnchor === undefined)
   const anchor = existingAnchor ?? createStackAnchor(items)
   validateAnchor(anchor)
 
@@ -57,7 +57,7 @@ export function createSpreadCanvasLayout(
   input: readonly CanvasArrangementLayoutItem[],
   anchor: { readonly x: number; readonly y: number }
 ): { readonly layouts: readonly CanvasArrangementLayout[] } {
-  const items = normalizeItems(input, false)
+  const items = normalizeCanvasArrangementItems(input, false)
   validateAnchor(anchor)
   const maximumWidth = Math.max(...items.map((item) => item.size.width))
   const maximumHeight = Math.max(...items.map((item) => item.size.height))
@@ -88,7 +88,7 @@ export function createSpreadCanvasLayout(
 export function createGridCanvasLayout(input: readonly CanvasArrangementLayoutItem[]): {
   readonly layouts: readonly CanvasArrangementLayout[]
 } {
-  const items = sortGridItems(normalizeItems(input, true))
+  const items = sortGridItems(normalizeCanvasArrangementItems(input, true))
   const bounds = mergeBounds(items)
   const plan = createGridShelfPlan(items)
   const gridOrigin = {
@@ -227,12 +227,17 @@ function itemArea(item: CanvasArrangementLayoutItem): number {
   return item.size.width * item.size.height
 }
 
-function normalizeItems(
-  input: readonly CanvasArrangementLayoutItem[],
-  sortVisually: boolean
-): CanvasArrangementLayoutItem[] {
-  if (input.length < 2) {
-    invalid('Canvas arrangement requires at least two objects.')
+export function normalizeCanvasArrangementItems<T extends CanvasArrangementLayoutItem>(
+  input: readonly T[],
+  sortVisually: boolean,
+  minimumCount = 2
+): T[] {
+  if (input.length < minimumCount) {
+    invalid(
+      minimumCount === 2
+        ? 'Canvas arrangement requires at least two objects.'
+        : 'Canvas arrangement requires at least one object.'
+    )
   }
   const items = input.map((item) => {
     const key = item.key.trim()

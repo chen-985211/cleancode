@@ -45,6 +45,7 @@ import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotio
 import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
 import { isApplyingWorkbenchViewport } from './viewport/workbenchViewportAdapter'
 import { useWorkbenchDirectZoom } from './viewport/useWorkbenchDirectZoom'
+import { useCanvasOrganization } from './viewport/useCanvasOrganization'
 import {
   centerCanvasViewportOnMinimapPoint,
   persistCanvasViewportFromMoveEnd,
@@ -98,6 +99,7 @@ export function WorkbenchCanvas({
   onRequestSaveBlockTemplate,
   isCanvasArrangementPending = false,
   onArrangeCanvasSelection,
+  onOrganizeCanvas,
   onMoveCanvasStack,
   onDeleteTerminalScope,
   onAddQuickExecutionTarget,
@@ -187,9 +189,37 @@ export function WorkbenchCanvas({
       ? (target) => void onAddQuickExecutionTarget(toQuickExecutionTarget(target))
       : undefined
   })
+  const canvasOrganization = useCanvasOrganization({
+    items: canvasArrangement.items,
+    scopeKey: JSON.stringify([
+      currentWorkbench?.project.id,
+      currentWorkspace?.workspaceId,
+      currentWorkbench?.graph.id
+    ]),
+    onOrganizeCanvas,
+    onUserAction: onViewportInteractionStart,
+    onFailure: () =>
+      notifications.notify({
+        kind: 'error',
+        title: t('canvas.arrangement.failedTitle'),
+        message: t('canvas.arrangement.failed')
+      }),
+    reactFlowInstanceRef
+  })
   const paneContextMenu = useCanvasPaneContextMenu({
     canCreateTerminal: isDesktopRuntime && Boolean(currentWorkbench),
     canGroupTerminals: isDesktopRuntime && Boolean(currentWorkbench) && !editingTerminalGroupId,
+    canOrganizeCanvas:
+      isDesktopRuntime &&
+      Boolean(currentWorkbench) &&
+      Boolean(onOrganizeCanvas) &&
+      canvasArrangement.items.length > 0 &&
+      !isCanvasArrangementPending &&
+      !isTerminalGroupSelectionMode &&
+      !editingTerminalGroupId,
+    onOrganizeCanvas: () => {
+      void canvasOrganization.organize()
+    },
     graphId: currentWorkbench?.graph.id ?? null,
     isBlocked: Boolean(placementTemplate),
     shortcutTooltips,
@@ -238,7 +268,10 @@ export function WorkbenchCanvas({
   })
   useWorkbenchDirectZoom({
     canvasSurfaceRef,
-    onViewportInteractionStart,
+    onViewportInteractionStart: () => {
+      canvasOrganization.cancelFocus()
+      onViewportInteractionStart?.()
+    },
     reactFlowInstanceRef,
     viewportMotionInstance
   })
@@ -508,6 +541,7 @@ export function WorkbenchCanvas({
                       : null
                 terminalZoomRasterCoordinator?.beginInteraction()
                 if (event) {
+                  canvasOrganization.cancelFocus()
                   cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
                   cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
                   onViewportInteractionStart?.()
