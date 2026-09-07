@@ -1,6 +1,6 @@
 import { app, BrowserWindow, screen, shell } from 'electron'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { FileSystemMainWindowStateStore } from './FileSystemMainWindowStateStore'
@@ -28,6 +28,9 @@ export function createMainWindow(input: {
   readonly appIconPath: string | undefined
   readonly policy: ElectronWindowPolicy
 }): void {
+  const rendererUrl =
+    process.env.ELECTRON_RENDERER_URL ||
+    pathToFileURL(join(mainModuleDirectory, '../renderer/index.html')).href
   const windowStateStore = new FileSystemMainWindowStateStore({
     filePath: join(app.getPath('userData'), 'window-state-v1.json'),
     logger: consoleLogger
@@ -85,6 +88,7 @@ export function createMainWindow(input: {
   })
   bindElectronPageZoomStartup(mainWindow.webContents)
   bindElectronExternalNavigationPolicy({
+    rendererUrl,
     onOpenError: logExternalNavigationError,
     openExternal: (address) => shell.openExternal(address),
     webContents: mainWindow.webContents
@@ -110,11 +114,7 @@ export function createMainWindow(input: {
 
   const loadRenderer = () => {
     if (mainWindow.isDestroyed()) return
-    if (process.env.ELECTRON_RENDERER_URL) {
-      void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-      return
-    }
-    void mainWindow.loadFile(join(mainModuleDirectory, '../renderer/index.html'))
+    void mainWindow.loadURL(rendererUrl)
   }
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit' || mainWindow.isDestroyed()) return
