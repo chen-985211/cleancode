@@ -1,6 +1,7 @@
 import type { zhCNCanvasMessages } from '../zh-CN/canvas'
 
 export const enCanvasMessages = {
+  'canvas.arrangement.organize': 'Organize canvas',
   'toolbar.label': 'Workbench toolbar',
   'toolbar.terminalTools': 'Terminal tools',
   'toolbar.newTerminal': 'New terminal block',
@@ -79,7 +80,8 @@ export const enCanvasMessages = {
   'canvas.arrangement.detach': 'Unstack selected objects',
   'canvas.arrangement.grid': 'Arrange selected objects in a grid',
   'canvas.arrangement.failedTitle': 'Could not arrange canvas objects',
-  'canvas.arrangement.failed': 'The previous layout was restored. Try again.',
+  'canvas.arrangement.failed':
+    'Arrangement did not finish. Check the current canvas and try again.',
   'canvas.viewportControls': 'Canvas viewport controls',
   'minimap.title': 'Block navigation minimap',
   'minimap.controls': 'Minimap controls',

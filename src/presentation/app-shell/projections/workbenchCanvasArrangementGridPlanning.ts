@@ -6,6 +6,7 @@ import {
   type CanvasArrangementLayoutItem
 } from '../../../contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
 import type { CanvasArrangementSelectionItem } from '../../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
+import { createOrganizedCanvasLayout } from '../../../contexts/canvas-arrangement/domain/services/CanvasOrganizationLayoutPolicy'
 
 interface Position {
   readonly x: number
@@ -19,17 +20,31 @@ interface PlannedGridItem {
 }
 
 export interface CanvasArrangementGridPlan {
+  readonly bounds: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  }
   readonly layouts: readonly CanvasArrangementLayout[]
   readonly nodePositionsById: ReadonlyMap<string, Position>
 }
 
 export function createCanvasArrangementGridPlan(
   items: readonly CanvasArrangementSelectionItem[],
-  graph: BlockGraphSnapshot
+  graph: BlockGraphSnapshot,
+  scope: 'selection' | 'canvas' = 'selection'
 ): CanvasArrangementGridPlan {
   const plannedItems = items.map((item) => createPlannedGridItem(item, graph))
-  const centeredLayoutItems = centerPlannedItemsAtOriginalSelection(plannedItems, items)
-  const layoutPlan = createGridCanvasLayout(centeredLayoutItems)
+  const layoutPlan =
+    scope === 'canvas'
+      ? createOrganizedCanvasLayout(
+          plannedItems.map(({ item, layoutItem }) => ({
+            ...layoutItem,
+            kind: item.reference.kind
+          }))
+        )
+      : createGridCanvasLayout(centerPlannedItemsAtOriginalSelection(plannedItems, items))
   const targetByKey = new Map(layoutPlan.layouts.map((layout) => [layout.key, layout.position]))
   const nodePositionsById = new Map<string, Position>()
 
@@ -44,7 +59,19 @@ export function createCanvasArrangementGridPlan(
     })
   }
 
-  return { layouts: layoutPlan.layouts, nodePositionsById }
+  const positionedItems = plannedItems.map(({ layoutItem }) => ({
+    ...layoutItem,
+    position: targetByKey.get(layoutItem.key)!
+  }))
+  const left = Math.min(...positionedItems.map((item) => item.position.x))
+  const top = Math.min(...positionedItems.map((item) => item.position.y))
+  const right = Math.max(...positionedItems.map((item) => item.position.x + item.size.width))
+  const bottom = Math.max(...positionedItems.map((item) => item.position.y + item.size.height))
+  return {
+    bounds: { x: left, y: top, width: right - left, height: bottom - top },
+    layouts: layoutPlan.layouts,
+    nodePositionsById
+  }
 }
 
 function createPlannedGridItem(

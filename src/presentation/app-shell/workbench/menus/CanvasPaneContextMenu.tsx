@@ -18,6 +18,7 @@ import { WorkbenchIcon } from '../../../shared/components/WorkbenchIcons'
 interface CanvasPaneContextMenuProps {
   readonly canCreateTerminal: boolean
   readonly canGroupTerminals: boolean
+  readonly canOrganizeCanvas?: boolean
   readonly open: boolean
   readonly position: { readonly x: number; readonly y: number }
   readonly shortcutTooltips: Pick<
@@ -27,17 +28,20 @@ interface CanvasPaneContextMenuProps {
   readonly onClose: () => void
   readonly onCreateTerminal: () => void
   readonly onGroupTerminals: () => void
+  readonly onOrganizeCanvas?: () => void
 }
 
 export function CanvasPaneContextMenu({
   canCreateTerminal,
   canGroupTerminals,
+  canOrganizeCanvas = false,
   open,
   position,
   shortcutTooltips,
   onClose,
   onCreateTerminal,
-  onGroupTerminals
+  onGroupTerminals,
+  onOrganizeCanvas
 }: CanvasPaneContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -152,6 +156,16 @@ export function CanvasPaneContextMenu({
           onGroupTerminals()
         }}
       />
+      <CanvasPaneContextMenuItem
+        disabled={!canOrganizeCanvas}
+        iconRole="arrangement-grid"
+        label={t('canvas.arrangement.organize')}
+        shortcut={null}
+        onSelect={() => {
+          onClose()
+          onOrganizeCanvas?.()
+        }}
+      />
     </CanvasNodeMenu>,
     document.body
   )
@@ -165,7 +179,7 @@ function CanvasPaneContextMenuItem({
   onSelect
 }: {
   readonly disabled: boolean
-  readonly iconRole: 'terminal' | 'terminal-group'
+  readonly iconRole: 'terminal' | 'terminal-group' | 'arrangement-grid'
   readonly label: string
   readonly shortcut: string | null
   readonly onSelect: () => void

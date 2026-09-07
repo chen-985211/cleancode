@@ -14,7 +14,6 @@ import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import {
   canvasArrangementItemKey,
   findCanvasArrangementStack,
-  findCanvasArrangementStacks,
   type CanvasArrangementSelectionItem
 } from '../../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import {
@@ -22,6 +21,7 @@ import {
   type CanvasArrangementMotionChoreography
 } from '../../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 import { createCanvasArrangementGridPlan } from '../projections/workbenchCanvasArrangementGridPlanning'
+import { commitCanvasArrangementLayout } from './commitCanvasArrangementLayout'
 
 interface UseCanvasArrangementActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -53,6 +53,9 @@ export function useCanvasArrangementActions({
   setCurrentGraph
 }: UseCanvasArrangementActionsInput) {
   const [isPending, setIsPending] = useState(false)
+  const pendingRef = useRef(false)
+  const scopeKey = JSON.stringify([currentWorkbench?.project.id, currentWorkspace?.workspaceId])
+  const [motionScope, setMotionScope] = useState(scopeKey)
   const [motionChoreography, setMotionChoreography] =
     useState<CanvasArrangementMotionChoreography | null>(null)
   const motionCleanupFrameIdsRef = useRef<number[]>([])
@@ -187,21 +190,89 @@ export function useCanvasArrangementActions({
     [commitLayouts]
   )
 
+  const commitGridPlan = useCallback(
+    async (items: readonly CanvasArrangementSelectionItem[], scope: 'selection' | 'canvas') => {
+      const plan = createCanvasArrangementGridPlan(items, currentWorkbench!.graph, scope)
+      setMotionChoreography(
+        createCanvasArrangementMotionChoreography(
+          withCombinationMembers(items, currentWorkbench!.graph),
+          'grid'
+        )
+      )
+      await commitCanvasArrangementLayout({
+        api: window.cleancode!,
+        arrangement: currentWorkbench!.canvasArrangement ?? emptyArrangement(currentWorkbench!),
+        items,
+        plan,
+        workbench: currentWorkbench!,
+        workspaceId: currentWorkspace!.workspaceId,
+        moveWorkspaceAgent,
+        setCurrentArrangement,
+        setCurrentGraph
+      })
+      return plan.bounds
+    },
+    [currentWorkbench, currentWorkspace, moveWorkspaceAgent, setCurrentArrangement, setCurrentGraph]
+  )
+
+  const organize = useCallback(
+    async (items: readonly CanvasArrangementSelectionItem[]) => {
+      if (
+        pendingRef.current ||
+        !currentWorkbench ||
+        !currentWorkspace ||
+        !window.cleancode ||
+        items.length === 0
+      )
+        return null
+      pendingRef.current = true
+      setIsPending(true)
+      setMotionScope(scopeKey)
+      clearMotionChoreography()
+      let completed = false
+      try {
+        const bounds = await commitGridPlan(items, 'canvas')
+        completed = true
+        return bounds
+      } catch {
+        notify({ kind: 'error', message: failureMessage, title: failureTitle })
+        return null
+      } finally {
+        pendingRef.current = false
+        setIsPending(false)
+        if (completed) scheduleMotionChoreographyCleanup()
+        else clearMotionChoreography()
+      }
+    },
+    [
+      currentWorkbench,
+      currentWorkspace,
+      scopeKey,
+      clearMotionChoreography,
+      commitGridPlan,
+      notify,
+      failureMessage,
+      failureTitle,
+      scheduleMotionChoreographyCleanup
+    ]
+  )
+
   const arrange = useCallback(
     async (
       action: 'detach-stack' | 'grid' | 'stack',
       items: readonly CanvasArrangementSelectionItem[]
     ): Promise<void> => {
-      if (isPending || !currentWorkbench || !currentWorkspace || items.length < 2) return
+      if (pendingRef.current || !currentWorkbench || !currentWorkspace || items.length < 2) return
       const api = window.cleancode
       if (!api) return
       const arrangement = currentWorkbench.canvasArrangement ?? emptyArrangement(currentWorkbench)
       const existingStack = findCanvasArrangementStack(arrangement, items)
-      const overlappingStacks = findCanvasArrangementStacks(arrangement, items)
       const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
       let completedSuccessfully = false
 
       clearMotionChoreography()
+      pendingRef.current = true
+      setMotionScope(scopeKey)
       setIsPending(true)
       try {
         if (action === 'stack') {
@@ -262,68 +333,15 @@ export function useCanvasArrangementActions({
           return
         }
 
-        const plan = createCanvasArrangementGridPlan(items, currentWorkbench.graph)
-        setMotionChoreography(
-          createCanvasArrangementMotionChoreography(
-            withCombinationMembers(items, currentWorkbench.graph),
-            'grid'
-          )
-        )
-        if (overlappingStacks.length > 0) {
-          await commitAndRemoveStacks(
-            items,
-            plan.layouts,
-            overlappingStacks,
-            plan.nodePositionsById
-          )
-        } else {
-          await commitLayouts(items, plan.layouts, plan.nodePositionsById)
-        }
+        await commitGridPlan(items, 'selection')
         completedSuccessfully = true
       } catch {
         notify({ kind: 'error', message: failureMessage, title: failureTitle })
       } finally {
         if (completedSuccessfully) scheduleMotionChoreographyCleanup()
         else clearMotionChoreography()
+        pendingRef.current = false
         setIsPending(false)
-      }
-
-      async function commitAndRemoveStacks(
-        selectedItems: readonly CanvasArrangementSelectionItem[],
-        layouts: readonly CanvasArrangementLayout[],
-        stacks: CanvasArrangementSnapshot['stacks'],
-        nodePositionsById: ReadonlyMap<string, { readonly x: number; readonly y: number }>
-      ): Promise<void> {
-        await commitLayoutsWithRollback(selectedItems, layouts, previousLayouts, nodePositionsById)
-        const removedStacks: CanvasArrangementSnapshot['stacks'][number][] = []
-        try {
-          let updated = arrangement
-          for (const stack of stacks) {
-            updated = await api!.removeCanvasStack({
-              projectDirectory: currentWorkbench!.project.directory,
-              projectId: currentWorkbench!.project.id,
-              stackId: stack.id,
-              workspaceId: currentWorkspace!.workspaceId
-            })
-            removedStacks.push(stack)
-          }
-          setCurrentArrangement(updated)
-        } catch (error) {
-          await commitLayouts(selectedItems, previousLayouts)
-          let restored = arrangement
-          for (const stack of removedStacks) {
-            restored = await api!.createCanvasStack({
-              anchor: stack.anchor,
-              items: stack.items,
-              projectDirectory: currentWorkbench!.project.directory,
-              projectId: currentWorkbench!.project.id,
-              stackId: stack.id,
-              workspaceId: currentWorkspace!.workspaceId
-            })
-          }
-          setCurrentArrangement(restored)
-          throw error
-        }
       }
     },
     [
@@ -334,7 +352,8 @@ export function useCanvasArrangementActions({
       clearMotionChoreography,
       failureMessage,
       failureTitle,
-      isPending,
+      commitGridPlan,
+      scopeKey,
       notify,
       scheduleMotionChoreographyCleanup,
       setCurrentArrangement
@@ -348,7 +367,8 @@ export function useCanvasArrangementActions({
       nextAnchor: { readonly x: number; readonly y: number },
       items: readonly CanvasArrangementSelectionItem[]
     ): Promise<boolean> => {
-      if (isPending || !currentWorkbench || !currentWorkspace || !window.cleancode) return false
+      if (pendingRef.current || !currentWorkbench || !currentWorkspace || !window.cleancode)
+        return false
       const delta = {
         x: nextAnchor.x - previousAnchor.x,
         y: nextAnchor.y - previousAnchor.y
@@ -359,6 +379,7 @@ export function useCanvasArrangementActions({
       }))
       const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
 
+      pendingRef.current = true
       setIsPending(true)
       try {
         await commitLayoutsWithRollback(items, layouts, previousLayouts)
@@ -380,6 +401,7 @@ export function useCanvasArrangementActions({
         notify({ kind: 'error', message: failureMessage, title: failureTitle })
         return false
       } finally {
+        pendingRef.current = false
         setIsPending(false)
       }
     },
@@ -390,13 +412,18 @@ export function useCanvasArrangementActions({
       currentWorkspace,
       failureMessage,
       failureTitle,
-      isPending,
       notify,
       setCurrentArrangement
     ]
   )
 
-  return { arrange, isPending, motionChoreography, moveStack }
+  return {
+    arrange,
+    organize,
+    isPending,
+    motionChoreography: motionScope === scopeKey ? motionChoreography : null,
+    moveStack
+  }
 }
 
 function withCombinationMembers(

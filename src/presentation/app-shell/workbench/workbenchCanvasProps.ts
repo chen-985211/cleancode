@@ -23,6 +23,7 @@ import type { MinimapNodeInteractionContextValue } from './minimap/minimapIntera
 import type { MoveCanvasStackHandler } from '../context-adapters/canvas-arrangement/useWorkbenchCanvasArrangement'
 import type { TerminalZoomRasterCanvasCoordinator } from './viewport/useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchNodeStore } from './nodes/workbenchNodeStore'
+import type { OrganizeCanvasHandler } from './viewport/useCanvasOrganization'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -71,6 +72,7 @@ export interface WorkbenchCanvasProps {
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
   readonly isCanvasArrangementPending?: boolean
   readonly onArrangeCanvasSelection?: ArrangeCanvasSelectionHandler
+  readonly onOrganizeCanvas?: OrganizeCanvasHandler
   readonly onMoveCanvasStack?: MoveCanvasStackHandler
   readonly onDeleteTerminalScope?: (
     target: BatchTerminalRemovalTargetSnapshot

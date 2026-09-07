@@ -4,6 +4,33 @@ import { useCanvasPaneContextMenu } from '../../../src/presentation/app-shell/wo
 import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
 
 describe('canvas pane context menu', () => {
+  it('organizes the entire canvas from a keyboard accessible menu action', async () => {
+    const actions = createActions()
+    render(<Harness actions={actions} graphId="graph-1" />)
+    fireEvent.contextMenu(screen.getByTestId('pane'), { clientX: 320, clientY: 240 })
+    const menu = screen.getByRole('menu', { name: '画布操作' })
+    const organize = within(menu).getByRole('menuitem', { name: '整理画布' })
+    await waitFor(() =>
+      expect(within(menu).getByRole('menuitem', { name: '新建终端积木' })).toHaveFocus()
+    )
+    fireEvent.keyDown(menu, { key: 'End' })
+    expect(organize).toHaveFocus()
+    fireEvent.click(organize)
+    expect(actions.onOrganizeCanvas).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(actions.onCreateTerminal).not.toHaveBeenCalled()
+  })
+
+  it('disables organization while the canvas has no available objects or is busy', () => {
+    const actions = createActions()
+    render(<Harness actions={actions} graphId="graph-1" canOrganizeCanvas={false} />)
+    fireEvent.contextMenu(screen.getByTestId('pane'), { clientX: 320, clientY: 240 })
+    const organize = screen.getByRole('menuitem', { name: '整理画布' })
+    expect(organize).toBeDisabled()
+    fireEvent.click(organize)
+    expect(actions.onOrganizeCanvas).not.toHaveBeenCalled()
+  })
+
   it('exposes the existing terminal actions with their configured shortcuts', async () => {
     const actions = createActions()
     render(<Harness actions={actions} graphId="graph-1" />)
@@ -109,12 +136,14 @@ interface HarnessProps {
   readonly actions: ReturnType<typeof createActions>
   readonly graphId: string
   readonly isBlocked?: boolean
+  readonly canOrganizeCanvas?: boolean
 }
 
-function Harness({ actions, graphId, isBlocked = false }: HarnessProps) {
+function Harness({ actions, graphId, isBlocked = false, canOrganizeCanvas = true }: HarnessProps) {
   const contextMenu = useCanvasPaneContextMenu({
     canCreateTerminal: true,
     canGroupTerminals: true,
+    canOrganizeCanvas,
     graphId,
     isBlocked,
     shortcutTooltips: {
@@ -144,6 +173,7 @@ function createActions() {
     onBeforeOpen: vi.fn(),
     onBeginTerminalGroupSelection: vi.fn(),
     onCreateTerminal: vi.fn(),
-    onFitCanvas: vi.fn()
+    onFitCanvas: vi.fn(),
+    onOrganizeCanvas: vi.fn()
   }
 }

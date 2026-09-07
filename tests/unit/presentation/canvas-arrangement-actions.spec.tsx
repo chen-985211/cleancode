@@ -6,6 +6,84 @@ import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/type
 import { useCanvasArrangementActions } from '../../../src/presentation/app-shell/coordinators/useCanvasArrangementActions'
 
 describe('canvas arrangement actions', () => {
+  it('organizes all objects and reports the committed bounds for viewport centering', async () => {
+    const snapshot = workflowWorkbench(emptyArrangement())
+    const moveBlock = vi.fn(async () => snapshot.graph)
+    installCanvasApi({ moveBlock })
+    const hook = renderActionsForWorkbench(snapshot)
+    let bounds: unknown
+    await act(async () => {
+      bounds = await hook.result.current.organize([selectionItem('terminal-3', 0, 400)])
+    })
+    expect(moveBlock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockId: 'terminal-3',
+        position: { x: -50, y: -40 }
+      })
+    )
+    expect(bounds).toEqual({ x: -50, y: -40, width: 100, height: 80 })
+  })
+
+  it('restores each original workflow member position after a partial organization failure', async () => {
+    const snapshot = workflowWorkbench(emptyArrangement())
+    const moveBlock = vi.fn(
+      async (command: { blockId: string; position: { x: number; y: number } }) => {
+        if (command.blockId === 'terminal-3' && command.position.y !== 400)
+          throw new Error('write failed')
+        return snapshot.graph
+      }
+    )
+    installCanvasApi({ moveBlock })
+    const hook = renderActionsForWorkbench(snapshot)
+    let result: unknown
+    await act(async () => {
+      result = await hook.result.current.organize([
+        {
+          key: 'workflow:terminal-1,terminal-2',
+          nodeIds: ['terminal-1', 'terminal-2'],
+          position: { x: 0, y: 0 },
+          reference: { kind: 'workflow', terminalIds: ['terminal-1', 'terminal-2'] },
+          size: { width: 1_400, height: 80 }
+        },
+        selectionItem('terminal-3', 0, 400)
+      ])
+    })
+    expect(result).toBeNull()
+    for (const block of snapshot.graph.blocks) {
+      expect(
+        moveBlock.mock.calls.filter(([command]) => command.blockId === block.id).at(-1)?.[0]
+          .position
+      ).toEqual(block.position)
+    }
+    expect(hook.notify).toHaveBeenCalledOnce()
+  })
+
+  it('admits only one organization before React has rendered its pending state', async () => {
+    const snapshot = workflowWorkbench(emptyArrangement())
+    let complete!: (graph: WorkbenchSnapshot['graph']) => void
+    const moveBlock = vi.fn(
+      () =>
+        new Promise<WorkbenchSnapshot['graph']>((resolve) => {
+          complete = resolve
+        })
+    )
+    installCanvasApi({ moveBlock })
+    const hook = renderActionsForWorkbench(snapshot)
+    let first!: Promise<unknown>
+    let second!: Promise<unknown>
+    act(() => {
+      first = hook.result.current.organize([selectionItem('terminal-3', 0, 400)])
+      second = hook.result.current.organize([selectionItem('terminal-3', 0, 400)])
+    })
+    expect(moveBlock).toHaveBeenCalledOnce()
+    await expect(second).resolves.toBeNull()
+    await act(async () => {
+      complete(snapshot.graph)
+      await first
+    })
+    expect(hook.result.current.isPending).toBe(false)
+  })
+
   it('creates one attached stack without a presentation state', async () => {
     const arrangement = emptyArrangement()
     const attached = arrangementWithStack()
