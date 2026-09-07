@@ -234,6 +234,9 @@ describe('Codex owned native session', () => {
           await rm(directory, { recursive: true, force: true })
         }
       }
-    }
+    },
+    // This scenario starts several native processes and performs four queue calls.
+    // Keep per-operation state deadlines; the whole scenario exceeds Vitest's 5s on Windows.
+    30_000
   )
 })
