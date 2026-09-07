@@ -95,5 +95,5 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_UNSUPPORTED === '1') {
   report('tui')
   process.stdout.write('NATIVE_TUI_READY\n')
   process.stdin.resume()
-  process.stdin.on('data', () => process.exit(0))
+  process.stdin.on('data', (data) => process.stdout.write('NATIVE_TUI_INPUT:' + data))
 }

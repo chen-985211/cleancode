@@ -31,7 +31,9 @@ describe('Codex owned native session', () => {
         '-a',
         'on-request',
         '--add-dir',
-        join(directory, '协作目录')
+        join(directory, '协作目录'),
+        '-c',
+        `developer_instructions='${'协作 instruction '.repeat(700)}'`
       ]
       const fixture = fileURLToPath(
         new URL('../../../fixtures/contexts/agent/codexNativeMessageCli.mjs', import.meta.url)
@@ -44,6 +46,15 @@ describe('Codex owned native session', () => {
           : `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(fixture)} "$@"\n`
       )
       await chmod(executable, 0o700)
+      if (process.platform === 'win32') {
+        const psQuote = (value: string) => `'${value.replaceAll("'", "''")}'`
+        // The same companion contract used by the existing foreground launcher.
+        // Long configuration must not pass through cmd's 8191-character boundary.
+        await writeFile(
+          executable.replace(/\.cmd$/, '.ps1'),
+          `& ${psQuote(process.execPath)} ${psQuote(fixture)} @args\nexit $LASTEXITCODE\n`
+        )
+      }
       const artifacts = new AgentLaunchArtifactScope()
       let identify!: (id: string) => void
       let wakeup: AgentMessageWakeupPort | null | undefined
@@ -66,6 +77,7 @@ describe('Codex owned native session', () => {
         }
       })
       artifacts.seal()
+      expect(plan.args[1]).toBe(await realpath(plan.args[1]!))
       const child = spawn(plan.executable, [...plan.args], {
         cwd: directory,
         env: {
@@ -79,6 +91,10 @@ describe('Codex owned native session', () => {
         stdio: ['pipe', 'pipe', 'pipe']
       })
       let relayErrors = ''
+      let relayOutput = ''
+      child.stdout.on('data', (data) => {
+        relayOutput += String(data)
+      })
       child.stderr.on('data', (data) => {
         relayErrors += String(data)
       })
@@ -102,6 +118,13 @@ describe('Codex owned native session', () => {
             }
           })
           child.once('error', reject)
+        })
+        child.stdin.write('native-input\n')
+        await pollUntilState({
+          observe: () => relayOutput,
+          accept: (output) => output.includes('NATIVE_TUI_INPUT:native-input'),
+          timeoutMs: 5_000,
+          description: 'native TUI receives input through the launcher'
         })
         const server = (await readFile(report, 'utf8'))
           .trim()

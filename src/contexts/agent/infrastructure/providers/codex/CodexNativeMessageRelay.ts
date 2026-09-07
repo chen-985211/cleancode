@@ -36,8 +36,13 @@ const invocation = args => {
   const argsPath = join(directory, 'argv-' + (++invocationId) + '.json');
   writeFileSync(argsPath, JSON.stringify({executable:config.executable,args}), {mode:0o600});
   const script = '$ErrorActionPreference="Stop"\n$spec=Get-Content -LiteralPath (' + decode(argsPath) +
-    ') -Raw -Encoding UTF8 | ConvertFrom-Json\n$cli=$spec.executable\n$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
-  return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive',
+    ') -Raw -Encoding UTF8 | ConvertFrom-Json\n$cli=(Get-Command -Name $spec.executable -ErrorAction Stop | Select-Object -First 1).Path\n' +
+    // Preserve the foreground launcher’s PowerShell companion selection for npm/custom shims.
+    'if ([IO.Path]::GetExtension($cli) -eq ".cmd") {\n' +
+    '  $companion=[IO.Path]::ChangeExtension($cli,".ps1")\n' +
+    '  if (Test-Path -LiteralPath $companion -PathType Leaf) { $cli=$companion }\n}\n' +
+    '$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
+  return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], argsPath };
 };
 const stopChild = (child, force = false) => {

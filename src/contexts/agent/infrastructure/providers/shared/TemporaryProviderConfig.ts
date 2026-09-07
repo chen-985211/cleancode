@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -13,11 +13,12 @@ export async function createTemporaryProviderConfig(
   filename: string,
   contents: string
 ): Promise<TemporaryProviderConfig> {
-  const directory = await mkdtemp(join(tmpdir(), prefix))
-  const path = join(directory, filename)
+  let directory = await mkdtemp(join(tmpdir(), prefix))
   try {
+    // Windows TEMP may contain an 8.3 alias. libuv file watchers need the long path.
+    directory = await realpath(directory)
     await chmod(directory, 0o700)
-    await writeFile(path, contents, { encoding: 'utf8', mode: 0o600 })
+    await writeFile(join(directory, filename), contents, { encoding: 'utf8', mode: 0o600 })
   } catch (setupError) {
     try {
       await removeTemporaryProviderDirectory(directory)
@@ -33,7 +34,7 @@ export async function createTemporaryProviderConfig(
   let disposed = false
   let disposalPromise: Promise<void> | null = null
   return {
-    path,
+    path: join(directory, filename),
     dispose() {
       if (disposed) return Promise.resolve()
       if (disposalPromise) return disposalPromise
