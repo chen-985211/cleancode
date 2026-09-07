@@ -31,16 +31,30 @@ describe('Codex native console input', () => {
       bindIdentity: () => undefined
     })
     artifacts.seal()
-    const terminal = spawn(plan.executable, [...plan.args], {
-      cwd: directory,
-      cols: 80,
-      rows: 24,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        NATIVE_MESSAGE_REPORT: join(directory, 'report')
+    const quote = (value: string) => `'${value.replaceAll("'", "''")}'`
+    // Match the application: a console shell owns the PTY before starting the GUI-subsystem
+    // Electron executable. AttachConsole(PARENT_PROCESS) must target that console shell.
+    const terminal = spawn(
+      process.platform === 'win32' ? 'powershell.exe' : plan.executable,
+      process.platform === 'win32'
+        ? [
+            '-NoLogo',
+            '-NoProfile',
+            '-Command',
+            `& ${[plan.executable, ...plan.args].map(quote).join(' ')}; exit $LASTEXITCODE`
+          ]
+        : [...plan.args],
+      {
+        cwd: directory,
+        cols: 80,
+        rows: 24,
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+          NATIVE_MESSAGE_REPORT: join(directory, 'report')
+        }
       }
-    })
+    )
     let output = ''
     let exitCode: number | undefined
     const data = terminal.onData((chunk) => {

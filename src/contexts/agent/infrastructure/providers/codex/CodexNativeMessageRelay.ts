@@ -1,11 +1,12 @@
 import { codexWindowsInvocation } from './CodexWindowsInvocation'
+import { codexNativeMessageFiles } from './CodexNativeMessageFiles'
 
 /** Runs inside the existing PTY; probes, TUI, server and queue share its real environment. */
 export const codexNativeMessageRelay = String.raw`
 ${codexWindowsInvocation}
 import { spawn, execFile } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
-import { readFile, writeFile, rename, stat } from 'node:fs/promises';
+import { readFile, writeFile, rename, stat, unlink } from 'node:fs/promises';
 import { watch, writeFileSync, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
 import { isatty } from 'node:tty';
 import { dirname, join } from 'node:path';
@@ -94,11 +95,7 @@ const capture = async args => {
   exits.delete(child);
   return code === 0 ? output : '';
 };
-const publish = async (path, value) => {
-  const temporary = path + '.tmp-' + randomBytes(12).toString('hex');
-  await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
-  await rename(temporary, path);
-};
+${codexNativeMessageFiles}
 const shutdown = async () => {
   if (closing) return;
   closing = true;
@@ -118,7 +115,11 @@ const receive = async () => {
   if (closing || queued || request.kind !== 'notify') return;
   if (typeof request.id !== 'string' || typeof request.notificationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(request.threadId)) return;
   const messageKey = request.threadId + ':' + request.notificationId;
-  if (accepted.has(messageKey)) { await publish(responsePath, {id:request.id,ok:true}); return; }
+  if (accepted.has(messageKey)) {
+    // A persistent filesystem error fails this attempt by timeout; it must not kill the TUI.
+    await publish(responsePath, {id:request.id,ok:true}).catch(() => {});
+    return;
+  }
   lastRequest = request.id;
   queued = spawnOwned(['queue', ...remoteArgs(), '--thread', request.threadId, '--message', config.reminder], ['ignore', 'ignore', 'ignore']);
   const child = queued;
