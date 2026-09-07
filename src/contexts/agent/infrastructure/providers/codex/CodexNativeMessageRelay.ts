@@ -6,7 +6,8 @@ ${codexWindowsInvocation}
 import { spawn, execFile } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
 import { readFile, writeFile, rename, stat } from 'node:fs/promises';
-import { watch, writeFileSync, unlinkSync } from 'node:fs';
+import { watch, writeFileSync, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
+import { isatty } from 'node:tty';
 import { dirname, join } from 'node:path';
 
 const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
@@ -58,7 +59,19 @@ const spawnOwned = (args, stdio) => {
   // Background npm shims and their native children share a private process group.
   // The interactive TUI retains the original terminal/session semantics.
   const detached = process.platform !== 'win32' && stdio !== 'inherit';
-  const child = spawn(command.executable, command.args, { cwd: config.cwd, env: process.env, stdio, windowsHide: true, detached });
+  // Electron's RouteStdioToConsole reconnects stdout/stderr but can leave stdin at NUL.
+  // Reopen only that interactive console case; redirected pipes/files keep their original input.
+  const consoleInput = stdio === 'inherit' && process.platform === 'win32' &&
+    process.versions.electron && isatty(1) && !isatty(0) && fstatSync(0).isCharacterDevice()
+    ? openSync('CONIN$', 'r+') : null;
+  let child;
+  try {
+    child = spawn(command.executable, command.args, { cwd: config.cwd, env: process.env,
+      stdio: consoleInput === null ? stdio : [consoleInput, 1, 2], windowsHide: stdio !== 'inherit', detached });
+  } finally {
+    // spawn duplicates the inherited handle; the relay must not keep an extra console reader.
+    if (consoleInput !== null) closeSync(consoleInput);
+  }
   if (detached) groups.add(child);
   children.add(child);
   if (command.argsPath) child.once('close', () => { try { unlinkSync(command.argsPath); } catch {} });

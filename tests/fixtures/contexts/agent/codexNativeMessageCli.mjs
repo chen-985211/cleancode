@@ -93,7 +93,16 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_UNSUPPORTED === '1') {
   process.exitCode = rejected ? 1 : 0
 } else {
   report('tui')
+  process.stdin.setRawMode?.(true)
   process.stdout.write('NATIVE_TUI_READY\n')
   process.stdin.resume()
-  process.stdin.on('data', (data) => process.stdout.write('NATIVE_TUI_INPUT:' + data))
+  let input = ''
+  process.stdin.on('data', (data) => {
+    if (String(data).includes('\x03')) {
+      process.stdout.write('NATIVE_TUI_INTERRUPTED\n')
+      process.exit(0)
+    }
+    input += data
+    process.stdout.write('NATIVE_TUI_INPUT:' + input)
+  })
 }
