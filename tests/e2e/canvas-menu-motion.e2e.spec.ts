@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import type { ElectronApplication, Locator, Page } from 'playwright'
+import type { ElectronApplication, JSHandle, Locator, Page } from 'playwright'
 
 import {
   createE2eWorkbench,
@@ -21,8 +21,10 @@ describe('canvas menu motion e2e', () => {
   let electronApp: ElectronApplication
   let page: Page
   let resources: E2eScenarioResources
+  let menuMotion: JSHandle<ReturnType<typeof observeRenderedMenuMotion>> | undefined
 
   beforeEach(async () => {
+    menuMotion = undefined
     resources = {}
     workbench = await createE2eWorkbench('cleancode-canvas-menu-motion-e2e')
     resources.workbench = workbench
@@ -36,14 +38,23 @@ describe('canvas menu motion e2e', () => {
     expect(
       await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     ).toBe(false)
+    menuMotion = await page.evaluateHandle(observeRenderedMenuMotion)
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
-    await teardownE2eScenario({
-      resources,
-      taskFailed: task.result?.state === 'fail',
-      taskName: task.name
-    })
+    try {
+      if (menuMotion && !page.isClosed()) await menuMotion.evaluate((observer) => observer.stop())
+    } finally {
+      try {
+        await menuMotion?.dispose()
+      } finally {
+        await teardownE2eScenario({
+          resources,
+          taskFailed: task.result?.state === 'fail',
+          taskName: task.name
+        })
+      }
+    }
   })
 
   it(
@@ -83,7 +94,7 @@ describe('canvas menu motion e2e', () => {
       await page
         .locator('[role="menu"][aria-label="画布操作"][data-interactive="true"]')
         .waitFor({ state: 'attached' })
-      await waitForSettledMenuPresentation(menu, 'initial canvas menu to settle open')
+      await waitForSettledMenuPresentation(menuMotion!, 'initial canvas menu to settle open')
       await menu.evaluate((element) => {
         element.setAttribute('data-e2e-presence-token', 'retained-surface')
       })
@@ -94,7 +105,7 @@ describe('canvas menu motion e2e', () => {
       await menu.waitFor({ state: 'attached' })
       expect(await menu.getAttribute('data-e2e-presence-token')).toBe('retained-surface')
       expect(await page.locator('[role="menu"][data-interactive="true"]').count()).toBe(1)
-      await waitForSettledMenuPresentation(menu, 'retargeted canvas menu to settle open')
+      await waitForSettledMenuPresentation(menuMotion!, 'retargeted canvas menu to settle open')
       await menu.getByRole('menuitem').first().click({ trial: true })
 
       const dismissLayerPresentation = await page
@@ -181,13 +192,14 @@ describe('canvas menu motion e2e', () => {
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
       await menu.waitFor({ state: 'attached' })
-      const openingPresentation = await waitForCompactMenuPresentation(
-        menu,
-        'canvas menu to render a compact opening presentation'
-      )
       const openPresentation = await waitForSettledMenuPresentation(
-        menu,
+        menuMotion!,
         'canvas menu to settle open'
+      )
+      // Deliberately consume the sample after settling: runner latency must not lose a frame.
+      const openingPresentation = await waitForCompactMenuPresentation(
+        menuMotion!,
+        'canvas menu to render a compact opening presentation'
       )
       const firstAction = menu.getByRole('menuitem').first()
       await firstAction.waitFor({ state: 'visible' })
@@ -203,15 +215,17 @@ describe('canvas menu motion e2e', () => {
       expect(await firstAction.isEnabled()).toBe(true)
       await firstAction.click({ trial: true })
 
+      await menuMotion!.evaluate((observer) => observer.reset())
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      expect(await menu.getAttribute('data-interactive')).toBe('false')
-      expect(await menu.getAttribute('aria-hidden')).toBe('true')
-      expect(await menu.getAttribute('inert')).not.toBeNull()
-
+      // Closing samples must also survive a delayed consumer and removal of the surface.
+      await menu.waitFor({ state: 'detached' })
       const closingPresentation = await waitForCompactMenuPresentation(
-        menu,
+        menuMotion!,
         'canvas menu to render a compact closing presentation'
       )
+      expect(closingPresentation.interactive).toBe(false)
+      expect(closingPresentation.ariaHidden).toBe('true')
+      expect(closingPresentation.inert).toBe(true)
       expect(closingPresentation.transform).not.toBe('none')
       expect(closingPresentation.scale).toBeLessThan(0.98)
       expect(closingPresentation.rect.width).toBeLessThan(openPresentation.rect.width)
@@ -219,7 +233,6 @@ describe('canvas menu motion e2e', () => {
       expectPointsWithinAxisTolerance(closingPresentation.anchor, point)
       expectPointsWithinAxisTolerance(closingPresentation.anchor, openingPresentation.anchor)
 
-      await menu.waitFor({ state: 'detached' })
       expect(await page.locator('[role="menu"][aria-label="画布操作"]').count()).toBe(0)
     },
     electronScenarioTimeoutMs
@@ -228,6 +241,9 @@ describe('canvas menu motion e2e', () => {
 
 interface RenderedMenuPresentation {
   readonly anchor: { readonly x: number; readonly y: number }
+  readonly interactive: boolean
+  readonly ariaHidden: string | null
+  readonly inert: boolean
   readonly opacity: number
   readonly rect: { readonly height: number; readonly width: number }
   readonly scale: number
@@ -235,38 +251,40 @@ interface RenderedMenuPresentation {
 }
 
 async function waitForCompactMenuPresentation(
-  menu: Locator,
+  observer: JSHandle<ReturnType<typeof observeRenderedMenuMotion>>,
   description: string
 ): Promise<RenderedMenuPresentation> {
-  return pollUntilState({
+  const observation = await pollUntilState({
     description,
-    observe: () => readRenderedMenuPresentation(menu),
-    accept: (presentation) =>
-      presentation.opacity > 0 &&
-      presentation.scale > 0 &&
-      presentation.scale < 0.98 &&
-      presentation.rect.width > 0 &&
-      presentation.rect.height > 0,
+    observe: () => observer.evaluate((recording) => recording.read()),
+    accept: (recording) => recording.compact !== null,
     intervalMs: 10,
     timeoutMs: 2_000
   })
+  return observation.compact!
 }
 
 async function waitForSettledMenuPresentation(
-  menu: Locator,
+  observer: JSHandle<ReturnType<typeof observeRenderedMenuMotion>>,
   description: string
 ): Promise<RenderedMenuPresentation> {
-  return pollUntilState({
+  const observation = await pollUntilState({
     description,
-    observe: () => readRenderedMenuPresentation(menu),
-    accept: (presentation) => presentation.opacity === 1 && presentation.scale === 1,
+    observe: () => observer.evaluate((recording) => recording.read()),
+    accept: ({ current }) => current?.opacity === 1 && current.scale === 1,
     intervalMs: 20,
     timeoutMs: 2_000
   })
+  return observation.current!
 }
 
-async function readRenderedMenuPresentation(menu: Locator): Promise<RenderedMenuPresentation> {
-  return menu.evaluate((element) => {
+function observeRenderedMenuMotion() {
+  let compact: RenderedMenuPresentation | null = null
+  let last: RenderedMenuPresentation | null = null
+  let frameId = 0
+  const readCurrent = (): RenderedMenuPresentation | null => {
+    const element = document.querySelector('[role="menu"][aria-label="画布操作"]')
+    if (!element) return null
     const styles = getComputedStyle(element)
     const transform = styles.transform
     const matrix = transform === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(transform)
@@ -282,6 +300,9 @@ async function readRenderedMenuPresentation(menu: Locator): Promise<RenderedMenu
         x: rect.left + scaleX * originX,
         y: rect.top + scaleY * originY
       },
+      interactive: element.getAttribute('data-interactive') === 'true',
+      ariaHidden: element.getAttribute('aria-hidden'),
+      inert: element.hasAttribute('inert'),
       opacity: Number.parseFloat(styles.opacity),
       rect: {
         height: rect.height,
@@ -290,7 +311,46 @@ async function readRenderedMenuPresentation(menu: Locator): Promise<RenderedMenu
       scale: (scaleX + scaleY) / 2,
       transform
     }
+  }
+  const sample = (): void => {
+    const current = readCurrent()
+    if (!current) return
+    last = current
+    if (
+      !compact &&
+      current.opacity > 0 &&
+      current.scale > 0 &&
+      current.scale < 0.98 &&
+      current.rect.width > 0 &&
+      current.rect.height > 0
+    ) {
+      compact = current
+    }
+  }
+  const sampleFrame = (): void => {
+    sample()
+    frameId = requestAnimationFrame(sampleFrame)
+  }
+  // Arm inside the renderer before input, independently of Playwright's round trips.
+  const mutations = new MutationObserver(sample)
+  mutations.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['style', 'data-interactive', 'aria-hidden', 'inert'],
+    childList: true,
+    subtree: true
   })
+  frameId = requestAnimationFrame(sampleFrame)
+  return {
+    read: () => ({ compact, current: readCurrent(), last }),
+    reset: () => {
+      compact = null
+      last = null
+    },
+    stop: () => {
+      cancelAnimationFrame(frameId)
+      mutations.disconnect()
+    }
+  }
 }
 
 function expectPointsWithinAxisTolerance(
