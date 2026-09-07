@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url'
 
 import { AgentLaunchArtifactScope } from '../../../../src/contexts/agent/application/services/AgentLaunchArtifactScope'
 import { prepareCodexNativeMessageLaunch } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexNativeMessageLaunch'
+import {
+  createForegroundJobShellControl,
+  disposeForegroundJobShellControl
+} from '../../../../src/contexts/run/infrastructure/pty/ForegroundJobShellControl'
 import { pollUntilState } from '../../../support/e2ePolling'
 
 describe('Codex native console input', () => {
@@ -31,17 +35,35 @@ describe('Codex native console input', () => {
       bindIdentity: () => undefined
     })
     artifacts.seal()
-    const quote = (value: string) => `'${value.replaceAll("'", "''")}'`
-    // Match the application: a console shell owns the PTY before starting the GUI-subsystem
-    // Electron executable. AttachConsole(PARENT_PROCESS) must target that console shell.
-    const terminal = spawn(
-      process.platform === 'win32' ? 'powershell.exe' : plan.executable,
+    // Use the production launcher: it owns the console and explicitly waits for the
+    // GUI-subsystem Electron executable instead of returning before the relay exits.
+    const foreground =
       process.platform === 'win32'
+        ? createForegroundJobShellControl(
+            {
+              executable: plan.executable,
+              args: plan.args,
+              environment: {},
+              generation: 1,
+              launchId: 'console-regression',
+              sessionId: 'console-regression',
+              onStarted: () => undefined,
+              onExit: () => undefined
+            },
+            { temporaryRoot: directory }
+          )
+        : undefined
+    const terminal = spawn(
+      foreground?.shellExecutable ?? plan.executable,
+      foreground
         ? [
             '-NoLogo',
             '-NoProfile',
-            '-Command',
-            `& ${[plan.executable, ...plan.args].map(quote).join(' ')}; exit $LASTEXITCODE`
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            foreground.scriptPath
           ]
         : [...plan.args],
       {
@@ -107,6 +129,7 @@ describe('Codex native console input', () => {
           })
           data.dispose()
           exit.dispose()
+          if (foreground) disposeForegroundJobShellControl(foreground)
           await rm(directory, { recursive: true, force: true })
         }
       }
