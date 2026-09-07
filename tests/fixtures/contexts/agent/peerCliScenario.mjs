@@ -1,10 +1,13 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { watch } from 'node:fs'
+import { basename, dirname } from 'node:path'
 import process from 'node:process'
 
 // A deterministic MCP client hosted by each native-terminal CLI fixture.
 export async function runPeerScenario(providerId, args) {
   const source = process.env.CLEANCODE_FAKE_PEER_SOURCE
   const reportPath = process.env.CLEANCODE_FAKE_PEER_REPORT
+  const notification = providerId === 'claude-code' ? await watchClaudeInbox(args) : undefined
   try {
     let url
     if (providerId === 'codex') {
@@ -39,6 +42,15 @@ export async function runPeerScenario(providerId, args) {
     }
     const call = async (name, arguments_) =>
       (await rpc('tools/call', { name, arguments: arguments_ })).structuredContent.output
+    const receive = async (arguments_ = {}) => {
+      for (;;) {
+        const result = await call('wait_agent_message', { ...arguments_, timeoutMs: 30_000 })
+        if (result.result.status === 'message' || !notification) return result
+        // A native-capable wait returns immediately. Continue only after a native
+        // FileChanged reminder, never by repeatedly polling the MCP inbox.
+        await notification.next()
+      }
+    }
     await rpc('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},
@@ -66,25 +78,20 @@ export async function runPeerScenario(providerId, args) {
           initialTask: 'Review fixture revision abc and report the result.'
         })
       }
-      const reply = await call('wait_agent_message', { replyToMessageId: created.initialMessageId, timeoutMs: 30_000 })
+      const reply = await receive({ replyToMessageId: created.initialMessageId })
       if (reply.result.status !== 'message') throw new Error('Peer did not reply.')
       await call('wait_agent_message', {
         acknowledgeMessageId: reply.result.message.messageId,
         timeoutMs: 0
       })
-      await writeFile(
-        reportPath,
-        JSON.stringify({
-          status: 'completed',
-          source,
-          replyToMessageId: reply.result.message.replyToMessageId
-        })
-      )
+      await publishReport(reportPath, {
+        status: 'completed',
+        source,
+        replyToMessageId: reply.result.message.replyToMessageId
+      })
       process.stdout.write('PEER_REVIEW_COMPLETE\n')
     } else {
-      // These legacy-version fixtures exercise the common MCP pull protocol.
-      // Native wakeup transports are verified by the Provider integration tests.
-      const received = await call('wait_agent_message', { timeoutMs: 30_000 })
+      const received = await receive()
       if (received.result.status !== 'message') throw new Error('No initial task was delivered.')
       const task = received.result.message
       await call('send_agent_message', {
@@ -97,9 +104,54 @@ export async function runPeerScenario(providerId, args) {
       await call('wait_agent_message', { acknowledgeMessageId: task.messageId, timeoutMs: 0 })
     }
   } catch (error) {
-    await writeFile(
-      reportPath,
-      JSON.stringify({ status: 'failed', source, message: String(error) })
-    )
+    await publishReport(reportPath, { status: 'failed', source, message: String(error) })
+  } finally {
+    notification?.close()
+  }
+}
+
+async function publishReport(path, report) {
+  // The E2E reader may observe the file as soon as it exists. Publish only a
+  // complete JSON document, with a separate staging file for each CLI process.
+  const temporary = `${path}.${process.pid}.tmp`
+  try {
+    await writeFile(temporary, JSON.stringify(report))
+    await rename(temporary, path)
+  } finally {
+    await rm(temporary, { force: true })
+  }
+}
+
+// Simulates Claude's native file watcher and authenticated Hook dispatch. The
+// actual exec-form Hook program is exercised by the Provider integration suite.
+async function watchClaudeInbox(args) {
+  const settings = JSON.parse(await readFile(args[args.indexOf('--settings') + 1], 'utf8'))
+  const signalPath = settings.hooks.FileChanged.find(entry => entry.matcher)?.matcher
+  const sessionIndex = args.findIndex(arg => arg === '--session-id' || arg === '--resume')
+  let pending = 0
+  let resume
+  let timer
+  const watcher = watch(dirname(signalPath), async (_event, filename) => {
+    if (filename !== basename(signalPath)) return
+    const response = await globalThis.fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + process.env.CLEANCODE_CLAUDE_HOOK_TOKEN },
+      body: JSON.stringify({ cwd: process.cwd(), session_id: args[sessionIndex + 1], hook_event_name: 'FileChanged', file_path: signalPath })
+    }).catch(() => undefined)
+    if (response?.status !== 200) return
+    pending++
+    resume?.()
+  })
+  return {
+    async next() {
+      if (!pending) await new Promise((resolve, reject) => {
+        resume = resolve
+        timer = globalThis.setTimeout(() => reject(new Error('No native Claude inbox reminder.')), 30_000)
+      })
+      globalThis.clearTimeout(timer)
+      resume = undefined
+      pending--
+    },
+    close() { watcher.close(); globalThis.clearTimeout(timer) }
   }
 }

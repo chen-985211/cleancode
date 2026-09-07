@@ -23,6 +23,7 @@ import {
 } from '../support/e2eWorkbench'
 import {
   agentLaunchReadyTimeoutMs,
+  agentCliReadyTimeoutMs,
   waitForAgentLaunchReady,
   waitForAgentProviderInstalled,
   waitForAgentTerminalReady,
@@ -378,7 +379,7 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
 async function waitForCodexLaunch(
   reportPath: string,
   expectedCount: number,
-  timeoutMs = agentLaunchReadyTimeoutMs
+  timeoutMs = agentCliReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
   return waitForCodexReport(
     reportPath,

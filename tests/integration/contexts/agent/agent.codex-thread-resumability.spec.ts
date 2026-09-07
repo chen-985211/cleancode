@@ -1,9 +1,15 @@
+import * as childProcess from 'node:child_process'
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, extname, join } from 'node:path'
 
 import { createCodexAppServerProcessInvocation } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAppServerProcessInvocation'
 import { inspectCodexThreadResumability } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexThreadResumabilityInspector'
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const original = await importOriginal<typeof childProcess>()
+  return { ...original, spawn: vi.fn(original.spawn) }
+})
 
 const threadId = '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
 const providerArgs = [
@@ -24,6 +30,7 @@ describe('Codex persisted thread inspection', () => {
   afterEach(async () => {
     // Even an assertion/test deadline must let the inspector finish owning its child processes.
     await query?.catch(() => undefined)
+    vi.mocked(childProcess.spawn).mockReset()
     await rm(directory, { recursive: true, force: true })
   })
 
@@ -71,6 +78,18 @@ describe('Codex persisted thread inspection', () => {
   ])(
     'classifies a metadata-only read as $expected for $response',
     async ({ response, expected }) => {
+      let childOutput = ''
+      const { spawn: originalSpawn } =
+        await vi.importActual<typeof childProcess>('node:child_process')
+      // Observe the real child's EOF acknowledgement through its already-owned pipe.
+      // Creating a marker file at EOF can be interrupted by bounded cleanup on Windows.
+      vi.mocked(childProcess.spawn).mockImplementation((command, args, options) => {
+        const child = originalSpawn(command, args, options)
+        child.stdout?.on('data', (chunk) => {
+          childOutput += String(chunk)
+        })
+        return child
+      })
       const script = join(directory, 'app-server.mjs')
       const report = join(directory, 'request.json')
       await writeFile(
@@ -89,7 +108,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     }))
     process.stdout.write(JSON.stringify({ id: request.id, ...JSON.parse(process.env.RESPONSE) }) + '\\n')
   }
-}).on('close', () => writeFileSync(process.env.REPORT_PATH + '.closed', 'closed'))
+}).on('close', () => process.stdout.write('EOF_CLOSED\\n'))
 `
       )
       query = inspectCodexThreadResumability({
@@ -112,7 +131,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       })
       expect(await realpath(observation.cwd)).toBe(await realpath(directory))
       expect(() => process.kill(observation.pid, 0)).toThrow()
-      expect(await readFile(`${report}.closed`, 'utf8')).toBe('closed')
+      expect(childOutput).toContain('EOF_CLOSED')
     },
     // Includes the production request deadline (7.5 s) and bounded cleanup (2.5 s).
     12_000

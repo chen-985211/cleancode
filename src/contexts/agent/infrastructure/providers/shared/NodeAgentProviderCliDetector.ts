@@ -48,8 +48,13 @@ export class NodeAgentProviderCliDetector implements AgentProviderDetector {
       if (this.options.minimumVersion) {
         const parsedVersion = readSemanticVersion(version)
         const minimumVersion = readSemanticVersion(this.options.minimumVersion)
-        if (!parsedVersion || !minimumVersion) return this.unavailable('invalid_output')
-        if (compareSemanticVersions(parsedVersion, minimumVersion) < 0) {
+        // A successful custom build may not publish semver. Let its launch-time
+        // capability handshake decide; an unknown version is not an old version.
+        if (
+          parsedVersion &&
+          minimumVersion &&
+          compareSemanticVersions(parsedVersion, minimumVersion) < 0
+        ) {
           return {
             installCommand: this.options.installCommand,
             minimumVersion: this.options.minimumVersion,
@@ -107,15 +112,6 @@ export function resolveAgentProviderInspectionTimeout(
 }
 
 type SemanticVersion = readonly [major: number, minor: number, patch: number]
-
-export function supportsAgentProviderVersion(
-  version: string | undefined,
-  minimum: string
-): boolean {
-  const parsed = version ? readSemanticVersion(version) : null
-  const required = readSemanticVersion(minimum)
-  return !!parsed && !!required && compareSemanticVersions(parsed, required) >= 0
-}
 
 function readSemanticVersion(value: string): SemanticVersion | null {
   const match = /(?:^|\D)(\d+)\.(\d+)\.(\d+)(?:\D|$)/.exec(value)

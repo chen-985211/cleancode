@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url'
 
 import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
+import { agentInboxWakeupPrompt } from '../../../application/ports/AgentMessageDeliveryPort'
 import { cleancodeMcpDeveloperInstructions } from '../../../application/dto/AgentToolProtocol'
 import type {
   AgentCapabilityInjector,
@@ -24,6 +25,8 @@ import {
   createTemporaryProviderConfig,
   type TemporaryProviderConfig
 } from '../shared/TemporaryProviderConfig'
+import { openCodeReporterPluginScript } from './OpenCodeReporterPlugin'
+import { OpenCodeNativeMessageDelivery } from './OpenCodeNativeMessageDelivery'
 import { OpenCodeEventReporter, isOpenCodeSessionId } from './OpenCodeEventReporter'
 import { createOpenCodeLaunchConfig, parseInheritedOpenCodeConfig } from './OpenCodeLaunchConfig'
 
@@ -43,6 +46,8 @@ export class OpenCodeAgentProviderContribution implements AgentProviderContribut
   readonly descriptor = {
     capabilities: {
       activityTracking: true,
+      nativeMessages: true,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
@@ -136,19 +141,29 @@ class OpenCodeTelemetryContribution implements AgentTelemetryContribution {
   }
 
   async prepareForLaunch(
-    command: Parameters<AgentTelemetryContribution['prepare']>[0],
+    command: CreateAgentLaunchPlanCommand,
     expectedSessionId?: string
   ): Promise<OpenCodeTelemetryPreparation> {
+    const delivery = command.messageDelivery
+      ? command.artifacts.track(
+          'opencode-native-delivery',
+          new OpenCodeNativeMessageDelivery(command.messageDelivery)
+        )
+      : undefined
     const reporter = await OpenCodeEventReporter.start({
+      onNativeMessageUnavailable: () => command.messageDelivery?.(null),
+      onNativeMessageEndpoint: (url, token) => delivery?.bindEndpoint(url, token),
       expectedSessionId,
       onActivityChanged: command.onActivityChanged ?? (() => undefined),
-      onSessionIdentified: (sessionId, confirmedBy) =>
+      onSessionIdentified: (sessionId, confirmedBy) => {
+        delivery?.bindSession(sessionId)
         command.onProviderSessionIdentified({
           formatVersion: 1,
           kind: 'opencode-session',
           metadata: { confirmedBy },
           value: sessionId
-        }),
+        })
+      },
       workspaceDirectory: command.workspaceDirectory
     })
     command.artifacts.track('opencode-event-reporter', reporter)
@@ -162,6 +177,8 @@ class OpenCodeTelemetryContribution implements AgentTelemetryContribution {
       args: [],
       env: {
         CLEANCODE_OPENCODE_REPORTER_TOKEN: reporter.token,
+        ...(delivery ? { CLEANCODE_OPENCODE_NATIVE_MESSAGES: '1' } : {}),
+        ...(expectedSessionId ? { CLEANCODE_OPENCODE_SESSION_ID: expectedSessionId } : {}),
         CLEANCODE_OPENCODE_REPORTER_URL: reporter.url
       },
       pluginUrl: pathToFileURL(plugin.path).href
@@ -182,7 +199,10 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
   ) {}
 
   async createLaunchPlan(command: CreateAgentLaunchPlanCommand) {
-    const inheritedConfig = parseInheritedOpenCodeConfig(process.env.OPENCODE_CONFIG_CONTENT)
+    const inheritedConfig = parseInheritedOpenCodeConfig(
+      command.launchProfile?.environment.OPENCODE_CONFIG_CONTENT ??
+        process.env.OPENCODE_CONFIG_CONTENT
+    )
     const sessionRef = command.providerSessionRef
       ? this.options.sessionRefCodec.parse(command.providerSessionRef)
       : undefined
@@ -202,6 +222,13 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
       : undefined
     if (instructions) command.artifacts.track('opencode-mcp-instructions', instructions)
 
+    // A fresh native TUI has no session until its first prompt. Establish it through
+    // the same official initial-prompt path used by MCP-created Agents.
+    const initialPrompt =
+      command.initialPrompt ??
+      (command.messageDelivery && command.cleancodeMcp && !sessionRef
+        ? agentInboxWakeupPrompt
+        : undefined)
     return {
       args: [
         ...this.options.baseArgs,
@@ -209,6 +236,7 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
         ...(sessionRef ? this.options.resume.createResumeArgs(sessionRef) : []),
         ...capability.args,
         ...telemetry.args,
+        ...(initialPrompt ? ['--prompt', initialPrompt] : []),
         command.workspaceDirectory
       ],
       env: {
@@ -227,32 +255,3 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
     }
   }
 }
-
-const openCodeReporterPluginScript = [
-  'const reportedEvents=new Set([',
-  '"session.created","session.status","session.idle","session.error","session.deleted",',
-  '"permission.asked","permission.updated","permission.replied",',
-  '"question.asked","question.replied","question.rejected"',
-  ']);',
-  'export const CleanCodeOpenCodeReporterPlugin=async({client,directory})=>{',
-  'const report=async(event)=>{',
-  'const url=process.env.CLEANCODE_OPENCODE_REPORTER_URL;',
-  'const token=process.env.CLEANCODE_OPENCODE_REPORTER_TOKEN;',
-  'if(!url||!token)return;',
-  'await fetch(url,{method:"POST",headers:{authorization:`Bearer ${token}`,',
-  '"content-type":"application/json"},body:JSON.stringify({directory,event})}).catch(()=>{});',
-  '};',
-  'return {',
-  'event:async({event})=>{',
-  'if(!reportedEvents.has(event?.type))return;',
-  'await report(event);',
-  '},',
-  '"chat.message":async({sessionID})=>{',
-  'const result=await client.session.get({path:{id:sessionID},query:{directory}}).catch(()=>null);',
-  'const info=result?.data;',
-  'if(!info||info.parentID!==undefined)return;',
-  'await report({type:"cleancode.session.activated",properties:{info}});',
-  '}',
-  '};',
-  '};'
-].join('')

@@ -24,7 +24,11 @@ describe('Native Agent peer messaging through session-scoped MCP', () => {
     ['claude-code', 'codex', false],
     ['codex', 'claude-code', false],
     ['claude-code', 'codex', true],
-    ['codex', 'claude-code', true]
+    ['codex', 'claude-code', true],
+    ['opencode', 'codex', true],
+    ['claude-code', 'opencode', true],
+    ['gemini', 'opencode', false],
+    ['codex', 'gemini', false]
   ] as const)(
     'routes a review and correlated reply from %s to %s without terminal writes, native=%s',
     async (from, to, native) => {

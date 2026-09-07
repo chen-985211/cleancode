@@ -459,6 +459,8 @@ describe('additional Agent Provider contributions', () => {
       expect(contribution.descriptor).toEqual({
         capabilities: {
           activityTracking: true,
+          initialPrompt: true,
+          nativeMessages: true,
           cleancodeMcp: true,
           launchInstructions: true,
           resume: true,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import type { AgentProviderPreferencesRepository } from '../../application/ports/AgentProviderPreferencesRepository'
@@ -27,8 +27,26 @@ export class FileSystemAgentProviderPreferencesRepository implements AgentProvid
     const normalized = AgentProviderPreferences.restore(preferences).toSnapshot()
     await mkdir(dirname(this.filePath), { recursive: true })
     const temporaryPath = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`
-    await writeFile(temporaryPath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 })
-    await rename(temporaryPath, this.filePath)
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 })
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await rename(temporaryPath, this.filePath)
+          return
+        } catch (error) {
+          if (
+            process.platform !== 'win32' ||
+            attempt >= 5 ||
+            !['EACCES', 'EBUSY', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '')
+          )
+            throw error
+          // Windows readers/scanners can briefly lock the existing destination.
+          await new Promise((resolve) => setTimeout(resolve, 10 * 2 ** attempt))
+        }
+      }
+    } finally {
+      await unlink(temporaryPath).catch(() => undefined)
+    }
   }
 }
 

@@ -439,7 +439,7 @@ Agent 控制台不得展示终端端口，不得加入终端组合，也不得�
 
 收件箱默认立即读取，支持原生通知的会话不挂起工具等待；领取、确认、空收件箱和启动就绪不要求额外用户汇报或礼貌性消息，用户明确要求检查时除外。需要同步给同伴的任务完成通过关联结果表达，不从一次 CLI 回答结束或活动通知推断。沟通对象选择由统一模型指引提供，不由 UI 推导固定负责人或用户已读状态。原生控制台的工具调用展示继续由 Provider 控制，CleanCode 不过滤或改写终端输出以隐藏通信过程。
 
-正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；新建 Agent 的默认选择菜单同样不得展示 detector 版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，其他 Provider 不得因虚构的版本门槛显示升级要求。快捷菜单不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项，这些状态只进入 Agent 设置和既有 Agent 的诊断反馈。
+正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；新建 Agent 的默认选择菜单同样不得展示 detector 版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.139`，其他 Provider 不得因虚构的版本门槛显示升级要求。快捷菜单不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项，这些状态只进入 Agent 设置和既有 Agent 的诊断反馈。
 
 每个 Provider 的 CLI 检查结果属于应用级共享的易失能力快照，不得由每个 Agent 重复维护。Agent 自身运行状态优先于该快照：运行中的 launch 必须保持静默，恢复失败、启动失败和会话结束不得被检查提示遮挡；旧检查结果不得覆盖较新的重试。
 

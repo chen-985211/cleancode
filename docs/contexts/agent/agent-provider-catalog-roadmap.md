@@ -53,7 +53,7 @@ Claude Code、Codex、OpenCode、Gemini、Cursor、GitHub Copilot、OpenClaw、H
 
 - 基础终端 Provider 只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。
 - Codex、Claude Code 和 OpenCode 执行受超时约束的版本命令，用于确认 CLI 可用性并读取版本。
-- 当前只有 Claude Code 声明最低版本 `2.1.119`；其他 Provider 不得因虚构的版本门槛返回 `upgrade_required`。
+- 当前只有 Claude Code 声明最低版本 `2.1.139`；其他 Provider 不得因虚构的版本门槛返回 `upgrade_required`。
 - Mistral Vibe 同时识别 `vibe` 与 `mistral-vibe`；具有复合依赖的 Provider 必须确认全部真实依赖。
 
 cleancode 不主动执行第三方安装、升级、登录或配置迁移命令。检测结果是应用级易失快照，可以是 `installed`、`missing`、`upgrade_required` 或 `temporarily_unavailable`，不是 Agent 或对话的持久化事实。

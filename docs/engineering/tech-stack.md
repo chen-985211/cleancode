@@ -109,11 +109,11 @@ registry descriptor 集合是完整的受支持 Provider catalog；专用 discov
 
 macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前 POSIX shell 的交互式 login invocation 获取用户 PATH，并把去重后的 shell 路径优先合并进 Electron 主进程环境；需要新建 Agent PTY 时，这一步和可用性预检必须在 PTY 快照主进程环境之前完成。超时或异常时保留继承 PATH。Windows 跳过 POSIX hydration，Provider CLI 检测继续通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；任何平台都不得把 executable 或 argv 拼接成可注入的命令文本。
 
-共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。基础终端目录只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，其他 Provider 不得虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
+共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。基础终端目录只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.139` 或更高版本，依据是 Hook exec-form args 的上游发布边界（详见[兼容性报告](../contexts/agent/native-collaboration-compatibility.md)）；其他 Provider 不得虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
 
 每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume`、`tui.terminal_title`、`app-server thread/list`、进程级 `notify` 和精确信任的退出 Hook 报告或补全当前 thread UUID，不声明精确活动跟踪；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入远程 MCP 与临时 instructions；Gemini 通过正式 `--session-id` 接受 cleancode 预分配 UUID，在 launch 启动后确认绑定并以 `--resume` 恢复，同时通过临时 system settings 注入 MCP。四者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
 
-原生收件箱唤醒复用 Node.js 内建文件、进程和本地传输能力，不新增 SDK 依赖。Codex 的临时 launcher 在既有 PTY 中以 Electron Node 模式启动，TUI、独立 app-server 与官方 queue 命令共享实际 shell 环境；服务不使用或接管用户全局 daemon。Claude 使用临时 FileChanged Hook 和信号文件，配置只在 launch 生命周期内存在。运行资格、降级与清理由 Agent 应用层和 Provider 适配器按[原生 MCP 协议](../contexts/agent/cleancode-mcp.md)分别负责。
+原生收件箱唤醒复用 Node.js 内建文件、进程和本地传输能力，不新增 SDK 依赖。Codex 的临时 launcher 在既有 PTY 中以 Electron Node 模式启动，TUI、独立 app-server 与官方 queue 命令共享实际 shell 环境；服务不使用或接管用户全局 daemon。Claude 使用临时 FileChanged Hook 和信号文件，OpenCode 使用原生插件持有的 SDK 与认证 loopback HTTP，配置只在 launch 生命周期内存在。运行资格、降级与清理由 Agent 应用层和 Provider 适配器按[原生 MCP 协议](../contexts/agent/cleancode-mcp.md)分别负责。
 
 CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Provider 在 MCP 初始化或失败时仍可正常运行；注册失败或认证握手超时只把 MCP 投影为 `failed`。Provider session ref 保存失败只把 binding 标记为 `persistence_failed`，不得把仍在运行的 launch 或活动误报为失败。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 

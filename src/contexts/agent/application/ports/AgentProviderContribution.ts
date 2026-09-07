@@ -118,6 +118,8 @@ export interface AgentLaunchPlan {
   readonly env: Readonly<Record<string, string>>
   readonly executable: string
   readonly gracefulShutdown?: {
+    /** Bounded Provider-owned cleanup after native input fails, before stopping the PTY. */
+    readonly onTimeout?: () => Promise<void>
     readonly inputIntervalMs: number
     readonly inputs: readonly string[]
     readonly timeoutMs: number

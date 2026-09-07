@@ -16,6 +16,11 @@ import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderL
 import { NodeAgentProviderCommandDetector } from '../shared/NodeAgentProviderCommandDetector'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import { createClientAssignedTerminalCliSession } from '../terminal-cli/DeclarativeTerminalCliSession'
+import {
+  createGeminiHookCommand,
+  mergeGeminiSettings,
+  readGeminiSystemSettings
+} from './GeminiLaunchSettings'
 import { GeminiHookReporter } from './GeminiHookReporter'
 
 export interface GeminiAgentProviderContributionOptions {
@@ -24,12 +29,14 @@ export interface GeminiAgentProviderContributionOptions {
   readonly createSessionId?: () => string
   readonly detector?: AgentProviderDetector
   readonly runtimeExecutable?: string
+  readonly runtimePlatform?: NodeJS.Platform
 }
 
 export class GeminiAgentProviderContribution implements AgentProviderContribution {
   readonly descriptor = {
     capabilities: {
       activityTracking: true,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: false,
       resume: true,
@@ -75,7 +82,10 @@ export class GeminiAgentProviderContribution implements AgentProviderContributio
     this.freshSession = session.freshSession
     this.resume = session.resume
     this.sessionRefCodec = session.sessionRefCodec
-    this.telemetry = new GeminiTelemetryContribution(options.runtimeExecutable ?? process.execPath)
+    this.telemetry = new GeminiTelemetryContribution(
+      options.runtimeExecutable ?? process.execPath,
+      options.runtimePlatform ?? process.platform
+    )
     this.launcher = new GeminiLaunchPlanner({
       baseArgs: options.baseArgs ?? [],
       capability: this.cleancodeCapability,
@@ -125,14 +135,17 @@ interface GeminiTelemetryPreparation {
 class GeminiTelemetryContribution implements AgentTelemetryContribution {
   readonly signals = { activity: true, sessionIdentity: true } as const
 
-  constructor(private readonly runtimeExecutable: string) {}
+  constructor(
+    private readonly runtimeExecutable: string,
+    private readonly runtimePlatform: NodeJS.Platform
+  ) {}
 
   prepare(command: Parameters<AgentTelemetryContribution['prepare']>[0]) {
     return this.prepareForLaunch(command)
   }
 
   async prepareForLaunch(
-    command: Parameters<AgentTelemetryContribution['prepare']>[0],
+    command: CreateAgentLaunchPlanCommand,
     settingsFragment: Readonly<Record<string, unknown>> = {}
   ): Promise<GeminiTelemetryPreparation> {
     const reporter = await GeminiHookReporter.start({
@@ -153,13 +166,19 @@ class GeminiTelemetryContribution implements AgentTelemetryContribution {
       geminiHookRelayScript
     )
     command.artifacts.track('gemini-hook-relay', relay)
+    const inherited = await readGeminiSystemSettings(
+      command.launchProfile?.environment ?? {},
+      this.runtimePlatform
+    )
     const settings = await createTemporaryProviderConfig(
       'cleancode-gemini-settings-',
       'settings.json',
-      JSON.stringify({
-        hooks: createGeminiHooks(this.runtimeExecutable, relay.path),
-        ...settingsFragment
-      })
+      JSON.stringify(
+        mergeGeminiSettings(inherited.settings, {
+          hooks: createGeminiHooks(this.runtimeExecutable, relay.path, this.runtimePlatform),
+          ...settingsFragment
+        })
+      )
     )
     command.artifacts.track('gemini-settings', settings)
     return {
@@ -168,17 +187,22 @@ class GeminiTelemetryContribution implements AgentTelemetryContribution {
         CLEANCODE_GEMINI_HOOK_TOKEN: reporter.token,
         CLEANCODE_GEMINI_HOOK_URL: reporter.url,
         ELECTRON_RUN_AS_NODE: '1',
-        GEMINI_CLI_SYSTEM_SETTINGS_PATH: settings.path
+        GEMINI_CLI_SYSTEM_SETTINGS_PATH: settings.path,
+        GEMINI_CLI_SYSTEM_DEFAULTS_PATH: inherited.defaults
       }
     }
   }
 }
 
-function createGeminiHooks(runtimeExecutable: string, relayPath: string) {
+function createGeminiHooks(
+  runtimeExecutable: string,
+  relayPath: string,
+  runtimePlatform: NodeJS.Platform
+) {
   const handler = {
     hooks: [
       {
-        command: createHookCommand(runtimeExecutable, relayPath),
+        command: createGeminiHookCommand(runtimeExecutable, relayPath, runtimePlatform),
         name: 'cleancode-agent-activity-reporter',
         timeout: 5_000,
         type: 'command'
@@ -223,7 +247,8 @@ class GeminiLaunchPlanner implements AgentLaunchPlanner {
         ...this.options.baseArgs,
         ...(command.launchProfile?.arguments ?? []),
         ...session.args,
-        ...telemetry.args
+        ...telemetry.args,
+        ...(command.initialPrompt ? ['--prompt-interactive', command.initialPrompt] : [])
       ],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
@@ -245,18 +270,10 @@ const geminiHookRelayScript = [
   'await fetch(process.env.CLEANCODE_GEMINI_HOOK_URL,{',
   'method:"POST",',
   'headers:{authorization:`Bearer ${process.env.CLEANCODE_GEMINI_HOOK_TOKEN}`},',
-  'body',
+  'body,signal:AbortSignal.timeout(3000)',
   '}).catch(()=>{});',
   "process.stdout.write('{}');"
 ].join('')
-
-function createHookCommand(runtimeExecutable: string, relayPath: string): string {
-  return [runtimeExecutable, relayPath].map(quoteCommandArgument).join(' ')
-}
-
-function quoteCommandArgument(value: string): string {
-  return `"${value.replaceAll('"', '\\"')}"`
-}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)

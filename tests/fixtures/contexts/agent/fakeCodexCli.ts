@@ -80,8 +80,16 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
           '--version'
         ]
       : ['--version'],
-    { timeout: 10_000 }
-  )
+    // Hosted Windows cold PowerShell startup exceeded 10s before any application launch.
+    // Keep this a single checked invocation and leave room in the 30s scenario setup budget.
+    { timeout: process.platform === 'win32' ? 20_000 : 10_000 }
+  ).catch((error: Error & { killed?: boolean; signal?: string; stderr?: string }) => {
+    throw new Error(
+      `Fake Codex first launch failed: killed=${Boolean(error.killed)}; ` +
+        `signal=${error.signal ?? 'none'}; stderr=${error.stderr ?? ''}`,
+      { cause: error }
+    )
+  })
   if (stdout.trim() !== 'codex-cli fake-e2e') {
     throw new Error(`Fake Codex CLI returned an unexpected version: ${JSON.stringify(stdout)}`)
   }
@@ -166,6 +174,11 @@ function report(kind, details = {}) {
 if (args.includes('--version')) {
   report('inspection')
   process.stdout.write('codex-cli fake-e2e\\n')
+  process.exit(0)
+}
+
+if (args.includes('--help')) {
+  process.stdout.write('Simulated CLI without native queue transport\\n')
   process.exit(0)
 }
 

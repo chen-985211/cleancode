@@ -435,7 +435,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - Agent Console 已删除独立 xterm registry、输出尾部缓存和原始输出 IPC，复用 Run 的 snapshot、sequence、attach/detach 与共享 xterm surface。
 - 创建 Agent 时从 registry 当前可用项解析默认 Provider；默认值只影响后续新建，既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
 - Codex、Claude Code 和 OpenCode 专用 contribution 已注册。Codex 提供 thread 身份与恢复、MCP 和 launch instructions，但不声明精确活动跟踪；Claude Code 提供首次用户输入确认的 session 绑定、恢复、Hook 活动和 MCP；OpenCode 提供 `opencode-session` codec、`--session` 恢复、顶层 session/活动插件事件、合并用户 inline config 的远程 MCP 与临时 instructions。Gemini 复用声明式 terminal CLI contribution，以正式 `--session-id` 预分配 UUID、在 launch 启动后确认绑定、用 `--resume` 恢复，并通过临时 system settings 注入 MCP。共享 contract fixture 同时证明最小 Provider 可以诚实降级，以及不带 telemetry 的 client-assigned session contribution 可以进入通用契约。
-- CLI availability 已区分 installed、missing、upgrade_required 与 temporarily_unavailable；当前只有 Claude Code 声明 `2.1.119` 最低版本，Codex 与 OpenCode 不制造最低版本门槛。
+- CLI availability 已区分 installed、missing、upgrade_required 与 temporarily_unavailable；当前只有 Claude Code 声明 `2.1.139` 最低版本，Codex 与 OpenCode 不制造最低版本门槛。
 - terminal、launch、activity、MCP readiness 与 Provider-session binding 已独立投影。MCP 初始化、失败或超时不终止基础 launch；binding 保存失败只标记 `persistence_failed`，不会覆盖仍在运行的 launch/activity。
 - Provider launch callback 由 Agent session 与单调 launch generation 双重隔离；临时资源通过每次 launch 的 `AgentLaunchArtifactScope` 登记，并在替换、退出与生命周期清理时释放或保留失败 scope 供重试。
 - Terminal Provider 协议 v4 把前台任务请求和 started/exited 事件送入独立 Provider 进程；`awaiting_started` 阶段消费内部 shell transport 回显，Agent 屏幕只从 Provider started 后发布输出；当前 macOS 真实 Electron E2E 已证明 `Ctrl+C` 结束 Codex launch 后同一 shell 继续接受命令，Windows 由原生 ConPTY integration 门禁负责对等验收。
@@ -683,7 +683,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ### 计划能力
 
-- Claude Code CLI、`2.1.119` 最低版本与可用性检测；更旧版本返回 `upgrade_required`，而不是伪装为已安装可用。
+- Claude Code CLI、`2.1.139` 最低版本与可用性检测；更旧版本返回 `upgrade_required`，而不是伪装为已安装可用。
 - 新会话启动与正式 session resume；空启动不持久化，首次用户输入 Hook 确认后才建立可恢复绑定。
 - 通过 Provider 正式 Hook 获取 session ID、turn、工具、等待输入、等待审批和停止事件。
 - Hook relay 使用 launch Token、完整 owner 和 generation 校验；Hook 只提供 Agent activity，不替代前台任务退出事实。

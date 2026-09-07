@@ -31,6 +31,7 @@ describe('Gemini Agent Provider contribution', () => {
 
     expect(contribution.descriptor.capabilities).toEqual({
       activityTracking: true,
+      initialPrompt: true,
       cleancodeMcp: true,
       launchInstructions: false,
       resume: true,

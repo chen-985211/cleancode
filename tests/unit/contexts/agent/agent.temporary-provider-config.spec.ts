@@ -1,6 +1,7 @@
 const fileSystem = vi.hoisted(() => ({
   chmod: vi.fn(),
   mkdtemp: vi.fn(),
+  realpath: vi.fn(),
   rm: vi.fn(),
   writeFile: vi.fn()
 }))
@@ -15,6 +16,7 @@ describe('temporary Agent Provider config', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     fileSystem.mkdtemp.mockResolvedValue('/tmp/cleancode-provider-config')
+    fileSystem.realpath.mockImplementation(async (path: string) => path)
     fileSystem.chmod.mockResolvedValue(undefined)
     fileSystem.writeFile.mockResolvedValue(undefined)
     fileSystem.rm.mockResolvedValue(undefined)
@@ -45,6 +47,33 @@ describe('temporary Agent Provider config', () => {
       createTemporaryProviderConfig('cleancode-provider-', 'provider.json', '{}')
     ).rejects.toBe(writeFailure)
 
+    expect(fileSystem.rm).toHaveBeenCalledWith('/tmp/cleancode-provider-config', {
+      force: true,
+      recursive: true
+    })
+  })
+
+  it('publishes a canonical directory so file watchers never receive a short-path alias', async () => {
+    const canonical = '/canonical/provider-config'
+    fileSystem.realpath.mockResolvedValueOnce(canonical)
+    const config = await createTemporaryProviderConfig('provider-', 'config.json', '{}')
+
+    expect(config.path).toBe(join(canonical, 'config.json'))
+    expect(fileSystem.writeFile).toHaveBeenCalledWith(config.path, '{}', {
+      encoding: 'utf8',
+      mode: 0o600
+    })
+    await config.dispose()
+    expect(fileSystem.rm).toHaveBeenCalledWith(canonical, { force: true, recursive: true })
+  })
+
+  it('cleans the allocated directory when canonicalization fails', async () => {
+    const failure = new Error('path resolution failed')
+    fileSystem.realpath.mockRejectedValueOnce(failure)
+    await expect(createTemporaryProviderConfig('provider-', 'config.json', '{}')).rejects.toBe(
+      failure
+    )
+    expect(fileSystem.writeFile).not.toHaveBeenCalled()
     expect(fileSystem.rm).toHaveBeenCalledWith('/tmp/cleancode-provider-config', {
       force: true,
       recursive: true

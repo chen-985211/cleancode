@@ -8,6 +8,7 @@ interface AgentProviderLaunchShutdownSession {
 }
 
 interface ProviderLaunchShutdownRuntime {
+  readonly onTimeout?: () => Promise<void>
   readonly exited: Promise<void>
   readonly hasExited: boolean
   readonly inputIntervalMs: number
@@ -55,7 +56,10 @@ export class AgentProviderLaunchShutdownCoordinator {
       return
     }
 
-    shutdown.request ??= this.performRequest(session, shutdown)
+    shutdown.request ??= this.performRequest(session, shutdown).catch((error) => {
+      shutdown.request = undefined
+      throw error
+    })
     await shutdown.request
   }
 
@@ -74,6 +78,7 @@ export class AgentProviderLaunchShutdownCoordinator {
     if (!shutdown.hasExited) {
       await waitForProviderLaunchExit(shutdown.exited, shutdown.timeoutMs)
     }
+    if (!shutdown.hasExited) await shutdown.onTimeout?.()
   }
 }
 
@@ -87,6 +92,7 @@ function createProviderLaunchShutdownRuntime(
     resolveExit = resolve
   })
   return {
+    onTimeout: strategy.onTimeout,
     exited,
     get hasExited() {
       return hasExited
