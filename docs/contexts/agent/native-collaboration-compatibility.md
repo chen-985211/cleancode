@@ -15,17 +15,17 @@
 | Agent       | 平台    | 原生启动、MCP、发现/创建、收发确认 | 身份绑定、恢复 | 已有会话自动继续                         | 忙碌与清理                              | 真实 CLI 记录（既有 / 本次）                                                                        |
 | ----------- | ------- | ---------------------------------- | -------------- | ---------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Codex       | macOS   | 实现                               | 实现           | 官方 queue + remote app-server           | 原生队列；独立后台进程组、launch 清理   | 既有 0.153.4 双向 MCP 通过；本次 0.149.0 / gpt-5.5 新建及恢复的空闲协作通过                         |
-| Codex       | Linux   | 实现                               | 实现           | 同上                                     | POSIX 进程组                            | 未实测：无 Linux 主机                                                                               |
-| Codex       | Windows | 实现                               | 实现           | 同一 unix://；官方 proxy 负责 AF_UNIX    | PowerShell 参数文件、taskkill 进程树    | 未实测：无 Windows 主机                                                                             |
+| Codex       | Linux   | 实现                               | 实现           | 同上                                     | POSIX 进程组                            | 未实测：无已登录的 Linux 真实 CLI 环境                                                              |
+| Codex       | Windows | 实现                               | 实现           | 同一 unix://；官方 proxy 负责 AF_UNIX    | PowerShell 参数文件、taskkill 进程树    | 未实测：无已登录的 Windows 真实 CLI 环境                                                            |
 | Claude Code | macOS   | 实现                               | 实现           | FileChanged + asyncRewake                | 忙碌/审批时延后；单次信号领取           | 既有 2.1.261 双向 MCP 通过；本次 2.1.139 唤醒/领取/确认有实测，完整回复未通过；2.1.263 部分启动验证 |
-| Claude Code | Linux   | 实现                               | 实现           | 同上，无平台禁用                         | exec-form Hook，无 shell 引号依赖       | 未实测：无 Linux 主机                                                                               |
-| Claude Code | Windows | 实现                               | 实现           | 同上，无平台禁用                         | exec-form Hook，无 Git Bash 依赖        | 未实测：无 Windows 主机                                                                             |
+| Claude Code | Linux   | 实现                               | 实现           | 同上，无平台禁用                         | exec-form Hook，无 shell 引号依赖       | 未实测：无已登录的 Linux 真实 CLI 环境                                                              |
+| Claude Code | Windows | 实现                               | 实现           | 同上，无平台禁用                         | exec-form Hook，无 Git Bash 依赖        | 未实测：无已登录的 Windows 真实 CLI 环境                                                            |
 | OpenCode    | macOS   | 实现                               | 实现           | 原生插件 SDK session.promptAsync         | 原生 busy 复核；通知去重；撤销 listener | 1.18.21：含手动创建的新建/恢复空闲协作通过；忙碌试验未完整通过                                      |
-| OpenCode    | Linux   | 实现                               | 实现           | 同上，无平台禁用                         | 认证 loopback HTTP，无 Unix socket 假设 | 未实测：无 Linux 主机                                                                               |
-| OpenCode    | Windows | 实现                               | 实现           | 同上，无平台禁用                         | file URL、HTTP、原生 npm 启动路径       | 未实测：无 Windows 主机                                                                             |
+| OpenCode    | Linux   | 实现                               | 实现           | 同上，无平台禁用                         | 认证 loopback HTTP，无 Unix socket 假设 | 未实测：无已登录的 Linux 真实 CLI 环境                                                              |
+| OpenCode    | Windows | 实现                               | 实现           | 同上，无平台禁用                         | file URL、HTTP、原生 npm 启动路径       | 未实测：无已登录的 Windows 真实 CLI 环境                                                            |
 | Gemini CLI  | macOS   | 实现                               | 实现           | **尚无满足本方案约束的上游空闲唤醒入口** | 保留主动领取；Hook 和临时配置清理       | 0.58.0：原生 TUI、MCP 和 SessionStart 通过；模型场景被未登录阻挡                                    |
-| Gemini CLI  | Linux   | 实现                               | 实现           | 同上，非平台限制                         | 保留系统策略/defaults；POSIX Hook       | 未实测：无 Linux 主机                                                                               |
-| Gemini CLI  | Windows | 实现                               | 实现           | 同上，非平台限制                         | PowerShell Hook、Windows 系统路径       | 未实测：无 Windows 主机                                                                             |
+| Gemini CLI  | Linux   | 实现                               | 实现           | 同上，非平台限制                         | 保留系统策略/defaults；POSIX Hook       | 未实测：无已登录的 Linux 真实 CLI 环境                                                              |
+| Gemini CLI  | Windows | 实现                               | 实现           | 同上，非平台限制                         | PowerShell Hook、Windows 系统路径       | 未实测：无已登录的 Windows 真实 CLI 环境                                                            |
 
 既有 main 记录来自 2026-09-06 的 Codex 0.153.4 ↔ Claude Code 2.1.261 真实双向代码审查协作，含 list/send/wait 和关联回复，未向 PTY 注入协作消息，见 [原生 MCP 的既有验证记录](cleancode-mcp.md)。它没有证明更低版本、Linux 或 Windows；本次 2.1.139 的试验未完成也不推翻 2.1.261 的通过记录。
 
@@ -53,7 +53,9 @@
 
 实际 CLI 在原 PTY 环境中探测。TUI、专属 app-server、queue 继承同一配置与环境，不接管用户 daemon。Windows 继续使用上游 AF_UNIX；**不调用 Node net.createConnection(path) 假装探测 AF_UNIX**。proxy 是字节转发，控制 socket 讲 WebSocket；就绪检测必须发送 HTTP upgrade 并核对 Sec-WebSocket-Accept，不能直接发送 JSONL。
 
-POSIX 后台 server/proxy/queue 使用独立进程组，清理覆盖 npm 包装进程的后代；交互 TUI 留在原终端。Windows 对标准 npm Codex .cmd 进行完整模板和包入口校验，再用该脚本原本选择的 node.exe 执行官方 bin/codex.js，保留其平台选择、环境与信号逻辑，避免 8191 字符的 cmd 上限截断 CleanCode 自身的长指令。其他包装仍由 PowerShell 读取私有参数文件执行，避免巨大的 EncodedCommand；不跳过自定义包装里的逻辑。taskkill /T 清理本次拥有的进程树。该绕过接在消息 launcher 内；显式 profile 等直接退回普通启动的路径，以及自定义或尚未识别的 .cmd 模板，仍受 cmd 长度/转义限制，应选择原生 exe。这个限制来自当前 CleanCode 启动路径，不是 Windows 不支持 AF_UNIX；本次未在 Windows 实测。模板依据是 [npm cmd-shim](https://github.com/npm/cmd-shim/blob/main/lib/index.js)，官方入口见 [Codex bin/codex.js](https://github.com/openai/codex/blob/rust-v0.149.0/codex-cli/bin/codex.js)。
+POSIX 后台 server/proxy/queue 使用独立进程组，清理覆盖 npm 包装进程的后代；交互 TUI 留在原终端。Windows 对标准 npm Codex .cmd 进行完整模板和包入口校验，再用该脚本原本选择的 node.exe 执行官方 bin/codex.js，保留其平台选择、环境与信号逻辑，避免 8191 字符的 cmd 上限截断 CleanCode 自身的长指令。其他包装仍由 PowerShell 读取私有参数文件执行，避免巨大的 EncodedCommand；不跳过自定义包装里的逻辑。taskkill /T 清理本次拥有的进程树。该绕过接在消息 launcher 内；显式 profile 等直接退回普通启动的路径，以及自定义或尚未识别的 .cmd 模板，仍受 cmd 长度/转义限制，应选择原生 exe。这个限制来自当前 CleanCode 启动路径，不是 Windows 不支持 AF_UNIX；本次 Windows CI 已验证模拟 CLI 的进程启动与参数保留，真实 Codex AF_UNIX 仍未实测。模板依据是 [npm cmd-shim](https://github.com/npm/cmd-shim/blob/main/lib/index.js)，官方入口见 [Codex bin/codex.js](https://github.com/openai/codex/blob/rust-v0.149.0/codex-cli/bin/codex.js)。
+
+Windows 启动继续优先选择包装配套的 `.ps1`。Electron Node 模式缺失交互 stdin 时使用绝对控制台设备路径恢复输入；真实 ConPTY 集成测试覆盖无需回车的按键与 Ctrl+C。临时配置先解析真实路径，避免短路径文件监听断言；响应发布与 Agent 偏好持久化对 Windows 短暂共享锁进行有界重试。原生按键退出超时后，先通过现有关闭 IPC 收尾 relay，再停止 PTY，覆盖能力探测尚未结束时关闭。
 
 已有显式 remote、profile、OSS 或不能安全投影到 server 的参数继续保留普通原生启动并报告 pull_only。私有 socket 路径须小于 104 字节；过长时保留原生启动。通知使用同一 message ID 去重，但已经由上游接受的队列项无法保证撤回；最多一次安静的空读取仍是允许的竞态结果。模型本身可能要求更高 CLI 版本：0.149.0 使用本机默认 gpt-6-astra 时被服务端拒绝，改用本次明确指定的 gpt-5.5 后空闲链路通过。这是模型兼容限制，不是 queue 的首次版本。
 
@@ -79,11 +81,13 @@ launch 插件持有原生 SDK，通过带随机 token 的 loopback HTTP 接收�
 
 ### 自动化验证
 
-适配代码已通过 pnpm build 和 pnpm verify:full：Contract 31 文件 / 157 项、单元 450 文件 / 2696 项、集成 58 文件 / 533 项、Electron E2E 20 文件 / 56 项通过；另有 21 项跳过。均在本机 macOS 执行，不能据此标记 Linux/Windows 已实测。临时真实 CLI 调查驱动未作为仓库测试基础设施保留；撤除其脚本与配置入口后，最终 pnpm verify:full 再次通过。
+初次适配提交在本机通过 pnpm build 和 pnpm verify:full：Contract 31 文件 / 157 项、单元 450 文件 / 2696 项、集成 58 文件 / 533 项、Electron E2E 20 文件 / 56 项通过；另有 21 项跳过。均在本机 macOS 执行，不能据此标记 Linux/Windows 已实测。临时真实 CLI 调查驱动未作为仓库测试基础设施保留；撤除其脚本与配置入口后，最终 pnpm verify:full 再次通过。
+
+Windows CI 修复后的提交 `3e6a2a4b425e5275c6ce816deaaf4a30e85701ad` 已通过三平台 [Full cross-platform quality](https://github.com/chen-985211/cleancode/actions/runs/34088237185) 和 [Electron E2E](https://github.com/chen-985211/cleancode/actions/runs/34088237365)，包括 Windows 两个原生集成分片、三个 Electron E2E 分片与打包冒烟。这些是对应 OS 上真实 Electron、PTY、进程和 Hook 配合**模拟厂商 CLI/SDK**的结果，不是实际厂商 CLI 的完整协作验收。后续夹具将同伴结果报告改为原子发布，修复本地读到半成品 JSON 的竞态；最终提交的验证结果记录在 PR 检查与说明中。
 
 - 单元：共享 AgentInboxDelivery 的 idle/busy、确认、合并、失败重试、旧 launch 回调隔离；Provider 配置与身份 codec。
 - Contract/集成：四种 Provider 的初始任务；跨 Provider 的真实 MCP HTTP 收发、确认、关联回复及零 PTY 协作写入；Claude 2.1.138/139/261 及非 semver 自定义构建的模拟版本命令边界；未知版本 Hook 握手；Codex 0.149.0/未知版本的模拟 CLI、WebSocket upgrade、通知去重、孙进程清理；OpenCode 真实插件模块/HTTP + **模拟 SDK**；Gemini JSONC 策略保留与本机真实 shell 特殊路径执行。
-- 标准 npm shim 的完整模板识别、超过 8191 字符参数的直接 argv 保留，以及修改过的包装拒绝绕过均由集成测试覆盖；这些跨平台运行的文件/参数测试不等于 Windows 执行。Windows 参数字符串断言只证明编码契约。Codex Windows 夹具用 socket marker 模拟上游 proxy，**不是 Windows AF_UNIX 实测**。同一集成测试在目标 OS 上运行后，才可记录该 OS 的进程/Hook 结果。
+- 标准 npm shim 的完整模板识别、超过 8191 字符参数的直接 argv 保留，以及修改过的包装拒绝绕过均由集成测试覆盖；Windows CI 已运行这些进程/参数测试；单独的参数字符串断言仍只证明编码契约。Codex Windows 夹具用 socket marker 模拟上游 proxy，**不是 Windows AF_UNIX 实测**。上面的原生平台 CI 记录覆盖该 OS 的进程/Hook 结果。
 - Electron E2E 使用仓库原生运行底座与模拟 Agent CLI；它不证明真实厂商 CLI 具备所需接口。
 
 ### 既有验证、增量调查与人工复现
@@ -102,4 +106,4 @@ Gemini 当前使用主动领取验证通信；正式空闲唤醒入口缺失单�
 
 本次 macOS 26.5.2（25F84）arm64 的 Codex 0.149.0 和 OpenCode 1.18.21 曾完整通过默认新建/恢复链路及零新增工具调用的确认安静窗口。Codex 0.153.4 另完成 manual 空闲消息闭环；OpenCode 1.18.21 追加的 manual 模式在新建、恢复时均完成空闲唤醒、关联回复和确认安静窗口。忙碌扩展中，Codex 曾返回两条关联回复，但随后过早终止导致恢复写锁冲突；据此补上进程组后代清理测试与等待正式回合结束。后续忙碌试验仍有模型/原生会话未完成的失败记录，不能用此前空闲成功替代忙碌通过。
 
-Gemini 0.58.0 在临时 trustedFolders 文件只信任本次仓库后，完成 MCP 初始化和 SessionStart，随后停在认证选择；没有可用的 Gemini 登录。Linux 和 Windows 没有执行主机，均未实测。补验证应在对应原生 OS 执行上述人工步骤和 pnpm verify:full，并覆盖：路径含空格/中文、npm shim 与 exe、空闲首条消息、忙碌和待审批时多条消息、重复确认、/new 或 /clear、退出后旧 token/endpoint 失效、重启恢复、手动与 MCP 创建一致性。不得用当前 macOS 结果或模拟 CLI 代替这些验收。
+Gemini 0.58.0 在临时 trustedFolders 文件只信任本次仓库后，完成 MCP 初始化和 SessionStart，随后停在认证选择；没有可用的 Gemini 登录。本次没有配置已登录的 Linux/Windows 真实厂商 CLI 环境，其人工协作场景均未实测；原生平台 CI 使用模拟 CLI 的结果已在上面单列。补验证应在对应原生 OS 执行上述人工步骤和 pnpm verify:full，并覆盖：路径含空格/中文、npm shim 与 exe、空闲首条消息、忙碌和待审批时多条消息、重复确认、/new 或 /clear、退出后旧 token/endpoint 失效、重启恢复、手动与 MCP 创建一致性。不得用当前 macOS 结果或模拟 CLI 代替这些验收。
