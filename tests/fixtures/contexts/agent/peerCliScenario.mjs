@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import process from 'node:process'
@@ -84,14 +84,11 @@ export async function runPeerScenario(providerId, args) {
         acknowledgeMessageId: reply.result.message.messageId,
         timeoutMs: 0
       })
-      await writeFile(
-        reportPath,
-        JSON.stringify({
-          status: 'completed',
-          source,
-          replyToMessageId: reply.result.message.replyToMessageId
-        })
-      )
+      await publishReport(reportPath, {
+        status: 'completed',
+        source,
+        replyToMessageId: reply.result.message.replyToMessageId
+      })
       process.stdout.write('PEER_REVIEW_COMPLETE\n')
     } else {
       const received = await receive()
@@ -107,12 +104,21 @@ export async function runPeerScenario(providerId, args) {
       await call('wait_agent_message', { acknowledgeMessageId: task.messageId, timeoutMs: 0 })
     }
   } catch (error) {
-    await writeFile(
-      reportPath,
-      JSON.stringify({ status: 'failed', source, message: String(error) })
-    )
+    await publishReport(reportPath, { status: 'failed', source, message: String(error) })
   } finally {
     notification?.close()
+  }
+}
+
+async function publishReport(path, report) {
+  // The E2E reader may observe the file as soon as it exists. Publish only a
+  // complete JSON document, with a separate staging file for each CLI process.
+  const temporary = `${path}.${process.pid}.tmp`
+  try {
+    await writeFile(temporary, JSON.stringify(report))
+    await rename(temporary, path)
+  } finally {
+    await rm(temporary, { force: true })
   }
 }
 
