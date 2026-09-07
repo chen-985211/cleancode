@@ -108,6 +108,7 @@ describe('Codex owned native session', () => {
             throw new Error(`Native relay exited before acceptance: ${relayErrors}`)
           })
         ])
+      let scenarioFailure: unknown
       try {
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Native fixture did not start')), 5_000)
@@ -214,9 +215,20 @@ describe('Codex owned native session', () => {
         for (const record of records) expect(() => process.kill(record.pid, 0)).toThrow()
         expect(descendantPid).toBeTypeOf('number')
         await vi.waitFor(() => expect(() => process.kill(descendantPid!, 0)).toThrow())
+      } catch (error) {
+        scenarioFailure = new Error(
+          `Codex relay scenario failed: ${String(error)}; stderr: ${relayErrors}; stdout: ${relayOutput}`,
+          { cause: error }
+        )
+        throw scenarioFailure
       } finally {
         try {
-          await artifacts.dispose()
+          await artifacts.dispose().catch((error) => {
+            throw new AggregateError(
+              scenarioFailure ? [scenarioFailure, error] : [error],
+              `Codex relay cleanup failed. stderr: ${relayErrors}; stdout: ${relayOutput}`
+            )
+          })
         } finally {
           if (serverPid) {
             try {

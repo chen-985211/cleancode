@@ -56,6 +56,7 @@ describe('Codex native console input', () => {
         timeoutMs: 10_000,
         description: marker
       })
+    let scenarioFailure: unknown
     try {
       await waitForOutput('NATIVE_TUI_READY')
       terminal.write('raw-input')
@@ -69,9 +70,17 @@ describe('Codex native console input', () => {
         description: 'native relay exits after the TUI'
       })
       expect(exitCode).toBe(0)
+    } catch (error) {
+      scenarioFailure = error
+      throw error
     } finally {
       try {
-        await artifacts.dispose()
+        await artifacts.dispose().catch((error) => {
+          throw new AggregateError(
+            scenarioFailure ? [scenarioFailure, error] : [error],
+            `Codex console cleanup failed. Exit: ${exitCode}; output: ${output}`
+          )
+        })
       } finally {
         try {
           if (exitCode === undefined) terminal.kill()

@@ -63,7 +63,8 @@ const spawnOwned = (args, stdio) => {
   // Reopen only that interactive console case; redirected pipes/files keep their original input.
   const consoleInput = stdio === 'inherit' && process.platform === 'win32' &&
     process.versions.electron && isatty(1) && !isatty(0) && fstatSync(0).isCharacterDevice()
-    ? openSync('CONIN$', 'r+') : null;
+    // The device namespace also prevents Electron's fs wrapper from resolving it under cwd.
+    ? openSync('\\\\.\\CONIN$', 'r+') : null;
   let child;
   try {
     child = spawn(command.executable, command.args, { cwd: config.cwd, env: process.env,
