@@ -36,7 +36,10 @@ describe('Electron renderer navigation', () => {
         [
           fileURLToPath(new URL('../../fixtures/platform/electronNavigation.mjs', import.meta.url)),
           policyPath,
-          directory
+          directory,
+          // Match Playwright's Electron launcher on Linux runners without a setuid sandbox.
+          // This flag is confined to the isolated fixture process.
+          ...(process.platform === 'linux' ? ['--no-sandbox'] : [])
         ],
         { env, timeout: 25_000, maxBuffer: 1024 * 1024 }
       )
