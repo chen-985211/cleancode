@@ -129,6 +129,19 @@ export function resolveShortcutPlatform(platform = navigator.platform): Shortcut
   return /Mac|iPhone|iPad|iPod/i.test(platform) ? 'mac' : 'other'
 }
 
+export function getDefaultApplicationShortcutBindings(
+  platform: ShortcutPlatform = resolveShortcutPlatform()
+): ApplicationShortcutBindings {
+  return Object.fromEntries(
+    applicationShortcutCommands.map((command) => [
+      command,
+      platform === 'other' && command.startsWith('selectCanvasNode')
+        ? { ...defaultApplicationShortcutBindings[command], alt: true, primary: false }
+        : { ...defaultApplicationShortcutBindings[command] }
+    ])
+  ) as ApplicationShortcutBindings
+}
+
 export function isApplicationShortcutBinding(value: unknown): value is ApplicationShortcutBinding {
   if (typeof value !== 'object' || value === null) {
     return false

@@ -2,7 +2,10 @@ import {
   applicationShortcutCommands,
   applicationShortcutBindingsEqual,
   defaultApplicationShortcutBindings,
+  getDefaultApplicationShortcutBindings,
   isApplicationShortcutBinding,
+  resolveShortcutPlatform,
+  type ShortcutPlatform,
   type ApplicationShortcutBinding,
   type ApplicationShortcutBindings,
   type ApplicationShortcutCommand
@@ -80,7 +83,7 @@ type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding
 
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 7
+  readonly version: 8
 }
 
 const v6FitCanvasDefaultBinding = {
@@ -199,7 +202,8 @@ function migrateV6Bindings(bindings: ShortcutBindingCatalog): ApplicationShortcu
 
 function extendLegacyBindings(
   bindings: ShortcutBindingCatalog,
-  preservedCommands: readonly string[]
+  preservedCommands: readonly string[],
+  defaults: ApplicationShortcutBindings = defaultApplicationShortcutBindings
 ): ApplicationShortcutBindings {
   const migrated: Record<string, ApplicationShortcutBinding | null> = {}
 
@@ -212,7 +216,7 @@ function extendLegacyBindings(
       continue
     }
 
-    const defaultBinding = defaultApplicationShortcutBindings[command]
+    const defaultBinding = defaults[command]
     const conflictsWithPreservedBinding =
       defaultBinding !== null &&
       Object.values(migrated).some(
@@ -225,9 +229,53 @@ function extendLegacyBindings(
 }
 
 export function readApplicationShortcutBindings(
-  storage: Pick<Storage, 'getItem'> = window.localStorage
+  storage: Pick<Storage, 'getItem'> = window.localStorage,
+  platform: ShortcutPlatform = resolveShortcutPlatform()
 ): ApplicationShortcutBindings {
   const stored = storage.getItem(shortcutBindingsStorageKey)
+  const defaults = getDefaultApplicationShortcutBindings(platform)
+  if (stored === null) return defaults
+
+  try {
+    const preference = JSON.parse(stored) as {
+      readonly version?: unknown
+      readonly bindings?: unknown
+    }
+    if (preference.version === 8) {
+      return hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
+        !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
+        ? cloneBindings(preference.bindings)
+        : defaults
+    }
+  } catch {
+    return defaults
+  }
+
+  const legacy = readLegacyApplicationShortcutBindings(stored, defaults)
+  const migrated = { ...legacy }
+  for (const command of applicationShortcutCommands) {
+    if (
+      !command.startsWith('selectCanvasNode') ||
+      !applicationShortcutBindingsEqual(
+        legacy[command],
+        defaultApplicationShortcutBindings[command]
+      )
+    )
+      continue
+    const nextDefault = defaults[command]
+    const conflict = applicationShortcutCommands.some(
+      (candidate) =>
+        candidate !== command && applicationShortcutBindingsEqual(migrated[candidate], nextDefault)
+    )
+    migrated[command] = conflict ? null : nextDefault
+  }
+  return migrated
+}
+
+function readLegacyApplicationShortcutBindings(
+  stored: string | null,
+  defaults: ApplicationShortcutBindings
+): ApplicationShortcutBindings {
   if (stored === null) {
     return defaultBindings()
   }
@@ -288,7 +336,7 @@ export function readApplicationShortcutBindings(
       !hasShortcutConflict(preference.bindings, v3ApplicationShortcutCommands)
     ) {
       return migrateCanvasZoomDefaults(
-        extendLegacyBindings(preference.bindings, v3ApplicationShortcutCommands)
+        extendLegacyBindings(preference.bindings, v3ApplicationShortcutCommands, defaults)
       )
     }
 
@@ -297,7 +345,7 @@ export function readApplicationShortcutBindings(
       hasCompleteBindingCatalog(preference.bindings, v2ApplicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, v2ApplicationShortcutCommands)
     ) {
-      return extendLegacyBindings(preference.bindings, v2ApplicationShortcutCommands)
+      return extendLegacyBindings(preference.bindings, v2ApplicationShortcutCommands, defaults)
     }
 
     if (
@@ -314,7 +362,7 @@ export function readApplicationShortcutBindings(
       }
 
       if (!hasShortcutConflict(migratedBindings, v2ApplicationShortcutCommands)) {
-        return extendLegacyBindings(migratedBindings, v2ApplicationShortcutCommands)
+        return extendLegacyBindings(migratedBindings, v2ApplicationShortcutCommands, defaults)
       }
     }
 
@@ -330,7 +378,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 7
+    version: 8
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

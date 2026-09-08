@@ -124,6 +124,21 @@ if [[ -n "$CLEANCODE_USER_ZDOTDIR" && -r "$CLEANCODE_USER_ZDOTDIR/.zshrc" ]]; th
   unset __cleancode_integration_zdotdir
 fi
 
+if [[ "$OSTYPE" == darwin* ]]; then
+  function __cleancode_bind_word_arrows() {
+    local keymap sequence widget
+    for keymap in emacs viins; do
+      for sequence widget in $'\\e[1;3D' backward-word $'\\e[1;3C' forward-word; do
+        if [[ "$(builtin bindkey -M "$keymap" "$sequence" 2>/dev/null)" == *' undefined-key' ]]; then
+          builtin bindkey -M "$keymap" "$sequence" "$widget"
+        fi
+      done
+    done
+  }
+  __cleancode_bind_word_arrows
+  unfunction __cleancode_bind_word_arrows
+fi
+
 autoload -Uz add-zsh-hook
 function __cleancode_urlencode() {
   emulate -L zsh

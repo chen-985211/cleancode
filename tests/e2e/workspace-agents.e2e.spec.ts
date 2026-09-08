@@ -400,9 +400,9 @@ describe('workspace Agents e2e', () => {
 
         return candidates.sort((left, right) => right.distance - left.distance)[0]!
       })
-      const primaryModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+      const navigationModifier = process.platform === 'darwin' ? 'Meta' : 'Alt'
 
-      await page.keyboard.press(`${primaryModifier}+${target.key}`)
+      await page.keyboard.press(`${navigationModifier}+${target.key}`)
       await page.waitForFunction(() =>
         Array.from(document.querySelectorAll('[data-agent-console-node]')).some(
           (agent) => agent.getAttribute('data-selection-state') === 'selected'
@@ -480,7 +480,7 @@ describe('workspace Agents e2e', () => {
       }, selectedAgentId)
       if (!nextTarget.agentId) throw new Error('Next Agent id is unavailable.')
 
-      await page.keyboard.press(`${primaryModifier}+${nextTarget.key}`)
+      await page.keyboard.press(`${navigationModifier}+${nextTarget.key}`)
       await page.waitForFunction(
         (agentId) =>
           document

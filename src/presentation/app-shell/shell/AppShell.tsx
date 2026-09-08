@@ -96,7 +96,8 @@ export function AppShell({
   const [shortcutPlatform] = useState(shortcuts.resolveShortcutPlatform)
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
-  const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
+  const { bindings, changeBinding, resetAllBindings } =
+    useApplicationShortcutPreference(shortcutPlatform)
   const agentCreation = useAgentCreationProviders()
   const {
     changePreferredProvider,

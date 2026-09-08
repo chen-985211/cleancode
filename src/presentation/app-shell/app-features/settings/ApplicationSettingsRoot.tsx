@@ -20,7 +20,7 @@ import {
 import {
   applicationShortcutBindingsEqual,
   applicationShortcutGroups,
-  defaultApplicationShortcutBindings,
+  getDefaultApplicationShortcutBindings,
   findShortcutConflict,
   formatShortcutBinding,
   normalizeShortcutBinding,
@@ -87,6 +87,7 @@ interface ApplicationSettingsRootProps {
 
 export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const { t } = useI18n()
+  const defaultBindings = getDefaultApplicationShortcutBindings(props.platform)
   const shortcutTooltips = createApplicationShortcutTooltipLabels(props.bindings, props.platform, t)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const backButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -361,13 +362,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                                       aria-label={t('settings.shortcuts.reset', { action })}
                                       disabled={applicationShortcutBindingsEqual(
                                         binding,
-                                        defaultApplicationShortcutBindings[command]
+                                        defaultBindings[command]
                                       )}
                                       onClick={() => {
-                                        props.onBindingChange(
-                                          command,
-                                          defaultApplicationShortcutBindings[command]
-                                        )
+                                        props.onBindingChange(command, defaultBindings[command])
                                         setRecordingCommand(null)
                                         setCaptureError(undefined)
                                       }}

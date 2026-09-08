@@ -10,6 +10,13 @@ import {
 } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 
 describe('application settings', () => {
+  it('restores the platform-specific Alt arrow default for a single navigation action', () => {
+    render(<SettingsHarness initiallyOpen platform="other" />)
+    fireEvent.click(screen.getByRole('button', { name: '恢复“选择左侧节点”的默认快捷键' }))
+    expect(screen.getByRole('button', { name: '修改“选择左侧节点”快捷键' })).toHaveTextContent(
+      'Alt←'
+    )
+  })
   it('projects the default navigation selection when the delayed settings surface first mounts', () => {
     const offsetWidth = vi
       .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
@@ -303,7 +310,13 @@ describe('application settings', () => {
   })
 })
 
-function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {
+function SettingsHarness({
+  initiallyOpen = false,
+  platform = 'mac'
+}: {
+  readonly initiallyOpen?: boolean
+  readonly platform?: 'mac' | 'other'
+}) {
   const [isOpen, setIsOpen] = useState(initiallyOpen)
   const [bindings, setBindings] = useState<ApplicationShortcutBindings>(
     defaultApplicationShortcutBindings
@@ -326,7 +339,7 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
     <ApplicationSettingsRoot
       bindings={bindings}
       isOpen={isOpen}
-      platform="mac"
+      platform={platform}
       onBindingChange={changeBinding}
       onClose={() => setIsOpen(false)}
       onOpen={() => setIsOpen(true)}
