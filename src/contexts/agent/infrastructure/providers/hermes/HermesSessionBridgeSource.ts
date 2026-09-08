@@ -2,7 +2,7 @@
 export const hermesSessionBridgeSource = String.raw`
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { watchFile, unwatchFile } from 'node:fs';
+import { statSync, watchFile, unwatchFile } from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 
 const activeFile = process.env.HERMES_TUI_ACTIVE_SESSION_FILE;
@@ -12,39 +12,60 @@ if (activeFile) {
   const originalSpawn = childProcess.spawn;
   let gateway;
   let immediate;
-  function sample() {
+  let selection;
+  let selectionStamp;
+  let selectionVersion = 0;
+  function readSelection() {
     try {
       const text = readFileSync(activeFile, 'utf8');
-      if (text.length > 2048) return;
-      const selected = JSON.parse(text).session_id;
-      if (typeof selected !== 'string' || !selected) return;
-      const session = sessions.get(selected);
-      if (!session) return;
-      reportSession(session?.durable ? session.key : null);
+      if (text.length <= 2048) {
+        const selected = JSON.parse(text).session_id;
+        const stat = statSync(activeFile, { bigint: true });
+        const stamp = [stat.ino, stat.mtimeNs, stat.ctimeNs, text].join(':');
+        if (typeof selected === 'string' && selected && stamp !== selectionStamp) {
+          selectionStamp = stamp;
+          selectionVersion++;
+          selection = selected;
+        }
+      }
     } catch { /* The selection file can be empty or mid-write. */ }
+    return selection;
+  }
+  function sample() {
+    const session = sessions.get(readSelection());
+    if (session) reportSession(session.durable ? session.key : null);
   }
   function scheduleSample() {
     if (immediate) clearImmediate(immediate);
     immediate = setImmediate(() => { immediate = undefined; sample(); });
   }
   function remember(id, key, durable) {
-    if (typeof id !== 'string' || typeof key !== 'string' || !/^[0-9]{8}_[0-9]{6}_[a-f0-9]{6,8}$/.test(key)) return;
-    const existing = sessions.get(key);
-    const session = { key, durable: Boolean(durable || existing?.durable) };
+    if (typeof id !== 'string' || !id || (key !== null && (typeof key !== 'string' || !/^[0-9]{8}_[0-9]{6}_[a-f0-9]{6,8}$/.test(key)))) return;
+    const session = sessions.get(id) ?? sessions.get(key) ?? { key: null, durable: false };
+    if (key) session.key = key;
+    session.durable ||= Boolean(durable);
     sessions.set(id, session);
-    sessions.set(key, session);
+    if (key) sessions.set(key, session);
     while (sessions.size > 512) {
       // Bound retained metadata; unrecognized selections remain unbound.
       sessions.delete(sessions.keys().next().value);
     }
   }
   function request(packet) {
-    if (!packet || !['session.create', 'session.resume', 'session.activate', 'prompt.submit'].includes(packet.method)) return;
+    if (!packet || !['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit'].includes(packet.method)) return;
     if (typeof packet.id !== 'string' && typeof packet.id !== 'number') return;
-    pending.set(packet.id, { method: packet.method, sessionId: packet.params?.session_id });
+    readSelection();
+    pending.set(packet.id, { method: packet.method, sessionId: packet.params?.session_id, selectionVersion });
     if (pending.size > 256) pending.delete(pending.keys().next().value);
   }
   function response(packet) {
+    if (packet?.method === 'event' && packet.params?.type === 'session.info') {
+      const params = packet.params;
+      // Metadata alone does not prove that a draft has been persisted or selected.
+      remember(params.session_id, params.payload?.stored_session_id, false);
+      scheduleSample();
+      return;
+    }
     const call = pending.get(packet?.id);
     if (!call) return;
     pending.delete(packet.id);
@@ -55,6 +76,16 @@ if (activeFile) {
     if (call.method === 'session.activate') {
       const known = sessions.get(r.session_key);
       remember(r.session_id, r.session_key, known?.durable || r.message_count > 0);
+    }
+    if (call.method === 'session.branch' && typeof r.session_id === 'string' && r.session_id) {
+      const selected = readSelection();
+      const parent = sessions.get(call.sessionId);
+      remember(r.session_id, null, true);
+      if (call.selectionVersion === selectionVersion && (selected === call.sessionId || (parent && sessions.get(selected) === parent))) {
+        // /branch switches the TUI sid without writing the selection file. Keep this
+        // override only until the next explicit file write, even if its ID is unchanged.
+        selection = r.session_id;
+      }
     }
     if (call.method === 'prompt.submit' && r.status === 'streaming') {
       const session = sessions.get(call.sessionId);
@@ -98,6 +129,9 @@ if (activeFile) {
       gateway = child;
       sessions.clear();
       pending.clear();
+      selection = undefined;
+      selectionStamp = undefined;
+      selectionVersion++;
       const readRequest = lines(packet => { if (gateway === child) request(packet); });
       const readResponse = lines(packet => { if (gateway === child) response(packet); });
       const originalWrite = child.stdin.write;
