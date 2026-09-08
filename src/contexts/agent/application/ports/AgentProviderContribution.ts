@@ -140,6 +140,8 @@ export interface CreateAgentLaunchPlanCommand {
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged?: (activity: AgentActivityStatus) => void
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+  /** The current CLI switched to a conversation that has no durable reference yet. */
+  readonly onProviderSessionCleared?: () => void
   readonly onTurnCompleted?: () => void
   readonly providerSessionRef?: ProviderSessionRefSnapshot
   readonly workspaceDirectory: string
@@ -173,6 +175,7 @@ export interface AgentTelemetryContribution {
     readonly artifacts: AgentLaunchArtifactRegistrar
     readonly onActivityChanged?: (activity: AgentActivityStatus) => void
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+    readonly onProviderSessionCleared?: () => void
     readonly onTurnCompleted?: () => void
     readonly workspaceDirectory: string
   }): Promise<{

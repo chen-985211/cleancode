@@ -1,0 +1,128 @@
+/** Observe only this TUI's local gateway protocol and its explicit foreground selection. */
+export const hermesSessionBridgeSource = String.raw`
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { watchFile, unwatchFile } from 'node:fs';
+import { StringDecoder } from 'node:string_decoder';
+
+const activeFile = process.env.HERMES_TUI_ACTIVE_SESSION_FILE;
+if (activeFile) {
+  const sessions = new Map();
+  const pending = new Map();
+  const originalSpawn = childProcess.spawn;
+  let gateway;
+  let immediate;
+  function sample() {
+    try {
+      const text = readFileSync(activeFile, 'utf8');
+      if (text.length > 2048) return;
+      const selected = JSON.parse(text).session_id;
+      if (typeof selected !== 'string' || !selected) return;
+      const session = sessions.get(selected);
+      if (!session) return;
+      reportSession(session?.durable ? session.key : null);
+    } catch { /* The selection file can be empty or mid-write. */ }
+  }
+  function scheduleSample() {
+    if (immediate) clearImmediate(immediate);
+    immediate = setImmediate(() => { immediate = undefined; sample(); });
+  }
+  function remember(id, key, durable) {
+    if (typeof id !== 'string' || typeof key !== 'string' || !/^[0-9]{8}_[0-9]{6}_[a-f0-9]{6,8}$/.test(key)) return;
+    const existing = sessions.get(key);
+    const session = { key, durable: Boolean(durable || existing?.durable) };
+    sessions.set(id, session);
+    sessions.set(key, session);
+    while (sessions.size > 512) {
+      // Bound retained metadata; unrecognized selections remain unbound.
+      sessions.delete(sessions.keys().next().value);
+    }
+  }
+  function request(packet) {
+    if (!packet || !['session.create', 'session.resume', 'session.activate', 'prompt.submit'].includes(packet.method)) return;
+    if (typeof packet.id !== 'string' && typeof packet.id !== 'number') return;
+    pending.set(packet.id, { method: packet.method, sessionId: packet.params?.session_id });
+    if (pending.size > 256) pending.delete(pending.keys().next().value);
+  }
+  function response(packet) {
+    const call = pending.get(packet?.id);
+    if (!call) return;
+    pending.delete(packet.id);
+    if (packet.error || !packet.result || typeof packet.result !== 'object') return;
+    const r = packet.result;
+    if (call.method === 'session.create') remember(r.session_id, r.stored_session_id ?? r.session_key, false);
+    if (call.method === 'session.resume') remember(r.session_id, r.resumed ?? r.session_key, true);
+    if (call.method === 'session.activate') {
+      const known = sessions.get(r.session_key);
+      remember(r.session_id, r.session_key, known?.durable || r.message_count > 0);
+    }
+    if (call.method === 'prompt.submit' && r.status === 'streaming') {
+      const session = sessions.get(call.sessionId);
+      if (session) session.durable = true;
+    }
+    scheduleSample();
+  }
+  function lines(consume) {
+    const decoder = new StringDecoder('utf8');
+    let buffer = '';
+    let dropping = false;
+    return chunk => {
+      try {
+        const text = typeof chunk === 'string' ? chunk : decoder.write(chunk);
+        for (const part of text.split(/(\n)/)) {
+          if (part === '\n') {
+            if (!dropping && buffer) { try { consume(JSON.parse(buffer)); } catch {} }
+            buffer = ''; dropping = false;
+          } else if (!dropping) {
+            if (buffer.length + part.length > 8 * 1024 * 1024) { buffer = ''; dropping = true; }
+            else buffer += part;
+          }
+        }
+      } catch { /* Unknown protocol must not affect the gateway stream. */ }
+    };
+  }
+  childProcess.spawn = function (...args) {
+    const argv = args[1];
+    const isGateway = Array.isArray(argv) && argv.some((arg, i) => arg === '-m' && argv[i + 1] === 'tui_gateway.entry');
+    if (isGateway) {
+      // Do not preload the observer into tools or Node subprocesses of the gateway.
+      const ownOption = '--import=' + JSON.stringify(import.meta.url);
+      const strip = env => {
+        if (typeof env?.NODE_OPTIONS === 'string') env.NODE_OPTIONS = env.NODE_OPTIONS.replace(ownOption, '').trim();
+      };
+      strip(process.env);
+      if (args[2]?.env) { args[2] = { ...args[2], env: { ...args[2].env } }; strip(args[2].env); }
+    }
+    const child = Reflect.apply(originalSpawn, this, args);
+    if (isGateway && child.stdin && child.stdout) {
+      gateway = child;
+      sessions.clear();
+      pending.clear();
+      const readRequest = lines(packet => { if (gateway === child) request(packet); });
+      const readResponse = lines(packet => { if (gateway === child) response(packet); });
+      const originalWrite = child.stdin.write;
+      child.stdin.write = function (chunk, ...rest) {
+        readRequest(chunk);
+        return Reflect.apply(originalWrite, this, [chunk, ...rest]);
+      };
+      child.stdout.on('data', readResponse);
+      child.once('close', () => {
+        if (gateway === child) {
+          sample();
+          unwatchFile(activeFile, sample);
+          gateway = undefined;
+          pending.clear();
+        }
+        child.stdout.off('data', readResponse);
+        child.stdin.write = originalWrite;
+      });
+      unwatchFile(activeFile, sample);
+      watchFile(activeFile, { persistent: false, interval: 50 }, sample);
+      process.removeListener('beforeExit', sample);
+      process.once('beforeExit', sample);
+    }
+    return child;
+  };
+  syncBuiltinESMExports();
+}
+`

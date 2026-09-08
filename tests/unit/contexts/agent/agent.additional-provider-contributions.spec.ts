@@ -159,8 +159,6 @@ describe('additional Agent Provider contributions', () => {
   })
 
   it.each([
-    [PiAgentProviderContribution, 'pi', 'Pi', 'pi', []],
-    [HermesAgentProviderContribution, 'hermes', 'Hermes', 'hermes', ['--tui']],
     [OpenClawAgentProviderContribution, 'openclaw', 'OpenClaw', 'openclaw', ['tui']]
   ] as const)(
     'adds %s as a baseline terminal Provider',
@@ -188,11 +186,9 @@ describe('additional Agent Provider contributions', () => {
         displayName,
         id: providerId
       })
-      expect(
-        'paths' in contribution.descriptor.icon
-          ? contribution.descriptor.icon.paths.length > 0
-          : contribution.descriptor.icon.imageDataUrl.startsWith('data:image/png;base64,')
-      ).toBe(true)
+      expect(contribution.descriptor.icon.imageDataUrl.startsWith('data:image/png;base64,')).toBe(
+        true
+      )
       expect(plan).toMatchObject({
         args,
         executable
@@ -202,7 +198,7 @@ describe('additional Agent Provider contributions', () => {
     }
   )
 
-  it('registers Pi, Hermes, and OpenClaw without optional capability contributions', () => {
+  it('registers Pi, Hermes, and OpenClaw through their declared capabilities', () => {
     const registry = new AgentProviderRegistry([
       new PiAgentProviderContribution({ detector: createInstalledDetector('pi') }),
       new HermesAgentProviderContribution({ detector: createInstalledDetector('hermes') }),

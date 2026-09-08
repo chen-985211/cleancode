@@ -10,6 +10,8 @@ import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-
 import { FileSystemAgentSessionRepository } from '../../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
 import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
+import { PiAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
+import { HermesAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
 
 describe('filesystem Agent session repository', () => {
   let storageDirectory: string
@@ -25,6 +27,40 @@ describe('filesystem Agent session repository', () => {
   afterEach(async () => {
     await rm(storageDirectory, { recursive: true, force: true })
   })
+
+  it.each(['pi', 'hermes'] as const)(
+    'reopens an exact %s binding and clears it without changing the Agent',
+    async (providerId) => {
+      const registry = createProviderRegistry()
+      const ref = {
+        formatVersion: 1,
+        kind: `${providerId}-session`,
+        value:
+          providerId === 'pi'
+            ? join(storageDirectory, 'conversation.jsonl')
+            : '20260908_123456_a1b2c3'
+      }
+      const agent = AgentSession.create({
+        agentId: 'resumable',
+        layout: defaultLayout,
+        name: 'My Agent',
+        projectId: 'project-1',
+        providerId,
+        workspaceId: 'workspace-main'
+      })
+      agent.bindProviderSession(createScope(agent.id), registry.parseSessionRef(providerId, ref))
+      await repository.save(agent)
+      const reopened = new FileSystemAgentSessionRepository(filePath, registry)
+      expect(
+        (await reopened.findAgent('project-1', 'workspace-main', agent.id))?.toSnapshot()
+      ).toEqual(agent.toSnapshot())
+      await reopened.delete(createScope(agent.id))
+      agent.clearProviderSession()
+      expect(
+        (await reopened.findAgent('project-1', 'workspace-main', agent.id))?.toSnapshot()
+      ).toEqual(agent.toSnapshot())
+    }
+  )
 
   it('keeps an atomic creation receipt after deleting an initialized Agent', async () => {
     const agent = createAgent('initialized-agent', 'Agent 1')
@@ -250,6 +286,8 @@ function createProviderRegistry(): AgentProviderRegistry {
     inspect: async () => ({ providerId: 'codex', status: 'installed' as const, version: 'test' })
   }
   return new AgentProviderRegistry([
+    new PiAgentProviderContribution(),
+    new HermesAgentProviderContribution(),
     new CodexAgentProviderContribution({ detector: installedDetector }),
     new ClaudeCodeAgentProviderContribution({
       detector: {

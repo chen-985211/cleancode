@@ -14,6 +14,111 @@ import {
 } from '../../../fixtures/agentTerminalRuntime'
 
 describe('Agent Provider session following', () => {
+  it('starts a new conversation only after draining the exited launch final identity', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const runtime = new RecordingAgentTerminalRuntime()
+    const originalLaunch = providers.contribution.launcher.createLaunchPlan
+    let release!: () => void
+    const closing = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockImplementation(
+      async (command) => {
+        command.artifacts.track('late-final-report', {
+          dispose: async () => {
+            await closing
+            command.onProviderSessionIdentified({
+              formatVersion: 1,
+              kind: 'codex-thread',
+              value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+            })
+          }
+        })
+        return originalLaunch(command)
+      }
+    )
+    const service = createSessionService(providers, repository, runtime)
+    await attachAgent(service, 'agent-1')
+    runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+    const restarting = attachAgent(service, 'agent-1', 'new')
+    // One event-loop boundary lets the in-memory attach reach the controlled cleanup gate.
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    release()
+    await restarting
+    expect(providers.launchCommands[1]?.providerSessionRef).toBeUndefined()
+    expect(
+      (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef ?? null
+    ).toBeNull()
+  })
+
+  it('drains the closing launch identity but rejects callbacks after resource disposal', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const originalLaunch = providers.contribution.launcher.createLaunchPlan
+    const finalRef = {
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    }
+    vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockImplementation(
+      async (command) => {
+        command.artifacts.track('final-identity', {
+          dispose: async () => command.onProviderSessionIdentified(finalRef)
+        })
+        return originalLaunch(command)
+      }
+    )
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    await service.disposeAll()
+    const save = vi.spyOn(repository, 'save')
+    const previous = providers.launchCommands[0]!
+    previous.onProviderSessionCleared?.()
+    previous.onProviderSessionIdentified({
+      ...finalRef,
+      value: '0290d8a1-8b7d-7d75-9f62-7a663ef87e44'
+    })
+    const reopened = new RecordingAgentProviderRegistry()
+    await attachAgent(createSessionService(reopened, repository), 'agent-1')
+    expect(reopened.launchCommands[0]?.providerSessionRef).toEqual(finalRef)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('orders a Provider empty-session boundary between durable identities', async () => {
+    const repository = new GatedAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    const command = providers.launchCommands[0]!
+    repository.blockNextFind()
+    command.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await repository.blockedFindStarted
+    expect(command).toHaveProperty('onProviderSessionCleared', expect.any(Function))
+    command.onProviderSessionCleared?.()
+    repository.releaseBlockedFind()
+    await vi.waitFor(async () => {
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef ?? null
+      ).toBeNull()
+      expect(repository.persistenceSaveCount).toBeGreaterThan(0)
+    })
+    command.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0290d8a1-8b7d-7d75-9f62-7a663ef87e44'
+    })
+    await vi.waitFor(async () =>
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef?.value
+      ).toBe('0290d8a1-8b7d-7d75-9f62-7a663ef87e44')
+    )
+  })
+
   it('clears a confirmed missing binding and accepts the next durable identity', async () => {
     const repository = new RecordingAgentSessionRepository()
     const firstProviders = new RecordingAgentProviderRegistry()
@@ -124,7 +229,8 @@ describe('Agent Provider session following', () => {
 
 function createSessionService(
   providers: RecordingAgentProviderRegistry,
-  repository: AgentSessionRepository
+  repository: AgentSessionRepository,
+  runtime = new RecordingAgentTerminalRuntime()
 ): AgentSessionService {
   const unusedTools: AgentToolExecutionOperations = {
     cancel: async () => {
@@ -135,7 +241,7 @@ function createSessionService(
     }
   }
   return new AgentSessionService(
-    new RecordingAgentTerminalRuntime(),
+    runtime,
     new RecordingMcpServer(),
     unusedTools,
     repository,
@@ -144,9 +250,10 @@ function createSessionService(
   )
 }
 
-function attachAgent(service: AgentSessionService, agentId: string) {
+function attachAgent(service: AgentSessionService, agentId: string, restartMode?: 'new') {
   return service.attach({
     agentId,
+    restartMode,
     columns: 80,
     onGraphUpdated: () => undefined,
     onRuntimeChanged: () => undefined,

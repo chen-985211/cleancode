@@ -178,6 +178,7 @@ export class AgentSessionService {
       existingSession.initialPrompt ??= command.initialPrompt
       existingSession.callbacks = createAgentSessionCallbacks(command)
       if (command.restartMode === 'new' && existingSession.shouldPersist) {
+        await disposeAgentLaunchArtifacts(existingSession)
         await this.persistence.clear(existingSession)
       }
       existingSession.isStopping = false
