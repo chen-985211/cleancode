@@ -22,7 +22,7 @@ describe('terminal Agent telemetry assets', () => {
       expect(JSON.parse(await readFile(assets.gatewayManifestPath, 'utf8'))).toEqual({
         url: 'http://127.0.0.1:43121/agent-activity'
       })
-      for (const commandName of ['claude', 'codex', 'gemini', 'opencode']) {
+      for (const commandName of ['claude', 'codex', 'gemini', 'opencode', 'pi', 'hermes']) {
         const shimPath = join(assets.shimDirectory, commandName)
         await access(shimPath, constants.X_OK)
         expect(await readFile(shimPath, 'utf8')).toContain('shim-launcher.mjs')
@@ -37,7 +37,17 @@ describe('terminal Agent telemetry assets', () => {
             windowsConsoleThemeProbe: true
           },
           gemini: { commandName: 'gemini', statusTracking: 'full' },
-          opencode: { commandName: 'opencode', statusTracking: 'full' }
+          opencode: { commandName: 'opencode', statusTracking: 'full' },
+          pi: {
+            commandName: 'pi',
+            statusTracking: 'full',
+            appendArgs: ['--extension', expect.any(String)]
+          },
+          hermes: {
+            commandName: 'hermes',
+            statusTracking: 'full',
+            nodePreload: expect.stringMatching(/^file:/)
+          }
         }
       })
       for (const providerId of ['claude-code', 'gemini', 'opencode']) {
@@ -90,6 +100,15 @@ describe('terminal Agent telemetry assets', () => {
         stateDirectory
       })
       const assets = await store.ensure()
+
+      for (const commandName of ['pi', 'hermes']) {
+        expect(await readFile(join(assets.shimDirectory, `${commandName}.cmd`), 'utf8')).toContain(
+          `${commandName}.ps1`
+        )
+        expect(await readFile(join(assets.shimDirectory, `${commandName}.ps1`), 'utf8')).toContain(
+          '"--prepare-windows"'
+        )
+      }
 
       const commandShim = await readFile(join(assets.shimDirectory, 'codex.cmd'), 'utf8')
       const powerShellShim = await readFile(join(assets.shimDirectory, 'codex.ps1'), 'utf8')

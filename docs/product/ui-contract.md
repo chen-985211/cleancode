@@ -413,7 +413,7 @@ Agent 控制台必须：
 
 用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。MCP 创建复用同一位置预留、提交、聚焦和输入激活流程，必须来自仍打开的同一工作区；忙或作用域失效时返回失败，使用原稳定 ID 重试，不能误插入其他画布。
 
-Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code、OpenCode、Gemini、Pi 和 Hermes 提供会话引用与恢复；其中 Codex、Claude Code、OpenCode 和 Gemini 支持 CleanCode MCP。Codex、Claude Code 和 OpenCode 还提供 launch instructions；Claude Code 和 OpenCode 提供精确活动跟踪。其他目录项当前只声明基础终端能力；各 Provider 未声明的可选能力不得由 UI 猜测或展示。
+Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code、OpenCode、Gemini、Pi 和 Hermes 提供会话引用与恢复；其中 Codex、Claude Code、OpenCode 和 Gemini 支持 CleanCode MCP。Codex、Claude Code 和 OpenCode 还提供 launch instructions；Claude Code、OpenCode、Pi 和 Hermes 提供结构化活动跟踪；Pi 的活动通知依赖包含 `agent_settled` 与 UI prompt 事件的 CLI 版本，Hermes 依赖内建本地 TUI 的对应事件。其他目录项当前只声明基础终端能力；各 Provider 未声明的可选能力不得由 UI 猜测或展示。
 
 Agent 设置必须用单一页面展示应用级默认值和完整目录，不提供模型选择。页面顶部提供 `Yolo / 手动` 权限选择与“新 Agent 默认启用 CleanCode MCP”开关；默认值分别为 `Yolo` 和开启。MCP 默认开关只初始化之后新建的 Agent，不能批量改写已有 Agent，且不支持 MCP 的 Provider 最终仍保持关闭。权限模式和 Provider 启动覆盖在下次启动或重启时生效。
 

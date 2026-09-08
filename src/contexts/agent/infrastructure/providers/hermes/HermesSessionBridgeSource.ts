@@ -2,7 +2,8 @@
 export const hermesSessionBridgeSource = String.raw`
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { statSync, watchFile, unwatchFile } from 'node:fs';
+import { realpathSync, statSync, watchFile, unwatchFile } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
 
 const activeFile = process.env.HERMES_TUI_ACTIVE_SESSION_FILE;
@@ -18,6 +19,57 @@ if (activeFile) {
   let branchSequence = 0;
   let branchAcceptance;
   let branchAcceptanceExpiry;
+  let activitySelection;
+  let activitySelectionVersion;
+  let activityRunning = false;
+  let activityApprovals = 0;
+  const activityPrompts = new Map();
+  function reportActivityWaiting() {
+    reportActivity(activityApprovals > 0 ? 'waiting_approval' : activityPrompts.size > 0 ? 'waiting_input' : activityRunning ? 'working' : 'unavailable');
+  }
+  function syncActivitySelection() {
+    const selected = readSelection();
+    if (selected !== activitySelection || selectionVersion !== activitySelectionVersion) {
+      activitySelection = selected;
+      activitySelectionVersion = selectionVersion;
+      activityRunning = false;
+      activityApprovals = 0;
+      activityPrompts.clear();
+      reportActivity('unavailable');
+    }
+    return selected;
+  }
+  function isForeground(id) {
+    const selected = syncActivitySelection();
+    return typeof id === 'string' && (id === selected || (sessions.has(id) && sessions.get(id) === sessions.get(selected)));
+  }
+  function activityEvent(params) {
+    if (!params || !isForeground(params.session_id)) return;
+    if (params.type === 'message.start') {
+      activityRunning = true;
+      reportActivity('working');
+    } else if (params.type === 'message.complete' && activityRunning) {
+      activityRunning = false;
+      activityApprovals = 0;
+      activityPrompts.clear();
+      reportActivity(params.payload?.status === 'complete' ? 'completed' : 'unavailable');
+    } else if (params.type === 'error') {
+      activityRunning = false;
+      activityApprovals = 0;
+      activityPrompts.clear();
+      reportActivity('unavailable');
+    } else if (['secret.expire', 'sudo.expire'].includes(params.type)) {
+      if (activityPrompts.delete(params.payload?.request_id)) reportActivityWaiting();
+    } else if (['approval.request', 'clarify.request', 'secret.request', 'sudo.request'].includes(params.type)) {
+      if (params.type === 'approval.request') activityApprovals = Math.min(64, activityApprovals + 1);
+      const id = params.payload?.request_id;
+      if (typeof id === 'string') {
+        activityPrompts.set(id, params.session_id);
+        if (activityPrompts.size > 64) activityPrompts.delete(activityPrompts.keys().next().value);
+      }
+      reportActivityWaiting();
+    }
+  }
   function clearBranchAcceptance() {
     if (branchAcceptanceExpiry) clearImmediate(branchAcceptanceExpiry);
     branchAcceptance = undefined;
@@ -40,7 +92,7 @@ if (activeFile) {
     return selection;
   }
   function sample() {
-    const session = sessions.get(readSelection());
+    const session = sessions.get(syncActivitySelection());
     if (session) reportSession(session.durable ? session.key : null);
   }
   function scheduleSample() {
@@ -62,7 +114,7 @@ if (activeFile) {
   function request(packet) {
     if (!packet || typeof packet.method !== 'string') return;
     if (typeof packet.id !== 'string' && typeof packet.id !== 'number') return;
-    const selected = readSelection();
+    const selected = syncActivitySelection();
     const acceptance = branchAcceptance;
     clearBranchAcceptance();
     if (acceptance && packet.method === 'session.close' && packet.params?.session_id === acceptance.parentId && selectionVersion === acceptance.selectionVersion && selected === acceptance.selection) {
@@ -71,14 +123,17 @@ if (activeFile) {
       selection = acceptance.sessionId;
       scheduleSample();
     }
-    if (!['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit'].includes(packet.method)) return;
+    if (!['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit', 'approval.respond', 'clarify.respond', 'secret.respond', 'sudo.respond'].includes(packet.method)) return;
     pending.set(packet.id, {
-      method: packet.method, sessionId: packet.params?.session_id, selectionVersion,
+      method: packet.method, sessionId: packet.params?.session_id ?? activityPrompts.get(packet.params?.request_id), selectionVersion,
+      requestId: packet.params?.request_id,
+      all: packet.params?.all === true,
       branchSequence: packet.method === 'session.branch' ? ++branchSequence : undefined
     });
     if (pending.size > 256) pending.delete(pending.keys().next().value);
   }
   function response(packet) {
+    if (packet?.method === 'event') activityEvent(packet.params);
     if (packet?.method === 'event' && packet.params?.type === 'session.info') {
       const params = packet.params;
       // Metadata alone does not prove that a draft has been persisted or selected.
@@ -114,6 +169,11 @@ if (activeFile) {
       const session = sessions.get(call.sessionId);
       if (session) session.durable = true;
     }
+    if (['approval.respond', 'clarify.respond', 'secret.respond', 'sudo.respond'].includes(call.method) && isForeground(call.sessionId) && call.selectionVersion === selectionVersion && ((Number.isSafeInteger(r.resolved) && r.resolved > 0) || r.status === 'ok')) {
+      activityPrompts.delete(call.requestId);
+      if (call.method === 'approval.respond') activityApprovals = call.all ? 0 : Math.max(0, activityApprovals - r.resolved);
+      reportActivityWaiting();
+    }
     scheduleSample();
   }
   function lines(consume) {
@@ -140,9 +200,14 @@ if (activeFile) {
     const isGateway = Array.isArray(argv) && argv.some((arg, i) => arg === '-m' && argv[i + 1] === 'tui_gateway.entry');
     if (isGateway) {
       // Do not preload the observer into tools or Node subprocesses of the gateway.
-      const ownOption = '--import=' + JSON.stringify(import.meta.url);
       const strip = env => {
-        if (typeof env?.NODE_OPTIONS === 'string') env.NODE_OPTIONS = env.NODE_OPTIONS.replace(ownOption, '').trim();
+        if (typeof env?.NODE_OPTIONS === 'string') env.NODE_OPTIONS = env.NODE_OPTIONS.replace(/--import=("[^"]*"|'[^']*'|[^\s]+)/g, (option, reference) => {
+          try {
+            const url = reference.startsWith('"') ? JSON.parse(reference) : reference.replace(/^'|'$/g, '');
+            return realpathSync(fileURLToPath(url)) === realpathSync(fileURLToPath(import.meta.url)) ? '' : option;
+          } catch { return option; }
+        }).trim();
+        if (env) for (const key of ['CLEANCODE_PROVIDER_ACTIVITY_PROVIDER', 'CLEANCODE_PROVIDER_ACTIVITY_TOKEN', 'CLEANCODE_PROVIDER_ACTIVITY_URL']) delete env[key];
       };
       strip(process.env);
       if (args[2]?.env) { args[2] = { ...args[2], env: { ...args[2].env } }; strip(args[2].env); }
@@ -156,6 +221,7 @@ if (activeFile) {
       selection = undefined;
       selectionStamp = undefined;
       selectionVersion++;
+      syncActivitySelection();
       const readRequest = lines(packet => { if (gateway === child) request(packet); });
       const readResponse = lines(packet => { if (gateway === child) response(packet); });
       const originalWrite = child.stdin.write;
@@ -171,6 +237,10 @@ if (activeFile) {
           unwatchFile(activeFile, sample);
           gateway = undefined;
           pending.clear();
+          activityRunning = false;
+          activityApprovals = 0;
+          activityPrompts.clear();
+          reportActivity('unavailable');
         }
         child.stdout.off('data', readResponse);
         child.stdin.write = originalWrite;

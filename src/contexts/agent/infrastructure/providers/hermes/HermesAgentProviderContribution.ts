@@ -18,6 +18,7 @@ export class HermesAgentProviderContribution extends TerminalCliAgentProviderCon
   readonly descriptor = {
     capabilities: {
       ...baselineTerminalCliCapabilities,
+      activityTracking: true,
       resume: true,
       sessionIdentityCapture: true,
       sessionRefCodec: true

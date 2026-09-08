@@ -3,8 +3,30 @@ import type {
   AgentProviderDescriptor
 } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
+import { PiAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
+import { HermesAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
 
 describe('Agent Provider contribution contract', () => {
+  it.each([new PiAgentProviderContribution(), new HermesAgentProviderContribution()])(
+    'requires activity telemetry to agree with the $descriptor.id capability',
+    (provider) => {
+      expect(provider.telemetry?.signals).toEqual({ activity: true, sessionIdentity: true })
+      expect(new AgentProviderRegistry([provider]).require(provider.descriptor.id)).toBe(provider)
+      expect(
+        () =>
+          new AgentProviderRegistry([
+            {
+              ...provider,
+              telemetry: {
+                ...provider.telemetry!,
+                prepare: provider.telemetry!.prepare.bind(provider.telemetry),
+                signals: { activity: false, sessionIdentity: true }
+              }
+            }
+          ])
+      ).toThrow()
+    }
+  )
   it('allows identity-only telemetry to report a new empty conversation without activity', async () => {
     const events: string[] = []
     const contribution: AgentProviderContribution = {

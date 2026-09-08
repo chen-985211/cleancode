@@ -15,6 +15,16 @@ export function createTerminalAgentLaunchSpecs(paths: TerminalAgentTelemetryScri
   const geminiSettingsPath = join(paths.assetDirectory, 'gemini-settings.json')
   return {
     providers: {
+      pi: {
+        appendArgs: ['--extension', join(paths.assetDirectory, 'pi-extension.mjs')],
+        commandName: 'pi',
+        statusTracking: 'full'
+      },
+      hermes: {
+        nodePreload: pathToFileURL(join(paths.assetDirectory, 'hermes-preload.mjs')).href,
+        commandName: 'hermes',
+        statusTracking: 'full'
+      },
       'claude-code': {
         appendArgs: ['--settings', claudeSettingsPath],
         commandName: 'claude',
@@ -314,7 +324,9 @@ function createLaunch(providerId, commandName, originalArgs) {
   environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID = randomUUID();
   let args = [...originalArgs];
   let temporaryDirectory = null;
+  if (environment.CLEANCODE_PROVIDER_ACTIVITY_PROVIDER === providerId) return { args, environment, executable, spec, temporaryDirectory };
   try {
+    if (spec.nodePreload) environment.NODE_OPTIONS = ((environment.NODE_OPTIONS || '') + ' --import=' + JSON.stringify(spec.nodePreload)).trim();
     if (Array.isArray(spec.appendArgs)) args.push(...spec.appendArgs);
     if (spec.mergeJsonEnvironment) {
       const variable = spec.mergeJsonEnvironment.variable;
@@ -346,12 +358,14 @@ function providerEnvironment(spec, environment) {
     'CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID',
     'CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID',
     spec.mergeJsonEnvironment?.variable,
-    spec.mergeJsonFileEnvironment?.variable
+    spec.mergeJsonFileEnvironment?.variable,
+    ...(spec.nodePreload ? ['NODE_OPTIONS'] : [])
   ].filter(Boolean);
   return Object.fromEntries(names.map((name) => [name, environment[name]]));
 }
 
 async function reportAgentActivity(provider, environment, signal, timeoutMs) {
+  if (environment.CLEANCODE_PROVIDER_ACTIVITY_PROVIDER === provider) return;
   const timeout = new AbortController();
   const timeoutId = setTimeout(() => timeout.abort(), timeoutMs);
   try {
