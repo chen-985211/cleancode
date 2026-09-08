@@ -37,9 +37,9 @@ export class AgentProviderLaunchCoordinator {
   ) {}
   async launch(session: ManagedAgentSession, refresh = true): Promise<void> {
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
-    const providerLaunchGeneration = ++session.providerLaunchGeneration
     await disposeAgentLaunchArtifacts(session)
     await this.persistence.waitForIdle()
+    const providerLaunchGeneration = ++session.providerLaunchGeneration
     const processSessionId = session.sessionId
     if (!canLaunchAgentProvider(session, processSessionId)) return
     const provider = this.providers.require(session.providerId)
@@ -58,8 +58,13 @@ export class AgentProviderLaunchCoordinator {
       providerLaunchGeneration,
       provider.descriptor.capabilities.activityTracking
     )
-    const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot): void => {
-      if (!managedActivity.isCurrent()) return
+    const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot | null): void => {
+      if (
+        !session.launchArtifacts ||
+        session.sessionId !== processSessionId ||
+        session.providerLaunchGeneration !== providerLaunchGeneration
+      )
+        return
       this.persistence.persist(session, sessionRef, providerLaunchGeneration)
     }
     const plan = await createManagedAgentLaunchPlan({
@@ -73,6 +78,7 @@ export class AgentProviderLaunchCoordinator {
       ...(launchProfile ? { launchProfile } : {}),
       onActivityChanged: managedActivity.recordStatus,
       onProviderSessionIdentified: persistProviderSessionRef,
+      onProviderSessionCleared: () => persistProviderSessionRef(null),
       onTurnCompleted: managedActivity.recordTurnCompleted,
       provider,
       session

@@ -1,4 +1,6 @@
 import { hermesProviderIcon } from '../shared/AgentProviderBrandIcons'
+import { createReportedTerminalCliSession } from '../terminal-cli/ReportedTerminalCliSession'
+import { HermesSessionTelemetry } from './HermesSessionTelemetry'
 import {
   baselineTerminalCliCapabilities,
   TerminalCliAgentProviderContribution,
@@ -14,7 +16,12 @@ const hermesLaunch = {
 
 export class HermesAgentProviderContribution extends TerminalCliAgentProviderContribution {
   readonly descriptor = {
-    capabilities: baselineTerminalCliCapabilities,
+    capabilities: {
+      ...baselineTerminalCliCapabilities,
+      resume: true,
+      sessionIdentityCapture: true,
+      sessionRefCodec: true
+    },
     displayName: 'Hermes',
     documentationUrl: 'https://hermes-agent.nousresearch.com/docs/',
     icon: hermesProviderIcon,
@@ -23,10 +30,13 @@ export class HermesAgentProviderContribution extends TerminalCliAgentProviderCon
   } as const
 
   constructor(options: TerminalCliAgentProviderOptions = {}) {
+    const session = createReportedTerminalCliSession('hermes')
     super(
       {
         launch: hermesLaunch,
-        providerId: 'hermes'
+        providerId: 'hermes',
+        session,
+        telemetry: new HermesSessionTelemetry(session.sessionRefCodec)
       },
       options
     )

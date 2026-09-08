@@ -14,6 +14,7 @@ export async function createManagedAgentLaunchPlan(command: {
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged: NonNullable<CreateAgentLaunchPlanCommand['onActivityChanged']>
   readonly onProviderSessionIdentified: CreateAgentLaunchPlanCommand['onProviderSessionIdentified']
+  readonly onProviderSessionCleared?: CreateAgentLaunchPlanCommand['onProviderSessionCleared']
   readonly onTurnCompleted: NonNullable<CreateAgentLaunchPlanCommand['onTurnCompleted']>
   readonly provider: AgentProviderContribution
   readonly session: ManagedAgentSession
@@ -54,6 +55,7 @@ export async function createManagedAgentLaunchPlan(command: {
       ...(launchProfile ? { launchProfile } : {}),
       onActivityChanged,
       onProviderSessionIdentified,
+      onProviderSessionCleared: command.onProviderSessionCleared,
       onTurnCompleted,
       providerSessionRef: session.providerSessionRef ?? undefined,
       workspaceDirectory: session.workspaceDirectory

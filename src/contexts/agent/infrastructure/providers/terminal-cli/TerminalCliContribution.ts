@@ -7,7 +7,8 @@ import type {
   AgentProviderDetector,
   AgentProviderLaunchConfiguration,
   AgentProviderSessionRefCodec,
-  AgentResumeStrategy
+  AgentResumeStrategy,
+  AgentTelemetryContribution
 } from '../../../application/ports/AgentProviderContribution'
 import { NodeAgentProviderCommandDetector } from '../shared/NodeAgentProviderCommandDetector'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
@@ -25,7 +26,10 @@ interface TerminalCliAgentProviderConfig {
   readonly launch: AgentProviderLaunchConfiguration
   readonly providerId: string
   readonly requiredExecutables?: readonly string[]
-  readonly session?: DeclarativeTerminalCliSession
+  readonly session?: Omit<DeclarativeTerminalCliSession, 'freshSession'> & {
+    readonly freshSession?: AgentFreshSessionStrategy
+  }
+  readonly telemetry?: AgentTelemetryContribution
 }
 
 export const baselineTerminalCliCapabilities = {
@@ -45,6 +49,7 @@ export abstract class TerminalCliAgentProviderContribution implements AgentProvi
   readonly launcher: AgentLaunchPlanner
   readonly resume?: AgentResumeStrategy
   readonly sessionRefCodec?: AgentProviderSessionRefCodec
+  readonly telemetry?: AgentTelemetryContribution
 
   protected constructor(
     config: TerminalCliAgentProviderConfig,
@@ -55,6 +60,7 @@ export abstract class TerminalCliAgentProviderContribution implements AgentProvi
     this.freshSession = config.session?.freshSession
     this.resume = config.session?.resume
     this.sessionRefCodec = config.session?.sessionRefCodec
+    this.telemetry = config.telemetry
     this.detector =
       options.detector ??
       new NodeAgentProviderCommandDetector({
@@ -82,18 +88,22 @@ export abstract class TerminalCliAgentProviderContribution implements AgentProvi
               })
             : { args: [], env: {} }
 
+        const telemetry = await this.telemetry?.prepare(launchCommand)
+
         return {
           args: [
             ...(launchCommand.launchProfile?.arguments ?? config.launch.defaultArguments),
             ...session.args,
-            ...capability.args
+            ...capability.args,
+            ...(telemetry?.args ?? [])
           ],
           env: {
             ELECTRON_RUN_AS_NODE: '1',
             PROMPT_EOL_MARK: '',
             ...createAgentProviderLoopbackEnvironment(),
             ...(launchCommand.launchProfile?.environment ?? config.launch.defaultEnvironment),
-            ...capability.env
+            ...capability.env,
+            ...telemetry?.env
           },
           executable: launchCommand.launchProfile?.executable ?? command,
           ...(session.sessionRef ? { providerSessionRefOnStarted: session.sessionRef } : {})

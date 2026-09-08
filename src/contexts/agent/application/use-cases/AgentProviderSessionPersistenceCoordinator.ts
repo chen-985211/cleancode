@@ -15,19 +15,21 @@ export class AgentProviderSessionPersistenceCoordinator {
 
   persist(
     session: ManagedAgentSession,
-    sessionRefSnapshot: ProviderSessionRefSnapshot,
+    sessionRefSnapshot: ProviderSessionRefSnapshot | null,
     providerLaunchGeneration: number
   ): void {
     if (!session.shouldPersist) return
     let sessionRef
     try {
-      sessionRef = this.providers.parseSessionRef(session.providerId, sessionRefSnapshot)
+      sessionRef = sessionRefSnapshot
+        ? this.providers.parseSessionRef(session.providerId, sessionRefSnapshot)
+        : null
     } catch {
       transitionAgentRuntime(session, { binding: 'persistence_failed' })
       return
     }
     const lane = this.resolveLane(session, providerLaunchGeneration)
-    const identity = providerSessionIdentity(sessionRef.toSnapshot())
+    const identity = sessionRef ? providerSessionIdentity(sessionRef.toSnapshot()) : null
     if (lane.latestIdentity === identity) return
 
     lane.latestIdentity = identity
@@ -41,11 +43,12 @@ export class AgentProviderSessionPersistenceCoordinator {
           (await this.repository.find(session.scope)) ??
           AgentSession.start(session.scope, session.providerId)
         if (!isCurrentPersistence(session, providerLaunchGeneration)) return
-        persistedSession.bindProviderSession(session.scope, sessionRef)
+        if (sessionRef) persistedSession.bindProviderSession(session.scope, sessionRef)
+        else persistedSession.clearProviderSession()
         await this.repository.save(persistedSession)
         if (isLatestPersistence(session, lane, providerLaunchGeneration, sequence, identity)) {
-          session.providerSessionRef = sessionRef.toSnapshot()
-          transitionAgentRuntime(session, { binding: 'persisted' })
+          session.providerSessionRef = sessionRef?.toSnapshot() ?? null
+          transitionAgentRuntime(session, { binding: sessionRef ? 'persisted' : 'unbound' })
         }
       })
       .catch(() => {
@@ -121,7 +124,7 @@ function isLatestPersistence(
   lane: PersistenceLane,
   providerLaunchGeneration: number,
   sequence: number,
-  identity: string
+  identity: string | null
 ): boolean {
   return (
     isCurrentPersistence(session, providerLaunchGeneration) &&

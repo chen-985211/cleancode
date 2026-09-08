@@ -103,7 +103,7 @@ Windows PowerShell/Profile 正常加载后由启动 bootstrap 在 `FullLanguage`
 
 ## Agent 集成
 
-当前 registry 内建 33 个 Agent Provider。Codex、Claude Code 和 OpenCode 提供专用增强 contribution；Gemini 在数据驱动的基础终端 contribution 上组合声明式 session 与 MCP 配方；其余项目提供 PATH 检测、交互启动命令、离线品牌图标与官方文档。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry contribution；fresh session、session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 CleanCode MCP 支持均由 Provider 如实声明并提供对应实现。
+当前 registry 内建 33 个 Agent Provider。Codex、Claude Code 和 OpenCode 提供专用增强 contribution；Gemini 在数据驱动的基础终端 contribution 上组合声明式 session 与 MCP 配方；Pi 与 Hermes 在基础终端 contribution 上组合会话身份捕获与精确恢复，其余项目提供 PATH 检测、交互启动命令、离线品牌图标与官方文档。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry contribution；fresh session、session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 CleanCode MCP 支持均由 Provider 如实声明并提供对应实现。
 
 registry descriptor 集合是完整的受支持 Provider catalog；专用 discovery 用例通过共享 `AgentProviderAvailabilityService` 检查该 catalog，只把 `installed` Provider 投影为可创建结果。共享服务合并并发检查、缓存易失快照并支持显式刷新；Agent 创建在持久化前执行新的可用性检查，已有持久化 Agent 则不因当前 CLI 不可用而从工作区消失。新工作区始终原子初始化为空 Agent 列表，只有用户明确执行新建操作后才检查 Provider 并创建 Agent。
 
@@ -111,7 +111,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 
 共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。基础终端目录只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.139` 或更高版本，依据是 Hook exec-form args 的上游发布边界（详见[兼容性报告](../contexts/agent/native-collaboration-compatibility.md)）；其他 Provider 不得虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
 
-每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume`、`tui.terminal_title`、`app-server thread/list`、进程级 `notify` 和精确信任的退出 Hook 报告或补全当前 thread UUID，不声明精确活动跟踪；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入远程 MCP 与临时 instructions；Gemini 通过正式 `--session-id` 接受 cleancode 预分配 UUID，在 launch 启动后确认绑定并以 `--resume` 恢复，同时通过临时 system settings 注入 MCP。四者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
+每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume`、`tui.terminal_title`、`app-server thread/list`、进程级 `notify` 和精确信任的退出 Hook 报告或补全当前 thread UUID，不声明精确活动跟踪；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入远程 MCP 与临时 instructions；Gemini 通过正式 `--session-id` 接受 cleancode 预分配 UUID，在 launch 启动后确认绑定并以 `--resume` 恢复，同时通过临时 system settings 注入 MCP。四者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。Pi 通过临时 extension 报告已保存 session 文件的精确路径，以 `--session` 恢复；Hermes 通过临时 Node preload 观察本地 TUI 的 gateway JSON-RPC 身份与本次前台选择文件，以 `--resume` 和 `--no-restore-cwd` 恢复。两者的身份回报使用 Node.js 内建文件 API 和 launch 私有临时目录，不增加第三方依赖，清理时排空最后回报。
 
 原生收件箱唤醒复用 Node.js 内建文件、进程和本地传输能力，不新增 SDK 依赖。Codex 的临时 launcher 在既有 PTY 中以 Electron Node 模式启动，TUI、独立 app-server 与官方 queue 命令共享实际 shell 环境；服务不使用或接管用户全局 daemon。Claude 使用临时 FileChanged Hook 和信号文件，OpenCode 使用原生插件持有的 SDK 与认证 loopback HTTP，配置只在 launch 生命周期内存在。运行资格、降级与清理由 Agent 应用层和 Provider 适配器按[原生 MCP 协议](../contexts/agent/cleancode-mcp.md)分别负责。
 

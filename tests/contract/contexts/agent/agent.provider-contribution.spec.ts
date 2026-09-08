@@ -5,6 +5,44 @@ import type {
 import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
 
 describe('Agent Provider contribution contract', () => {
+  it('allows identity-only telemetry to report a new empty conversation without activity', async () => {
+    const events: string[] = []
+    const contribution: AgentProviderContribution = {
+      descriptor: createDescriptor(),
+      detector: {
+        inspect: async () => ({ providerId: 'example', status: 'installed', version: '1.0.0' })
+      },
+      sessionRefCodec: { parse: (ref) => ref },
+      resume: { createResumeArgs: (ref) => ['--resume', ref.value] },
+      telemetry: {
+        signals: { activity: false, sessionIdentity: true },
+        prepare: async (command) => {
+          command.onProviderSessionCleared?.()
+          command.onProviderSessionIdentified({
+            formatVersion: 1,
+            kind: 'example-session',
+            value: 'durable-session'
+          })
+          return { args: [], env: {} }
+        }
+      },
+      launcher: {
+        createLaunchPlan: async (command) => ({
+          executable: 'example',
+          ...(await contribution.telemetry!.prepare(command))
+        })
+      }
+    }
+    const registry = new AgentProviderRegistry([contribution])
+    await registry.require('example').launcher.createLaunchPlan({
+      artifacts: { track: (_label, artifact) => artifact },
+      onProviderSessionCleared: () => events.push('empty'),
+      onProviderSessionIdentified: (ref) => events.push(ref.value),
+      workspaceDirectory: '/repo'
+    })
+    expect(events).toEqual(['empty', 'durable-session'])
+  })
+
   it('accepts a client-assigned session identity without requiring telemetry', async () => {
     const sessionRef = {
       formatVersion: 1,

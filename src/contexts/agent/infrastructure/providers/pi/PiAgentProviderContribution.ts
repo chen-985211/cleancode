@@ -1,4 +1,6 @@
 import { piProviderIcon } from '../shared/AgentProviderBrandIcons'
+import { createReportedTerminalCliSession } from '../terminal-cli/ReportedTerminalCliSession'
+import { PiSessionTelemetry } from './PiSessionTelemetry'
 import {
   baselineTerminalCliCapabilities,
   TerminalCliAgentProviderContribution,
@@ -13,7 +15,12 @@ const piLaunch = {
 
 export class PiAgentProviderContribution extends TerminalCliAgentProviderContribution {
   readonly descriptor = {
-    capabilities: baselineTerminalCliCapabilities,
+    capabilities: {
+      ...baselineTerminalCliCapabilities,
+      resume: true,
+      sessionIdentityCapture: true,
+      sessionRefCodec: true
+    },
     displayName: 'Pi',
     documentationUrl: 'https://pi.dev',
     icon: piProviderIcon,
@@ -22,10 +29,13 @@ export class PiAgentProviderContribution extends TerminalCliAgentProviderContrib
   } as const
 
   constructor(options: TerminalCliAgentProviderOptions = {}) {
+    const session = createReportedTerminalCliSession('pi')
     super(
       {
         launch: piLaunch,
-        providerId: 'pi'
+        providerId: 'pi',
+        session,
+        telemetry: new PiSessionTelemetry(session.sessionRefCodec)
       },
       options
     )
