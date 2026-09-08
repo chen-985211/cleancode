@@ -15,6 +15,14 @@ if (activeFile) {
   let selection;
   let selectionStamp;
   let selectionVersion = 0;
+  let branchSequence = 0;
+  let branchAcceptance;
+  let branchAcceptanceExpiry;
+  function clearBranchAcceptance() {
+    if (branchAcceptanceExpiry) clearImmediate(branchAcceptanceExpiry);
+    branchAcceptance = undefined;
+    branchAcceptanceExpiry = undefined;
+  }
   function readSelection() {
     try {
       const text = readFileSync(activeFile, 'utf8');
@@ -52,10 +60,22 @@ if (activeFile) {
     }
   }
   function request(packet) {
-    if (!packet || !['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit'].includes(packet.method)) return;
+    if (!packet || typeof packet.method !== 'string') return;
     if (typeof packet.id !== 'string' && typeof packet.id !== 'number') return;
-    readSelection();
-    pending.set(packet.id, { method: packet.method, sessionId: packet.params?.session_id, selectionVersion });
+    const selected = readSelection();
+    const acceptance = branchAcceptance;
+    clearBranchAcceptance();
+    if (acceptance && packet.method === 'session.close' && packet.params?.session_id === acceptance.parentId && selectionVersion === acceptance.selectionVersion && selected === acceptance.selection) {
+      // The guarded TUI callback closes its parent before switching sid. A successful
+      // branch response alone does not prove that the callback accepted the result.
+      selection = acceptance.sessionId;
+      scheduleSample();
+    }
+    if (!['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit'].includes(packet.method)) return;
+    pending.set(packet.id, {
+      method: packet.method, sessionId: packet.params?.session_id, selectionVersion,
+      branchSequence: packet.method === 'session.branch' ? ++branchSequence : undefined
+    });
     if (pending.size > 256) pending.delete(pending.keys().next().value);
   }
   function response(packet) {
@@ -81,10 +101,13 @@ if (activeFile) {
       const selected = readSelection();
       const parent = sessions.get(call.sessionId);
       remember(r.session_id, null, true);
-      if (call.selectionVersion === selectionVersion && (selected === call.sessionId || (parent && sessions.get(selected) === parent))) {
-        // /branch switches the TUI sid without writing the selection file. Keep this
-        // override only until the next explicit file write, even if its ID is unchanged.
-        selection = r.session_id;
+      if (call.branchSequence === branchSequence && call.selectionVersion === selectionVersion && (selected === call.sessionId || (parent && sessions.get(selected) === parent))) {
+        clearBranchAcceptance();
+        branchAcceptance = { parentId: call.sessionId, sessionId: r.session_id, selection: selected, selectionVersion };
+        // Accepted callbacks send session.close in the response's promise microtasks.
+        // Expire at the next event-loop boundary so a later unrelated close cannot
+        // accept a discarded branch. Subsequent explicit file writes still take priority.
+        branchAcceptanceExpiry = setImmediate(clearBranchAcceptance);
       }
     }
     if (call.method === 'prompt.submit' && r.status === 'streaming') {
@@ -129,6 +152,7 @@ if (activeFile) {
       gateway = child;
       sessions.clear();
       pending.clear();
+      clearBranchAcceptance();
       selection = undefined;
       selectionStamp = undefined;
       selectionVersion++;
@@ -142,6 +166,7 @@ if (activeFile) {
       child.stdout.on('data', readResponse);
       child.once('close', () => {
         if (gateway === child) {
+          clearBranchAcceptance();
           sample();
           unwatchFile(activeFile, sample);
           gateway = undefined;
