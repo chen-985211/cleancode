@@ -31,6 +31,7 @@ export async function installTerminalShellIntegration(
     writePrivateFile(files.bashInitFile, bashIntegrationScript),
     writePrivateFile(files.fishInitFile, fishIntegrationScript),
     writePrivateFile(join(zshDotDirectory, '.zshenv'), zshEnvironmentScript),
+    writePrivateFile(join(zshDotDirectory, 'input.zsh'), zshInputInitScript),
     writePrivateFile(join(zshDotDirectory, '.zprofile'), zshProfileScript),
     writePrivateFile(join(zshDotDirectory, '.zshrc'), zshRcScript),
     writePrivateFile(join(zshDotDirectory, '.zlogin'), zshLoginScript)
@@ -51,12 +52,20 @@ export function decorateTerminalShellIntegration(input: {
   if (input.platform === 'win32') return unchanged
   if (input.hasLaunchCommand && input.launchMode !== 'interactive') return unchanged
 
+  // A private executable may delegate to zsh after Run has prepared this environment.
+  // Publish the optional input initializer without interpreting another context's launcher.
+  const inputEnvironment: Readonly<Record<string, string>> =
+    input.platform === 'darwin'
+      ? { CLEANCODE_ZSH_INPUT_INIT: join(input.files.zshDotDirectory, 'input.zsh') }
+      : {}
+  const delegated = { environment: inputEnvironment, interactiveShellArguments: [] } as const
   const shellName = basename(input.shell).toLowerCase()
   if (shellName === 'zsh') {
     const userZdotDirectory = input.environment.ZDOTDIR ?? input.environment.HOME
-    if (!userZdotDirectory) return unchanged
+    if (!userZdotDirectory) return delegated
     return {
       environment: {
+        ...inputEnvironment,
         CLEANCODE_USER_ZDOTDIR: userZdotDirectory,
         ZDOTDIR: input.files.zshDotDirectory
       },
@@ -65,20 +74,20 @@ export function decorateTerminalShellIntegration(input: {
   }
   if (shellName === 'bash') {
     return {
-      environment: {},
+      environment: inputEnvironment,
       interactiveShellArguments: ['--init-file', input.files.bashInitFile]
     }
   }
   if (shellName === 'fish') {
     return {
-      environment: {},
+      environment: inputEnvironment,
       interactiveShellArguments: [
         '--init-command',
         `source ${quoteShellWord(input.files.fishInitFile)}`
       ]
     }
   }
-  return unchanged
+  return delegated
 }
 
 async function writePrivateFile(path: string, contents: string): Promise<void> {
@@ -122,6 +131,10 @@ if [[ -n "$CLEANCODE_USER_ZDOTDIR" && -r "$CLEANCODE_USER_ZDOTDIR/.zshrc" ]]; th
   CLEANCODE_USER_ZDOTDIR="$ZDOTDIR"
   ZDOTDIR="$__cleancode_integration_zdotdir"
   unset __cleancode_integration_zdotdir
+fi
+
+if [[ -r "\${CLEANCODE_ZSH_INPUT_INIT:-}" ]]; then
+  source "$CLEANCODE_ZSH_INPUT_INIT"
 fi
 
 autoload -Uz add-zsh-hook
@@ -192,4 +205,21 @@ function __cleancode_report_cwd --on-event fish_prompt
   set --local encoded (string escape --style=url -- "$PWD")
   builtin printf '\\e]7;file://localhost%s\\a' "$encoded"
 end
+`
+
+const zshInputInitScript = `
+if [[ "$OSTYPE" == darwin* ]]; then
+  function __cleancode_bind_word_arrows() {
+    local keymap sequence widget
+    for keymap in emacs viins; do
+      for sequence widget in $'\\e[1;3D' backward-word $'\\e[1;3C' forward-word; do
+        if [[ "$(builtin bindkey -M "$keymap" "$sequence" 2>/dev/null)" == *' undefined-key' ]]; then
+          builtin bindkey -M "$keymap" "$sequence" "$widget"
+        fi
+      done
+    done
+  }
+  __cleancode_bind_word_arrows
+  unfunction __cleancode_bind_word_arrows
+fi
 `

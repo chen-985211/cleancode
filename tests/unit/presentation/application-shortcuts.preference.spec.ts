@@ -7,9 +7,103 @@ import {
   shortcutBindingsStorageKey,
   writeApplicationShortcutBindings
 } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutPreference'
+import { act, renderHook } from '@testing-library/react'
+import { useApplicationShortcutPreference } from '../../../src/presentation/app-shell/app-features/shortcuts/useApplicationShortcutPreference'
 
 describe('application shortcut preference', () => {
-  beforeEach(() => window.localStorage.clear())
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel')
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('resets and persists the complete platform default catalog', () => {
+    const { result } = renderHook(() => useApplicationShortcutPreference('other'))
+    act(() => result.current.changeBinding('selectCanvasNodeLeft', null))
+    act(() => result.current.resetAllBindings())
+    expect(result.current.bindings.selectCanvasNodeLeft).toEqual({
+      alt: true,
+      key: 'ArrowLeft',
+      primary: false,
+      shift: false
+    })
+    expect(readApplicationShortcutBindings(window.localStorage, 'other')).toEqual(
+      result.current.bindings
+    )
+  })
+
+  it('adds the new platform defaults to early catalogs even when an old Ctrl arrow is customized elsewhere', () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({
+        version: 1,
+        bindings: {
+          openSettings: defaultApplicationShortcutBindings.openSettings,
+          createTerminal: defaultApplicationShortcutBindings.selectCanvasNodeLeft,
+          createAgent: defaultApplicationShortcutBindings.createAgent,
+          groupTerminals: null
+        }
+      })
+    )
+    expect(readApplicationShortcutBindings().selectCanvasNodeLeft).toEqual({
+      alt: true,
+      key: 'ArrowLeft',
+      primary: false,
+      shift: false
+    })
+  })
+
+  it.each(['Win32', 'Linux x86_64'])('uses Alt arrows by default on %s', (platform) => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue(platform)
+    const bindings = readApplicationShortcutBindings()
+    for (const direction of ['Left', 'Right', 'Up', 'Down'] as const) {
+      expect(bindings[`selectCanvasNode${direction}`]).toEqual({
+        alt: true,
+        key: `Arrow${direction}`,
+        primary: false,
+        shift: false
+      })
+    }
+  })
+
+  it('migrates old Windows defaults while preserving custom, cleared and conflicting bindings', () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    const custom = { alt: true, key: 'H', primary: false, shift: false }
+    const occupied = { alt: true, key: 'ArrowDown', primary: false, shift: false }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({
+        version: 7,
+        bindings: {
+          ...defaultApplicationShortcutBindings,
+          selectCanvasNodeRight: custom,
+          selectCanvasNodeUp: null,
+          createAgent: occupied
+        }
+      })
+    )
+    const bindings = readApplicationShortcutBindings()
+    expect(bindings.selectCanvasNodeLeft).toEqual({
+      alt: true,
+      key: 'ArrowLeft',
+      primary: false,
+      shift: false
+    })
+    expect(bindings.selectCanvasNodeRight).toEqual(custom)
+    expect(bindings.selectCanvasNodeUp).toBeNull()
+    expect(bindings.selectCanvasNodeDown).toBeNull()
+    expect(bindings.createAgent).toEqual(occupied)
+  })
+
+  it('preserves an explicitly saved Ctrl arrow after upgrading the preference version', () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
+    expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
+    expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey)!)).toMatchObject({
+      version: 8
+    })
+  })
 
   it('uses the complete default catalog when no preference exists', () => {
     expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
@@ -247,12 +341,12 @@ describe('application shortcut preference', () => {
     })
   })
 
-  it('writes the complete catalog with preference schema v7', () => {
+  it('writes the complete catalog with preference schema v8', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 7
+      version: 8
     })
   })
 

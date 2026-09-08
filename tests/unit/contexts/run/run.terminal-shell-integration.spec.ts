@@ -66,11 +66,33 @@ describe('terminal shell integration', () => {
       })
 
       expect(decoration).toEqual({
-        environment: expectedEnvironment,
+        environment: {
+          ...expectedEnvironment,
+          CLEANCODE_ZSH_INPUT_INIT: join('/state/zsh', 'input.zsh')
+        },
         interactiveShellArguments: expectedArguments
       })
     }
   )
+
+  it('provides the same macOS input initialization to a delegated shell launcher', async () => {
+    const files = await installTerminalShellIntegration(rootDirectory)
+    const decoration = decorateTerminalShellIntegration({
+      environment: { HOME: '/users/me' },
+      files,
+      hasLaunchCommand: false,
+      launchMode: 'interactive',
+      platform: 'darwin',
+      shell: '/private-shell/launch'
+    })
+    expect(decoration.environment.CLEANCODE_ZSH_INPUT_INIT).toBe(
+      join(files.zshDotDirectory, 'input.zsh')
+    )
+    expect(decoration.interactiveShellArguments).toEqual([])
+    expect(await readFile(decoration.environment.CLEANCODE_ZSH_INPUT_INIT!, 'utf8')).toContain(
+      'backward-word'
+    )
+  })
 
   it('leaves finite commands and unsupported shells unchanged', () => {
     const files = {

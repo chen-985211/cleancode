@@ -187,6 +187,13 @@ function createZshStartupRelay(
     'fi',
     'export CLEANCODE_AGENT_ACTIVITY_USER_ZDOTDIR="$_cleancode_user_zdotdir"',
     ...pathBootstrap,
+    ...(startupFile === '.zshrc'
+      ? [
+          'if [[ -r "${CLEANCODE_ZSH_INPUT_INIT:-}" ]]; then',
+          '  source "$CLEANCODE_ZSH_INPUT_INIT"',
+          'fi'
+        ]
+      : []),
     ...restore,
     'unset _cleancode_user_zdotdir _cleancode_wrapper_zdotdir',
     ''

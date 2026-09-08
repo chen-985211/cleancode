@@ -265,12 +265,15 @@ describe('app shell create terminal focus', () => {
     await screen.findByTestId('mock-react-flow')
     await waitFor(() => expect(screen.getByRole('button', { name: '收起小地图' })).toBeEnabled())
     await screen.findByTestId('mock-node-right-terminal')
+    const navigationModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+      ? { metaKey: true }
+      : { altKey: true }
     const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
       ? { metaKey: true }
       : { ctrlKey: true }
     reactFlowSpies.setViewport.mockClear()
     expect(screen.queryByTestId('mock-node-agent:default-agent')).not.toBeInTheDocument()
-    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowRight', ...navigationModifier })
 
     await waitFor(() =>
       expect(screen.getByTestId('mock-node-right-terminal')).toHaveAttribute(
@@ -280,7 +283,7 @@ describe('app shell create terminal focus', () => {
     )
     expect(reactFlowSpies.setViewport).toHaveBeenCalledOnce()
 
-    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowLeft', ...navigationModifier })
 
     await waitFor(() =>
       expect(screen.getByTestId('mock-node-left-terminal')).toHaveAttribute('data-selected', 'true')

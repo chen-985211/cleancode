@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
@@ -22,6 +22,7 @@ import {
   createE2eNodeCommand,
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
+  e2eShellReadyMarker,
   readTerminalSessionId,
   waitForTerminalOutput,
   waitForTerminalShellReady,
@@ -45,8 +46,20 @@ describe('terminal daily interactions e2e', () => {
     resources = {}
     workbench = await createE2eWorkbench('cleancode-terminal-daily-e2e')
     resources.workbench = workbench
+    const environment = createE2eTerminalEnvironment()
+    if (process.platform === 'darwin') {
+      const zshDirectory = join(workbench.registryDirectory, 'zsh')
+      await mkdir(zshDirectory)
+      await writeFile(
+        join(zshDirectory, '.zshrc'),
+        `bindkey -e\nPROMPT='${e2eShellReadyMarker} '\n`
+      )
+      environment.SHELL = '/bin/zsh'
+      environment.HOME = zshDirectory
+      environment.ZDOTDIR = zshDirectory
+    }
     electronApp = await launchApp(workbench, {
-      environment: createE2eTerminalEnvironment()
+      environment
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -61,6 +74,23 @@ describe('terminal daily interactions e2e', () => {
       taskName: task.name
     })
   })
+
+  it.runIf(process.platform === 'darwin')(
+    'moves by words with Option arrows in a terminal created through the default activity launcher',
+    async () => {
+      await createRunningTerminal(page)
+      const sessionId = await readTerminalSessionId(page, 'Terminal 1')
+      await page.keyboard.type("printf '\\n__CC_WORD_RESULT__%s__\\n' alpha beta")
+      await page.keyboard.press('Alt+ArrowLeft')
+      await page.keyboard.type('X')
+      await page.keyboard.press('Alt+ArrowRight')
+      await page.keyboard.type('Y')
+      await page.keyboard.press('Enter')
+      await waitForTerminalOutput(page, 'Terminal 1', '__CC_WORD_RESULT__XbetaY__')
+      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+    },
+    electronScenarioTimeoutMs
+  )
 
   it(
     'keeps search, Unicode, paste and renderer fallback usable in one live session',
@@ -126,6 +156,8 @@ describe('terminal daily interactions e2e', () => {
             new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData })
           )
       }, clipboardText)
+      // zsh keeps a bracketed paste editable until the user confirms it.
+      await page.keyboard.press('Enter')
       await waitForTerminalOutput(page, 'Terminal 1', '__PASTE_AFTER_RENDERER_FALLBACK__')
 
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(originalSessionId)
@@ -275,7 +307,12 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
   await selectBlankCanvasAction(page, '新建终端积木')
   await readTerminalSessionId(page, 'Terminal 1')
-  await waitForTerminalShellReady(page, 'Terminal 1')
+  if (process.platform === 'darwin') {
+    // zsh can emit bracketed-paste control bytes after its prompt marker.
+    await waitForTerminalOutput(page, 'Terminal 1', e2eShellReadyMarker)
+  } else {
+    await waitForTerminalShellReady(page, 'Terminal 1')
+  }
   const terminalInput = page.getByLabel('Terminal input')
   await terminalInput.focus()
   await pollUntilState({

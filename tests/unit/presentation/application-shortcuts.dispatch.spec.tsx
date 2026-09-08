@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { readApplicationShortcutBindings } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcutPreference'
 
 import {
   defaultApplicationShortcutBindings,
@@ -10,6 +11,37 @@ import {
 } from '../../../src/presentation/app-shell/app-features/shortcuts/useApplicationShortcuts'
 
 describe('application shortcut dispatch', () => {
+  afterEach(() => vi.restoreAllMocks())
+  it.each(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])(
+    'reserves Alt + %s for canvas navigation and passes Ctrl arrows to the terminal on other platforms',
+    (key) => {
+      vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+      const actions = createActions()
+      const terminalInput = vi.fn()
+      const bindings = readApplicationShortcutBindings({ getItem: () => null })
+      render(
+        <ShortcutHarness
+          actions={actions}
+          bindings={bindings}
+          platform="other"
+          onTerminalArrowKey={terminalInput}
+        />
+      )
+      const terminal = screen.getByLabelText('快捷键测试终端')
+      fireEvent.keyDown(terminal, { key, ctrlKey: true })
+      expect(terminalInput).toHaveBeenCalledOnce()
+      expect(
+        Object.values(actions).every((action) => vi.mocked(action.run).mock.calls.length === 0)
+      ).toBe(true)
+      terminalInput.mockClear()
+      fireEvent.keyDown(terminal, { key, altKey: true })
+      fireEvent.keyDown(terminal, { key, altKey: true, repeat: true })
+      expect(terminalInput).not.toHaveBeenCalled()
+      expect(
+        actions[`selectCanvasNode${key.slice(5)}` as keyof ApplicationShortcutActions].run
+      ).toHaveBeenCalledOnce()
+    }
+  )
   it.each([
     ['openSettings', ',', false],
     ['toggleSidebar', 'b', false],
@@ -201,12 +233,14 @@ describe('application shortcut dispatch', () => {
 function ShortcutHarness({
   actions,
   bindings = defaultApplicationShortcutBindings,
+  platform = 'mac',
   onCanvasNodeArrowKey,
   onTerminalArrowKey,
   showDialog = false
 }: {
   readonly actions: ApplicationShortcutActions
   readonly bindings?: ApplicationShortcutBindings
+  readonly platform?: 'mac' | 'other'
   readonly onCanvasNodeArrowKey?: () => void
   readonly onTerminalArrowKey?: () => void
   readonly showDialog?: boolean
@@ -214,7 +248,7 @@ function ShortcutHarness({
   useApplicationShortcuts({
     actions,
     bindings,
-    platform: 'mac'
+    platform
   })
 
   return (

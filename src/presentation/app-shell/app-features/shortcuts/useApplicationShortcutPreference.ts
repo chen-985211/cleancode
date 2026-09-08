@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
 
 import {
-  applicationShortcutCommands,
-  defaultApplicationShortcutBindings,
+  getDefaultApplicationShortcutBindings,
+  resolveShortcutPlatform,
+  type ShortcutPlatform,
   type ApplicationShortcutBinding,
   type ApplicationShortcutBindings,
   type ApplicationShortcutCommand
@@ -12,9 +13,11 @@ import {
   writeApplicationShortcutBindings
 } from './applicationShortcutPreference'
 
-export function useApplicationShortcutPreference() {
-  const [bindings, setBindings] = useState<ApplicationShortcutBindings>(
-    readApplicationShortcutBindings
+export function useApplicationShortcutPreference(
+  platform: ShortcutPlatform = resolveShortcutPlatform()
+) {
+  const [bindings, setBindings] = useState<ApplicationShortcutBindings>(() =>
+    readApplicationShortcutBindings(window.localStorage, platform)
   )
 
   const changeBinding = useCallback(
@@ -25,14 +28,8 @@ export function useApplicationShortcutPreference() {
   )
 
   const resetAllBindings = useCallback((): void => {
-    const defaults = Object.fromEntries(
-      applicationShortcutCommands.map((command) => {
-        const binding = defaultApplicationShortcutBindings[command]
-        return [command, binding === null ? null : { ...binding }]
-      })
-    ) as ApplicationShortcutBindings
-    setBindings(persistBindings(defaults))
-  }, [])
+    setBindings(persistBindings(getDefaultApplicationShortcutBindings(platform)))
+  }, [platform])
 
   return { bindings, changeBinding, resetAllBindings }
 }
