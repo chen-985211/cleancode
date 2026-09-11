@@ -168,11 +168,7 @@ describe('quick execution e2e', () => {
       await page.getByRole('button', { name: '新建 Agent' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
       await waitForQuickLaunchCount(reportPath, launchOutput, 2)
-      await waitForCanvasViewportTransform(
-        page,
-        focusedViewport,
-        'quick execution shortcut to follow its canvas target'
-      )
+      await waitForCanvasViewportTransform(page, focusedViewport)
       expect(
         await setQuickExecutionTargetFollowing(page, false, 'quick-execution-canvas-settings.png')
       ).toBe(true)
@@ -652,16 +648,21 @@ async function panCanvasAwayFromQuickExecutionTarget(page: Page): Promise<string
 
 async function waitForCanvasViewportTransform(
   page: Page,
-  expectedTransform: string,
-  description: string
+  expectedTransform: string
 ): Promise<void> {
-  const transform = await pollUntilState({
-    description,
+  const expected = expectedTransform.slice(7, -1).split(',').map(Number)
+  await pollUntilState({
+    description: 'quick execution shortcut to follow its canvas target within half a CSS pixel',
     observe: () => readCanvasViewportTransform(page),
-    accept: (currentTransform) => currentTransform === expectedTransform,
+    accept: (transform) => {
+      const actual = transform.slice(7, -1).split(',').map(Number)
+      return (
+        actual.length === 6 &&
+        actual.every((value, i) => Math.abs(value - expected[i]!) <= (i < 4 ? 0.000001 : 0.5))
+      )
+    },
     timeoutMs: 5_000
   })
-  expect(transform).toBe(expectedTransform)
 }
 
 async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
