@@ -15,6 +15,46 @@ const providers = ['pi', 'hermes'] as const
 const entries = process.platform === 'win32' ? ['managed'] : ['managed', 'terminal', 'managed-shim']
 
 describe.each(entries)('Pi and Hermes activity through %s', (entry) => {
+  it.each(['running', 'working', 'waiting', 'idle', 'background-complete', 'unselected'])(
+    'restores only an active foreground Hermes turn after activation: %s',
+    async (state) => {
+      const signals = await runScenario(entry!, 'hermes', 'activate-' + state)
+      const active = ['running', 'working', 'waiting'].includes(state)
+      expect(signals.filter((value) => value === 'completed')).toHaveLength(active ? 1 : 0)
+      expect(signals.filter((value) => value === 'working')).toHaveLength(active ? 2 : 1)
+    }
+  )
+
+  it.each([
+    'input',
+    'approval',
+    'mixed',
+    'answered',
+    'approval-answered',
+    'expired',
+    'ended',
+    'late-input',
+    'late-approval'
+  ])('restores unresolved Hermes waits after switching: %s', async (kind) => {
+    const signals = await runScenario(entry!, 'hermes', 'wait-switch-' + kind)
+    const visible = signals.filter((value) => value !== 'idle' && value !== 'unavailable')
+    const waiting =
+      kind.includes('approval') || kind === 'mixed' ? 'waiting_approval' : 'waiting_input'
+    expect(visible).toEqual([
+      'working',
+      ...(kind === 'mixed' ? ['waiting_input'] : []),
+      waiting,
+      ...(kind === 'ended'
+        ? []
+        : [
+            kind.endsWith('answered') || kind === 'expired' ? 'working' : waiting,
+            ...(kind === 'mixed' ? ['waiting_input'] : []),
+            ...(kind.endsWith('answered') || kind === 'expired' ? [] : ['working']),
+            'completed'
+          ])
+    ])
+  })
+
   it('continues notifying after Pi reloads its extension within the same launch', async () => {
     const signals = await runScenario(entry!, 'pi', 'reload')
     expect(signals.filter((value) => value === 'completed')).toHaveLength(2)
@@ -214,6 +254,34 @@ createInterface({ input: child.stdout }).on('line', line => { const packet = JSO
 function request(method, params = {}) { return new Promise(resolve => { const id = ++sequence; pending.set(id, resolve); child.stdin.write(JSON.stringify({ id, method, params }) + '\n'); }); }
 await request('session.create');
 await request('prompt.submit', { session_id: 'foreground' });
+const activation = process.env.TEST_OUTCOME.startsWith('activate-');
+if (process.env.TEST_OUTCOME.startsWith('wait-switch-')) {
+  const kind = process.env.TEST_OUTCOME.slice('wait-switch-'.length);
+  await request('test.wait');
+  writeFileSync(process.env.HERMES_TUI_ACTIVE_SESSION_FILE, JSON.stringify({ session_id: 'other' }));
+  await request('test.barrier');
+  if (kind === 'approval-answered') await request('approval.respond', { session_id: 'foreground', choice: 'once' });
+  if (kind.startsWith('late-')) {
+    const reply = request(kind === 'late-approval' ? 'approval.respond' : 'clarify.respond', { session_id: 'foreground', request_id: 'first', all: true, defer: true });
+    await request('test.new-wait');
+    await reply;
+  }
+  if (kind === 'answered') await request('clarify.respond', { request_id: 'first', answer: 'yes' });
+  if (kind === 'expired') await request('test.expire');
+  if (kind === 'ended') await request('test.complete');
+  const result = await request('session.activate', { session_id: 'foreground' });
+  writeFileSync(process.env.HERMES_TUI_ACTIVE_SESSION_FILE, JSON.stringify({ session_id: result.session_key }));
+  await request('test.barrier');
+  if (kind === 'approval' || kind === 'late-approval' || kind === 'mixed') await request('approval.respond', { session_id: 'foreground', choice: 'once' });
+  if (kind === 'input' || kind === 'late-input' || kind === 'mixed') await request('clarify.respond', { request_id: 'first', answer: 'yes' });
+} else if (activation) {
+  writeFileSync(process.env.HERMES_TUI_ACTIVE_SESSION_FILE, JSON.stringify({ session_id: 'other' }));
+  const result = await request('session.activate', { session_id: 'foreground' });
+  if (process.env.TEST_OUTCOME === 'activate-background-complete') await request('test.complete');
+  if (process.env.TEST_OUTCOME !== 'activate-unselected') {
+    writeFileSync(process.env.HERMES_TUI_ACTIVE_SESSION_FILE, JSON.stringify({ session_id: result.session_key }));
+  }
+} else {
 await request('test.wait');
 if (process.env.TEST_OUTCOME === 'expired') await request('test.expire');
 else if (process.env.TEST_OUTCOME === 'input') {
@@ -226,6 +294,7 @@ if (process.env.TEST_OUTCOME === 'switch') {
   writeFileSync(process.env.HERMES_TUI_ACTIVE_SESSION_FILE, JSON.stringify({ session_id: 'other' }));
   await request('session.create', { other: true });
 }
+}
 await request('test.complete');
 child.stdin.end();
 await new Promise(resolve => child.once('close', resolve));
@@ -235,13 +304,32 @@ const gatewayScript = String.raw`
 import { createInterface } from 'node:readline';
 if ((process.env.NODE_OPTIONS ?? '').includes('--import=')) throw new Error('preload leaked to tools');
 function event(type, payload = {}, session_id = 'foreground') { process.stdout.write(JSON.stringify({ method: 'event', params: { type, session_id, payload } }) + '\n'); }
+let deferred;
 createInterface({ input: process.stdin }).on('line', line => {
   const q = JSON.parse(line);
   let result = {};
-  if (q.method === 'session.create') result = { session_id: q.params.other ? 'other' : 'foreground', stored_session_id: '20260908_123456_a1b2c3' };
+  if (q.params.defer) { deferred = q; return; }
+  if (q.method === 'test.new-wait') {
+    event('message.complete', { status: 'complete' });
+    event('message.start');
+    event(process.env.TEST_OUTCOME.endsWith('approval') ? 'approval.request' : 'clarify.request', { request_id: 'first' });
+    process.stdout.write(JSON.stringify({ id: deferred.id, result: { status: 'ok', resolved: 1 } }) + '\n');
+  }
+  if (q.method === 'session.create') result = { session_id: q.params.other ? 'other' : 'foreground', stored_session_id: q.params.other ? '20260908_123457_d4e5f6' : '20260908_123456_a1b2c3' };
   if (q.method === 'prompt.submit') { result = { status: 'streaming' }; event('message.start'); }
+  if (q.method === 'session.activate') {
+    const mode = process.env.TEST_OUTCOME;
+    result = { session_id: 'foreground', session_key: '20260908_123456_a1b2c3', message_count: 1,
+      running: (mode.startsWith('wait-switch-') && mode !== 'wait-switch-ended') || ['activate-running', 'activate-background-complete', 'activate-unselected'].includes(mode),
+      status: mode === 'activate-working' ? 'working' : mode === 'activate-waiting' ? 'waiting' : 'idle' };
+  }
   if (q.method === 'test.wait') {
-    if (process.env.TEST_OUTCOME === 'expired') event('secret.request', { request_id: 'secret' });
+    if (process.env.TEST_OUTCOME.startsWith('wait-switch-')) {
+      const kind = process.env.TEST_OUTCOME.slice('wait-switch-'.length);
+      if (kind === 'expired') event('secret.request', { request_id: 'secret' });
+      else if (!kind.includes('approval')) event('clarify.request', { request_id: 'first' });
+      if (kind.includes('approval') || kind === 'mixed') event('approval.request');
+    } else if (process.env.TEST_OUTCOME === 'expired') event('secret.request', { request_id: 'secret' });
     else if (process.env.TEST_OUTCOME === 'input') { event('clarify.request', { request_id: 'first' }); event('clarify.request', { request_id: 'second' }); }
     else event('approval.request');
     event('message.complete', { status: 'complete' }, 'background');
@@ -251,7 +339,7 @@ createInterface({ input: process.stdin }).on('line', line => {
   if (q.method === 'test.still-waiting') event('clarify.request', { request_id: 'second' });
   if (q.method === 'test.expire') event('secret.expire', { request_id: 'secret' });
   if (q.method === 'test.complete') {
-    const status = ['switch', 'input', 'expired'].includes(process.env.TEST_OUTCOME) ? 'complete' : process.env.TEST_OUTCOME;
+    const status = (process.env.TEST_OUTCOME.startsWith('activate-') || process.env.TEST_OUTCOME.startsWith('wait-switch-') || ['switch', 'input', 'expired'].includes(process.env.TEST_OUTCOME)) ? 'complete' : process.env.TEST_OUTCOME;
     event('message.complete', { status }); event('message.complete', { status });
   }
   process.stdout.write(JSON.stringify({ id: q.id, result }) + '\n');

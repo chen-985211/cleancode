@@ -21,21 +21,16 @@ if (activeFile) {
   let branchAcceptanceExpiry;
   let activitySelection;
   let activitySelectionVersion;
-  let activityRunning = false;
-  let activityApprovals = 0;
-  const activityPrompts = new Map();
-  function reportActivityWaiting() {
-    reportActivity(activityApprovals > 0 ? 'waiting_approval' : activityPrompts.size > 0 ? 'waiting_input' : activityRunning ? 'working' : 'unavailable');
+  function reportActivityWaiting(session = sessions.get(activitySelection)) {
+    reportActivity(session?.approvals.size > 0 ? 'waiting_approval' : session?.prompts.size > 0 ? 'waiting_input' : session?.running ? 'working' : 'unavailable');
   }
   function syncActivitySelection() {
     const selected = readSelection();
     if (selected !== activitySelection || selectionVersion !== activitySelectionVersion) {
       activitySelection = selected;
       activitySelectionVersion = selectionVersion;
-      activityRunning = false;
-      activityApprovals = 0;
-      activityPrompts.clear();
       reportActivity('unavailable');
+      reportActivityWaiting();
     }
     return selected;
   }
@@ -44,31 +39,37 @@ if (activeFile) {
     return typeof id === 'string' && (id === selected || (sessions.has(id) && sessions.get(id) === sessions.get(selected)));
   }
   function activityEvent(params) {
-    if (!params || !isForeground(params.session_id)) return;
+    if (!params || !['message.start', 'message.complete', 'error', 'secret.expire', 'sudo.expire', 'approval.request', 'clarify.request', 'secret.request', 'sudo.request'].includes(params.type)) return;
+    const foreground = isForeground(params.session_id);
+    if (!sessions.has(params.session_id)) remember(params.session_id, null, false);
+    const session = sessions.get(params.session_id);
+    if (!session) return;
+    // Retain only bounded protocol metadata, including unresolved background waits.
     if (params.type === 'message.start') {
-      activityRunning = true;
-      reportActivity('working');
-    } else if (params.type === 'message.complete' && activityRunning) {
-      activityRunning = false;
-      activityApprovals = 0;
-      activityPrompts.clear();
-      reportActivity(params.payload?.status === 'complete' ? 'completed' : 'unavailable');
-    } else if (params.type === 'error') {
-      activityRunning = false;
-      activityApprovals = 0;
-      activityPrompts.clear();
-      reportActivity('unavailable');
-    } else if (['secret.expire', 'sudo.expire'].includes(params.type)) {
-      if (activityPrompts.delete(params.payload?.request_id)) reportActivityWaiting();
-    } else if (['approval.request', 'clarify.request', 'secret.request', 'sudo.request'].includes(params.type)) {
-      if (params.type === 'approval.request') activityApprovals = Math.min(64, activityApprovals + 1);
-      const id = params.payload?.request_id;
-      if (typeof id === 'string') {
-        activityPrompts.set(id, params.session_id);
-        if (activityPrompts.size > 64) activityPrompts.delete(activityPrompts.keys().next().value);
+      session.running = true;
+    } else if (params.type === 'message.complete' || params.type === 'error') {
+      const running = session.running;
+      const waiting = session.approvals.size > 0 || session.prompts.size > 0;
+      session.running = false;
+      session.approvals.clear();
+      session.prompts.clear();
+      if (foreground && (running || waiting || params.type === 'error')) {
+        reportActivity(running && params.type === 'message.complete' && params.payload?.status === 'complete' ? 'completed' : 'unavailable');
       }
-      reportActivityWaiting();
+      return;
+    } else if (['secret.expire', 'sudo.expire'].includes(params.type)) {
+      session.prompts.delete(params.payload?.request_id);
+    } else if (params.type === 'approval.request') {
+      session.approvals.add({});
+      if (session.approvals.size > 64) session.approvals.delete(session.approvals.values().next().value);
+    } else {
+      const id = params.payload?.request_id;
+      if (typeof id === 'string' && !session.prompts.has(id)) {
+        session.prompts.set(id, {});
+        if (session.prompts.size > 64) session.prompts.delete(session.prompts.keys().next().value);
+      }
     }
+    if (foreground) reportActivityWaiting(session);
   }
   function clearBranchAcceptance() {
     if (branchAcceptanceExpiry) clearImmediate(branchAcceptanceExpiry);
@@ -101,7 +102,7 @@ if (activeFile) {
   }
   function remember(id, key, durable) {
     if (typeof id !== 'string' || !id || (key !== null && (typeof key !== 'string' || !/^[0-9]{8}_[0-9]{6}_[a-f0-9]{6,8}$/.test(key)))) return;
-    const session = sessions.get(id) ?? sessions.get(key) ?? { key: null, durable: false };
+    const session = sessions.get(id) ?? sessions.get(key) ?? { key: null, durable: false, running: false, approvals: new Set(), prompts: new Map() };
     if (key) session.key = key;
     session.durable ||= Boolean(durable);
     sessions.set(id, session);
@@ -124,8 +125,12 @@ if (activeFile) {
       scheduleSample();
     }
     if (!['session.create', 'session.resume', 'session.activate', 'session.branch', 'prompt.submit', 'approval.respond', 'clarify.respond', 'secret.respond', 'sudo.respond'].includes(packet.method)) return;
+    const requestId = packet.params?.request_id;
+    const sessionId = packet.params?.session_id ?? [...sessions].find(([, session]) => session.prompts.has(requestId))?.[0];
+    const activity = sessions.get(sessionId);
     pending.set(packet.id, {
-      method: packet.method, sessionId: packet.params?.session_id ?? activityPrompts.get(packet.params?.request_id), selectionVersion,
+      method: packet.method, sessionId, selectionVersion,
+      activity, prompt: activity?.prompts.get(requestId), approvals: activity ? [...activity.approvals] : [],
       requestId: packet.params?.request_id,
       all: packet.params?.all === true,
       branchSequence: packet.method === 'session.branch' ? ++branchSequence : undefined
@@ -151,6 +156,15 @@ if (activeFile) {
     if (call.method === 'session.activate') {
       const known = sessions.get(r.session_key);
       remember(r.session_id, r.session_key, known?.durable || r.message_count > 0);
+      const session = sessions.get(r.session_id);
+      if (session) {
+        session.running = r.running === true || r.status === 'working' || r.status === 'waiting';
+        // The TUI writes its foreground file after receiving the response. Retain
+        // this snapshot for that selection; the response itself cannot select it.
+        if (isForeground(r.session_id)) {
+          reportActivityWaiting(session);
+        }
+      }
     }
     if (call.method === 'session.branch' && typeof r.session_id === 'string' && r.session_id) {
       const selected = readSelection();
@@ -169,10 +183,16 @@ if (activeFile) {
       const session = sessions.get(call.sessionId);
       if (session) session.durable = true;
     }
-    if (['approval.respond', 'clarify.respond', 'secret.respond', 'sudo.respond'].includes(call.method) && isForeground(call.sessionId) && call.selectionVersion === selectionVersion && ((Number.isSafeInteger(r.resolved) && r.resolved > 0) || r.status === 'ok')) {
-      activityPrompts.delete(call.requestId);
-      if (call.method === 'approval.respond') activityApprovals = call.all ? 0 : Math.max(0, activityApprovals - r.resolved);
-      reportActivityWaiting();
+    if (['approval.respond', 'clarify.respond', 'secret.respond', 'sudo.respond'].includes(call.method) && call.activity && ((Number.isSafeInteger(r.resolved) && r.resolved > 0) || r.status === 'ok')) {
+      const session = call.activity;
+      // Resolve only waits captured by this request. A late response must not
+      // erase a new turn's waits, even when the foreground changed meanwhile.
+      if (call.prompt && session.prompts.get(call.requestId) === call.prompt) session.prompts.delete(call.requestId);
+      if (call.method === 'approval.respond' && Number.isSafeInteger(r.resolved) && r.resolved > 0) {
+        const count = call.all ? call.approvals.length : r.resolved;
+        for (const approval of call.approvals.filter(approval => session.approvals.has(approval)).slice(0, count)) session.approvals.delete(approval);
+      }
+      if (isForeground(call.sessionId) && sessions.get(call.sessionId) === session) reportActivityWaiting(session);
     }
     scheduleSample();
   }
@@ -237,9 +257,7 @@ if (activeFile) {
           unwatchFile(activeFile, sample);
           gateway = undefined;
           pending.clear();
-          activityRunning = false;
-          activityApprovals = 0;
-          activityPrompts.clear();
+          sessions.clear();
           reportActivity('unavailable');
         }
         child.stdout.off('data', readResponse);
