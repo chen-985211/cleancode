@@ -94,6 +94,10 @@ describe('Codex owned native session', () => {
       })
       let relayErrors = ''
       let relayOutput = ''
+      let relayLaunchError: Error | undefined
+      child.once('error', (error) => {
+        relayLaunchError = error
+      })
       child.stdout.on('data', (data) => {
         relayOutput += String(data)
       })
@@ -131,15 +135,17 @@ describe('Codex owned native session', () => {
           await artifacts.dispose()
           return
         }
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Native fixture did not start')), 5_000)
-          child.stdout.on('data', (data) => {
-            if (String(data).includes('NATIVE_TUI_READY')) {
-              clearTimeout(timeout)
-              resolve()
-            }
-          })
-          child.once('error', reject)
+        // The relay permits 10s for capability probes and another 10s for the
+        // server handshake. Observe accumulated output so split/early chunks count.
+        await pollUntilState({
+          observe: () => ({ output: relayOutput, errors: relayErrors, exitCode: child.exitCode }),
+          accept: ({ output, errors, exitCode }) => {
+            if (relayLaunchError) throw relayLaunchError
+            if (exitCode !== null) throw new Error(`Native fixture exited (${exitCode}): ${errors}`)
+            return output.includes('NATIVE_TUI_READY')
+          },
+          timeoutMs: 25_000,
+          description: 'native fixture readiness after capability probes and server handshake'
         })
         child.stdin.write('native-input\n')
         await pollUntilState({
@@ -270,6 +276,6 @@ describe('Codex owned native session', () => {
     },
     // This scenario starts several native processes and performs four queue calls.
     // Keep per-operation state deadlines; the whole scenario exceeds Vitest's 5s on Windows.
-    30_000
+    60_000
   )
 })
