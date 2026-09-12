@@ -249,14 +249,21 @@ describe('Agent terminal theme across workspaces e2e', () => {
         .click()
       await expectCurrentGitBranch(workbench.projectDirectory, branchName)
 
+      // Git checkout precedes Project persistence; wait for the committed binding.
+      const defaultWorkspaceAfter = await pollUntilState({
+        description: 'default workspace branch binding to finish persisting after checkout',
+        observe: async () =>
+          (await readProjectMetadata(workbench)).workspaces.find(
+            (workspace) => workspace.workspaceKind === 'default'
+          ),
+        accept: (workspace) => workspace?.gitBranch === branchName,
+        timeoutMs: 10_000
+      })
+
       const agentAfter = await waitForAgentTerminal(page, 'main', 'light')
       await waitForTerminalShellReady(page, 'Terminal 1')
       const terminalAfterId = await readTerminalSessionId(page, 'Terminal 1')
       const terminalAfter = await readTerminalRuntime(page, terminalAfterId)
-      const metadataAfter = await readProjectMetadata(workbench)
-      const defaultWorkspaceAfter = metadataAfter.workspaces.find(
-        (workspace) => workspace.workspaceKind === 'default'
-      )
 
       expect(agentAfter).toMatchObject({
         workspaceId: agentBefore.workspaceId,

@@ -185,7 +185,7 @@ describe('terminal provider shutdown coordinator', () => {
         releaseId: 'release-slow-durable-checkpoint',
         sessions: [retained]
       })
-      await vi.advanceTimersByTimeAsync(1_000)
+      await vi.advanceTimersByTimeAsync(3_000)
       checkpoint.resolve()
       const result = await release
 

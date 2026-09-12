@@ -43,16 +43,31 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   const executablePath = join(binDirectory, process.platform === 'win32' ? 'codex.cmd' : 'codex')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
   const savedThreadsPath = `${reportPath}.threads.json`
-  const programPath = join(fixtureDirectory, 'codex.mjs')
+  const packageDirectory = join(binDirectory, 'node_modules', '@openai', 'codex')
+  const programPath =
+    process.platform === 'win32'
+      ? join(packageDirectory, 'bin', 'codex.js')
+      : join(fixtureDirectory, 'codex.mjs')
   const sessionId = randomUUID()
   const switchSessionId = randomUUID()
 
   await mkdir(binDirectory, { recursive: true })
   await writeFile(savedThreadsPath, JSON.stringify([sessionId, switchSessionId]), 'utf8')
+  if (process.platform === 'win32') {
+    await mkdir(join(packageDirectory, 'bin'), { recursive: true })
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({
+        name: '@openai/codex',
+        type: 'module',
+        bin: { codex: 'bin/codex.js' }
+      })
+    )
+  }
   await writeFile(programPath, createFakeCodexProgram(), 'utf8')
   if (process.platform === 'win32') {
     await Promise.all([
-      writeFile(executablePath, createWindowsCmdLauncher(programPath), 'utf8'),
+      writeFile(executablePath, createWindowsCmdLauncher(), 'utf8'),
       writeFile(
         join(binDirectory, 'codex.ps1'),
         createWindowsPowerShellLauncher(programPath),
@@ -337,6 +352,11 @@ function draw() {
     process.pid +
     CSI +
     '0m'
+  if (process.env.CLEANCODE_FAKE_CODEX_RASTER === '1') {
+    for (let row = 2; row <= Math.min(rows, 8); row++) {
+      output += CSI + row + ';1H' + CSI + '38;2;' + foreground + 'm' + 'MW'.repeat(Math.floor((columns - 1) / 2)) + CSI + '0m'
+    }
+  }
   output += (CSI + '2;1H').repeat(process.platform === 'win32' ? 128 : 1_600)
   process.stdout.write(output)
   report('draw')
@@ -544,8 +564,26 @@ function startSession() {
 `
 }
 
-function createWindowsCmdLauncher(programPath: string): string {
-  return `@echo off\r\nif "%~1" == "--version" (\r\n  echo codex-cli fake-e2e\r\n  exit /b 0\r\n)\r\n"${process.execPath}" "${programPath}" %*\r\n`
+// Match the ordinary npm installation layout so relay probes use Node directly.
+// Custom PowerShell wrappers remain covered by the native-message integration tests.
+function createWindowsCmdLauncher(): string {
+  return String.raw`@ECHO off
+GOTO start
+:find_dp0
+SET dp0=%~dp0
+EXIT /b
+:start
+SETLOCAL
+CALL :find_dp0
+
+IF EXIST "%dp0%\node.exe" (
+  SET "_prog=%dp0%\node.exe"
+) ELSE (
+  SET "_prog=node"
+)
+
+endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & set PATHEXT=%PATHEXT:;.JS;=;% & "%_prog%"  "%dp0%\node_modules\@openai\codex\bin\codex.js" %*
+`.replaceAll('\n', '\r\n')
 }
 
 function createWindowsPowerShellLauncher(programPath: string): string {

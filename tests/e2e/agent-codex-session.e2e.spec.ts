@@ -27,18 +27,11 @@ import {
   waitForAgentLaunchReady,
   waitForAgentProviderInstalled,
   waitForAgentTerminalReady,
-  stopAgentLaunchForShellSetup,
-  writeAgentTerminalInput,
   type AgentLaunchReadySnapshot
 } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
-import {
-  asE2eTerminalInput,
-  createE2ePrintCommand,
-  createE2eTerminalEnvironment,
-  prependE2ePath
-} from '../support/e2eTerminal'
+import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 import {
   readWebgl2Availability,
   readXtermInkRatio,
@@ -54,13 +47,16 @@ describe('Codex Agent session e2e', () => {
   let resources: E2eScenarioResources
   let workbench: E2eWorkbench
 
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     resources = {}
     workbench = await createE2eWorkbench('cleancode-codex-agent-e2e')
     resources.workbench = workbench
     fakeCodex = await installFakeCodexCli(workbench.appStateDirectory)
     electronApp = await launchApp(workbench, {
-      environment: createAgentProviderEnvironment(fakeCodex)
+      environment: {
+        ...createAgentProviderEnvironment(fakeCodex),
+        CLEANCODE_FAKE_CODEX_RASTER: task.name.includes('backing density') ? '1' : '0'
+      }
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -126,16 +122,7 @@ describe('Codex Agent session e2e', () => {
       await createCodexAgentAndWaitForLaunch(page)
 
       const terminal = page.locator('[data-agent-console-node] .agent-terminal-viewport').first()
-      await stopAgentLaunchForShellSetup(page, terminal)
-      const visualMarker = Array.from(
-        { length: 6 },
-        (_, index) => `__AGENT_RASTER_VISIBLE_${index}__ ${'MW'.repeat(18)}`
-      ).join('\n')
-      await writeAgentTerminalInput(
-        page,
-        terminal,
-        asE2eTerminalInput(createE2ePrintCommand(visualMarker))
-      )
+      await waitForCodexLaunch(fakeCodex.reportPath, 1)
       const rendererState = await pollUntilState({
         description: 'Agent terminal renderer activation',
         observe: () => readXtermRendererState(terminal),

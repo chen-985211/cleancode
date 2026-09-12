@@ -30,7 +30,7 @@ describe('Pi and Hermes exact session recovery', () => {
         resume: true,
         sessionRefCodec: true,
         sessionIdentityCapture: true,
-        activityTracking: false,
+        activityTracking: true,
         cleancodeMcp: false
       })
       expect(provider.resume?.createResumeArgs({ formatVersion: 1, kind, value })).toEqual(args)

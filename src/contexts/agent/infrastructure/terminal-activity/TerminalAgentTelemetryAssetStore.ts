@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { providerActivityReportSource } from '../providers/shared/ProviderActivityReportSource'
+import { piSessionExtensionSource } from '../providers/pi/PiSessionExtensionSource'
+import { hermesSessionBridgeSource } from '../providers/hermes/HermesSessionBridgeSource'
 
 import {
   createClaudeSettings,
@@ -45,7 +48,9 @@ const providerShims = [
   { commandName: 'claude', providerId: 'claude-code' },
   { commandName: 'codex', providerId: 'codex' },
   { commandName: 'gemini', providerId: 'gemini' },
-  { commandName: 'opencode', providerId: 'opencode' }
+  { commandName: 'opencode', providerId: 'opencode' },
+  { commandName: 'pi', providerId: 'pi' },
+  { commandName: 'hermes', providerId: 'hermes' }
 ] as const
 
 export class TerminalAgentTelemetryAssetStore {
@@ -106,6 +111,16 @@ export class TerminalAgentTelemetryAssetStore {
       ),
       writePrivateFileAtomically(hookRelayPath, terminalAgentHookRelayScript),
       writePrivateFileAtomically(openCodePluginPath, terminalAgentOpenCodePluginScript),
+      writePrivateFileAtomically(
+        join(assetDirectory, 'pi-extension.mjs'),
+        'function reportSession() {}\n' + providerActivityReportSource + piSessionExtensionSource
+      ),
+      writePrivateFileAtomically(
+        join(assetDirectory, 'hermes-preload.mjs'),
+        "import { readFileSync } from 'node:fs';\nfunction reportSession() {}\n" +
+          providerActivityReportSource +
+          hermesSessionBridgeSource
+      ),
       writePrivateFileAtomically(shimLauncherPath, terminalAgentShimLauncherScript),
       ...(this.platform === 'win32'
         ? []

@@ -11,6 +11,7 @@ import type {
 } from '../dto/AgentActivityProtocol'
 
 const defaultQuietWindowMs = 1_500
+const maximumCompletionWaitMs = 3_000
 
 export interface AgentActivityScheduledTask {
   cancel(): void
@@ -284,14 +285,23 @@ export class AgentActivityRegistry {
     invocationKey: string,
     pending: PendingCompletion
   ): void {
-    pending.task = this.clock.schedule(() => {
-      if (!terminal.active || terminal.pendingCompletions.get(invocationKey) !== pending) return
-      terminal.pendingCompletions.delete(invocationKey)
-      this.publish({
-        completion: { ...pending.completion, terminalRevision: terminal.revision },
-        type: 'turn_completed'
-      })
-    }, this.quietWindowMs)
+    // TUI clocks can keep producing output after a turn has already completed.
+    // Rearming the quiet window must never move the original publication deadline.
+    const remainingWaitMs = Math.max(
+      0,
+      pending.completion.completedAt + maximumCompletionWaitMs - this.clock.now()
+    )
+    pending.task = this.clock.schedule(
+      () => {
+        if (!terminal.active || terminal.pendingCompletions.get(invocationKey) !== pending) return
+        terminal.pendingCompletions.delete(invocationKey)
+        this.publish({
+          completion: { ...pending.completion, terminalRevision: terminal.revision },
+          type: 'turn_completed'
+        })
+      },
+      Math.min(this.quietWindowMs, remainingWaitMs)
+    )
   }
 
   private retireTerminal(terminal: TerminalActivityState): void {

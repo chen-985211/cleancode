@@ -309,9 +309,16 @@ describe('workspace default contents e2e', () => {
     async () => {
       await openWorkspaceSettings()
       const editor = page.getByRole('form', { name: '工作区默认内容', exact: true })
+      await pollUntilState({
+        description: 'workspace defaults autosave settled before opening the picker',
+        observe: () => editor.getAttribute('aria-busy'),
+        accept: (busy) => busy === 'false',
+        timeoutMs: 10_000
+      })
       await editor.getByRole('button', { name: '添加 Agent', exact: true }).click()
       await page.getByRole('menuitem', { name: 'Codex', exact: true }).click()
       for (const name of ['Startup', 'Notes']) {
+        await page.locator('.workspace-defaults-picker').waitFor({ state: 'detached' })
         await editor.getByRole('button', { name: '添加模板', exact: true }).click()
         await page.getByRole('menuitem', { name, exact: true }).click()
       }
@@ -370,12 +377,26 @@ describe('workspace default contents e2e', () => {
   }
   async function configureDefaults() {
     const editor = page.getByRole('form', { name: '工作区默认内容', exact: true })
+    await pollUntilState({
+      description: 'workspace defaults autosave settled before opening the picker',
+      observe: () => editor.getAttribute('aria-busy'),
+      accept: (busy) => busy === 'false',
+      timeoutMs: 10_000
+    })
     await editor.getByRole('button', { name: '添加 Agent', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Codex', exact: true }).click()
+    await page.locator('.workspace-defaults-picker').waitFor({ state: 'detached' })
     await editor.getByRole('button', { name: '增加 Codex 数量', exact: true }).click()
+    await pollUntilState({
+      description: 'workspace defaults autosave settled before opening the picker',
+      observe: () => editor.getAttribute('aria-busy'),
+      accept: (busy) => busy === 'false',
+      timeoutMs: 10_000
+    })
     await editor.getByRole('button', { name: '添加 Agent', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Claude Code', exact: true }).click()
     for (const name of ['Startup', 'Notes']) {
+      await page.locator('.workspace-defaults-picker').waitFor({ state: 'detached' })
       await editor.getByRole('button', { name: '添加模板', exact: true }).click()
       await page
         .getByRole('group', { name: '全局', exact: true })

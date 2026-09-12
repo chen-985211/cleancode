@@ -17,6 +17,7 @@ export class PiAgentProviderContribution extends TerminalCliAgentProviderContrib
   readonly descriptor = {
     capabilities: {
       ...baselineTerminalCliCapabilities,
+      activityTracking: true,
       resume: true,
       sessionIdentityCapture: true,
       sessionRefCodec: true
