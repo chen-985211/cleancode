@@ -96,6 +96,20 @@ export function runLineGate(argv = process.argv.slice(2), cwd = process.cwd(), l
   for (const violation of violations) {
     logger.error(`- ${violation.filePath}: ${violation.lineCount} lines`)
   }
+  logger.error(
+    [
+      '',
+      'Required action for the coding agent:',
+      'Treat this failure as a refactoring task to complete now. Do not stop after reporting it or only propose a split.',
+      '1. Read each listed file and its callers/tests. Follow AGENTS.md routing and docs/engineering/development.md for the affected paths and change risk.',
+      '2. Identify cohesive responsibilities and actively extract them into clearly named modules in the appropriate context and layer. Preserve behavior, public contracts and dependency direction; avoid circular imports.',
+      `3. Update imports and affected tests. Keep every resulting file within ${maxLines} lines, including newly extracted modules.`,
+      '4. Do not bypass this gate by raising the limit, adding exclusions, moving code outside checked directories, deleting behavior/tests, or compressing code/removing readable formatting just to reduce line count.',
+      `5. Run the affected tests, then node scripts/check-max-lines.mjs --all --max-lines ${maxLines}, and rerun the failed parent gate (if any). Fix remaining failures before resuming the original task.`,
+      'Report the responsibility split and verification results when finished. If genuinely blocked, explain the concrete blocker and required next action.',
+      'Rule owner: docs/engineering/development.md (quality gates and file size).'
+    ].join('\n')
+  )
 
   return 1
 }
