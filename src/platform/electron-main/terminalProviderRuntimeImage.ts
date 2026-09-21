@@ -8,6 +8,7 @@ import {
   type RuntimeImagePublishLockLease
 } from './TerminalProviderRuntimeImagePublishLock'
 import type { TerminalProviderArchiveFileSystem } from './terminalProviderRuntimeEnvironment'
+import { isTransientRuntimeImagePublishError } from './terminalProviderRuntimeImageRetry'
 import {
   areRuntimeDataFingerprintsEqual,
   areRuntimeFileStatsEqual,
@@ -65,6 +66,7 @@ export interface TerminalProviderRuntimeImageOptions {
   readonly retirementFileSystem?: RuntimeImageRetirementFileSystem
   readonly isProcessAlive?: (processId: number) => boolean
   readonly onFailure?: (error: unknown) => void
+  readonly acquirePublishLock?: typeof acquireRuntimeImagePublishLock
 }
 
 interface RuntimeImageSources {
@@ -144,77 +146,82 @@ export class TerminalProviderRuntimeImageManager {
       return warmTarget
     }
 
-    let stagingDirectory: string | null = null
-    let quarantineDirectory: string | null = null
-    let publishLock: RuntimeImagePublishLockLease | null = null
-    try {
-      const { identity, sources } = await this.readRuntimeImageDescriptor()
-      const { imageKey } = identity
-      await mkdir(this.options.runtimeRootDirectory, { recursive: true })
-      publishLock = await acquireRuntimeImagePublishLock(
-        this.options.runtimeRootDirectory,
-        imageKey,
-        this.options.isProcessAlive ?? isProcessAlive
-      )
-      await publishLock.assertOwned()
-      const lockedExisting = await this.readFullyValidatedTarget(identity)
-      if (lockedExisting) {
-        await this.writeMarker(
-          join(this.options.runtimeRootDirectory, imageKey),
-          this.createMarker(identity, sources, lockedExisting.imageFiles),
-          true
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let stagingDirectory: string | null = null
+      let quarantineDirectory: string | null = null
+      let publishLock: RuntimeImagePublishLockLease | null = null
+      try {
+        const { identity, sources } = await this.readRuntimeImageDescriptor()
+        const { imageKey } = identity
+        await mkdir(this.options.runtimeRootDirectory, { recursive: true })
+        publishLock = await (this.options.acquirePublishLock ?? acquireRuntimeImagePublishLock)(
+          this.options.runtimeRootDirectory,
+          imageKey,
+          this.options.isProcessAlive ?? isProcessAlive
         )
+        await publishLock.assertOwned()
+        const lockedExisting = await this.readFullyValidatedTarget(identity)
+        if (lockedExisting) {
+          await this.writeMarker(
+            join(this.options.runtimeRootDirectory, imageKey),
+            this.createMarker(identity, sources, lockedExisting.imageFiles),
+            true
+          )
+          await publishLock.assertOwned()
+          await reserveRuntimeImage(this.options, imageKey)
+          await publishLock.assertOwned()
+          this.resolvedImageKey = imageKey
+          return lockedExisting.target
+        }
+        quarantineDirectory = await quarantineIncompleteImage(
+          this.options.runtimeRootDirectory,
+          imageKey
+        )
+        stagingDirectory = join(
+          this.options.runtimeRootDirectory,
+          `${imageKey}.staging-${process.pid}-${randomUUID()}`
+        )
+        await this.copyRuntimeClosure(sources, stagingDirectory, identity.runtimeDataFiles)
+        await publishLock.assertOwned()
+        const imageFiles = await this.validateCopiedRuntimeClosure(
+          stagingDirectory,
+          sources,
+          identity
+        )
+        if (!imageFiles) {
+          throw new Error('Staged terminal Provider runtime image did not match its content key.')
+        }
+        await this.writeMarker(
+          stagingDirectory,
+          this.createMarker(identity, sources, imageFiles),
+          false
+        )
+        await publishLock.assertOwned()
+        const imageDirectory = join(this.options.runtimeRootDirectory, imageKey)
+        await rename(stagingDirectory, imageDirectory)
+        stagingDirectory = null
         await publishLock.assertOwned()
         await reserveRuntimeImage(this.options, imageKey)
         await publishLock.assertOwned()
+        const published = this.createImageTarget(imageDirectory, imageKey, sources)
         this.resolvedImageKey = imageKey
-        return lockedExisting.target
+        return published
+      } catch (error) {
+        this.options.onFailure?.(error)
+        if (publishLock || attempt > 0 || !isTransientRuntimeImagePublishError(error)) {
+          return fallback
+        }
+      } finally {
+        if (stagingDirectory) {
+          await rm(stagingDirectory, { force: true, recursive: true }).catch(() => undefined)
+        }
+        if (quarantineDirectory) {
+          await rm(quarantineDirectory, { force: true, recursive: true }).catch(() => undefined)
+        }
+        await publishLock?.close().catch(() => undefined)
       }
-      quarantineDirectory = await quarantineIncompleteImage(
-        this.options.runtimeRootDirectory,
-        imageKey
-      )
-      stagingDirectory = join(
-        this.options.runtimeRootDirectory,
-        `${imageKey}.staging-${process.pid}-${randomUUID()}`
-      )
-      await this.copyRuntimeClosure(sources, stagingDirectory, identity.runtimeDataFiles)
-      await publishLock.assertOwned()
-      const imageFiles = await this.validateCopiedRuntimeClosure(
-        stagingDirectory,
-        sources,
-        identity
-      )
-      if (!imageFiles) {
-        throw new Error('Staged terminal Provider runtime image did not match its content key.')
-      }
-      await this.writeMarker(
-        stagingDirectory,
-        this.createMarker(identity, sources, imageFiles),
-        false
-      )
-      await publishLock.assertOwned()
-      const imageDirectory = join(this.options.runtimeRootDirectory, imageKey)
-      await rename(stagingDirectory, imageDirectory)
-      stagingDirectory = null
-      await publishLock.assertOwned()
-      await reserveRuntimeImage(this.options, imageKey)
-      await publishLock.assertOwned()
-      const published = this.createImageTarget(imageDirectory, imageKey, sources)
-      this.resolvedImageKey = imageKey
-      return published
-    } catch (error) {
-      this.options.onFailure?.(error)
-      return fallback
-    } finally {
-      if (stagingDirectory) {
-        await rm(stagingDirectory, { force: true, recursive: true }).catch(() => undefined)
-      }
-      if (quarantineDirectory) {
-        await rm(quarantineDirectory, { force: true, recursive: true }).catch(() => undefined)
-      }
-      await publishLock?.close().catch(() => undefined)
     }
+    return fallback
   }
 
   async pruneUnusedImages(): Promise<void> {
