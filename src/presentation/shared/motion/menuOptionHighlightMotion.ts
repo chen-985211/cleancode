@@ -85,9 +85,13 @@ export function createMenuOptionHighlightMotionController({
     visible = false
   }
 
+  const projectPosition = (): void => {
+    root?.style.setProperty(yProperty, `${round(axis.value)}px`)
+  }
+
   const present = (state: 'idle' | 'moving'): void => {
     if (!root) return
-    root.style.setProperty(yProperty, `${round(axis.value)}px`)
+    projectPosition()
     root.setAttribute(visibleAttribute, 'true')
     root.setAttribute(motionStateAttribute, state)
     visible = true
@@ -107,11 +111,13 @@ export function createMenuOptionHighlightMotionController({
 
     if (isSpringAxisSettled(axis, target, settlementThresholds)) {
       axis = { value: target, velocity: 0 }
-      present('idle')
+      if (visible) present('idle')
+      else projectPosition()
       return
     }
 
-    present('moving')
+    if (visible) present('moving')
+    else projectPosition()
     scheduleFrame()
   }
 
@@ -124,7 +130,6 @@ export function createMenuOptionHighlightMotionController({
     },
     hide: (currentRoot) => {
       if (currentRoot !== root) return
-      cancelFrame()
       root.removeAttribute(visibleAttribute)
       root.removeAttribute(motionStateAttribute)
       root.removeAttribute(targetYAttribute)
@@ -173,7 +178,7 @@ export function createMenuOptionHighlightMotionController({
       cancelFrame()
       axis = { value: target, velocity: 0 }
       if (visible) present('idle')
-      else root?.style.setProperty(yProperty, `${round(axis.value)}px`)
+      else projectPosition()
     }
   }
 }

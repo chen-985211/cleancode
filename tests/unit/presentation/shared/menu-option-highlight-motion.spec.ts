@@ -69,7 +69,7 @@ describe('menu option highlight motion', () => {
     expect(root.attributes.has('data-visible')).toBe(false)
     expect(root.attributes.has('data-target-y')).toBe(false)
     expect(readY(root)).toBe(yBeforeLeave)
-    expect(scheduler.pendingFrames()).toBe(0)
+    expect(scheduler.pendingFrames()).toBe(1)
 
     controller.moveTo(root, { height: 38, top: 119 })
     expect(readY(root)).toBe(yBeforeLeave)
@@ -80,6 +80,27 @@ describe('menu option highlight motion', () => {
     scheduler.advanceUntilIdle()
     expect(readY(root)).toBe(119)
     expect(root.attributes.get('data-motion-state')).toBe('idle')
+  })
+
+  it('lets hidden motion decay before a later reverse hover', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
+
+    controller.moveTo(root, { height: 38, top: 5 })
+    controller.moveTo(root, { height: 38, top: 81 })
+    scheduler.advanceNextFrame(40)
+    controller.hide(root)
+
+    scheduler.advanceUntilIdle()
+    expect(readY(root)).toBe(81)
+    expect(root.attributes.has('data-visible')).toBe(false)
+    expect(root.attributes.has('data-motion-state')).toBe(false)
+
+    controller.moveTo(root, { height: 38, top: 5 })
+    expect(readY(root)).toBe(81)
+    scheduler.advanceNextFrame()
+    expect(readY(root)).toBeLessThan(81)
   })
 
   it('restores a settled highlight when pointer hover returns to the same option', () => {
