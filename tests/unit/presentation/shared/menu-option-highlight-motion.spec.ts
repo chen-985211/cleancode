@@ -52,7 +52,7 @@ describe('menu option highlight motion', () => {
     expect(scheduler.pendingFrames()).toBe(0)
   })
 
-  it('clears a stale pointer highlight and lands the next target without a ghost transition', () => {
+  it('keeps the current presentation when pointer hover leaves and enters another option', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
     const controller = createMenuOptionHighlightMotionController({ scheduler })
@@ -60,15 +60,55 @@ describe('menu option highlight motion', () => {
     controller.moveTo(root, { height: 38, top: 5 })
     controller.moveTo(root, { height: 38, top: 81 })
     expect(scheduler.pendingFrames()).toBe(1)
+    scheduler.advanceNextFrame(40)
+    const yBeforeLeave = readY(root)
+    expect(yBeforeLeave).toBeGreaterThan(5)
+    expect(yBeforeLeave).toBeLessThan(81)
 
     controller.hide(root)
     expect(root.attributes.has('data-visible')).toBe(false)
     expect(root.attributes.has('data-target-y')).toBe(false)
-    expect(readY(root)).toBe(5)
+    expect(readY(root)).toBe(yBeforeLeave)
     expect(scheduler.pendingFrames()).toBe(0)
 
     controller.moveTo(root, { height: 38, top: 119 })
+    expect(readY(root)).toBe(yBeforeLeave)
+    expect(root.attributes.get('data-visible')).toBe('true')
+    expect(root.attributes.get('data-motion-state')).toBe('moving')
+    expect(scheduler.pendingFrames()).toBe(1)
+
+    scheduler.advanceUntilIdle()
     expect(readY(root)).toBe(119)
+    expect(root.attributes.get('data-motion-state')).toBe('idle')
+  })
+
+  it('restores a settled highlight when pointer hover returns to the same option', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
+
+    controller.moveTo(root, { height: 38, top: 5 })
+    controller.hide(root)
+    controller.moveTo(root, { height: 38, top: 5 })
+
+    expect(readY(root)).toBe(5)
+    expect(root.attributes.get('data-visible')).toBe('true')
+    expect(root.attributes.get('data-motion-state')).toBe('idle')
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('keeps a hidden highlight hidden while reduced motion settles its position', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
+
+    controller.moveTo(root, { height: 38, top: 5 })
+    controller.moveTo(root, { height: 38, top: 81 })
+    controller.hide(root)
+    controller.setReducedMotion(true)
+
+    expect(readY(root)).toBe(81)
+    expect(root.attributes.has('data-visible')).toBe(false)
     expect(scheduler.pendingFrames()).toBe(0)
   })
 })

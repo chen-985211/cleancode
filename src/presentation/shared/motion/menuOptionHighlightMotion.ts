@@ -65,6 +65,7 @@ export function createMenuOptionHighlightMotionController({
   let axis: SpringAxis = { value: 0, velocity: 0 }
   let target = 0
   let initialized = false
+  let visible = false
   let reducedMotion = false
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
@@ -81,6 +82,7 @@ export function createMenuOptionHighlightMotionController({
     root.removeAttribute(visibleAttribute)
     root.removeAttribute(motionStateAttribute)
     root.removeAttribute(targetYAttribute)
+    visible = false
   }
 
   const present = (state: 'idle' | 'moving'): void => {
@@ -88,6 +90,7 @@ export function createMenuOptionHighlightMotionController({
     root.style.setProperty(yProperty, `${round(axis.value)}px`)
     root.setAttribute(visibleAttribute, 'true')
     root.setAttribute(motionStateAttribute, state)
+    visible = true
   }
 
   const scheduleFrame = (): void => {
@@ -125,9 +128,7 @@ export function createMenuOptionHighlightMotionController({
       root.removeAttribute(visibleAttribute)
       root.removeAttribute(motionStateAttribute)
       root.removeAttribute(targetYAttribute)
-      axis = { value: axis.value, velocity: 0 }
-      target = axis.value
-      initialized = false
+      visible = false
     },
     moveTo: (nextRoot, geometry) => {
       if (nextRoot !== root) {
@@ -149,7 +150,17 @@ export function createMenuOptionHighlightMotionController({
         return
       }
 
-      if (geometry.top === target) return
+      if (geometry.top === target) {
+        if (visible) return
+        if (isSpringAxisSettled(axis, target, settlementThresholds)) {
+          axis = { value: target, velocity: 0 }
+          present('idle')
+          return
+        }
+        present('moving')
+        scheduleFrame()
+        return
+      }
 
       axis = retargetSpringAxis(axis, geometry.top, 'preserve')
       target = geometry.top
@@ -161,7 +172,8 @@ export function createMenuOptionHighlightMotionController({
       if (!reducedMotion || !initialized) return
       cancelFrame()
       axis = { value: target, velocity: 0 }
-      present('idle')
+      if (visible) present('idle')
+      else root?.style.setProperty(yProperty, `${round(axis.value)}px`)
     }
   }
 }
