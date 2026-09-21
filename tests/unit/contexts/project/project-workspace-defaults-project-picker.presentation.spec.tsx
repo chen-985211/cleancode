@@ -132,4 +132,18 @@ describe('workspace defaults project picker', () => {
 
     expect(hoverRule).toContain('background: var(--cc-surface-hover);')
   })
+
+  it('keeps the directional caret fixed while the menu opens', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'src/contexts/project/presentation/components/WorkspaceDefaults.css'),
+      'utf8'
+    )
+
+    expect(styles).not.toMatch(
+      /\.workspace-defaults-project-trigger-caret\s*\{[^}]*transition:\s*transform/
+    )
+    expect(styles).not.toMatch(
+      /\.workspace-defaults-project-trigger\[aria-expanded='true'\]\s+\.workspace-defaults-project-trigger-caret\s*\{[^}]*transform:/
+    )
+  })
 })

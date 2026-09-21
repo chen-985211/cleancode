@@ -370,13 +370,6 @@
   outline: 2px solid var(--cc-ring);
   outline-offset: 2px;
 }
-.workspace-defaults-project-trigger-caret {
-  transition: transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-}
-.workspace-defaults-project-trigger[aria-expanded='true']
-  .workspace-defaults-project-trigger-caret {
-  transform: rotate(180deg);
-}
 .workspace-defaults-project-menu {
   --cc-menu-option-highlight-inset: 5px;
   position: fixed;
