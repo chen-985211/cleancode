@@ -157,7 +157,31 @@ describe('workspace external open control', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '选择打开方式' }))
     const menu = screen.getByRole('menu')
-    expect(menu).toHaveAttribute('data-surface-spring-preset', 'anchored-bottom-left')
+    const [vscodeOption, folderOption] = screen.getAllByRole('menuitem')
+    const highlight = menu.querySelector<HTMLElement>('.menu-option-highlight-motion')
+    Object.defineProperties(vscodeOption, {
+      offsetHeight: { configurable: true, value: 28 },
+      offsetTop: { configurable: true, value: 6 }
+    })
+    Object.defineProperties(folderOption, {
+      offsetHeight: { configurable: true, value: 28 },
+      offsetTop: { configurable: true, value: 35 }
+    })
+    expect(menu).toHaveAttribute('data-surface-spring-preset', 'directional-menu')
+    expect(highlight).not.toBeNull()
+    expect(
+      screen
+        .getAllByRole('menuitem')
+        .every((option) => option.hasAttribute('data-menu-option-highlight'))
+    ).toBe(true)
+
+    fireEvent.pointerOver(vscodeOption, { pointerType: 'mouse' })
+    expect(highlight?.style.getPropertyValue('--cc-menu-option-highlight-y')).toBe('6px')
+    fireEvent.pointerLeave(menu, { pointerType: 'mouse' })
+    fireEvent.pointerOver(folderOption, { pointerType: 'mouse' })
+    expect(highlight?.style.getPropertyValue('--cc-menu-option-highlight-y')).toBe('6px')
+    expect(highlight).toHaveAttribute('data-target-y', '35')
+
     fireEvent.pointerLeave(control, { pointerType: 'mouse' })
     fireEvent.pointerLeave(menu, { pointerType: 'mouse' })
     expect(screen.getByRole('menu')).toBe(menu)

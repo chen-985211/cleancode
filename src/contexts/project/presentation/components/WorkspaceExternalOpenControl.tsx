@@ -17,6 +17,7 @@ import type {
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
+import { useMenuOptionHighlightMotion } from '../../../../presentation/shared/hooks/useMenuOptionHighlightMotion'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 interface WorkspaceExternalOpenControlProps {
@@ -82,6 +83,8 @@ function WorkspaceExternalOpenSplitControl({
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
   const pendingInitialFocusRef = useRef<MenuInitialFocus | null>(null)
+  const { highlightRef, interactionProps: highlightInteractionProps } =
+    useMenuOptionHighlightMotion()
   const menuId = useId()
   const triggerId = useId()
   const closeMenu = useCallback((restoreTriggerFocus = false): void => {
@@ -188,7 +191,7 @@ function WorkspaceExternalOpenSplitControl({
           <button
             ref={menuTriggerRef}
             id={triggerId}
-            className="workspace-external-open-control__button workspace-external-open-control__button--menu"
+            className="workspace-external-open-control__button workspace-external-open-control__button--menu directional-menu-trigger"
             type="button"
             aria-controls={isMenuOpen ? menuId : undefined}
             aria-expanded={isMenuOpen}
@@ -216,13 +219,14 @@ function WorkspaceExternalOpenSplitControl({
       <AnchoredSurfaceMotion
         ref={menuRef}
         id={menuId}
-        className="workspace-external-open-menu anchored-surface-motion"
+        className="workspace-external-open-menu anchored-surface-motion directional-menu-surface menu-option-highlight-container"
         data-side="top"
         open={isMenuOpen}
-        springPreset="anchored-bottom-left"
+        springPreset="directional-menu"
         portalContainer={document.body}
         role="menu"
         aria-labelledby={triggerId}
+        {...highlightInteractionProps}
         onExitComplete={() => {
           setMenuPosition(null)
         }}
@@ -236,8 +240,10 @@ function WorkspaceExternalOpenSplitControl({
           visibility: menuPosition ? 'visible' : 'hidden'
         }}
       >
+        <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
         <button
-          className="workspace-external-open-menu__item"
+          className="workspace-external-open-menu__item menu-option-highlight-target"
+          data-menu-option-highlight
           type="button"
           role="menuitem"
           disabled={isPending}
@@ -247,7 +253,8 @@ function WorkspaceExternalOpenSplitControl({
           {t('workspaceExternalOpen.vscode')}
         </button>
         <button
-          className="workspace-external-open-menu__item"
+          className="workspace-external-open-menu__item menu-option-highlight-target"
+          data-menu-option-highlight
           type="button"
           role="menuitem"
           disabled={isPending}

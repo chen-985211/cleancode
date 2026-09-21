@@ -169,6 +169,37 @@ describe('surface spring motion', () => {
     expect(Math.abs(readNumber(root, '--cc-surface-motion-translate-y'))).toBeLessThanOrEqual(6)
   })
 
+  it('projects the Agent selector growth profile for directional menus', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'directional-menu',
+      scheduler
+    })
+
+    controller.intentChanged(root, {
+      onSettled: vi.fn(),
+      reducedMotion: false,
+      visible: true
+    })
+
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(0)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(0.72)
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe(
+      'calc(var(--cc-anchored-surface-offset-y) * 1)'
+    )
+
+    scheduler.advanceNextFrame(100)
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBeGreaterThan(0)
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBeLessThan(1)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBeGreaterThan(0.72)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBeLessThan(1)
+
+    scheduler.advanceUntilIdle()
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+  })
+
   it('moves a bottom-left anchored menu only toward its trigger without scaling', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()

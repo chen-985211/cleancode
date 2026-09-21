@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { StrictMode } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { WorkspaceDefaultsProjectPicker } from '../../../../src/contexts/project/presentation/components/WorkspaceDefaultsProjectPicker'
@@ -30,6 +32,12 @@ describe('workspace defaults project picker', () => {
       const trigger = screen.getByRole('button', { name: '切换项目：Same name' })
       fireEvent.click(trigger)
       const options = screen.getAllByRole('menuitemradio')
+      const menu = screen.getByRole('menu')
+      expect(menu).toHaveAttribute('data-surface-spring-preset', 'directional-menu')
+      expect(menu.querySelector('.menu-option-highlight-motion')).not.toBeNull()
+      expect(options.every((option) => option.hasAttribute('data-menu-option-highlight'))).toBe(
+        true
+      )
       expect(options[0]).toHaveAccessibleDescription('/first/project')
       expect(options[1]).toHaveAccessibleDescription('/second/project')
       expect(options[1]).toHaveFocus()
@@ -67,5 +75,18 @@ describe('workspace defaults project picker', () => {
     expect(outside).toHaveFocus()
     expect(outsideClick).toHaveBeenCalledOnce()
     expect(select).not.toHaveBeenCalled()
+  })
+
+  it('uses the Agent-style check without a persistent selected background', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'src/contexts/project/presentation/components/WorkspaceDefaults.css'),
+      'utf8'
+    )
+    const checkedRule =
+      styles
+        .split(".workspace-defaults-project-menu button[aria-checked='true'] {")[1]
+        ?.split('}')[0] ?? ''
+
+    expect(checkedRule).toContain('background: transparent;')
   })
 })
