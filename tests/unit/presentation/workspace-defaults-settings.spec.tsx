@@ -96,8 +96,7 @@ describe('workspace defaults in application settings', () => {
       'aria-checked',
       'true'
     )
-    expect(screen.getByRole('menu')).toHaveFocus()
-    expect(screen.getByRole('menuitemradio', { name: 'Second' })).not.toHaveFocus()
+    expect(screen.getByRole('menuitemradio', { name: 'Second' })).toHaveFocus()
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitemradio', { name: 'First' })).toHaveFocus()
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })

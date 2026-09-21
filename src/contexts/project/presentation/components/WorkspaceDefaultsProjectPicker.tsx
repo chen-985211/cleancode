@@ -13,6 +13,8 @@ interface ProjectChoice {
   readonly directory: string
 }
 
+type ProjectMenuInitialFocus = 'selected' | 'first' | 'last'
+
 export function WorkspaceDefaultsProjectPicker({
   projects,
   selected,
@@ -26,6 +28,7 @@ export function WorkspaceDefaultsProjectPicker({
   const id = useId()
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
+  const initialFocus = useRef<ProjectMenuInitialFocus>('selected')
   const { highlightRef, interactionProps: highlightInteractionProps } =
     useMenuOptionHighlightMotion()
   const [open, setOpen] = useState(false)
@@ -46,7 +49,19 @@ export function WorkspaceDefaultsProjectPicker({
       ...(upward ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
       maxHeight: Math.max(48, Math.min(360, upward ? rect.top - 24 : below))
     })
-    popup.current?.focus({ preventScroll: true })
+    const options = [
+      ...(popup.current?.querySelectorAll<HTMLButtonElement>(
+        '[role="menuitemradio"]:not(:disabled)'
+      ) ?? [])
+    ]
+    const option =
+      initialFocus.current === 'first'
+        ? options[0]
+        : initialFocus.current === 'last'
+          ? options[options.length - 1]
+          : (options.find((item) => item.getAttribute('aria-checked') === 'true') ?? options[0])
+    if (option) option.focus({ preventScroll: true })
+    else popup.current?.focus({ preventScroll: true })
   }, [open, selected.id])
   useOutsidePointerDismiss({
     active: open,
@@ -80,11 +95,19 @@ export function WorkspaceDefaultsProjectPicker({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) {
+            close(false)
+            return
+          }
+          initialFocus.current = 'selected'
+          setOpen(true)
+        }}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             event.stopPropagation()
+            initialFocus.current = event.key === 'ArrowDown' ? 'first' : 'last'
             setOpen(true)
           }
         }}
