@@ -6,7 +6,6 @@ import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
 import { useMenuOptionHighlightMotion } from '../../../../presentation/shared/hooks/useMenuOptionHighlightMotion'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
-import { WorkspaceDefaultsButton } from './WorkspaceDefaultsMotion'
 
 interface ProjectChoice {
   readonly id: string
@@ -38,7 +37,7 @@ export function WorkspaceDefaultsProjectPicker({
   useLayoutEffect(() => {
     if (!open || !anchor.current) return
     const rect = anchor.current.getBoundingClientRect()
-    const width = Math.min(320, window.innerWidth - 32)
+    const width = Math.min(360, window.innerWidth - 32)
     const below = window.innerHeight - rect.bottom - 24
     const upward = below < 180 && rect.top > below
     setPosition({
@@ -47,9 +46,7 @@ export function WorkspaceDefaultsProjectPicker({
       ...(upward ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
       maxHeight: Math.max(48, Math.min(360, upward ? rect.top - 24 : below))
     })
-    popup.current
-      ?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
-      ?.focus({ preventScroll: true })
+    popup.current?.focus({ preventScroll: true })
   }, [open, selected.id])
   useOutsidePointerDismiss({
     active: open,
@@ -74,8 +71,9 @@ export function WorkspaceDefaultsProjectPicker({
 
   return (
     <>
-      <WorkspaceDefaultsButton
-        buttonRef={anchor}
+      <button
+        ref={anchor}
+        type="button"
         className="workspace-defaults-project-trigger directional-menu-trigger"
         aria-label={t('workspaceDefaults.switchProject', { name: selected.name })}
         title={selected.directory}
@@ -91,10 +89,17 @@ export function WorkspaceDefaultsProjectPicker({
           }
         }}
       >
-        <FolderIcon size={16} aria-hidden="true" />
-        <span>{selected.name}</span>
-        <CaretDownIcon size={12} aria-hidden="true" />
-      </WorkspaceDefaultsButton>
+        <FolderIcon size={18} aria-hidden="true" />
+        <span className="workspace-defaults-project-trigger-copy">
+          <strong>{selected.name}</strong>
+          <small>{selected.directory}</small>
+        </span>
+        <CaretDownIcon
+          className="workspace-defaults-project-trigger-caret"
+          size={12}
+          aria-hidden="true"
+        />
+      </button>
       <AnchoredSurfaceMotion
         ref={popup}
         id={id}
@@ -105,6 +110,7 @@ export function WorkspaceDefaultsProjectPicker({
         data-side={position.bottom === undefined ? 'bottom' : 'top'}
         style={position}
         role="menu"
+        tabIndex={-1}
         aria-label={t('workspaceDefaults.project')}
         {...highlightInteractionProps}
         onKeyDown={(event) => {
@@ -126,9 +132,9 @@ export function WorkspaceDefaultsProjectPicker({
             event.preventDefault()
             event.stopPropagation()
             const next =
-              event.key === 'Home'
+              event.key === 'Home' || (event.key === 'ArrowDown' && index < 0)
                 ? 0
-                : event.key === 'End'
+                : event.key === 'End' || (event.key === 'ArrowUp' && index < 0)
                   ? options.length - 1
                   : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
             options[next]?.focus()

@@ -86,12 +86,18 @@ describe('workspace defaults in application settings', () => {
       />
     )
     const switcher = screen.getByRole('button', { name: '切换项目：Second' })
+    const projectContext = screen.getByText('项目', {
+      selector: '.workspace-defaults-project-context-label'
+    })
+    expect(projectContext.parentElement).toContainElement(switcher)
+    expect(switcher).toHaveTextContent('/second')
     fireEvent.click(switcher)
     expect(screen.getByRole('menuitemradio', { name: 'Second' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
-    expect(screen.getByRole('menuitemradio', { name: 'Second' })).toHaveFocus()
+    expect(screen.getByRole('menu')).toHaveFocus()
+    expect(screen.getByRole('menuitemradio', { name: 'Second' })).not.toHaveFocus()
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitemradio', { name: 'First' })).toHaveFocus()
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })

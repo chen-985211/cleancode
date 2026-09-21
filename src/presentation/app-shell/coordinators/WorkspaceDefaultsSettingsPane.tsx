@@ -30,16 +30,21 @@ export function WorkspaceDefaultsSettingsPane({
       <header className="workspace-defaults-settings-header">
         <div className="workspace-defaults-settings-heading">
           <h2>{t('settings.workspace.title')}</h2>
-          {selected && window.cleancode?.getWorkspaceDefaults ? (
+        </div>
+        {selected ? (
+          <p className="workspace-defaults-description">{t('workspaceDefaults.description')}</p>
+        ) : null}
+        {selected && window.cleancode?.getWorkspaceDefaults ? (
+          <div className="workspace-defaults-project-context">
+            <span className="workspace-defaults-project-context-label">
+              {t('workspaceDefaults.project')}
+            </span>
             <WorkspaceDefaultsProjectPicker
               projects={workbenches.map((workbench) => workbench.project)}
               selected={selected.project}
               onSelect={setSelectedId}
             />
-          ) : null}
-        </div>
-        {selected ? (
-          <p className="workspace-defaults-description">{t('workspaceDefaults.description')}</p>
+          </div>
         ) : null}
       </header>
       {selected && window.cleancode?.getWorkspaceDefaults ? (
