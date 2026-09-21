@@ -45,8 +45,8 @@ describe('workspace external open statusbar styles', () => {
     expect(buttonHoverRule).toContain('background: var(--cc-surface-subtle);')
     expect(menuButtonRule).toContain('width: 17px;')
     expect(menuButtonRule).not.toContain('border-left:')
-    expect(menuButtonStateRule).toContain('background: var(--cc-primary-border);')
-    expect(menuButtonStateRule).toContain('color: var(--cc-primary-hover);')
+    expect(menuButtonStateRule).toContain('background: var(--cc-directional-menu-hover);')
+    expect(menuButtonStateRule).toContain('color: var(--cc-foreground);')
     expect(appIconRule).toContain('width: 16px;')
     expect(appIconRule).toContain('height: 16px;')
     expect(appIconRule).toContain('background: var(--cc-brand-vscode);')
@@ -56,25 +56,20 @@ describe('workspace external open statusbar styles', () => {
     expect(menuItemRule).toContain('border-radius: 7px;')
     expect(menuItemRule).toContain('font-size: 13px;')
     expect(menuItemRule).toContain('var(--cc-motion-duration-feedback)')
-    expect(menuItemInteractiveRule).toContain('background: var(--cc-surface-subtle);')
+    expect(menuItemInteractiveRule).toContain('background: transparent;')
     expect(menuItemInteractiveRule).toContain('color: var(--cc-foreground);')
     expect(menuItemInteractiveRule).not.toContain('var(--cc-neutral-overlay)')
     expect(styles).not.toContain('.workspace-external-open-control--split {')
   })
 
-  it('defines the menu hover surface independently in light and dark themes', () => {
+  it('defines the shared directional-menu hover surface in light and dark themes', () => {
     const lightThemeRule = readThemeRule(":root,\n:root[data-theme='light']")
     const darkThemeRule = readThemeRule(":root[data-theme='dark']")
 
-    expect(lightThemeRule).toContain('--cc-surface-subtle:')
-    expect(lightThemeRule).toContain('--cc-surface-overlay:')
-    expect(darkThemeRule).toContain('--cc-surface-subtle:')
-    expect(darkThemeRule).toContain('--cc-surface-overlay:')
-    expect(readToken(lightThemeRule, '--cc-surface-subtle')).not.toBe(
-      readToken(lightThemeRule, '--cc-surface-overlay')
-    )
-    expect(readToken(darkThemeRule, '--cc-surface-subtle')).not.toBe(
-      readToken(darkThemeRule, '--cc-surface-overlay')
+    expect(lightThemeRule).toContain('--cc-directional-menu-hover:')
+    expect(darkThemeRule).toContain('--cc-directional-menu-hover:')
+    expect(readToken(lightThemeRule, '--cc-directional-menu-hover')).not.toBe(
+      readToken(darkThemeRule, '--cc-directional-menu-hover')
     )
   })
 })

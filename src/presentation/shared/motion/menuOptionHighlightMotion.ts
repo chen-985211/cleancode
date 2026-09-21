@@ -3,48 +3,48 @@ import {
   isSpringAxisSettled,
   retargetSpringAxis,
   type SpringAxis
-} from '../../../shared/motion/motionSpring'
+} from './motionSpring'
 
-export interface AgentCreateMenuHighlightMotionRoot {
+export interface MenuOptionHighlightMotionRoot {
   readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>
   readonly removeAttribute: (name: string) => unknown
   readonly setAttribute: (name: string, value: string) => unknown
 }
 
-export interface AgentCreateMenuHighlightMotionFrameScheduler {
+export interface MenuOptionHighlightMotionFrameScheduler {
   readonly cancelFrame: (frameId: number) => void
   readonly now: () => number
   readonly requestFrame: (callback: FrameRequestCallback) => number
 }
 
-interface AgentCreateMenuHighlightMotionControllerOptions {
-  readonly scheduler?: AgentCreateMenuHighlightMotionFrameScheduler
+interface MenuOptionHighlightMotionControllerOptions {
+  readonly scheduler?: MenuOptionHighlightMotionFrameScheduler
 }
 
-interface AgentCreateMenuHighlightGeometry {
+interface MenuOptionHighlightGeometry {
   readonly height: number
   readonly top: number
 }
 
-export interface AgentCreateMenuHighlightMotionController {
+export interface MenuOptionHighlightMotionController {
   readonly dispose: () => void
-  readonly hide: (root: AgentCreateMenuHighlightMotionRoot) => void
+  readonly hide: (root: MenuOptionHighlightMotionRoot) => void
   readonly moveTo: (
-    root: AgentCreateMenuHighlightMotionRoot,
-    geometry: AgentCreateMenuHighlightGeometry
+    root: MenuOptionHighlightMotionRoot,
+    geometry: MenuOptionHighlightGeometry
   ) => void
   readonly setReducedMotion: (reducedMotion: boolean) => void
 }
 
-const heightProperty = '--cc-agent-create-menu-highlight-height'
-const yProperty = '--cc-agent-create-menu-highlight-y'
+const heightProperty = '--cc-menu-option-highlight-height'
+const yProperty = '--cc-menu-option-highlight-y'
 const visibleAttribute = 'data-visible'
 const motionStateAttribute = 'data-motion-state'
 const targetYAttribute = 'data-target-y'
 const springDynamics = { dampingRatio: 1, response: 0.22 }
 const settlementThresholds = { speed: 0.4, value: 0.05 }
 
-const browserFrameScheduler: AgentCreateMenuHighlightMotionFrameScheduler = {
+const browserFrameScheduler: MenuOptionHighlightMotionFrameScheduler = {
   cancelFrame: (frameId) => {
     if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(frameId)
     else window.clearTimeout(frameId)
@@ -58,10 +58,10 @@ const browserFrameScheduler: AgentCreateMenuHighlightMotionFrameScheduler = {
   }
 }
 
-export function createAgentCreateMenuHighlightMotionController({
+export function createMenuOptionHighlightMotionController({
   scheduler = browserFrameScheduler
-}: AgentCreateMenuHighlightMotionControllerOptions = {}): AgentCreateMenuHighlightMotionController {
-  let root: AgentCreateMenuHighlightMotionRoot | null = null
+}: MenuOptionHighlightMotionControllerOptions = {}): MenuOptionHighlightMotionController {
+  let root: MenuOptionHighlightMotionRoot | null = null
   let axis: SpringAxis = { value: 0, velocity: 0 }
   let target = 0
   let initialized = false

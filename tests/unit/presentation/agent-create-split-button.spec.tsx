@@ -104,7 +104,7 @@ describe('Agent create split button', () => {
     const menu = screen.getByRole('menu')
     const claude = screen.getByRole('menuitemradio', { name: 'Claude Code' })
     const settings = screen.getByRole('menuitem', { name: 'Agent 设置…' })
-    const highlight = menu.querySelector<HTMLElement>('.agent-create-menu__highlight')
+    const highlight = menu.querySelector<HTMLElement>('.menu-option-highlight-motion')
 
     expect(highlight).not.toBeNull()
     expect(highlight).not.toHaveAttribute('data-visible')
@@ -112,14 +112,14 @@ describe('Agent create split button', () => {
     setMenuItemGeometry(claude, 43)
     setMenuItemGeometry(settings, 96)
 
-    fireEvent.pointerEnter(claude)
+    fireEvent.pointerOver(claude)
     expect(highlight).toHaveAttribute('data-visible', 'true')
     expect(highlight).toHaveAttribute('data-target-y', '43')
 
     fireEvent.pointerLeave(menu)
     expect(highlight).not.toHaveAttribute('data-visible')
     expect(highlight).not.toHaveAttribute('data-target-y')
-    expect(highlight?.style.getPropertyValue('--cc-agent-create-menu-highlight-y')).toBe('43px')
+    expect(highlight?.style.getPropertyValue('--cc-menu-option-highlight-y')).toBe('43px')
 
     settings.focus()
     expect(highlight).toHaveAttribute('data-visible', 'true')
@@ -175,6 +175,10 @@ describe('Agent create split button', () => {
       resolve(process.cwd(), 'src/presentation/app-shell/styles/theme.css'),
       'utf8'
     )
+    const directionalMenuStyles = readFileSync(
+      resolve(process.cwd(), 'src/presentation/shared/styles/directional-menu-motion.css'),
+      'utf8'
+    )
     const buttonRule = styles.split('.agent-create-split .toolbar-button {')[1]?.split('}')[0] ?? ''
     const splitRule = styles.split('.agent-create-split {')[1]?.split('}')[0] ?? ''
     const mainRule = styles.split('.agent-create-split__main {')[1]?.split('}')[0] ?? ''
@@ -192,7 +196,7 @@ describe('Agent create split button', () => {
         .split('.agent-create-menu__item:hover,\n.agent-create-menu__item:focus-visible {')[1]
         ?.split('}')[0] ?? ''
     const menuHighlightRule =
-      styles.split('.agent-create-menu__highlight {')[1]?.split('}')[0] ?? ''
+      directionalMenuStyles.split('.menu-option-highlight-motion {')[1]?.split('}')[0] ?? ''
     const activeButtonRule =
       styles
         .split('.agent-create-split .toolbar-button:active:not(:disabled) {')[1]
@@ -205,18 +209,18 @@ describe('Agent create split button', () => {
     expect(agentToolbarGroupRule).toContain('border-radius: 999px;')
     expect(splitRule).toContain('border-radius: 999px;')
     expect(themeStyles).toContain('--cc-agent-create-surface: rgb(246 246 247);')
-    expect(themeStyles).toContain('--cc-agent-create-hover: rgb(226 226 228);')
+    expect(themeStyles).toContain('--cc-directional-menu-hover: rgb(226 226 228);')
     expect(buttonRule).toContain('border-color: transparent;')
     expect(buttonRule).toContain('background: transparent;')
     expect(buttonRule).toContain('height: 38px;')
     expect(mainRule).toContain('padding: 0 14px;')
     expect(triggerRule).toContain('width: 38px;')
-    expect(hoverRule).toContain('background: var(--cc-agent-create-hover);')
+    expect(hoverRule).toContain('background: var(--cc-directional-menu-hover);')
     expect(hoveredButtonRule).toContain('background: transparent;')
     expect(menuItemInteractionRule).toContain('background: transparent;')
-    expect(menuHighlightRule).toContain('background: var(--cc-agent-create-hover);')
+    expect(menuHighlightRule).toContain('background: var(--cc-directional-menu-hover);')
     expect(menuHighlightRule).toContain(
-      'transform: translate3d(0, var(--cc-agent-create-menu-highlight-y, 0px), 0);'
+      'transform: translate3d(0, var(--cc-menu-option-highlight-y, 0px), 0);'
     )
     expect(activeButtonRule).toContain('transform: none;')
   })

@@ -32,7 +32,7 @@
 }
 
 .agent-create-split[data-disabled='false']:hover {
-  background: var(--cc-agent-create-hover);
+  background: var(--cc-directional-menu-hover);
 }
 
 .agent-create-split[data-disabled='false']:hover .toolbar-button:not(:disabled) {
@@ -55,6 +55,7 @@
 }
 
 .agent-create-menu {
+  --cc-menu-option-highlight-inset: 5px;
   position: fixed;
   z-index: 220;
   width: 224px;
@@ -69,29 +70,6 @@
 
 .agent-create-menu:focus {
   outline: none;
-}
-
-.agent-create-menu__highlight {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  right: 5px;
-  left: 5px;
-  height: var(--cc-agent-create-menu-highlight-height, 38px);
-  border-radius: 7px;
-  background: var(--cc-agent-create-hover);
-  opacity: 0;
-  pointer-events: none;
-  transform: translate3d(0, var(--cc-agent-create-menu-highlight-y, 0px), 0);
-  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-}
-
-.agent-create-menu__highlight[data-visible='true'] {
-  opacity: 1;
-}
-
-.agent-create-menu__highlight[data-motion-state='moving'] {
-  will-change: transform;
 }
 
 .agent-create-menu__item {
@@ -171,10 +149,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-create-menu__highlight {
-    transition: none;
-  }
-
   .agent-create-split__spinner {
     animation: none;
   }

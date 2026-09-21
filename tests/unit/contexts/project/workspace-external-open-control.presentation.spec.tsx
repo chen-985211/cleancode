@@ -157,7 +157,13 @@ describe('workspace external open control', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '选择打开方式' }))
     const menu = screen.getByRole('menu')
-    expect(menu).toHaveAttribute('data-surface-spring-preset', 'anchored-bottom-left')
+    expect(menu).toHaveAttribute('data-surface-spring-preset', 'directional-menu')
+    expect(menu.querySelector('.menu-option-highlight-motion')).not.toBeNull()
+    expect(
+      screen
+        .getAllByRole('menuitem')
+        .every((option) => option.hasAttribute('data-menu-option-highlight'))
+    ).toBe(true)
     fireEvent.pointerLeave(control, { pointerType: 'mouse' })
     fireEvent.pointerLeave(menu, { pointerType: 'mouse' })
     expect(screen.getByRole('menu')).toBe(menu)

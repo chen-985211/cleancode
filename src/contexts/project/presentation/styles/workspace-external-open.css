@@ -55,8 +55,8 @@
 
 .workspace-external-open-control__button--menu:hover:not([aria-disabled='true']),
 .workspace-external-open-control__button--menu[aria-expanded='true'] {
-  background: var(--cc-primary-border);
-  color: var(--cc-primary-hover);
+  background: var(--cc-directional-menu-hover);
+  color: var(--cc-foreground);
 }
 
 .workspace-external-open-control__button:focus-visible {
@@ -79,6 +79,7 @@
 }
 
 .workspace-external-open-menu {
+  --cc-menu-option-highlight-inset: 6px;
   position: fixed;
   z-index: 220;
   display: grid;
@@ -89,7 +90,7 @@
   background: var(--cc-surface-overlay);
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
-  transform-origin: left bottom;
+  transform-origin: 50% 100%;
 }
 
 .workspace-external-open-menu__item {
@@ -114,7 +115,7 @@
 
 .workspace-external-open-menu__item:hover:not(:disabled),
 .workspace-external-open-menu__item:focus-visible {
-  background: var(--cc-surface-subtle);
+  background: transparent;
   color: var(--cc-foreground);
   outline: none;
 }

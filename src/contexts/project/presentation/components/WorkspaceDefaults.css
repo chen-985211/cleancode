@@ -325,10 +325,11 @@
 .workspace-defaults-project-trigger:hover,
 .workspace-defaults-project-trigger[aria-expanded='true'] {
   border-color: var(--cc-primary-border);
-  background: var(--cc-surface-hover);
+  background: var(--cc-directional-menu-hover);
   color: var(--cc-foreground);
 }
 .workspace-defaults-project-menu {
+  --cc-menu-option-highlight-inset: 5px;
   position: fixed;
   z-index: 1600;
   box-sizing: border-box;
@@ -360,14 +361,14 @@
   color: var(--cc-muted-strong);
 }
 .workspace-defaults-project-menu button[aria-checked='true'] {
-  background: var(--cc-primary-wash);
+  background: transparent;
 }
 .workspace-defaults-project-menu button[aria-checked='true'] > svg:last-child {
   color: var(--cc-primary);
 }
 .workspace-defaults-project-menu button:hover,
 .workspace-defaults-project-menu button:focus-visible {
-  background: var(--cc-surface-hover);
+  background: transparent;
 }
 .workspace-defaults-project-menu button:focus-visible {
   outline: 2px solid var(--cc-ring);

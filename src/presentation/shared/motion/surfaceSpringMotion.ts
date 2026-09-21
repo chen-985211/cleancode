@@ -3,6 +3,10 @@ import {
   type SpringProgressMotionFrameScheduler,
   type SpringProgressMotionRoot
 } from './springProgressMotion'
+import {
+  directionalMenuMotionProfile,
+  resolveDirectionalMenuPresentation
+} from './directionalMenuMotion'
 
 export type SurfaceSpringPreset =
   | 'anchored'
@@ -10,6 +14,7 @@ export type SurfaceSpringPreset =
   | 'anchored-top-left'
   | 'anchored-top-right'
   | 'bottom-control'
+  | 'directional-menu'
   | 'drawer-right'
   | 'fullscreen-right'
 
@@ -80,6 +85,16 @@ function presentSurface(
 }
 
 function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
+  if (preset === 'directional-menu') {
+    const presentation = resolveDirectionalMenuPresentation(1 - remaining)
+    return {
+      contentOpacity: 1,
+      opacity: presentation.opacity,
+      scale: presentation.scale,
+      translateX: `calc(var(--cc-anchored-surface-offset-x) * ${presentation.hiddenProgress})`,
+      translateY: `calc(var(--cc-anchored-surface-offset-y) * ${presentation.hiddenProgress})`
+    }
+  }
   if (preset === 'anchored') {
     return {
       contentOpacity: 1,
@@ -135,6 +150,7 @@ function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
 }
 
 function responseForPreset(preset: SurfaceSpringPreset): number {
+  if (preset === 'directional-menu') return directionalMenuMotionProfile.springResponse
   if (preset === 'anchored') return 0.28
   if (preset === 'anchored-bottom-left' || preset === 'anchored-top-left') return 0.18
   if (preset === 'anchored-top-right') return 0.24

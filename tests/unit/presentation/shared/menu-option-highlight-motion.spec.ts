@@ -1,22 +1,23 @@
 import {
-  createAgentCreateMenuHighlightMotionController,
-  type AgentCreateMenuHighlightMotionFrameScheduler,
-  type AgentCreateMenuHighlightMotionRoot
-} from '../../../src/presentation/app-shell/workbench/creation/agentCreateMenuHighlightMotion'
+  createMenuOptionHighlightMotionController,
+  type MenuOptionHighlightMotionFrameScheduler,
+  type MenuOptionHighlightMotionRoot
+} from '../../../../src/presentation/shared/motion/menuOptionHighlightMotion'
 
-describe('Agent create menu highlight motion', () => {
+describe('menu option highlight motion', () => {
   it('lands the first highlight directly and retargets the moving spring without a jump', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
-    const controller = createAgentCreateMenuHighlightMotionController({ scheduler })
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
 
     controller.moveTo(root, { height: 38, top: 5 })
     expect(readY(root)).toBe(5)
     expect(root.attributes.get('data-visible')).toBe('true')
     expect(scheduler.pendingFrames()).toBe(0)
 
-    controller.moveTo(root, { height: 38, top: 81 })
+    controller.moveTo(root, { height: 54, top: 81 })
     expect(readY(root)).toBe(5)
+    expect(root.properties.get('--cc-menu-option-highlight-height')).toBe('54px')
     expect(root.attributes.get('data-motion-state')).toBe('moving')
 
     scheduler.advanceNextFrame(50)
@@ -24,7 +25,7 @@ describe('Agent create menu highlight motion', () => {
     expect(yBeforeRetarget).toBeGreaterThan(5)
     expect(yBeforeRetarget).toBeLessThan(81)
 
-    controller.moveTo(root, { height: 38, top: 18 })
+    controller.moveTo(root, { height: 32, top: 18 })
     expect(readY(root)).toBe(yBeforeRetarget)
 
     scheduler.advanceUntilIdle()
@@ -35,7 +36,7 @@ describe('Agent create menu highlight motion', () => {
   it('settles the current target immediately when reduced motion becomes active', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
-    const controller = createAgentCreateMenuHighlightMotionController({ scheduler })
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
 
     controller.moveTo(root, { height: 38, top: 5 })
     controller.moveTo(root, { height: 38, top: 81 })
@@ -54,7 +55,7 @@ describe('Agent create menu highlight motion', () => {
   it('clears a stale pointer highlight and lands the next target without a ghost transition', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
-    const controller = createAgentCreateMenuHighlightMotionController({ scheduler })
+    const controller = createMenuOptionHighlightMotionController({ scheduler })
 
     controller.moveTo(root, { height: 38, top: 5 })
     controller.moveTo(root, { height: 38, top: 81 })
@@ -73,10 +74,10 @@ describe('Agent create menu highlight motion', () => {
 })
 
 function readY(root: ReturnType<typeof createRoot>): number {
-  return Number.parseFloat(root.properties.get('--cc-agent-create-menu-highlight-y') ?? '0')
+  return Number.parseFloat(root.properties.get('--cc-menu-option-highlight-y') ?? '0')
 }
 
-function createRoot(): AgentCreateMenuHighlightMotionRoot & {
+function createRoot(): MenuOptionHighlightMotionRoot & {
   readonly attributes: Map<string, string>
   readonly properties: Map<string, string>
 } {
@@ -100,7 +101,7 @@ function createRoot(): AgentCreateMenuHighlightMotionRoot & {
   }
 }
 
-function createFrameScheduler(): AgentCreateMenuHighlightMotionFrameScheduler & {
+function createFrameScheduler(): MenuOptionHighlightMotionFrameScheduler & {
   readonly advanceNextFrame: (milliseconds?: number) => void
   readonly advanceUntilIdle: () => void
   readonly pendingFrames: () => number

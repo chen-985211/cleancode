@@ -1,5 +1,6 @@
 @import '../styles/theme.css';
 @import '../../shared/styles/surface-motion.css';
+@import '../../shared/styles/directional-menu-motion.css';
 @import '../../shared/styles/application-settings-switch.css';
 @import '../styles/base.css';
 @import '../app-features/settings/theme-settings.css';

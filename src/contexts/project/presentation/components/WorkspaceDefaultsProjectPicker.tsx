@@ -4,6 +4,7 @@ import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { useMenuOptionHighlightMotion } from '../../../../presentation/shared/hooks/useMenuOptionHighlightMotion'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { WorkspaceDefaultsButton } from './WorkspaceDefaultsMotion'
 
@@ -26,6 +27,8 @@ export function WorkspaceDefaultsProjectPicker({
   const id = useId()
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
+  const { highlightRef, interactionProps: highlightInteractionProps } =
+    useMenuOptionHighlightMotion()
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<CSSProperties>({ top: 0, left: 0 })
   function close(restoreFocus: boolean) {
@@ -73,7 +76,7 @@ export function WorkspaceDefaultsProjectPicker({
     <>
       <WorkspaceDefaultsButton
         buttonRef={anchor}
-        className="workspace-defaults-project-trigger"
+        className="workspace-defaults-project-trigger directional-menu-trigger"
         aria-label={t('workspaceDefaults.switchProject', { name: selected.name })}
         title={selected.directory}
         aria-haspopup="menu"
@@ -97,11 +100,13 @@ export function WorkspaceDefaultsProjectPicker({
         id={id}
         open={open}
         portalContainer={document.body}
-        springPreset={position.bottom === undefined ? 'anchored-top-left' : 'anchored-bottom-left'}
-        className="workspace-defaults-project-menu anchored-surface-motion"
+        springPreset="directional-menu"
+        className="workspace-defaults-project-menu anchored-surface-motion directional-menu-surface menu-option-highlight-container"
+        data-side={position.bottom === undefined ? 'bottom' : 'top'}
         style={position}
         role="menu"
         aria-label={t('workspaceDefaults.project')}
+        {...highlightInteractionProps}
         onKeyDown={(event) => {
           if (event.key === 'Escape' || event.key === 'Tab') {
             if (event.key === 'Escape') event.preventDefault()
@@ -130,8 +135,11 @@ export function WorkspaceDefaultsProjectPicker({
           }
         }}
       >
+        <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
         {projects.map((project) => (
           <button
+            className="menu-option-highlight-target"
+            data-menu-option-highlight
             type="button"
             role="menuitemradio"
             aria-label={project.name}

@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -11,12 +10,11 @@ import {
 import { createPortal } from 'react-dom'
 
 import type { CreatableAgentProviderSnapshot } from '../../../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
-import { createAgentCreateMenuHighlightMotionController } from './agentCreateMenuHighlightMotion'
 import { AgentProviderIcon } from '../../../../contexts/agent/presentation/components/AgentProviderIcon'
 import { CanvasMenuSurface } from '../menus/CanvasMenuMotionProvider'
 import { useI18n } from '../../../i18n/useI18n'
 import { TooltipLabel } from '../../../shared/components/Tooltip'
-import { usePrefersReducedMotion } from '../../../shared/hooks/usePrefersReducedMotion'
+import { useMenuOptionHighlightMotion } from '../../../shared/hooks/useMenuOptionHighlightMotion'
 import { WorkbenchIcon } from '../../../shared/components/WorkbenchIcons'
 
 interface AgentCreateSplitButtonProps {
@@ -35,11 +33,10 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const highlightRef = useRef<HTMLSpanElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const highlightMotion = useMemo(() => createAgentCreateMenuHighlightMotionController(), [])
-  const reducedMotion = usePrefersReducedMotion()
+  const { highlightRef, interactionProps: highlightInteractionProps } =
+    useMenuOptionHighlightMotion()
   const [menuPosition, setMenuPosition] = useState<{
     readonly anchorX: number
     readonly anchorY: number
@@ -56,34 +53,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     setIsOpen(false)
     triggerRef.current?.focus()
   }, [])
-
-  const activateMenuHighlight = useCallback(
-    (item: HTMLButtonElement): void => {
-      const highlight = highlightRef.current
-      if (!highlight) return
-      highlightMotion.moveTo(highlight, {
-        height: item.offsetHeight,
-        top: item.offsetTop
-      })
-    },
-    [highlightMotion]
-  )
-
-  const handleMenuPointerLeave = useCallback((): void => {
-    const focusedItem = itemRefs.current.find((item) => item === document.activeElement)
-    if (focusedItem) {
-      activateMenuHighlight(focusedItem)
-      return
-    }
-    const highlight = highlightRef.current
-    if (highlight) highlightMotion.hide(highlight)
-  }, [activateMenuHighlight, highlightMotion])
-
-  useLayoutEffect(() => {
-    highlightMotion.setReducedMotion(reducedMotion)
-  }, [highlightMotion, reducedMotion])
-
-  useEffect(() => () => highlightMotion.dispose(), [highlightMotion])
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -218,7 +187,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={t('toolbar.chooseDefaultAgent')}
-        className="toolbar-button agent-create-split__trigger"
+        className="toolbar-button agent-create-split__trigger directional-menu-trigger"
         disabled={isDisabled}
         type="button"
         onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -234,7 +203,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           ref={menuRef}
           anchor={{ x: menuPosition?.anchorX ?? 0, y: menuPosition?.anchorY ?? 0 }}
           aria-label={t('toolbar.chooseDefaultAgent')}
-          className="agent-create-menu"
+          className="agent-create-menu directional-menu-surface menu-option-highlight-container"
           data-side={menuPosition?.side ?? 'bottom'}
           menuId="agent-create-menu"
           motionReady={menuPosition !== null}
@@ -248,10 +217,10 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           }}
           onRequestClose={closeMenu}
           onPresenceChange={setIsMenuPresent}
-          onPointerLeave={handleMenuPointerLeave}
+          {...highlightInteractionProps}
           onKeyDown={handleMenuKeyDown}
         >
-          <span ref={highlightRef} aria-hidden="true" className="agent-create-menu__highlight" />
+          <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
           {props.providers.length === 0 ? (
             <div className="agent-create-menu__empty" role="status">
               {t('toolbar.noAvailableAgents')}
@@ -270,14 +239,13 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
                     itemRefs.current[index] = element
                   }}
                   aria-checked={providerId === props.defaultProviderId}
-                  className="agent-create-menu__item"
+                  className="agent-create-menu__item menu-option-highlight-target"
+                  data-menu-option-highlight
                   key={providerId}
                   role="menuitemradio"
                   type="button"
                   onClick={select}
-                  onFocus={(event) => activateMenuHighlight(event.currentTarget)}
                   onKeyDown={(event) => handleItemKeyDown(event, index, select)}
-                  onPointerEnter={(event) => activateMenuHighlight(event.currentTarget)}
                 >
                   <span className="agent-create-menu__icon" aria-hidden="true">
                     <AgentProviderIcon icon={provider.descriptor.icon} />
@@ -298,21 +266,20 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
             ref={(element) => {
               itemRefs.current[props.providers.length] = element
             }}
-            className="agent-create-menu__item agent-create-menu__item--settings"
+            className="agent-create-menu__item agent-create-menu__item--settings menu-option-highlight-target"
+            data-menu-option-highlight
             role="menuitem"
             type="button"
             onClick={() => {
               closeMenu()
               props.onOpenAgentSettings()
             }}
-            onFocus={(event) => activateMenuHighlight(event.currentTarget)}
             onKeyDown={(event) =>
               handleItemKeyDown(event, props.providers.length, () => {
                 closeMenu()
                 props.onOpenAgentSettings()
               })
             }
-            onPointerEnter={(event) => activateMenuHighlight(event.currentTarget)}
           >
             <span className="agent-create-menu__icon" aria-hidden="true">
               <WorkbenchIcon role="settings" size={16} />
