@@ -285,11 +285,7 @@
   margin-bottom: 32px;
 }
 .workspace-defaults-settings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 12px 16px;
+  display: block;
 }
 .workspace-defaults-settings-heading h2 {
   margin: 0;
@@ -299,34 +295,87 @@
   line-height: 1.2;
 }
 .workspace-defaults-settings-header .workspace-defaults-description {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
+}
+.workspace-defaults-project-context {
+  display: grid;
+  gap: 7px;
+  margin-top: 22px;
+}
+.workspace-defaults-project-context-label {
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 .workspace-defaults-project-trigger {
-  max-width: min(240px, 100%);
+  display: flex;
+  width: min(360px, 100%);
   min-width: 0;
-  min-height: 30px;
-  padding: 5px 8px;
-  gap: 7px;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 8px;
-  background: var(--cc-surface-subtle);
+  min-height: 48px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
+  background: transparent;
+  padding: 7px 10px;
   color: var(--cc-foreground);
+  font: inherit;
   font-size: 13px;
   font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
-.workspace-defaults-project-trigger > span {
+.workspace-defaults-project-trigger-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+.workspace-defaults-project-trigger-copy strong,
+.workspace-defaults-project-trigger-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.workspace-defaults-project-trigger-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.workspace-defaults-project-trigger-copy small {
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
 .workspace-defaults-project-trigger svg {
   flex-shrink: 0;
+  color: var(--cc-muted-strong);
 }
-.workspace-defaults-project-trigger:hover,
-.workspace-defaults-project-trigger[aria-expanded='true'] {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-directional-menu-hover);
+.workspace-defaults-project-trigger.directional-menu-trigger:hover:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-hover);
   color: var(--cc-foreground);
+}
+.workspace-defaults-project-trigger.directional-menu-trigger[aria-expanded='true'] {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+.workspace-defaults-project-trigger:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+.workspace-defaults-project-trigger-caret {
+  transition: transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+.workspace-defaults-project-trigger[aria-expanded='true']
+  .workspace-defaults-project-trigger-caret {
+  transform: rotate(180deg);
 }
 .workspace-defaults-project-menu {
   --cc-menu-option-highlight-inset: 5px;
@@ -360,9 +409,6 @@
   flex-shrink: 0;
   color: var(--cc-muted-strong);
 }
-.workspace-defaults-project-menu button[aria-checked='true'] {
-  background: transparent;
-}
 .workspace-defaults-project-menu button[aria-checked='true'] > svg:last-child {
   color: var(--cc-primary);
 }
@@ -388,7 +434,7 @@
 }
 .workspace-defaults-project-copy strong {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.4;
 }
 .workspace-defaults-project-copy small {
