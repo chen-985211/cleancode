@@ -163,9 +163,6 @@
   flex: 0 0 24px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cc-divider);
-  border-radius: 7px;
-  background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
 }
 

@@ -50,7 +50,7 @@ export const zhCNSettingsMessages = {
   'settings.canvas.title': '画布',
   'settings.canvas.reduceVisualNoise': '减少视觉噪声',
   'settings.canvas.reduceVisualNoiseDescription':
-    '缩小画布时隐藏次要描述和操作；悬停、聚焦或选中时重新显示。',
+    '始终隐藏终端描述；缩小画布时隐藏其他次要操作，悬停、聚焦或选中时重新显示。',
   'settings.canvas.followQuickExecutionTarget': '快捷执行后跟随目标',
   'settings.canvas.followQuickExecutionTargetDescription':
     '使用快捷键执行后，将对应终端、流程或组合定位到画布视野中。',

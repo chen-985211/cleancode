@@ -274,6 +274,31 @@ describe('workbench object motion styles', () => {
       /\[data-canvas-detail='overview'\]\s+\.agent-console-node\s*\{/
     )
   })
+
+  it('lets the visual-noise preference hide terminal descriptions without leaving a second row', () => {
+    const reducedTitleRule = readStyleRule(
+      terminalNodeStyles,
+      "[data-reduce-visual-noise='true'] .terminal-node__title"
+    )
+    const reducedMetaRule = readStyleRule(
+      terminalNodeStyles,
+      "[data-reduce-visual-noise='true'] .terminal-node__meta"
+    )
+    const reducedDescriptionRule = readStyleRule(
+      terminalNodeStyles,
+      "[data-reduce-visual-noise='true'] .terminal-node__description"
+    )
+    const detailLevelStyles = objectMotionStyles.slice(
+      objectMotionStyles.indexOf("[data-canvas-detail='compact']"),
+      objectMotionStyles.indexOf('@keyframes')
+    )
+
+    expect(reducedTitleRule).toContain('display: flex;')
+    expect(reducedTitleRule).toContain('align-items: center;')
+    expect(reducedMetaRule).toContain('display: contents;')
+    expect(reducedDescriptionRule).toContain('display: none;')
+    expect(detailLevelStyles).not.toContain('.terminal-node__description')
+  })
 })
 
 function readRule(selector: string): string {

@@ -355,6 +355,7 @@ export function WorkbenchCanvas({
           ref={canvasSurfaceRef}
           tabIndex={-1}
           data-canvas-detail={canvasDetailLevel}
+          data-reduce-visual-noise={reduceVisualNoise ? 'true' : 'false'}
           className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
             .filter(Boolean)
             .join(' ')}

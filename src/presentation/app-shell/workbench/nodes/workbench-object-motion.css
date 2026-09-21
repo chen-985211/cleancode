@@ -174,7 +174,6 @@
 
 [data-canvas-detail='compact']
   :is(
-    .terminal-node__description,
     .terminal-node__actions,
     .terminal-group-node__action-group--membership,
     .agent-console-actions__center,
@@ -182,7 +181,6 @@
   ),
 [data-canvas-detail='overview']
   :is(
-    .terminal-node__description,
     .terminal-node__actions,
     .terminal-service-runtime__label,
     .terminal-service-runtime__address,
@@ -199,7 +197,6 @@
 :is([data-canvas-detail='compact'], [data-canvas-detail='overview'])
   :is(.terminal-node, .terminal-group-node, .agent-console-node):is(:hover, :focus-within)
   :is(
-    .terminal-node__description,
     .terminal-node__actions,
     .terminal-service-runtime__label,
     .terminal-service-runtime__address,
@@ -211,7 +208,6 @@
 :is([data-canvas-detail='compact'], [data-canvas-detail='overview'])
   .react-flow__node.selected
   :is(
-    .terminal-node__description,
     .terminal-node__actions,
     .terminal-service-runtime__label,
     .terminal-service-runtime__address,
