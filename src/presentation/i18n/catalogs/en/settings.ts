@@ -13,6 +13,8 @@ export const enSettingsMessages = {
   'settings.back': 'Back to workspace',
   'settings.workspace.title': 'Workspaces',
   'settings.navigation': 'Settings navigation',
+  'settings.about.title': 'About',
+  'settings.about.version': 'Version',
   'settings.shortcuts.title': 'Keyboard shortcuts',
   'settings.shortcuts.resetAll': 'Reset all',
   'settings.shortcuts.recording': 'Press a new shortcut',
