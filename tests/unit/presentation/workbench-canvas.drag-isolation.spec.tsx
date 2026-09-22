@@ -69,6 +69,25 @@ describe('workbench canvas drag isolation', () => {
     directZoomSpies.cancel.mockClear()
   })
 
+  it.each([
+    { expected: 'true', reduceVisualNoise: true },
+    { expected: 'false', reduceVisualNoise: false }
+  ])(
+    'projects reduceVisualNoise=$reduceVisualNoise onto the canvas surface',
+    ({ expected, reduceVisualNoise }) => {
+      const { agentNode, terminalNode } = createNodes()
+
+      renderCanvas([agentNode, terminalNode], vi.fn(), vi.fn(), vi.fn(), {
+        reduceVisualNoise
+      })
+
+      expect(document.querySelector('.canvas-surface')).toHaveAttribute(
+        'data-reduce-visual-noise',
+        expected
+      )
+    }
+  )
+
   it('does not move an Agent when dragging a selected terminal', () => {
     const { agentNode, terminalNode } = createNodes()
     const onNodesChange = vi.fn()

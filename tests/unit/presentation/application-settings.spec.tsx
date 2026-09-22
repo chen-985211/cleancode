@@ -269,7 +269,7 @@ describe('application settings', () => {
 
     expect(screen.getByRole('heading', { name: '画布' })).toBeInTheDocument()
     expect(
-      screen.getByText('缩小画布时隐藏次要描述和操作；悬停、聚焦或选中时重新显示。')
+      screen.getByText('始终隐藏终端描述；缩小画布时隐藏其他次要操作，悬停、聚焦或选中时重新显示。')
     ).toBeInTheDocument()
     const toggle = screen.getByRole('switch', { name: '减少视觉噪声' })
     expect(toggle).toHaveAttribute('aria-checked', 'true')

@@ -58,8 +58,7 @@ describe('workspace defaults project picker', () => {
       )
       expect(options[0]).toHaveAccessibleDescription('/first/project')
       expect(options[1]).toHaveAccessibleDescription('/second/project')
-      expect(menu).toHaveFocus()
-      expect(options[1]).not.toHaveFocus()
+      expect(options[1]).toHaveFocus()
       fireEvent.keyDown(menu, { key: 'Escape' })
       expect(escape).not.toHaveBeenCalled()
       expect(trigger).toHaveFocus()
@@ -71,6 +70,25 @@ describe('workspace defaults project picker', () => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     }
   )
+
+  it.each([
+    ['ArrowDown', 0],
+    ['ArrowUp', 1]
+  ])('focuses the expected option when %s opens the menu', (key, expectedIndex) => {
+    render(
+      <WorkspaceDefaultsProjectPicker
+        projects={projects}
+        selected={projects[1]}
+        onSelect={vi.fn()}
+      />
+    )
+
+    const trigger = screen.getByRole('button', { name: '切换项目：Same name' })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key })
+
+    expect(screen.getAllByRole('menuitemradio')[expectedIndex]).toHaveFocus()
+  })
 
   it('lets an outside control take the same click without restoring focus to the project', () => {
     const outsideClick = vi.fn()
