@@ -1,0 +1,50 @@
+.about-settings-pane {
+  width: min(100%, 760px);
+}
+
+.about-settings-product {
+  display: grid;
+  justify-items: center;
+  padding: clamp(48px, 10vh, 100px) 16px 48px;
+  text-align: center;
+}
+
+.about-settings-product__icon {
+  display: block;
+  width: 104px;
+  height: 104px;
+  margin-bottom: 18px;
+}
+
+.about-settings-product h2,
+.about-settings-product dl {
+  margin: 0;
+}
+
+.about-settings-product h2 {
+  color: var(--cc-foreground);
+  font-size: 28px;
+  font-weight: 680;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.about-settings-product dl {
+  margin-top: 10px;
+  color: var(--cc-muted-strong);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.about-settings-product dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.about-settings-product dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}

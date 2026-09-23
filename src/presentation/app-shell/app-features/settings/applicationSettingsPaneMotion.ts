@@ -7,7 +7,7 @@ import {
 import type { SpringProgressMotionFrameScheduler } from '../../../shared/motion/springProgressMotion'
 
 export type ApplicationSettingsPane =
-  'agents' | 'canvas' | 'diagnostics' | 'shortcuts' | 'terminal' | 'workspace'
+  'about' | 'agents' | 'canvas' | 'diagnostics' | 'shortcuts' | 'terminal' | 'workspace'
 export type ApplicationSettingsPaneDirection = 'backward' | 'forward' | 'none'
 
 export interface ApplicationSettingsPaneMotionRoot {
@@ -57,7 +57,8 @@ const paneOrder: readonly ApplicationSettingsPane[] = [
   'workspace',
   'terminal',
   'agents',
-  'diagnostics'
+  'diagnostics',
+  'about'
 ]
 const dynamics = { dampingRatio: 1, response: 0.3 }
 const opacityProperty = '--application-settings-pane-motion-opacity'

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 
+import packageJson from '../../../package.json'
 import { ApplicationSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ApplicationSettingsRoot'
 import {
   defaultApplicationShortcutBindings,
@@ -78,7 +79,7 @@ describe('application settings', () => {
       within(settingsNavigation)
         .getAllByRole('button')
         .map((button) => button.textContent)
-    ).toEqual(['快捷键', '画布', '工作区', '终端', 'Agent', '问题反馈'])
+    ).toEqual(['快捷键', '画布', '工作区', '终端', 'Agent', '问题反馈', '关于'])
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(
@@ -298,7 +299,7 @@ describe('application settings', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('places problem feedback last and opens its lightweight diagnostics actions', () => {
+  it('opens the lightweight problem feedback actions immediately before about', () => {
     render(<SettingsHarness initiallyOpen />)
 
     fireEvent.click(screen.getByRole('button', { name: '问题反馈' }))
@@ -307,6 +308,21 @@ describe('application settings', () => {
     expect(screen.getByRole('button', { name: '复制诊断摘要' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '导出诊断文件' })).toBeInTheDocument()
     expect(screen.getByText('不包含源码、终端内容或 Agent 对话。')).toBeInTheDocument()
+  })
+
+  it('places about last and shows the application name and package version', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    const navigation = screen.getByRole('navigation', { name: '设置导航' })
+    const navigationItems = within(navigation).getAllByRole('button')
+    expect(navigationItems.at(-1)).toHaveTextContent('关于')
+
+    fireEvent.click(screen.getByRole('button', { name: '关于' }))
+
+    expect(screen.getByRole('region', { name: '关于' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: packageJson.productName })).toBeInTheDocument()
+    expect(screen.getByText('版本')).toBeInTheDocument()
+    expect(screen.getByText(packageJson.version)).toBeInTheDocument()
   })
 })
 

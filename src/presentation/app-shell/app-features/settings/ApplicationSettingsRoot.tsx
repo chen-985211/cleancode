@@ -7,6 +7,7 @@ import { KeyboardIcon } from '@phosphor-icons/react/dist/csr/Keyboard'
 import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
+import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
 import {
   useCallback,
@@ -45,6 +46,7 @@ import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreferenc
 import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
 import { ApplicationDiagnosticsPane } from './ApplicationDiagnosticsPane'
+import { AboutSettingsPane } from './AboutSettingsPane'
 import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 import { useInterruptibleSurfaceFocusRestore } from '../../../shared/hooks/useInterruptibleSurfaceFocusRestore'
 import {
@@ -248,6 +250,15 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               <BugIcon size={17} aria-hidden="true" />
               <span>{t('settings.diagnostics.title')}</span>
             </button>
+            <button
+              type="button"
+              data-selection-motion-option="about"
+              aria-current={activePane === 'about' ? 'page' : undefined}
+              onClick={() => setSelectedPane('about')}
+            >
+              <InfoIcon size={17} aria-hidden="true" />
+              <span>{t('settings.about.title')}</span>
+            </button>
           </nav>
           <main className="application-settings-content">
             <ApplicationSettingsPaneTransition activePane={activePane}>
@@ -277,6 +288,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 />
               ) : activePane === 'diagnostics' ? (
                 <ApplicationDiagnosticsPane />
+              ) : activePane === 'about' ? (
+                <AboutSettingsPane />
               ) : (
                 <div className="shortcut-settings-pane">
                   <header className="shortcut-settings-pane__header">

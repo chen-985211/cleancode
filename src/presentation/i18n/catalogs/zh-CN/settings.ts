@@ -11,6 +11,8 @@ export const zhCNSettingsMessages = {
   'settings.back': '返回工作区',
   'settings.workspace.title': '工作区',
   'settings.navigation': '设置导航',
+  'settings.about.title': '关于',
+  'settings.about.version': '版本',
   'settings.shortcuts.title': '快捷键',
   'settings.shortcuts.resetAll': '全部恢复默认',
   'settings.shortcuts.recording': '请按下新的快捷键',
