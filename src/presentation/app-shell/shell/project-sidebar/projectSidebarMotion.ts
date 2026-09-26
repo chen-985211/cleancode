@@ -17,6 +17,7 @@ export interface ProjectSidebarMotionElements {
   readonly spatial: ProjectSidebarMotionSurface | null
   readonly center: ProjectSidebarMotionSurface | null
   readonly statusbar?: ProjectSidebarMotionSurface | null
+  readonly taskArea?: ProjectSidebarMotionSurface | null
 }
 
 export interface ProjectSidebarMotionFrameScheduler {
@@ -92,6 +93,8 @@ export function createProjectSidebarMotionController({
     if (!elements) return
     const layoutProgress = clamp(axis.value, 0, 1)
     const spatialOffset = expandedWidth * layoutProgress
+    // Only the lightweight task view reflows; canvas/terminal surfaces keep compositor motion.
+    elements.taskArea?.style.setProperty('left', `${round(spatialOffset)}px`)
     if (state === 'collapsed' || state === 'expanded') {
       clearTranslations(elements)
     } else {
@@ -133,6 +136,7 @@ export function createProjectSidebarMotionController({
   const clearElements = (): void => {
     if (!elements) return
     clearTranslations(elements)
+    elements.taskArea?.style.removeProperty('left')
     elements.sidebar?.removeAttribute(stateAttribute)
     elements.titlebar?.removeAttribute(stateAttribute)
     elements.spatial?.removeAttribute(stateAttribute)
@@ -195,7 +199,8 @@ function hasSameElements(
     current.titlebar === next.titlebar &&
     current.spatial === next.spatial &&
     current.center === next.center &&
-    current.statusbar === next.statusbar
+    current.statusbar === next.statusbar &&
+    current.taskArea === next.taskArea
   )
 }
 

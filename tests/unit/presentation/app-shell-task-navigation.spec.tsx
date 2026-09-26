@@ -1,11 +1,82 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useRef, useState } from 'react'
 import { AppShellProjectArea } from '../../../src/presentation/app-shell/shell/project-sidebar/AppShellProjectArea'
+import { useProjectSidebarMotion } from '../../../src/presentation/app-shell/shell/project-sidebar/useProjectSidebarMotion'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('task navigation', () => {
   afterEach(() => {
     delete window.cleancode
+    vi.restoreAllMocks()
   })
+
+  it.each([false, true])(
+    'keeps the same task view and usable sidebar toggle when initially collapsed is %s',
+    async (initialIsCollapsed) => {
+      const matchMedia = window.matchMedia.bind(window)
+      vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+        ...matchMedia(query),
+        matches: query === '(prefers-reduced-motion: reduce)'
+      }))
+      const workbench = createWorkbenchSnapshot('/one', 'One')
+      window.cleancode = {
+        listProjectIssues: async () => ({
+          repository: { name: 'owner/repo', defaultBranch: 'main' },
+          issues: [],
+          hasMore: false
+        })
+      } as unknown as NonNullable<Window['cleancode']>
+      function Harness() {
+        const [isCollapsed, setIsCollapsed] = useState(initialIsCollapsed)
+        const toggleRef = useRef<HTMLButtonElement>(null)
+        const motion = useProjectSidebarMotion(isCollapsed)
+        return (
+          <main className={`app-shell ${isCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
+            <section className="app-shell__workspace">Canvas</section>
+            <AppShellProjectArea
+              workbenches={[workbench]}
+              currentWorkbench={workbench}
+              isDesktopRuntime
+              isCollapsed={isCollapsed}
+              toggleRef={toggleRef}
+              motion={motion}
+              toggleTooltip="Toggle"
+              onToggle={() => setIsCollapsed((value) => !value)}
+              onAddProject={vi.fn()}
+              onArchiveBranchWorkspace={vi.fn()}
+              onCheckoutMainBranch={vi.fn()}
+              onCreateBranchWorkspace={vi.fn()}
+              onRemoveProject={vi.fn()}
+              onReorderProject={vi.fn()}
+              onSelectWorkspace={vi.fn()}
+              onCreateIssueWorkspace={vi.fn()}
+              onProjectChanged={vi.fn()}
+            />
+          </main>
+        )
+      }
+      render(<Harness />)
+      const layout = document.querySelector<HTMLElement>('.task-surface-host')
+      expect(layout).not.toBeNull()
+      expect(layout?.style.left).toBe(initialIsCollapsed ? '0px' : '280px')
+      // Reveal the navigation first if the application was initially collapsed.
+      if (initialIsCollapsed) fireEvent.click(screen.getByRole('button', { name: '展开侧边栏' }))
+      fireEvent.click(screen.getByRole('button', { name: '任务' }))
+      await screen.findByRole('button', { name: '任务项目' })
+      const surface = document.querySelector('.task-surface')
+      const toggle = screen.getByRole('button', { name: '收起侧边栏' })
+      fireEvent.click(toggle)
+      expect(toggle).toHaveAccessibleName('展开侧边栏')
+      expect(toggle.closest('[inert]')).toBeNull()
+      expect(layout?.style.left).toBe('0px')
+      fireEvent.click(toggle)
+      expect(toggle).toHaveAccessibleName('收起侧边栏')
+      expect(layout?.style.left).toBe('280px')
+      expect(document.querySelector('.task-surface')).toBe(surface)
+      expect(screen.getByRole('button', { name: '任务' })).toHaveAttribute('aria-expanded', 'true')
+      expect(document.querySelector<HTMLElement>('.app-shell__workspace')?.inert).toBe(true)
+    }
+  )
 
   it('has one entry above projects and browses another project without switching the canvas', async () => {
     const one = createWorkbenchSnapshot('/one', 'One')

@@ -6,8 +6,18 @@ const sidebarStyles = readProjectStyle('project-sidebar.css')
 const sidebarLayoutStyles = readStyle('shell/project-sidebar/project-sidebar-layout.css')
 const titlebarStyles = readStyle('shell/project-sidebar/project-sidebar-titlebar.css')
 const canvasStyles = readStyle('workbench/workbench-canvas.css')
+const taskStyles = readStyle('shell/project-sidebar/task-surface.css')
 
 describe('project sidebar motion styles', () => {
+  it('keeps the sidebar and its stationary toggle above the task area throughout motion', () => {
+    const sidebarColumn = readRule(sidebarLayoutStyles, '.project-sidebar-column')
+    const taskArea = readRule(taskStyles, '.task-surface-host')
+    const layer = (rule: string) => Number(rule.match(/z-index:\s*(\d+)/)?.[1])
+    expect(layer(sidebarColumn)).toBeGreaterThan(layer(taskArea))
+    expect(taskArea).toContain('right: 0;')
+    expect(taskStyles).not.toContain('.app-shell--sidebar-collapsed .project-issues__header')
+  })
+
   it('keeps the application layout stable while motion is running on compositor surfaces', () => {
     const shellRule = readRule(shellStyles, '.app-shell')
     const sidebarColumnRule = readRule(sidebarLayoutStyles, '.project-sidebar-column')

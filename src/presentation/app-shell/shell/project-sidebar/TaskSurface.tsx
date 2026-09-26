@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, type ReactNode, type Ref, type RefObject } from 'react'
 import { useSurfaceMotionPresence } from '../../../shared/hooks/useSurfaceMotionPresence'
 import { useSurfaceSpringMotion } from '../../../shared/hooks/useSurfaceSpringMotion'
 import { acquireSurfaceIsolationLease } from '../../../shared/motion/surfaceIsolation'
@@ -6,11 +6,13 @@ import { acquireSurfaceIsolationLease } from '../../../shared/motion/surfaceIsol
 export function TaskSurface({
   open,
   surfaceRef,
+  sidebarMotionRef,
   onExitComplete,
   children
 }: {
   readonly open: boolean
   readonly surfaceRef: RefObject<HTMLDivElement | null>
+  readonly sidebarMotionRef?: Ref<HTMLDivElement>
   readonly onExitComplete: () => void
   readonly children: ReactNode
 }) {
@@ -29,7 +31,7 @@ export function TaskSurface({
     return acquireSurfaceIsolationLease(targets)
   }, [open, surfaceRef])
   return (
-    <div className="task-surface-host" hidden={!presence.isPresent}>
+    <div ref={sidebarMotionRef} className="task-surface-host" hidden={!presence.isPresent}>
       <div
         ref={surfaceRef}
         className="task-surface anchored-surface-motion"

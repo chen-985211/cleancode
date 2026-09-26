@@ -3,8 +3,11 @@
 }
 .task-surface-host {
   position: absolute;
-  inset: 0 0 0 var(--cc-sidebar-expanded-width);
-  z-index: 30;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--cc-sidebar-expanded-width);
+  z-index: 9;
   overflow: clip;
   pointer-events: none;
 }
@@ -30,6 +33,6 @@
 .app-shell:has(.task-surface-host:not([hidden])) > .app-shell__settings {
   visibility: hidden;
 }
-.app-shell--sidebar-collapsed .project-issues__header {
-  padding-top: 40px;
+.task-surface .project-issues__header {
+  padding-top: calc(var(--cc-titlebar-height) + 4px);
 }

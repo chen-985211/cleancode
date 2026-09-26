@@ -71,12 +71,13 @@ export function AppShellProjectArea({
           ) : undefined
         }
       />
-      {workbench && taskProjectId !== null ? (
-        <TaskSurface
-          open={open}
-          surfaceRef={surfaceRef}
-          onExitComplete={focus.completeFocusRestore}
-        >
+      <TaskSurface
+        open={open && !!workbench && taskProjectId !== null}
+        surfaceRef={surfaceRef}
+        sidebarMotionRef={props.motion.taskAreaRef}
+        onExitComplete={focus.completeFocusRestore}
+      >
+        {workbench && taskProjectId !== null ? (
           <ProjectIssuesPanel
             project={workbench.project}
             title={t('tasks.title')}
@@ -106,8 +107,8 @@ export function AppShellProjectArea({
             }}
             onProjectChanged={onProjectChanged}
           />
-        </TaskSurface>
-      ) : null}
+        ) : null}
+      </TaskSurface>
     </div>
   )
 }
