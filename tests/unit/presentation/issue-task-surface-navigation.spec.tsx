@@ -10,7 +10,7 @@ afterEach(() => {
   delete window.cleancode
 })
 
-it('keeps a reopened task surface open after a superseded issue creation completes', async () => {
+async function startCreation() {
   const origin = createWorkbenchSnapshot('/one', 'One', { gitBranch: 'main' })
   const other = createWorkbenchSnapshot('/two', 'Two', { gitBranch: 'main' })
   const issue = {
@@ -71,6 +71,7 @@ it('keeps a reopened task surface open after a superseded issue creation complet
     }),
     listWorkspaceInitializations: async () => []
   } as unknown as NonNullable<Window['cleancode']>
+  const onCanvasPointerDown = vi.fn()
   const nodeStore = createWorkbenchNodeStore()
   function Harness() {
     const [current, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(origin)
@@ -96,7 +97,11 @@ it('keeps a reopened task surface open after a superseded issue creation complet
     })
     return (
       <main className="app-shell">
-        <section className="app-shell__workspace" data-testid="canvas">
+        <section
+          className="app-shell__workspace"
+          data-testid="canvas"
+          onPointerDown={onCanvasPointerDown}
+        >
           {current?.project.name}
         </section>
         <AppShellProjectArea
@@ -129,6 +134,11 @@ it('keeps a reopened task surface open after a superseded issue creation complet
   fireEvent.click(screen.getByRole('button', { name: '开始处理' }))
   fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
   await waitFor(() => expect(start).toHaveBeenCalledOnce())
+  return { entry, finish, switchWorkspace, onCanvasPointerDown }
+}
+
+it('keeps a reopened task surface open after a superseded issue creation completes', async () => {
+  const { entry, finish, switchWorkspace } = await startCreation()
   const otherGroup = screen.getByRole('group', { name: /Two/ })
   fireEvent.click(within(otherGroup).getByRole('button', { name: '切换到默认工作区 main' }))
   await waitFor(() => expect(screen.getByTestId('canvas')).toHaveTextContent('Two'))
@@ -141,3 +151,21 @@ it('keeps a reopened task surface open after a superseded issue creation complet
   expect(screen.getByTestId('canvas')).toHaveTextContent('Two')
   expect(entry).toHaveAttribute('aria-expanded', 'true')
 })
+
+it.each(['任务项目', '标签'])(
+  'closes the %s menu when issue creation opens the workspace',
+  async (label) => {
+    const { entry, finish, onCanvasPointerDown } = await startCreation()
+    if (label === '标签') fireEvent.click(screen.getByRole('button', { name: '返回任务列表' }))
+    fireEvent.click(screen.getByRole('button', { name: label }))
+    expect(screen.getByRole('menu', { name: label })).toBeInTheDocument()
+    await act(async () => finish())
+    expect(entry).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByTestId('canvas'), { pointerId: 1 })
+    expect(onCanvasPointerDown).toHaveBeenCalledOnce()
+    fireEvent.click(entry)
+    expect(entry).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  }
+)

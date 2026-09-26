@@ -82,6 +82,7 @@ export function AppShellProjectArea({
             title={t('tasks.title')}
             projectSelector={
               <IssueMenuSelect
+                active={open}
                 label={t('tasks.project')}
                 value={workbench.project.id}
                 options={props.workbenches.map((item) => ({

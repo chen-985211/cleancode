@@ -6,11 +6,13 @@ import { useMenuOptionHighlightMotion } from '../../../../presentation/shared/ho
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 export function IssueMenuSelect({
+  active,
   label,
   value,
   options,
   onChange
 }: {
+  readonly active: boolean
   readonly label: string
   readonly value: string
   readonly options: readonly { readonly value: string; readonly label: string }[]
@@ -20,11 +22,14 @@ export function IssueMenuSelect({
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
   const initialFocus = useRef<'container' | 'first' | 'last'>('container')
-  const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const open = active && expanded
+  // A hidden owner cannot leave a portal interactive or reopen it on its next visit.
+  if (!active && expanded) setExpanded(false)
   const [position, setPosition] = useState<CSSProperties>({ top: 0, left: 0 })
   const { highlightRef, interactionProps } = useMenuOptionHighlightMotion()
   function close(restore: boolean) {
-    setOpen(false)
+    setExpanded(false)
     if (restore) anchor.current?.focus({ preventScroll: true })
   }
   useLayoutEffect(() => {
@@ -74,20 +79,21 @@ export function IssueMenuSelect({
         ref={anchor}
         className="project-issues__select directional-menu-trigger"
         type="button"
+        disabled={!active}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => {
           initialFocus.current = 'container'
-          setOpen(!open)
+          setExpanded(!open)
         }}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             event.stopPropagation()
             initialFocus.current = event.key === 'ArrowDown' ? 'first' : 'last'
-            setOpen(true)
+            setExpanded(true)
           }
         }}
       >

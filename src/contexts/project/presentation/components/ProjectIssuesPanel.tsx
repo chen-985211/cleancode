@@ -368,6 +368,7 @@ export function ProjectIssuesPanel({
               {t('issues.mine')}
             </button>
             <IssueMenuSelect
+              active={open && !detailVisible}
               label={t('issues.label')}
               value={model.view.label}
               onChange={(value) => model.update({ label: value, limit: 50 })}
