@@ -23,6 +23,7 @@ export const zhCNProjectMessages = {
   'issues.start': '开始处理',
   'issues.refresh': '刷新 Issues',
   'issues.close': '关闭任务面板',
+  'issues.sourceHint': '从此仓库读取 Issues，点击修改来源。',
   'issues.configureRepository': '选择 GitHub 仓库',
   'issues.repository': 'GitHub 仓库',
   'issues.repositoryPlaceholder': 'owner/repository',

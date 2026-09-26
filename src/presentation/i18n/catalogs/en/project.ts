@@ -25,6 +25,7 @@ export const enProjectMessages = {
   'issues.start': 'Start working',
   'issues.refresh': 'Refresh issues',
   'issues.close': 'Close tasks panel',
+  'issues.sourceHint': 'Read issues from this repository. Click to change the source.',
   'issues.configureRepository': 'Choose a GitHub repository',
   'issues.repository': 'GitHub repository',
   'issues.repositoryPlaceholder': 'owner/repository',

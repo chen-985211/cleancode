@@ -7,6 +7,9 @@ import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
+import { GitHubMarkIcon } from '../../../../presentation/shared/components/GitHubMarkIcon'
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple'
+import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
 import { CircleDashedIcon } from '@phosphor-icons/react/dist/csr/CircleDashed'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { StartIssueWorkspaceCommand } from '../../application/dto/ProjectIssues'
@@ -150,7 +153,7 @@ export function ProjectIssuesPanel({
                   })
                 }}
               >
-                <GitBranchIcon size={14} aria-hidden="true" />
+                <GitHubMarkIcon size={16} />
                 <input
                   aria-label={t('issues.repository')}
                   autoFocus
@@ -182,21 +185,23 @@ export function ProjectIssuesPanel({
                 </button>
               </form>
             ) : (
-              <button
-                ref={sourceRef}
-                className="project-issues__source"
-                type="button"
-                aria-expanded={configuring}
-                title={t('issues.configureRepository')}
-                onClick={() => {
-                  restoreRepositoryFocus.current = true
-                  model.update({ repositoryDraft: repository })
-                  setConfiguringProject(project.id)
-                }}
-              >
-                <GitBranchIcon size={14} aria-hidden="true" />
-                <span>{repository || t('issues.configureRepository')}</span>
-              </button>
+              <TooltipLabel content={t('issues.sourceHint')} side="bottom">
+                <button
+                  ref={sourceRef}
+                  className="project-issues__source"
+                  type="button"
+                  aria-expanded={configuring}
+                  onClick={() => {
+                    restoreRepositoryFocus.current = true
+                    model.update({ repositoryDraft: repository })
+                    setConfiguringProject(project.id)
+                  }}
+                >
+                  <GitHubMarkIcon size={16} />
+                  <span>{repository || t('issues.configureRepository')}</span>
+                  <PencilSimpleIcon size={13} aria-hidden="true" />
+                </button>
+              </TooltipLabel>
             )}
           </div>
         </div>
