@@ -175,6 +175,72 @@ describe('project issues panel', () => {
     expect(close).not.toHaveBeenCalled()
     expect(trigger).toHaveFocus()
   })
+  it.each(['success', 'failure', 'rejection'] as const)(
+    'keeps another project busy when an earlier creation settles with %s',
+    async (outcome) => {
+      let notify!: (event: IssueWorkspaceProgress) => void
+      const operations: {
+        command: StartIssueWorkspaceCommand
+        resolve: (success: boolean) => void
+        reject: (error: Error) => void
+      }[] = []
+      const onStart = vi.fn(
+        (command: StartIssueWorkspaceCommand) =>
+          new Promise<boolean>((resolve, reject) => operations.push({ command, resolve, reject }))
+      )
+      window.cleancode = {
+        listProjectIssues: async () => result,
+        getProjectIssue: async () => issue,
+        onIssueWorkspaceProgress: (listener: typeof notify) => {
+          notify = listener
+          return vi.fn()
+        }
+      } as unknown as NonNullable<Window['cleancode']>
+      const one = createWorkbenchSnapshot('/one', 'one').project
+      const two = createWorkbenchSnapshot('/two', 'two').project
+      const props = {
+        onClose: vi.fn(),
+        onStart,
+        onOpenWorkspace: vi.fn(),
+        onProjectChanged: vi.fn()
+      }
+      const { rerender } = render(<ProjectIssuesPanel {...props} project={one} />)
+      fireEvent.click(await screen.findByRole('button', { name: issue.title }))
+      fireEvent.click(await screen.findByRole('button', { name: '开始处理' }))
+      fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+      rerender(<ProjectIssuesPanel {...props} project={two} />)
+      fireEvent.click(await screen.findByRole('button', { name: issue.title }))
+      fireEvent.click(await screen.findByRole('button', { name: '开始处理' }))
+      fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+      expect(onStart).toHaveBeenCalledTimes(2)
+      act(() => notify({ operationId: operations[0]!.command.operationId!, phase: 'creating' }))
+      expect(screen.getByRole('button', { name: '正在准备基准…' })).toBeDisabled()
+      act(() => notify({ operationId: operations[1]!.command.operationId!, phase: 'creating' }))
+      await act(async () => {
+        if (outcome === 'rejection') operations[0]!.reject(new Error('Project one failed'))
+        else operations[0]!.resolve(outcome === 'success')
+      })
+      expect(screen.getByRole('button', { name: '正在创建…' })).toBeDisabled()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      fireEvent.submit(screen.getByRole('button', { name: '正在创建…' }).closest('form')!)
+      expect(onStart).toHaveBeenCalledTimes(2)
+      rerender(<ProjectIssuesPanel {...props} project={one} />)
+      await screen.findByRole('heading', { name: issue.title })
+      expect(screen.getByRole('button', { name: '开始处理' })).toBeEnabled()
+      if (outcome === 'rejection') expect(screen.getByRole('alert')).toBeInTheDocument()
+      else expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      rerender(<ProjectIssuesPanel {...props} project={two} />)
+      await screen.findByRole('heading', { name: issue.title })
+      expect(screen.getByRole('button', { name: '开始处理' })).toBeDisabled()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      await act(async () => operations[1]!.resolve(false))
+      fireEvent.click(screen.getByRole('button', { name: '开始处理' }))
+      fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+      act(() => notify({ operationId: operations[1]!.command.operationId!, phase: 'creating' }))
+      expect(screen.getByRole('button', { name: '正在准备基准…' })).toBeDisabled()
+      await act(async () => operations[2]!.resolve(false))
+    }
+  )
   it('cancels repository editing on an outside pointer without saving or stealing focus', async () => {
     const project = createWorkbenchSnapshot('/project', 'project').project
     const configure = vi.fn()

@@ -49,13 +49,15 @@ export function ProjectIssuesPanel({
 }) {
   const { t } = useI18n()
   const model = useProjectIssues(project, open)
-  const [action, setAction] = useState<{
-    projectId: string
-    busy: boolean
-    phase?: IssueWorkspacePhase
-    error?: unknown
-  }>()
-  const busy = action?.projectId === project.id && action.busy
+  const [actions, setActions] = useState<
+    Record<
+      string,
+      { operationId: string; busy: boolean; phase?: IssueWorkspacePhase; error?: unknown }
+    >
+  >({})
+  const inFlightActions = useRef(new Map<string, string>())
+  const action = actions[project.id]
+  const busy = action?.busy ?? false
   const [configuringProject, setConfiguringProject] = useState<string>()
   const repositoryFormRef = useRef<HTMLFormElement>(null)
   const restoreRepositoryFocus = useRef(true)
@@ -68,23 +70,18 @@ export function ProjectIssuesPanel({
   useLayoutEffect(() => {
     liveProject.current = project.id
   }, [project.id])
-  const creationRef = useRef<{ operationId: string; projectId: string } | null>(null)
   useEffect(
     () =>
       window.cleancode?.onIssueWorkspaceProgress?.((event) => {
-        const active = creationRef.current
-        if (
-          !active ||
-          event.operationId !== active.operationId ||
-          active.projectId !== liveProject.current
-        )
-          return
         if (event.phase !== 'preparing' && event.phase !== 'creating') return
-        setAction((current) =>
-          current?.busy && current.projectId === active.projectId
-            ? { ...current, phase: event.phase }
-            : current
-        )
+        setActions((current) => {
+          const active = Object.entries(current).find(
+            ([, value]) => value.busy && value.operationId === event.operationId
+          )
+          if (!active) return current
+          const [projectId, value] = active
+          return { ...current, [projectId]: { ...value, phase: event.phase } }
+        })
       }),
     []
   )
@@ -96,18 +93,29 @@ export function ProjectIssuesPanel({
     else if (wasDetail.current) selectedRowRef.current?.focus({ preventScroll: true })
     wasDetail.current = detailVisible
   }, [detailVisible, open])
-  const run = async (operation: () => Promise<unknown>) => {
-    if (busy) return
+  const run = async (operation: (operationId: string) => Promise<unknown>) => {
     const projectId = project.id
-    setAction({ projectId, busy: true })
+    if (inFlightActions.current.has(projectId)) return
+    const operationId = crypto.randomUUID()
+    inFlightActions.current.set(projectId, operationId)
+    setActions((current) => ({ ...current, [projectId]: { operationId, busy: true } }))
+    const settle = (error?: unknown) =>
+      setActions((current) =>
+        current[projectId]?.operationId === operationId
+          ? { ...current, [projectId]: { operationId, busy: false, error } }
+          : current
+      )
     try {
-      await operation()
-      setAction({ projectId, busy: false })
+      await operation(operationId)
+      settle()
     } catch (error) {
-      setAction({ projectId, busy: false, error })
+      settle(error)
+    } finally {
+      if (inFlightActions.current.get(projectId) === operationId)
+        inFlightActions.current.delete(projectId)
     }
   }
-  const actionError = action?.projectId === project.id ? action.error : undefined
+  const actionError = action?.error
   const error = actionError ?? model.error ?? model.detailError
   const failedRepository = isSerializedAppError(model.error)
     ? model.error.details?.repository
@@ -303,22 +311,15 @@ export function ProjectIssuesPanel({
                 busy={busy}
                 onOpenWorkspace={onOpenWorkspace}
                 onStart={(values) =>
-                  void run(async () => {
-                    const operationId = crypto.randomUUID()
-                    creationRef.current = { operationId, projectId: project.id }
-                    try {
-                      const success = await onStart({
-                        projectDirectory: project.directory,
-                        repository: selected.repository,
-                        number: selected.number,
-                        ...values,
-                        operationId
-                      })
-                      if (success && liveProject.current === project.id) onWorkspaceStarted()
-                    } finally {
-                      if (creationRef.current?.operationId === operationId)
-                        creationRef.current = null
-                    }
+                  void run(async (operationId) => {
+                    const success = await onStart({
+                      projectDirectory: project.directory,
+                      repository: selected.repository,
+                      number: selected.number,
+                      ...values,
+                      operationId
+                    })
+                    if (success && liveProject.current === project.id) onWorkspaceStarted()
                   })
                 }
               />

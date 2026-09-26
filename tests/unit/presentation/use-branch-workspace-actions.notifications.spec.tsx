@@ -89,6 +89,37 @@ describe('branch workspace action notifications', () => {
     expect(replaceWorkbench.mock.calls).toEqual([[selected]])
   })
 
+  it('reports a failed preparation without creating or selecting a workspace', async () => {
+    const workbench = createWorkbench()
+    const start = vi.fn()
+    const replaceWorkbench = vi.fn()
+    const notifications = createNotifications()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: { ...createRuntimeApi(), startIssueWorkspace: start }
+    })
+    const { result } = renderBranchWorkspaceActions(workbench, notifications, { replaceWorkbench })
+    await act(async () => {
+      const created = await result.current.createBranchWorkspace(workbench, 'issue/42', {
+        requestId: 'request',
+        beforeCreate: rejectingAction('Save failed'),
+        issueCommand: {
+          projectDirectory: workbench.project.directory,
+          repository: 'owner/repo',
+          number: 42,
+          branchName: 'issue/42',
+          baseBranch: 'main'
+        }
+      })
+      expect(created).toBeUndefined()
+    })
+    expect(start).not.toHaveBeenCalled()
+    expect(replaceWorkbench).not.toHaveBeenCalled()
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '创建分支工作区失败', kind: 'error' })
+    )
+  })
+
   it('routes every rejected workspace action through an independently keyed notification', async () => {
     const workbench = createWorkbench()
     const runtimeApi = createRuntimeApi({

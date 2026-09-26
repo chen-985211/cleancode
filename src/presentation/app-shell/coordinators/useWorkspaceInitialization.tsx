@@ -32,6 +32,7 @@ interface WorkspaceInitializationInput {
       readonly requestId: string
       readonly defaults?: WorkspaceDefaults
       readonly issueCommand?: StartIssueWorkspaceCommand
+      readonly beforeCreate?: () => Promise<void>
     }
   ) => Promise<WorkbenchSnapshot | undefined>
   readonly nodeStore: WorkbenchNodeStore
@@ -239,6 +240,9 @@ export function useWorkspaceInitialization({
     const result = await createWorkspace(workbench, branchName, {
       requestId,
       issueCommand,
+      ...(issueCommand
+        ? { beforeCreate: () => autosaveStore.flush(workbench.project.directory) }
+        : {}),
       defaults: autosaveStore.get(workbench.project.directory)?.value
     })
     if (!result) return false
@@ -290,13 +294,8 @@ export function useWorkspaceInitialization({
   return {
     cancelFocus,
     createBranchWorkspace,
-    createIssueWorkspace: async (
-      workbench: WorkbenchSnapshot,
-      command: StartIssueWorkspaceCommand
-    ) => {
-      await autosaveStore.flush(workbench.project.directory)
-      return createBranchWorkspace(workbench, command.branchName, command)
-    },
+    createIssueWorkspace: (workbench: WorkbenchSnapshot, command: StartIssueWorkspaceCommand) =>
+      createBranchWorkspace(workbench, command.branchName, command),
     renderSettings: (workbenches: readonly WorkbenchSnapshot[], onClose: () => void) => (
       <WorkspaceDefaultsSettingsPane
         autosaveStore={autosaveStore}

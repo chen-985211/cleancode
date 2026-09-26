@@ -273,6 +273,7 @@ export function useBranchWorkspaceActions({
         readonly requestId: string
         readonly defaults?: WorkspaceDefaults
         readonly issueCommand?: StartIssueWorkspaceCommand
+        readonly beforeCreate?: () => Promise<void>
       }
     ): Promise<WorkbenchSnapshot | undefined> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'create')
@@ -281,12 +282,16 @@ export function useBranchWorkspaceActions({
       const origin = currentWorkbenchRef.current
 
       try {
+        // Preparatory saves belong to this intent too; later navigation must
+        // supersede creation even before its IPC request has started.
+        const { beforeCreate, ...commandOptions } = options ?? {}
+        if (beforeCreate) await beforeCreate()
         const createdWorkbench = options?.issueCommand
           ? await window.cleancode?.startIssueWorkspace(options.issueCommand)
           : await window.cleancode?.createBranchWorkspace({
               projectDirectory: workbench.project.directory,
               branchName,
-              ...options
+              ...commandOptions
             })
 
         if (!isCurrentActionAttempt(key, occurrenceId)) return

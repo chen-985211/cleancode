@@ -48,7 +48,13 @@ describe('workspace initialization coordination', () => {
     'uses the latest project settings when creating from %s',
     async (source) => {
       const f = fixture()
-      const create = vi.fn(async () => ({ ...f.workbench, initialization: null }))
+      const committed = vi.fn(async () => ({ ...f.workbench, initialization: null }))
+      const create = vi.fn<Parameters<typeof useWorkspaceInitialization>[0]['createWorkspace']>(
+        async (_workbench, _branch, options) => {
+          if (options?.beforeCreate) await options.beforeCreate()
+          return committed()
+        }
+      )
       let finishSave!: () => void
       const save = vi.fn(
         () =>
@@ -96,8 +102,8 @@ describe('workspace initialization coordination', () => {
             ? result.current.createIssueWorkspace(f.workbench, issueCommand)
             : result.current.createBranchWorkspace(f.workbench, 'feature')
       })
-      if (source === 'issue') expect(create).not.toHaveBeenCalled()
-      else expect(create).toHaveBeenCalledOnce()
+      if (source === 'issue') expect(committed).not.toHaveBeenCalled()
+      else expect(committed).toHaveBeenCalledOnce()
       await act(async () => {
         finishSave()
         expect(await creation).toBe(true)
@@ -105,6 +111,7 @@ describe('workspace initialization coordination', () => {
       expect(create).toHaveBeenCalledWith(f.workbench, 'feature', {
         requestId: expect.any(String),
         issueCommand: source === 'issue' ? issueCommand : undefined,
+        ...(source === 'issue' ? { beforeCreate: expect.any(Function) } : {}),
         defaults: { templates: [], agents: [{ providerId: 'test-agent', count: 1 }] }
       })
     }
