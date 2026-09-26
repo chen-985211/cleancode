@@ -1,3 +1,4 @@
+import { normalizeProjectIssue, type ProjectIssueReference } from '../value-objects/ProjectIssue'
 import {
   createExpectedAppError,
   getAppErrorCode,
@@ -32,6 +33,8 @@ export interface WorkspaceInitializationItem {
 }
 
 export interface WorkspaceInitializationInput {
+  readonly baseRef?: string
+  readonly issue?: ProjectIssueReference
   readonly id: string
   readonly projectId: string
   readonly projectDirectory: string
@@ -59,6 +62,8 @@ export class WorkspaceInitialization {
   static create(input: WorkspaceInitializationInput): WorkspaceInitialization {
     const defaults = normalizeWorkspaceDefaults(input.defaults)
     const scope = {
+      ...(input.baseRef ? { baseRef: input.baseRef } : {}),
+      ...(input.issue ? { issue: normalizeProjectIssue(input.issue) } : {}),
       id: input.id,
       projectId: input.projectId,
       projectDirectory: input.projectDirectory,
@@ -109,6 +114,8 @@ export class WorkspaceInitialization {
       new Set(snapshot.items.map((item) => item?.id)).size !== snapshot.items.length
     )
       invalid()
+    if (snapshot.issue) normalizeProjectIssue(snapshot.issue)
+    if (snapshot.baseRef !== undefined && !validText(snapshot.baseRef)) invalid()
     for (const item of snapshot.items) {
       if (
         !item ||

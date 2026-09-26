@@ -3,7 +3,7 @@ import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
-import { useCallback, useEffect, useRef, useState, type Ref } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
@@ -30,6 +30,7 @@ interface ProjectSidebarShortcutTooltips {
 }
 
 interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
+  readonly navigation?: ReactNode
   readonly workbenches: readonly TWorkbench[]
   readonly currentWorkbench: TWorkbench | null
   readonly isCollapsed?: boolean
@@ -55,6 +56,7 @@ interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
 }
 
 export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
+  navigation,
   workbenches,
   currentWorkbench,
   isCollapsed = false,
@@ -98,6 +100,7 @@ export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
             {t('sidebar.previewWarning')}
           </div>
         ) : null}
+        {navigation}
         <div className="project-sidebar__section-header">
           <span className="project-sidebar__label">{t('sidebar.projects')}</span>
           <TooltipLabel content={addProjectTooltip}>

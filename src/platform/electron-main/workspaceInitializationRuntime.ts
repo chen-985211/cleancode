@@ -160,6 +160,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     return { initialization: (await initialize.inspect(snapshot.id)) ?? snapshot, templates }
   }
   return {
+    preparation,
     wrapLifecycle: (
       lifecycle: Pick<ProjectIpcHandlersInput, 'archiveBranchWorkspace' | 'forgetProject'>
     ) => ({

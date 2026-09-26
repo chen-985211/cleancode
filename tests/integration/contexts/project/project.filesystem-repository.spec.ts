@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 
 import { FileSystemProjectRepository } from '../../../../src/contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
 import { CreateProjectUseCase } from '../../../../src/contexts/project/application/use-cases/CreateProjectUseCase'
+import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
 describe('project filesystem repository', () => {
   let projectDirectory: string
@@ -17,6 +18,31 @@ describe('project filesystem repository', () => {
   afterEach(async () => {
     await rm(projectDirectory, { recursive: true, force: true })
     await rm(appStateDirectory, { recursive: true, force: true })
+  })
+
+  it('restores the project repository and issue links after reopening the application', async () => {
+    const repository = new FileSystemProjectRepository(appStateDirectory)
+    const issue = {
+      id: 'I_42',
+      repository: 'owner/repo',
+      number: 42,
+      title: 'Resize',
+      url: 'https://github.com/owner/repo/issues/42'
+    }
+    const project = Project.create({ name: 'Project', directory: projectDirectory })
+      .bindIssueRepository('owner/repo')
+      .addLinkedWorktreeWorkspace({
+        workspaceId: 'task',
+        displayName: 'issue/42',
+        gitBranch: 'issue/42',
+        directory: join(appStateDirectory, 'task'),
+        issue
+      })
+    await repository.save(project)
+    const reopened = await new FileSystemProjectRepository(appStateDirectory).findByDirectory(
+      projectDirectory
+    )
+    expect(reopened).toEqual(project.toSnapshot())
   })
 
   it('keeps project metadata outside the opened project directory', async () => {

@@ -1,6 +1,24 @@
 import type { zhCNErrorsMessages } from '../zh-CN/errors'
 
 export const enErrorsMessages = {
+  'error.PROJECT_ISSUE_INVALID': 'The issue or repository changed. Refresh and try again.',
+  'error.PROJECT_ISSUE_ALREADY_LINKED': 'This issue already has a workspace. Refresh and open it.',
+  'error.GITHUB_CLI_UNAVAILABLE':
+    'GitHub CLI was not found. Install gh and run gh auth login, then retry.',
+  'error.GITHUB_AUTH_REQUIRED': 'Run gh auth login in a terminal, then refresh.',
+  'error.GITHUB_ISSUES_DISABLED':
+    'GitHub Issues are disabled for this repository. Choose another task source in the repository settings.',
+  'error.GITHUB_PERMISSION_DENIED':
+    'Your GitHub account cannot read issues in this repository. Check the account and token permissions.',
+  'error.GITHUB_RESOURCE_UNAVAILABLE':
+    'The repository or issue does not exist, or your account cannot access it. Check the repository and signed-in account.',
+  'error.GITHUB_RATE_LIMITED': 'The GitHub API request limit was reached. Refresh later.',
+  'error.GITHUB_REQUEST_FAILED':
+    'GitHub request failed. Check your connection, login, and repository access, then retry.',
+  'error.GITHUB_REPOSITORY_NOT_CONFIGURED': 'Choose a GitHub repository for this project.',
+  'error.GITHUB_BASE_UNAVAILABLE':
+    'Could not fetch the base branch. Check the branch name, connection, and Git repository access.',
+
   'error.AGENT_PROVIDER_UNAVAILABLE':
     'This Agent provider is unavailable. Check its installation and Agent settings, then retry.',
   'error.WORKSPACE_DEFAULTS_INVALID': 'The defaults are invalid. Select the content again.',
@@ -44,6 +62,7 @@ export const enErrorsMessages = {
   'error.BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES':
     'The workspace has uncommitted changes and cannot be archived.',
   'error.BRANCH_WORKSPACE_NOT_FOUND': 'The branch workspace does not exist. Refresh and try again.',
+  'error.GIT_BRANCH_NAME_INVALID': 'Invalid Git branch name. Edit the name and try again.',
   'error.GIT_BRANCH_ALREADY_EXISTS':
     'The Git branch already exists, so a workspace with the same name cannot be created.',
   'error.GIT_BRANCH_CHECKED_OUT_IN_WORKTREE':

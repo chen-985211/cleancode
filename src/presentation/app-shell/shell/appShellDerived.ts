@@ -69,3 +69,10 @@ export function appShellClassName(
     .filter(Boolean)
     .join(' ')
 }
+
+export function groupMemberCount(
+  graph: { readonly terminalGroups: readonly TerminalGroupSnapshot[] } | null | undefined,
+  groupId: string | null
+): number {
+  return graph?.terminalGroups.find((group) => group.id === groupId)?.memberBlockIds.length ?? 0
+}

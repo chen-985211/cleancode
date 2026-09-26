@@ -7,6 +7,54 @@ import {
 
 describe('project sidebar motion', () => {
   it.each([
+    [280, false, false],
+    [280, true, false],
+    [360, false, false],
+    [360, true, false],
+    [280, false, true],
+    [280, true, true]
+  ])(
+    'keeps the task area beside the sidebar for width %s, collapsed %s, reduced motion %s',
+    (expandedWidth, initialIsCollapsed, reducedMotion) => {
+      const scheduler = createFrameScheduler()
+      const taskArea = createSurface()
+      const elements = { ...createElements(), taskArea }
+      const controller = createProjectSidebarMotionController({ scheduler })
+      const changeIntent = (isCollapsed: boolean) =>
+        controller.intentChanged(elements, { expandedWidth, isCollapsed, reducedMotion })
+      const expectContinuousBoundary = () => {
+        const sidebarRight =
+          expandedWidth + readSidebarPresentation(elements.sidebar, expandedWidth)
+        expect(Number.parseFloat(taskArea.properties.get('left') ?? '')).toBeCloseTo(
+          sidebarRight,
+          4
+        )
+      }
+
+      changeIntent(initialIsCollapsed)
+      expectContinuousBoundary()
+      changeIntent(!initialIsCollapsed)
+      expectContinuousBoundary()
+      scheduler.advanceNextFrame(100)
+      expectContinuousBoundary()
+      const boundaryBeforeReversal = taskArea.properties.get('left')
+      changeIntent(initialIsCollapsed)
+      if (!reducedMotion) expect(taskArea.properties.get('left')).toBe(boundaryBeforeReversal)
+      expectContinuousBoundary()
+      for (let frame = 0; frame < 240 && scheduler.pendingFrames() > 0; frame += 1) {
+        scheduler.advanceNextFrame()
+        expectContinuousBoundary()
+      }
+      expect(scheduler.pendingFrames()).toBe(0)
+      expect(Number.parseFloat(taskArea.properties.get('left') ?? '')).toBe(
+        initialIsCollapsed ? 0 : expandedWidth
+      )
+      controller.dispose()
+      expect(taskArea.properties.size).toBe(0)
+    }
+  )
+
+  it.each([
     {
       initialIsCollapsed: true,
       label: 'opening',

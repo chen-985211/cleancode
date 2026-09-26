@@ -27,6 +27,7 @@ import {
 import { agentCliReadyTimeoutMs, waitForAgentProviderInstalled } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
+import { waitForWorkspaceInteractive } from '../support/e2eSurfaceIsolation'
 import {
   createE2eTerminalEnvironment,
   prependE2ePath,
@@ -452,7 +453,7 @@ async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
   }, theme)
   await page.getByRole('button', { name: '关闭主题设置' }).click()
   await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
-  await page.waitForFunction(() => document.querySelector('[inert]') === null)
+  await waitForWorkspaceInteractive(page)
 }
 
 async function initializeGitProject(directory: string): Promise<void> {

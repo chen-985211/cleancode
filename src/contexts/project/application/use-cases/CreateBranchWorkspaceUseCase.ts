@@ -1,3 +1,5 @@
+import type { ProjectIssueReference } from '../../domain/value-objects/ProjectIssue'
+import { normalizeNewBranchName } from '../../domain/value-objects/GitBranchName'
 import { Project } from '../../domain/aggregates/Project'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
@@ -7,6 +9,9 @@ import type { ProjectRepository } from '../ports/ProjectRepository'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateBranchWorkspaceCommand {
+  readonly selectWorkspace?: boolean
+  readonly baseRef?: string
+  readonly issue?: ProjectIssueReference
   readonly workspaceId?: string
   readonly projectDirectory: string
   readonly branchName: string
@@ -38,8 +43,15 @@ export class CreateBranchWorkspaceUseCase {
     if (!projectSnapshot) {
       throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
     }
+    if (
+      command.issue &&
+      projectSnapshot.issueRepository &&
+      command.issue.repository.toLowerCase() !== projectSnapshot.issueRepository.toLowerCase()
+    ) {
+      throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
+    }
 
-    const branchName = command.branchName.trim()
+    const branchName = normalizeNewBranchName(command.branchName)
     const project = Project.fromSnapshot(projectSnapshot)
     const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
 
@@ -63,6 +75,8 @@ export class CreateBranchWorkspaceUseCase {
       branchName
     })
     const updatedProject = project.addLinkedWorktreeWorkspace({
+      selectWorkspace: command.selectWorkspace,
+      issue: command.issue,
       workspaceId: command.workspaceId,
       displayName: branchName,
       directory: worktreeDirectory,
@@ -70,6 +84,7 @@ export class CreateBranchWorkspaceUseCase {
     })
 
     await this.gitWorkspacePort.createBranchWorktree({
+      ...(command.baseRef ? { baseRef: command.baseRef } : {}),
       repositoryDirectory: project.directory,
       branchName,
       worktreeDirectory

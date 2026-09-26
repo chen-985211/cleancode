@@ -19,6 +19,98 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it.each(['new', 'retry', 'recovered', 'discovered'] as const)(
+    'preserves the selected workspace during background %s creation',
+    async (path) => {
+      const f = fixture()
+      const command = {
+        projectDirectory: '/project',
+        branchName: 'issue/42',
+        requestId: 'background',
+        selectWorkspace: false,
+        issue: {
+          id: 'I_42',
+          repository: 'owner/repo',
+          number: 42,
+          title: 'Task',
+          url: 'https://github.com/owner/repo/issues/42'
+        }
+      }
+      if (path === 'retry') await f.prepare.create(command)
+      if (path === 'recovered' || path === 'discovered') {
+        f.projects.save.mockRejectedValueOnce(new Error('Disk unavailable'))
+        await expect(f.prepare.create(command)).rejects.toThrow('Disk unavailable')
+      }
+      if (path === 'discovered') {
+        await f.projects.save(
+          Project.fromSnapshot(f.project()).addLinkedWorktreeWorkspace({
+            workspaceId: 'discovered',
+            displayName: command.branchName,
+            gitBranch: command.branchName,
+            directory: '/worktrees/issue/42'
+          })
+        )
+      }
+      // The latest user selection must win, including recovery after a failed save.
+      await f.projects.save(Project.fromSnapshot(f.project()).switchCurrentWorkspace('main'))
+      await f.prepare.create(command)
+      const saved = f.project()
+      expect(
+        saved.workspaces.filter((item) => item.isCurrent).map((item) => item.workspaceId)
+      ).toEqual(['main'])
+      expect(saved.workspaces.find((item) => item.issue?.id === 'I_42')).toMatchObject({
+        isCurrent: false,
+        gitBranch: command.branchName
+      })
+      expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+    }
+  )
+
+  it.each(['issue/invalid name', 'HEAD', '-option', 'issue/../task', 'issue/task.lock'])(
+    'rejects invalid branch %s before freezing a request and permits correction',
+    async (branchName) => {
+      const f = fixture()
+      const command = { projectDirectory: '/project', requestId: 'correctable', branchName }
+      await expect(f.prepare.create(command)).rejects.toMatchObject({
+        code: 'GIT_BRANCH_NAME_INVALID'
+      })
+      expect(f.records.size).toBe(0)
+      expect(f.git.createBranchWorktree).not.toHaveBeenCalled()
+      expect(f.content.prepareTemplate).not.toHaveBeenCalled()
+      await f.prepare.create({ ...command, branchName: 'issue/fixed' })
+      expect(f.project().workspaces.find((item) => item.isCurrent)?.gitBranch).toBe('issue/fixed')
+    }
+  )
+
+  it('preserves the issue and exact base across metadata failure and recovery', async () => {
+    const f = fixture()
+    const issue = {
+      id: 'I_42',
+      repository: 'owner/repo',
+      number: 42,
+      title: 'Resize',
+      url: 'https://github.com/owner/repo/issues/42'
+    }
+    const command = {
+      projectDirectory: '/project',
+      branchName: 'issue/42',
+      requestId: 'issue-request',
+      baseRef: 'a'.repeat(40),
+      issue
+    }
+    f.projects.save.mockRejectedValueOnce(new Error('Disk unavailable'))
+    await expect(f.prepare.create(command)).rejects.toThrow()
+    expect(f.git.createBranchWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ baseRef: command.baseRef })
+    )
+    const recovered = await f.prepare.create(command)
+    expect(recovered.workspaces.find((w) => w.isCurrent)?.issue).toEqual(issue)
+    expect(f.records.get(command.requestId)).toMatchObject({ issue, baseRef: command.baseRef })
+    expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+    await expect(f.prepare.create({ ...command, baseRef: 'b'.repeat(40) })).rejects.toMatchObject({
+      code: 'WORKSPACE_INITIALIZATION_CONFLICT'
+    })
+  })
   it('removes only invalid template references and returns the canonical saved settings', async () => {
     const f = fixture()
     f.content.listTemplateIds.mockResolvedValue([])

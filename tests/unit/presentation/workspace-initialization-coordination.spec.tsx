@@ -44,51 +44,78 @@ describe('workspace initialization coordination', () => {
     expect(notifications.notify).toHaveBeenCalledOnce()
   })
 
-  it('creates directly with the latest project settings while their save is pending', async () => {
-    const f = fixture()
-    const create = vi.fn(async () => ({ ...f.workbench, initialization: null }))
-    let finishSave!: () => void
-    const save = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          finishSave = () =>
-            resolve({
-              defaults: { templates: [], agents: [{ providerId: 'test-agent', count: 1 }] },
-              removedTemplateIds: []
-            })
-        })
-    )
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: {
-        applyWorkspaceInitialization: vi.fn(),
-        getWorkspaceDefaults: vi.fn(async () => ({
-          defaults: { templates: [], agents: [] },
-          removedTemplateIds: []
-        })),
-        listBlockTemplates: vi.fn(async () => []),
-        discoverCreatableAgentProviders: vi.fn(async () => [
-          { descriptor: { id: 'test-agent', displayName: 'Test Agent', icon: null } }
-        ]),
-        getAgentProviderPreferences: vi.fn(async () => ({ disabledProviderIds: [] })),
-        listWorkspaceInitializations: vi.fn(async () => []),
-        saveWorkspaceDefaults: save
+  it.each(['branch', 'issue'] as const)(
+    'uses the latest project settings when creating from %s',
+    async (source) => {
+      const f = fixture()
+      const committed = vi.fn(async () => ({ ...f.workbench, initialization: null }))
+      const create = vi.fn<Parameters<typeof useWorkspaceInitialization>[0]['createWorkspace']>(
+        async (_workbench, _branch, options) => {
+          if (options?.beforeCreate) await options.beforeCreate()
+          return committed()
+        }
+      )
+      let finishSave!: () => void
+      const save = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            finishSave = () =>
+              resolve({
+                defaults: { templates: [], agents: [{ providerId: 'test-agent', count: 1 }] },
+                removedTemplateIds: []
+              })
+          })
+      )
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: {
+          applyWorkspaceInitialization: vi.fn(),
+          getWorkspaceDefaults: vi.fn(async () => ({
+            defaults: { templates: [], agents: [] },
+            removedTemplateIds: []
+          })),
+          listBlockTemplates: vi.fn(async () => []),
+          discoverCreatableAgentProviders: vi.fn(async () => [
+            { descriptor: { id: 'test-agent', displayName: 'Test Agent', icon: null } }
+          ]),
+          getAgentProviderPreferences: vi.fn(async () => ({ disabledProviderIds: [] })),
+          listWorkspaceInitializations: vi.fn(async () => []),
+          saveWorkspaceDefaults: save
+        }
+      })
+      const { result } = renderController(f.workbench, create)
+      render(result.current.renderSettings([f.workbench], vi.fn()))
+      fireEvent.click(await screen.findByRole('button', { name: '添加 Agent' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Test Agent' }))
+      await waitFor(() => expect(save).toHaveBeenCalledOnce())
+      const issueCommand = {
+        projectDirectory: f.workbench.project.directory,
+        repository: 'owner/repo',
+        number: 42,
+        branchName: 'feature',
+        baseBranch: 'main'
       }
-    })
-    const { result } = renderController(f.workbench, create)
-    render(result.current.renderSettings([f.workbench], vi.fn()))
-    fireEvent.click(await screen.findByRole('button', { name: '添加 Agent' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Test Agent' }))
-    await waitFor(() => expect(save).toHaveBeenCalledOnce())
-    await act(async () => {
-      expect(await result.current.createBranchWorkspace(f.workbench, 'feature')).toBe(true)
-    })
-    expect(create).toHaveBeenCalledWith(f.workbench, 'feature', {
-      requestId: expect.any(String),
-      defaults: { templates: [], agents: [{ providerId: 'test-agent', count: 1 }] }
-    })
-    await act(async () => finishSave())
-  })
+      let creation!: Promise<boolean>
+      await act(async () => {
+        creation =
+          source === 'issue'
+            ? result.current.createIssueWorkspace(f.workbench, issueCommand)
+            : result.current.createBranchWorkspace(f.workbench, 'feature')
+      })
+      if (source === 'issue') expect(committed).not.toHaveBeenCalled()
+      else expect(committed).toHaveBeenCalledOnce()
+      await act(async () => {
+        finishSave()
+        expect(await creation).toBe(true)
+      })
+      expect(create).toHaveBeenCalledWith(f.workbench, 'feature', {
+        requestId: expect.any(String),
+        issueCommand: source === 'issue' ? issueCommand : undefined,
+        ...(source === 'issue' ? { beforeCreate: expect.any(Function) } : {}),
+        defaults: { templates: [], agents: [{ providerId: 'test-agent', count: 1 }] }
+      })
+    }
+  )
 
   it('keeps an empty canvas free of defaults configuration prompts', () => {
     const f = fixture()

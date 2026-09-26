@@ -87,6 +87,16 @@ import type {
   ApplicationDiagnosticsSummary
 } from './platform/ipc/applicationDiagnosticsChannels'
 
+import type {
+  ListProjectIssuesQuery,
+  ProjectIssuesSnapshot,
+  ProjectIssueQuery,
+  ProjectIssueSnapshot,
+  PrepareIssueWorkspaceQuery,
+  IssueWorkspaceProgress,
+  StartIssueWorkspaceCommand
+} from './contexts/project/application/dto/ProjectIssues'
+
 interface WorkbenchSnapshot {
   readonly initialization?: WorkspaceInitializationSnapshot | null
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -132,6 +142,15 @@ declare global {
       applyWorkspaceInitialization(
         command: InitializeWorkspaceContentCommand
       ): Promise<WorkspaceInitializationResult>
+      listProjectIssues(query: ListProjectIssuesQuery): Promise<ProjectIssuesSnapshot>
+      getProjectIssue(query: ProjectIssueQuery): Promise<ProjectIssueSnapshot>
+      configureProjectIssues(command: {
+        projectDirectory: string
+        repository: string
+      }): Promise<ProjectSnapshot>
+      startIssueWorkspace(command: StartIssueWorkspaceCommand): Promise<WorkbenchSnapshot>
+      prepareIssueWorkspace(query: PrepareIssueWorkspaceQuery): Promise<void>
+      onIssueWorkspaceProgress(listener: (event: IssueWorkspaceProgress) => void): () => void
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
       reorderProject(command: {

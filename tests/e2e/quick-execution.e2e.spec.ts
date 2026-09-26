@@ -8,6 +8,7 @@ import type { ElectronApplication, Locator, Page } from 'playwright'
 import { writeQuickLaunchFixtureScript } from '../fixtures/contexts/run/fakeTerminalPrograms'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { pollUntilState } from '../support/e2ePolling'
+import { waitForWorkspaceInteractive } from '../support/e2eSurfaceIsolation'
 import {
   createE2eWorkbench,
   electronLaunchTimeoutMs,
@@ -557,7 +558,7 @@ async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
   )
   await page.getByRole('button', { name: '关闭主题设置' }).click()
   await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
-  await page.waitForFunction(() => document.querySelector('[inert]') === null)
+  await waitForWorkspaceInteractive(page)
 }
 
 async function waitForQuickExecutionVisualToSettle(page: Page): Promise<void> {
@@ -602,7 +603,7 @@ async function setQuickExecutionTargetFollowing(
   if (wasEnabled !== enabled) await toggle.click()
   await page.getByRole('button', { name: '返回工作区' }).click()
   await page.locator('.application-settings-surface').waitFor({ state: 'detached' })
-  await page.waitForFunction(() => document.querySelector('[inert]') === null)
+  await waitForWorkspaceInteractive(page)
   return wasEnabled
 }
 
