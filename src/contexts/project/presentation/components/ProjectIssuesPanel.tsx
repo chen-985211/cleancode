@@ -394,7 +394,7 @@ export function ProjectIssuesPanel({
           <div
             className="project-issues__list"
             aria-label={t('issues.list')}
-            aria-busy={model.loading}
+            aria-busy={model.loading || model.loadingMore}
           >
             <div className="project-issues__columns" aria-hidden="true">
               <span>{t('issues.list')}</span>
@@ -480,14 +480,28 @@ export function ProjectIssuesPanel({
                 </div>
               )
             })}
+            {model.moreError ? (
+              <div role="alert" className="project-issues__error project-issues__pagination-error">
+                <InfoIcon size={17} aria-hidden="true" />
+                {resolveUserFacingErrorMessage(model.moreError, 'issues.failed', t)}
+              </div>
+            ) : null}
             {model.data?.hasMore ? (
               <button
                 className="toolbar-button project-issues__more"
                 type="button"
-                disabled={model.view.limit >= 500}
-                onClick={() => model.update({ limit: Math.min(500, model.view.limit + 50) })}
+                aria-disabled={model.loadingMore || (model.view.limit >= 500 && !model.moreError)}
+                onClick={model.loadMore}
               >
-                {t(model.view.limit >= 500 ? 'issues.refineSearch' : 'issues.loadMore')}
+                {t(
+                  model.loadingMore
+                    ? 'issues.loading'
+                    : model.moreError
+                      ? 'issues.retryLoadMore'
+                      : model.view.limit >= 500
+                        ? 'issues.refineSearch'
+                        : 'issues.loadMore'
+                )}
               </button>
             ) : null}
           </div>

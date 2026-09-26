@@ -41,6 +41,7 @@ export const zhCNProjectMessages = {
   'issues.empty': '没有符合条件的未关闭 Issue',
   'issues.linked': '已关联工作区',
   'issues.loadMore': '加载更多',
+  'issues.retryLoadMore': '重试加载',
   'issues.refineSearch': '请缩小搜索范围',
   'issues.choose': '选择一个 Issue 查看详情',
 

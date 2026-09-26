@@ -43,6 +43,7 @@ export const enProjectMessages = {
   'issues.empty': 'No open issues match these filters',
   'issues.linked': 'Linked workspace',
   'issues.loadMore': 'Load more',
+  'issues.retryLoadMore': 'Retry loading',
   'issues.refineSearch': 'Refine your search',
   'issues.choose': 'Select an issue to see details',
 

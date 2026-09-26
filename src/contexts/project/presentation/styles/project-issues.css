@@ -1,3 +1,5 @@
+@import './project-issue-menu.css';
+
 .project-issues {
   display: flex;
   width: 100%;
@@ -332,6 +334,14 @@
 }
 .project-issues__more {
   margin: 20px auto;
+  min-width: 9em;
+}
+.project-issues__more[aria-disabled='true'] {
+  color: var(--cc-muted);
+  cursor: default;
+}
+.project-issues__pagination-error {
+  margin: 20px 14px 0;
 }
 .project-issues__empty {
   padding: 64px 16px;
@@ -528,75 +538,6 @@
 }
 .project-issues__search input[type='search']:focus-visible {
   outline: none;
-}
-
-.project-issues__select {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  max-width: 240px;
-  min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
-  background: var(--cc-surface-subtle);
-  color: var(--cc-foreground);
-  font: inherit;
-}
-.project-issues__select span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.project-issues__select svg {
-  flex-shrink: 0;
-  color: var(--cc-muted);
-}
-.project-issues__select:hover,
-.project-issues__select[aria-expanded='true'] {
-  background: var(--cc-directional-menu-hover);
-  border-color: var(--cc-border);
-}
-.project-issues-menu {
-  --cc-menu-option-highlight-inset: 5px;
-  position: fixed;
-  z-index: 1600;
-  overflow: auto;
-  padding: 5px;
-  border: 1px solid var(--cc-border);
-  border-radius: 10px;
-  background: var(--cc-surface-overlay);
-  color: var(--cc-foreground);
-  box-shadow: var(--cc-shadow-floating);
-}
-.project-issues-menu button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-.project-issues-menu button span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.project-issues-menu button svg {
-  flex-shrink: 0;
-  color: var(--cc-primary);
-}
-.project-issues-menu button:focus-visible {
-  outline-offset: -2px;
 }
 
 .project-issues__filters

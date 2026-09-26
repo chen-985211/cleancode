@@ -20,8 +20,11 @@ const emptyView: IssueView = { search: '', query: '', label: '', assignedToMe: f
 export function useProjectIssues(project: ProjectSnapshot, open: boolean) {
   const [views, setViews] = useState<Record<string, IssueView>>({})
   const [revision, setRevision] = useState(0)
+  const [retry, setRetry] = useState(0)
   const [response, setResponse] = useState<{
     key: string
+    scope: string
+    limit: number
     data?: ProjectIssuesSnapshot
     error?: unknown
   }>()
@@ -36,18 +39,20 @@ export function useProjectIssues(project: ProjectSnapshot, open: boolean) {
       ...current,
       [project.id]: { ...(current[project.id] ?? emptyView), ...change }
     }))
-  const key = JSON.stringify([
+  const scope = JSON.stringify([
     project.id,
     project.directory,
     project.issueRepository,
     view.query,
     view.assignedToMe,
     view.label,
-    view.limit,
     revision
   ])
-  const data = response?.key === key ? response.data : undefined
+  const key = JSON.stringify([scope, view.limit, retry])
+  // Only pagination may reuse results. A new query or explicit refresh owns a new scope.
+  const data = response?.scope === scope && response.limit <= view.limit ? response.data : undefined
   const error = response?.key === key ? response.error : undefined
+  const pending = response?.key !== key
   const selected = view.detailOpen
     ? data?.issues.find((issue) => issue.id === view.selectedId)
     : undefined
@@ -64,15 +69,23 @@ export function useProjectIssues(project: ProjectSnapshot, open: boolean) {
         limit: view.limit
       })
       .then((value) => {
-        if (active) setResponse({ key, data: value })
+        if (active) setResponse({ key, scope, limit: view.limit, data: value })
       })
       .catch((error) => {
-        if (active) setResponse({ key, error })
+        if (active)
+          setResponse((previous) => ({
+            key,
+            scope,
+            limit: view.limit,
+            data:
+              previous?.scope === scope && previous.limit <= view.limit ? previous.data : undefined,
+            error
+          }))
       })
     return () => {
       active = false
     }
-  }, [key, open, project.directory, view.query, view.assignedToMe, view.label, view.limit])
+  }, [key, scope, open, project.directory, view.query, view.assignedToMe, view.label, view.limit])
   useEffect(() => {
     if (!open || !selected || !window.cleancode) return
     let active = true
@@ -96,9 +109,16 @@ export function useProjectIssues(project: ProjectSnapshot, open: boolean) {
     view,
     update,
     data,
-    error,
+    error: data ? undefined : error,
     selected,
-    loading: !data && !error,
+    loading: !data && pending,
+    loadingMore: Boolean(data && pending),
+    moreError: data ? error : undefined,
+    loadMore: () => {
+      if (!open || pending || !data?.hasMore) return
+      if (error) setRetry((value) => value + 1)
+      else if (view.limit < 500) update({ limit: Math.min(500, view.limit + 50) })
+    },
     detail: detail?.key === detailKey ? detail.data : undefined,
     detailError: detail?.key === detailKey ? detail.error : undefined,
     refresh: () => setRevision((value) => value + 1)
