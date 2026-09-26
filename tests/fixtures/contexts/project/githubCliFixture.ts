@@ -25,7 +25,7 @@ process.stdout.write(JSON.stringify(args.includes('repo') ? {nameWithOwner:'fixt
       PATH: [directory, dirname(process.execPath), process.env.PATH]
         .filter(Boolean)
         .join(delimiter),
-      NODE_OPTIONS: `--require "${preload}"`
+      NODE_OPTIONS: `--require ${JSON.stringify(preload)}`
     }
   }
   const executable = join(directory, 'gh')
