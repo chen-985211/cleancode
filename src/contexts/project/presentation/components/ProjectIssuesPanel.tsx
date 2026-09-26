@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
 import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
@@ -232,6 +233,19 @@ export function ProjectIssuesPanel({
                 </button>
               </TooltipLabel>
             )}
+            {repository ? (
+              <TooltipLabel content={t('issues.openRepository')} side="bottom">
+                <a
+                  className="icon-button"
+                  href={`https://github.com/${repository}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t('issues.openRepository')}
+                >
+                  <ArrowSquareOutIcon size={17} aria-hidden="true" />
+                </a>
+              </TooltipLabel>
+            ) : null}
           </div>
         </div>
         <div className="project-issues__header-actions">

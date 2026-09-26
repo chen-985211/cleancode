@@ -80,13 +80,17 @@
   outline-offset: 2px;
 }
 .project-issues__source-control {
-  width: 320px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
   max-width: 100%;
   min-width: 0;
 }
 .project-issues__repository {
   display: flex;
-  width: 100%;
+  width: 320px;
+  max-width: 100%;
   height: 32px;
   align-items: center;
   gap: 4px;

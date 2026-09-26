@@ -31,6 +31,65 @@ describe('project issues panel', () => {
   afterEach(() => {
     delete window.cleancode
   })
+  it('links to the resolved repository without treating an unsaved draft as its source', async () => {
+    const list = vi.fn(async () => result)
+    window.cleancode = { listProjectIssues: list } as unknown as NonNullable<Window['cleancode']>
+    const { rerender } = render(
+      <ProjectIssuesPanel
+        project={createWorkbenchSnapshot('/project', 'project').project}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={vi.fn()}
+      />
+    )
+    const link = await screen.findByRole('link', { name: '在 GitHub 打开仓库' })
+    expect(link).toHaveAttribute('href', 'https://github.com/owner/repo')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+    fireEvent.click(screen.getByRole('button', { name: 'owner/repo' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'GitHub 仓库' }), {
+      target: { value: 'draft/repo' }
+    })
+    expect(link).toHaveAttribute('href', 'https://github.com/owner/repo')
+    list.mockResolvedValue({
+      ...result,
+      repository: { name: 'other/source', defaultBranch: 'main' }
+    })
+    rerender(
+      <ProjectIssuesPanel
+        project={createWorkbenchSnapshot('/other', 'other').project}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={vi.fn()}
+      />
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: '在 GitHub 打开仓库' })).toHaveAttribute(
+        'href',
+        'https://github.com/other/source'
+      )
+    )
+  })
+  it('does not offer a repository link before a source is known', async () => {
+    window.cleancode = {
+      listProjectIssues: vi.fn(async () => {
+        throw new Error('Unavailable')
+      })
+    } as unknown as NonNullable<Window['cleancode']>
+    render(
+      <ProjectIssuesPanel
+        project={createWorkbenchSnapshot('/project', 'project').project}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={vi.fn()}
+      />
+    )
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('link', { name: '在 GitHub 打开仓库' })).not.toBeInTheDocument()
+  })
   it('prefetches the selected base and displays only the active creation progress', async () => {
     let notify!: (event: IssueWorkspaceProgress) => void
     let finish!: (value: boolean) => void

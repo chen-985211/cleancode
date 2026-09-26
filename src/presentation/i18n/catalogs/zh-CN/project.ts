@@ -14,6 +14,7 @@ export const zhCNProjectMessages = {
   'issues.details': 'Issue 详情',
   'issues.openState': '未关闭',
   'issues.closedState': '已关闭',
+  'issues.openRepository': '在 GitHub 打开仓库',
   'issues.viewGitHub': '在 GitHub 中查看',
   'issues.loading': '正在加载…',
   'issues.noDescription': '暂无描述',

@@ -16,6 +16,7 @@ export const enProjectMessages = {
   'issues.details': 'Issue details',
   'issues.openState': 'Open',
   'issues.closedState': 'Closed',
+  'issues.openRepository': 'Open repository on GitHub',
   'issues.viewGitHub': 'View on GitHub',
   'issues.loading': 'Loading…',
   'issues.noDescription': 'No description',
