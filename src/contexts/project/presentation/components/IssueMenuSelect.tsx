@@ -19,7 +19,7 @@ export function IssueMenuSelect({
   const id = useId()
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
-  const initialFocus = useRef<'selected' | 'first' | 'last'>('selected')
+  const initialFocus = useRef<'container' | 'first' | 'last'>('container')
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<CSSProperties>({ top: 0, left: 0 })
   const { highlightRef, interactionProps } = useMenuOptionHighlightMotion()
@@ -45,7 +45,7 @@ export function IssueMenuSelect({
         ? items[0]
         : initialFocus.current === 'last'
           ? items[items.length - 1]
-          : (items.find((item) => item.getAttribute('aria-checked') === 'true') ?? items[0])
+          : popup.current
     target?.focus({ preventScroll: true })
   }, [open])
   useOutsidePointerDismiss({
@@ -79,7 +79,7 @@ export function IssueMenuSelect({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => {
-          initialFocus.current = 'selected'
+          initialFocus.current = 'container'
           setOpen(!open)
         }}
         onKeyDown={(event) => {
@@ -127,9 +127,9 @@ export function IssueMenuSelect({
           if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
             event.preventDefault()
             const next =
-              event.key === 'Home'
+              event.key === 'Home' || (event.key === 'ArrowDown' && index < 0)
                 ? 0
-                : event.key === 'End'
+                : event.key === 'End' || (event.key === 'ArrowUp' && index < 0)
                   ? items.length - 1
                   : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
             items[next]?.focus()

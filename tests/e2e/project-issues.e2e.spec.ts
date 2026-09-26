@@ -109,6 +109,8 @@ describe('project issues', () => {
       expect(
         await labels.getByRole('menuitemradio', { name: '全部标签' }).getAttribute('aria-checked')
       ).toBe('true')
+      const highlight = labels.locator('.menu-option-highlight-motion')
+      expect(await highlight.getAttribute('data-visible')).not.toBe('true')
       const menuBounds = await labels.boundingBox()
       const triggerBounds = await page
         .getByRole('button', { name: '标签', exact: true })
@@ -120,6 +122,27 @@ describe('project issues', () => {
       expect(await page.getByRole('button', { name: '标签', exact: true }).textContent()).toBe(
         'bug'
       )
+      await page.getByRole('button', { name: '标签', exact: true }).click()
+      await page.locator('.project-issues-menu[data-surface-motion-state="open"]').waitFor()
+      expect(await highlight.getAttribute('data-visible')).not.toBe('true')
+      const allLabels = labels.getByRole('menuitemradio', { name: '全部标签' })
+      await allLabels.hover()
+      await labels
+        .locator('.menu-option-highlight-motion[data-visible="true"][data-motion-state="idle"]')
+        .waitFor()
+      const rowBounds = await allLabels.boundingBox()
+      const highlightBounds = await highlight.boundingBox()
+      expect(highlightBounds!.y).toBeCloseTo(rowBounds!.y, 0)
+      expect(highlightBounds!.height).toBeCloseTo(rowBounds!.height, 0)
+      expect(
+        await labels
+          .getByRole('menuitemradio', { name: 'bug', exact: true })
+          .getAttribute('aria-checked')
+      ).toBe('true')
+      await page.screenshot({ path: 'test-results/project-issues-menu-hover.png' })
+      await page.getByRole('button', { name: '标签', exact: true }).hover()
+      expect(await highlight.getAttribute('data-visible')).not.toBe('true')
+      await labels.press('Escape')
       await page.getByRole('button', { name: 'Fix terminal resizing', exact: true }).click()
       await page.getByRole('heading', { name: 'Fix terminal resizing' }).waitFor()
       await page
