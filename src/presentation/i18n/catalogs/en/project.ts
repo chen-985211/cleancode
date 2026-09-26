@@ -20,6 +20,7 @@ export const enProjectMessages = {
   'issues.loading': 'Loading…',
   'issues.noDescription': 'No description',
   'issues.openWorkspace': 'Open workspace',
+  'issues.openWorkspaceNamed': 'Open workspace {name}',
   'issues.baseBranch': 'Base branch',
   'issues.creating': 'Creating…',
   'issues.start': 'Start working',

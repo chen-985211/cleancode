@@ -18,6 +18,7 @@ export const zhCNProjectMessages = {
   'issues.loading': '正在加载…',
   'issues.noDescription': '暂无描述',
   'issues.openWorkspace': '打开工作区',
+  'issues.openWorkspaceNamed': '打开工作区 {name}',
   'issues.baseBranch': '基准分支',
   'issues.creating': '正在创建…',
   'issues.start': '开始处理',

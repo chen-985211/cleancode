@@ -207,6 +207,7 @@
 }
 .project-issues__columns,
 .project-issues__row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px 180px;
   align-items: center;
@@ -236,10 +237,14 @@
   transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 .project-issues__row:hover,
-.project-issues__row:focus-visible {
+.project-issues__row:has(:focus-visible) {
   background: var(--cc-surface-hover);
 }
-.project-issues__row:focus-visible {
+.project-issues__row-open {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
   outline-offset: -2px;
 }
 .project-issues__row-main {
@@ -305,6 +310,25 @@
 }
 .project-issues__workspace svg {
   flex: 0 0 auto;
+}
+.project-issues__workspace-link {
+  position: relative;
+  justify-self: start;
+  max-width: 100%;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+.project-issues__workspace-link:hover,
+.project-issues__workspace-link:focus-visible {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .project-issues__more {
   margin: 20px auto;

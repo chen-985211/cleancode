@@ -258,6 +258,12 @@ describe('project issues panel', () => {
         onProjectChanged={vi.fn()}
       />
     )
+    const workspaceLink = await screen.findByRole('button', { name: '打开工作区 issue/42' })
+    fireEvent.click(workspaceLink)
+    expect(onOpenWorkspace).toHaveBeenCalledExactlyOnceWith('task')
+    expect(window.cleancode.getProjectIssue).not.toHaveBeenCalled()
+    expect(screen.queryByRole('heading', { name: issue.title })).not.toBeInTheDocument()
+    expect(workspaceLink.parentElement?.closest('button')).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: issue.title }))
     fireEvent.click(await screen.findByRole('button', { name: '打开工作区' }))
     expect(onOpenWorkspace).toHaveBeenCalledWith('task')

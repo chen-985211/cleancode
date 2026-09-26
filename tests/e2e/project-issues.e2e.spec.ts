@@ -277,6 +277,44 @@ describe('project issues', () => {
       expect(
         after.workspaces.filter((item) => item.issue?.number === 42).map((item) => item.workspaceId)
       ).toEqual([task.workspaceId])
+      await panel.waitFor({ state: 'hidden' })
+      const defaultWorkspace = page.getByRole('button', { name: '切换到默认工作区 unrelated' })
+      const taskWorkspace = page.getByRole('button', {
+        name: 'issue/42-fix-terminal-resizing 独立工作区',
+        exact: true
+      })
+      for (const input of ['pointer', 'keyboard']) {
+        await defaultWorkspace.click()
+        await defaultWorkspace.and(page.locator('[aria-current="page"]')).waitFor()
+        await page.getByRole('button', { name: '任务', exact: true }).click()
+        if (await panel.getByRole('button', { name: '返回任务列表' }).count())
+          await panel.getByRole('button', { name: '返回任务列表' }).click()
+        const link = panel.getByRole('button', {
+          name: '打开工作区 issue/42-fix-terminal-resizing',
+          exact: true
+        })
+        await link.waitFor()
+        expect(await panel.getByRole('heading', { name: 'Fix terminal resizing' }).count()).toBe(0)
+        if (input === 'pointer') {
+          await link.hover()
+          await page.screenshot({ path: 'test-results/project-issues-workspace-link.png' })
+          await link.click()
+        } else {
+          await panel.getByRole('button', { name: 'Fix terminal resizing', exact: true }).focus()
+          await page.keyboard.press('Tab')
+          expect(await link.evaluate((element) => document.activeElement === element)).toBe(true)
+          await page.keyboard.press('Enter')
+        }
+        await panel.waitFor({ state: 'hidden' })
+        await taskWorkspace.and(page.locator('[aria-current="page"]')).waitFor()
+        expect(await workspace.evaluate((element) => (element as HTMLElement).inert)).toBe(false)
+      }
+      const reopened = await page.evaluate(
+        async () => (await window.cleancode!.listWorkbenches())[0]!.project
+      )
+      expect(reopened.workspaces.map((item) => item.workspaceId)).toEqual(
+        after.workspaces.map((item) => item.workspaceId)
+      )
     },
     electronScenarioTimeoutMs
   )

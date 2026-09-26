@@ -363,14 +363,14 @@ export function ProjectIssuesPanel({
             {model.data?.issues.map((issue) => {
               const workspace = project.workspaces.find((item) => item.issue?.id === issue.id)
               return (
-                <button
-                  key={issue.id}
-                  ref={model.view.selectedId === issue.id ? selectedRowRef : undefined}
-                  className="project-issues__row"
-                  type="button"
-                  aria-label={issue.title}
-                  onClick={() => model.update({ selectedId: issue.id, detailOpen: true })}
-                >
+                <div key={issue.id} className="project-issues__row">
+                  <button
+                    ref={model.view.selectedId === issue.id ? selectedRowRef : undefined}
+                    className="project-issues__row-open"
+                    type="button"
+                    aria-label={issue.title}
+                    onClick={() => model.update({ selectedId: issue.id, detailOpen: true })}
+                  />
                   <span className="project-issues__row-main">
                     <CircleDashedIcon
                       className="project-issues__issue-icon"
@@ -392,17 +392,24 @@ export function ProjectIssuesPanel({
                   <span className="project-issues__assignees">
                     {issue.assignees.map((login) => `@${login}`).join(', ') || '—'}
                   </span>
-                  <span className="project-issues__workspace">
-                    {workspace ? (
-                      <>
+                  {workspace ? (
+                    <TooltipLabel
+                      content={t('issues.openWorkspaceNamed', { name: workspace.displayName })}
+                    >
+                      <button
+                        className="project-issues__workspace project-issues__workspace-link"
+                        type="button"
+                        aria-label={t('issues.openWorkspaceNamed', { name: workspace.displayName })}
+                        onClick={() => onOpenWorkspace(workspace.workspaceId)}
+                      >
                         <GitBranchIcon size={14} aria-hidden="true" />
                         <span>{workspace.displayName}</span>
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </button>
+                      </button>
+                    </TooltipLabel>
+                  ) : (
+                    <span className="project-issues__workspace">—</span>
+                  )}
+                </div>
               )
             })}
             {model.data?.hasMore ? (
