@@ -396,7 +396,6 @@ registerProjectIssuesRuntime({
   registry: getProjectRegistryRepository(),
   transactions: projectWorkspaceTransactions,
   preparation: workspaceInitialization.preparation,
-  select: projectIpcHandlers.switchBranchWorkspace,
   loadWorkbench,
   ipcMain,
   logger: consoleLogger

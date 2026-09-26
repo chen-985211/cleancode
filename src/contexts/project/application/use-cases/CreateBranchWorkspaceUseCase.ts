@@ -9,6 +9,7 @@ import type { ProjectRepository } from '../ports/ProjectRepository'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateBranchWorkspaceCommand {
+  readonly selectWorkspace?: boolean
   readonly baseRef?: string
   readonly issue?: ProjectIssueReference
   readonly workspaceId?: string
@@ -74,6 +75,7 @@ export class CreateBranchWorkspaceUseCase {
       branchName
     })
     const updatedProject = project.addLinkedWorktreeWorkspace({
+      selectWorkspace: command.selectWorkspace,
       issue: command.issue,
       workspaceId: command.workspaceId,
       displayName: branchName,

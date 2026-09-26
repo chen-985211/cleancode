@@ -1,3 +1,4 @@
+import { ProjectRegistryTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
@@ -64,6 +65,9 @@ export interface ProjectIpcHandlersInput {
 }
 
 export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void {
+  // Keep workspace and registry selection in request order, including workbench
+  // loading. A slow earlier load must not commit its project after a later choice.
+  const workspaceSelections = new ProjectRegistryTransactionCoordinator()
   registerIpcHandler<void, WorkbenchSnapshot | null>({
     channel: 'cleancode:add-project',
     handler: async () => {
@@ -146,14 +150,15 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
 
   registerIpcHandler<unknown, WorkbenchSnapshot>({
     channel: 'cleancode:switch-branch-workspace',
-    handler: async (command) => {
-      const project = await input.switchBranchWorkspace({
-        projectDirectory: readStringField(command, 'projectDirectory'),
-        workspaceId: readStringField(command, 'workspaceId')
-      })
+    handler: (command) =>
+      workspaceSelections.run(async () => {
+        const project = await input.switchBranchWorkspace({
+          projectDirectory: readStringField(command, 'projectDirectory'),
+          workspaceId: readStringField(command, 'workspaceId')
+        })
 
-      return loadAndSelectWorkbench(input, project)
-    },
+        return loadAndSelectWorkbench(input, project)
+      }),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'switchBranchWorkspace',

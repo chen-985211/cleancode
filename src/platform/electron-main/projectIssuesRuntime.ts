@@ -20,10 +20,6 @@ export function registerProjectIssuesRuntime(input: {
   readonly registry: ProjectRegistryRepository
   readonly transactions: ProjectWorkspaceTransactionCoordinator
   readonly preparation: PrepareWorkspaceInitializationUseCase
-  readonly select: (command: {
-    projectDirectory: string
-    workspaceId: string
-  }) => Promise<ProjectSnapshot>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<unknown>
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
@@ -44,8 +40,7 @@ export function registerProjectIssuesRuntime(input: {
     github,
     cache,
     base: new GitCliIssueBaseAdapter(),
-    preparation: input.preparation,
-    select: input.select
+    preparation: input.preparation
   })
   registerProjectIssueIpcHandlers({
     ipcMain: input.ipcMain,

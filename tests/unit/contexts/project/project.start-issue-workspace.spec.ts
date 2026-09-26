@@ -15,6 +15,18 @@ const issue = {
 }
 
 describe('start an issue workspace', () => {
+  it('prepares a target workbench without committing workspace selection', async () => {
+    const f = fixture(false)
+    await f.useCase.execute({
+      projectDirectory: '/project',
+      repository: 'owner/repo',
+      number: 42,
+      branchName: 'issue/42',
+      baseBranch: 'main'
+    })
+    expect(f.create).toHaveBeenCalledWith(expect.objectContaining({ selectWorkspace: false }))
+  })
+
   it('replaces a legacy invalid uncreated request after the branch name is corrected', async () => {
     const f = fixture(true, 'issue/invalid name')
     await f.useCase.execute({
@@ -221,8 +233,7 @@ function fixture(withPending = true, pendingBranch = 'issue/42') {
               }
             ]
           : []
-    },
-    select: vi.fn(async () => project)
+    }
   })
   return {
     useCase,

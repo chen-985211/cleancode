@@ -1,3 +1,4 @@
+import { Project } from '../../domain/aggregates/Project'
 import type { ProjectIssueScope } from '../services/ProjectIssueScope'
 import { ProjectIssueReadCache } from '../services/ProjectIssueReadCache'
 import type { GitHubIssuePort } from '../ports/GitHubIssuePort'
@@ -27,10 +28,6 @@ interface Dependencies {
   readonly cache?: ProjectIssueReadCache
   readonly base: IssueWorkspaceBasePort
   readonly preparation: Pick<PrepareWorkspaceInitializationUseCase, 'create' | 'list' | 'cancelOne'>
-  readonly select: (command: {
-    projectDirectory: string
-    workspaceId: string
-  }) => Promise<ProjectSnapshot>
 }
 
 export class StartIssueWorkspaceUseCase {
@@ -99,12 +96,14 @@ export class StartIssueWorkspaceUseCase {
     progress?: (phase: IssueWorkspacePhase) => void
   ): Promise<ProjectSnapshot> {
     progress?.('preparing')
-    const { scope, base, preparation, select } = this.dependencies
+    const { scope, base, preparation } = this.dependencies
     const context = await this.resolveContext(command)
     const { project, repository, selectedRepository, issue, existing } = context
     let { pending } = context
+    // This is a target-workbench projection, not a committed selection. The
+    // caller navigates explicitly only if this result is still relevant.
     if (existing)
-      return select({ projectDirectory: project.directory, workspaceId: existing.workspaceId })
+      return Project.fromSnapshot(project).switchCurrentWorkspace(existing.workspaceId).toSnapshot()
     if (pending && !pending.worktreeCreated && !isValidNewBranchName(pending.branchName)) {
       // Old versions could freeze an invalid name before Git rejected it. Only
       // discard such an uncreated request after its replacement passes validation.
@@ -122,12 +121,17 @@ export class StartIssueWorkspaceUseCase {
     )
       throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
     progress?.('creating')
-    return preparation.create({
+    const created = await preparation.create({
+      selectWorkspace: false,
       projectDirectory: project.directory,
       branchName,
       requestId: pending?.id,
       baseRef,
       issue: pending?.issue ?? issue
     })
+    const target = created.workspaces.find((workspace) => sameProjectIssue(workspace.issue, issue))
+    if (!target)
+      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+    return Project.fromSnapshot(created).switchCurrentWorkspace(target.workspaceId).toSnapshot()
   }
 }

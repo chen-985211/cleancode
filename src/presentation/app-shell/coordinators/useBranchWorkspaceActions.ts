@@ -210,7 +210,7 @@ export function useBranchWorkspaceActions({
           (workspace) => workspace.workspaceId === workspaceId
         )
 
-        if (selectedWorkspace?.isCurrent) {
+        if (selectedWorkspace?.isCurrent && !currentSelectionAttemptRef.current) {
           const occurrenceId = beginSelectionAttempt(key)
           settleSelectionAttempt(key, occurrenceId)
           dismissPublishedActionError(key)
@@ -295,17 +295,20 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        const current = currentWorkbenchRef.current
-        if (
-          !options?.issueCommand ||
-          (selectionEpoch.current === epoch &&
+        if (options?.issueCommand) {
+          // Creation publishes metadata, but must not commit a navigation choice.
+          rememberCreatedWorkspace(createdWorkbench)
+          const current = currentWorkbenchRef.current
+          if (
+            selectionEpoch.current === epoch &&
             current?.project.id === origin?.project.id &&
-            current?.graph.workspaceId === origin?.graph.workspaceId)
-        ) {
+            current?.graph.workspaceId === origin?.graph.workspaceId
+          ) {
+            await selectWorkspaceWithResult(createdWorkbench, createdWorkbench.graph.workspaceId)
+          }
+        } else {
           clearCurrentBlockSelection()
           replaceWorkbench(createdWorkbench)
-        } else {
-          rememberCreatedWorkspace(createdWorkbench)
         }
         completeActionAttempt(key, occurrenceId)
         return createdWorkbench
@@ -326,7 +329,8 @@ export function useBranchWorkspaceActions({
       isCurrentActionAttempt,
       publishActionError,
       rememberCreatedWorkspace,
-      replaceWorkbench
+      replaceWorkbench,
+      selectWorkspaceWithResult
     ]
   )
 

@@ -19,6 +19,53 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it.each(['new', 'retry', 'recovered', 'discovered'] as const)(
+    'preserves the selected workspace during background %s creation',
+    async (path) => {
+      const f = fixture()
+      const command = {
+        projectDirectory: '/project',
+        branchName: 'issue/42',
+        requestId: 'background',
+        selectWorkspace: false,
+        issue: {
+          id: 'I_42',
+          repository: 'owner/repo',
+          number: 42,
+          title: 'Task',
+          url: 'https://github.com/owner/repo/issues/42'
+        }
+      }
+      if (path === 'retry') await f.prepare.create(command)
+      if (path === 'recovered' || path === 'discovered') {
+        f.projects.save.mockRejectedValueOnce(new Error('Disk unavailable'))
+        await expect(f.prepare.create(command)).rejects.toThrow('Disk unavailable')
+      }
+      if (path === 'discovered') {
+        await f.projects.save(
+          Project.fromSnapshot(f.project()).addLinkedWorktreeWorkspace({
+            workspaceId: 'discovered',
+            displayName: command.branchName,
+            gitBranch: command.branchName,
+            directory: '/worktrees/issue/42'
+          })
+        )
+      }
+      // The latest user selection must win, including recovery after a failed save.
+      await f.projects.save(Project.fromSnapshot(f.project()).switchCurrentWorkspace('main'))
+      await f.prepare.create(command)
+      const saved = f.project()
+      expect(
+        saved.workspaces.filter((item) => item.isCurrent).map((item) => item.workspaceId)
+      ).toEqual(['main'])
+      expect(saved.workspaces.find((item) => item.issue?.id === 'I_42')).toMatchObject({
+        isCurrent: false,
+        gitBranch: command.branchName
+      })
+      expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+    }
+  )
+
   it.each(['issue/invalid name', 'HEAD', '-option', 'issue/../task', 'issue/task.lock'])(
     'rejects invalid branch %s before freezing a request and permits correction',
     async (branchName) => {

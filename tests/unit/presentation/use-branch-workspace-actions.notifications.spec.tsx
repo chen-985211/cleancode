@@ -27,10 +27,11 @@ describe('branch workspace action notifications', () => {
     const current = createWorkbench()
     const target = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
     const replaceWorkbench = vi.fn()
+    const switchBranchWorkspace = vi.fn(async () => target)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: {
-        ...createRuntimeApi(),
+        ...createRuntimeApi({ switchBranchWorkspace }),
         startIssueWorkspace: vi.fn(async () => target)
       }
     })
@@ -49,6 +50,10 @@ describe('branch workspace action notifications', () => {
         }
       })
     )
+    expect(switchBranchWorkspace).toHaveBeenCalledWith({
+      projectDirectory: target.project.directory,
+      workspaceId: target.graph.workspaceId
+    })
     expect(replaceWorkbench).toHaveBeenCalledWith(target)
   })
 
@@ -312,7 +317,7 @@ describe('branch workspace action notifications', () => {
     expect(notifications.notify).not.toHaveBeenCalled()
   })
 
-  it('invalidates an in-flight selection when the target is already current', async () => {
+  it('persists selecting the visible workspace again while another selection is in flight', async () => {
     const workbench = createWorkbench()
     const currentFeatureWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       gitBranch: 'feature/alpha',
@@ -325,7 +330,10 @@ describe('branch workspace action notifications', () => {
     })
     const staleResult = createWorkbenchSnapshot('/tmp/alpha-project', 'stale-result')
     const pendingAttempt = createDeferred<ReturnType<typeof createWorkbench>>()
-    const switchBranchWorkspace = vi.fn(() => pendingAttempt.promise)
+    const switchBranchWorkspace = vi
+      .fn()
+      .mockImplementationOnce(() => pendingAttempt.promise)
+      .mockResolvedValueOnce(currentFeatureWorkbench)
     const notifications = createNotifications()
     const replaceWorkbench = vi.fn()
     Object.defineProperty(window, 'cleancode', {
@@ -366,8 +374,8 @@ describe('branch workspace action notifications', () => {
       await staleRun
     })
 
-    expect(switchBranchWorkspace).toHaveBeenCalledOnce()
-    expect(replaceWorkbench).not.toHaveBeenCalled()
+    expect(switchBranchWorkspace).toHaveBeenCalledTimes(2)
+    expect(replaceWorkbench).toHaveBeenCalledExactlyOnceWith(currentFeatureWorkbench)
   })
 
   it('retranslates only the retained current workspace error', async () => {

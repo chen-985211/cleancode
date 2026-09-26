@@ -27,6 +27,7 @@ import {
 } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateInitializedWorkspaceCommand {
+  readonly selectWorkspace?: boolean
   readonly baseRef?: string
   readonly issue?: ProjectIssueReference
   readonly projectDirectory: string
@@ -249,11 +250,14 @@ export class PrepareWorkspaceInitializationUseCase {
                   snapshot!.issue
                 )
               : Project.fromSnapshot(latest)
-            const selected = recovered.switchCurrentWorkspace(discovered.workspaceId)
+            const selected =
+              command.selectWorkspace === false
+                ? recovered
+                : recovered.switchCurrentWorkspace(discovered.workspaceId)
             await this.dependencies.projects.save(selected)
             return selected.toSnapshot()
           })
-        } else project = await this.recoverWorkspace(snapshot)
+        } else project = await this.recoverWorkspace(snapshot, command.selectWorkspace)
       } else {
         project = await this.dependencies.createWorkspace(
           {
@@ -261,7 +265,8 @@ export class PrepareWorkspaceInitializationUseCase {
             ...(snapshot.issue ? { issue: snapshot.issue } : {}),
             projectDirectory: project.directory,
             branchName: command.branchName,
-            workspaceId: snapshot.workspaceId
+            workspaceId: snapshot.workspaceId,
+            selectWorkspace: command.selectWorkspace
           },
           async () => {
             const confirmed = WorkspaceInitialization.restore(snapshot!)
@@ -273,6 +278,7 @@ export class PrepareWorkspaceInitializationUseCase {
       }
     }
     if (
+      command.selectWorkspace !== false &&
       !project.workspaces.some(
         (workspace) => workspace.workspaceId === snapshot!.workspaceId && workspace.isCurrent
       )
@@ -292,7 +298,8 @@ export class PrepareWorkspaceInitializationUseCase {
   }
 
   private async recoverWorkspace(
-    snapshot: WorkspaceInitializationSnapshot
+    snapshot: WorkspaceInitializationSnapshot,
+    selectWorkspace = true
   ): Promise<ProjectSnapshot> {
     return this.dependencies.transactions.run(snapshot.projectDirectory, async () => {
       const project = await this.requireProject(snapshot.projectDirectory)
@@ -314,6 +321,7 @@ export class PrepareWorkspaceInitializationUseCase {
       )
         stale()
       const recovered = Project.fromSnapshot(project).addLinkedWorktreeWorkspace({
+        selectWorkspace,
         issue: snapshot.issue,
         workspaceId: snapshot.workspaceId,
         displayName: snapshot.branchName!,

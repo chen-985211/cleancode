@@ -142,6 +142,7 @@ export class Project {
   }
 
   addLinkedWorktreeWorkspace(input: {
+    readonly selectWorkspace?: boolean
     readonly issue?: ProjectIssueReference
     readonly workspaceId?: string
     readonly displayName: string
@@ -195,7 +196,10 @@ export class Project {
       this.name,
       this.directory,
       [
-        ...this.workspaceSnapshots.map((workspace) => ({ ...workspace, isCurrent: false })),
+        ...this.workspaceSnapshots.map((workspace) => ({
+          ...workspace,
+          isCurrent: input.selectWorkspace === false ? workspace.isCurrent : false
+        })),
         {
           ...(issue ? { issue } : {}),
           workspaceId,
@@ -203,7 +207,7 @@ export class Project {
           displayName,
           directory,
           gitBranch,
-          isCurrent: true
+          isCurrent: input.selectWorkspace !== false
         }
       ],
       this.issueRepository
