@@ -67,9 +67,14 @@ export function ProjectIssuesPanel({
   const backRef = useRef<HTMLButtonElement>(null)
   const wasDetail = useRef(false)
   const liveProject = useRef(project.id)
+  const viewEpoch = useRef(0)
   useLayoutEffect(() => {
     liveProject.current = project.id
-  }, [project.id])
+    return () => {
+      // Leaving this view revokes its pending requests' permission to close a later view.
+      viewEpoch.current += 1
+    }
+  }, [open, project.id])
   useEffect(
     () =>
       window.cleancode?.onIssueWorkspaceProgress?.((event) => {
@@ -312,6 +317,7 @@ export function ProjectIssuesPanel({
                 onOpenWorkspace={onOpenWorkspace}
                 onStart={(values) =>
                   void run(async (operationId) => {
+                    const epoch = viewEpoch.current
                     const success = await onStart({
                       projectDirectory: project.directory,
                       repository: selected.repository,
@@ -319,7 +325,7 @@ export function ProjectIssuesPanel({
                       ...values,
                       operationId
                     })
-                    if (success && liveProject.current === project.id) onWorkspaceStarted()
+                    if (success && viewEpoch.current === epoch) onWorkspaceStarted()
                   })
                 }
               />

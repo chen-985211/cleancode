@@ -31,6 +31,68 @@ describe('project issues panel', () => {
   afterEach(() => {
     delete window.cleancode
   })
+  it.each([
+    'unchanged',
+    'project-updated',
+    'closed',
+    'reopened',
+    'project-switched',
+    'project-round-trip',
+    'unmounted'
+  ] as const)('only closes the original active view after creation: %s', async (navigation) => {
+    const project = createWorkbenchSnapshot('/project', 'project').project
+    const other = createWorkbenchSnapshot('/other', 'other').project
+    let finish!: (value: boolean) => void
+    const onStart = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve
+        })
+    )
+    window.cleancode = {
+      listProjectIssues: vi.fn(async () => result),
+      getProjectIssue: vi.fn(async () => issue)
+    } as unknown as NonNullable<Window['cleancode']>
+    const props = {
+      project,
+      onStart,
+      onClose: vi.fn(),
+      onWorkspaceStarted: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onProjectChanged: vi.fn()
+    }
+    const { rerender, unmount } = render(<ProjectIssuesPanel {...props} />)
+    fireEvent.click(await screen.findByRole('button', { name: issue.title }))
+    fireEvent.click(await screen.findByRole('button', { name: '开始处理' }))
+    fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+    expect(onStart).toHaveBeenCalledOnce()
+
+    if (navigation === 'closed' || navigation === 'reopened') {
+      rerender(<ProjectIssuesPanel {...props} open={false} />)
+      if (navigation === 'reopened') rerender(<ProjectIssuesPanel {...props} />)
+    } else if (navigation === 'project-switched' || navigation === 'project-round-trip') {
+      rerender(<ProjectIssuesPanel {...props} project={other} />)
+      if (navigation === 'project-round-trip') rerender(<ProjectIssuesPanel {...props} />)
+    } else if (navigation === 'unmounted') {
+      unmount()
+    } else if (navigation === 'project-updated') {
+      rerender(<ProjectIssuesPanel {...props} project={{ ...project, name: 'Renamed' }} />)
+    }
+
+    await act(async () => finish(true))
+    expect(props.onWorkspaceStarted).toHaveBeenCalledTimes(
+      navigation === 'unchanged' || navigation === 'project-updated' ? 1 : 0
+    )
+    if (navigation === 'reopened' || navigation === 'project-round-trip') {
+      const start = await screen.findByRole('button', { name: '开始处理' })
+      expect(start).toBeEnabled()
+      if (start.getAttribute('aria-expanded') === 'false') fireEvent.click(start)
+      fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+      expect(onStart).toHaveBeenCalledTimes(2)
+      await act(async () => finish(true))
+      expect(props.onWorkspaceStarted).toHaveBeenCalledOnce()
+    }
+  })
   it('links to the resolved repository without treating an unsaved draft as its source', async () => {
     const list = vi.fn(async () => result)
     window.cleancode = { listProjectIssues: list } as unknown as NonNullable<Window['cleancode']>
