@@ -1,3 +1,5 @@
+import { ProjectIssueReadCache } from '../../../../src/contexts/project/application/services/ProjectIssueReadCache'
+import type { ProjectIssueSnapshot } from '../../../../src/contexts/project/application/dto/ProjectIssues'
 import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 import { ProjectIssueScope } from '../../../../src/contexts/project/application/services/ProjectIssueScope'
 import { ListProjectIssuesUseCase } from '../../../../src/contexts/project/application/use-cases/ListProjectIssuesUseCase'
@@ -7,6 +9,44 @@ import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts
 import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('project issue queries and configuration', () => {
+  it('keeps provider-read references isolated by project identity and selected source', async () => {
+    const f = fixture()
+    const cache = new ProjectIssueReadCache()
+    const issue: ProjectIssueSnapshot = {
+      id: 'I_42',
+      repository: 'owner/repo',
+      number: 42,
+      title: 'Listed',
+      url: 'https://github.com/owner/repo/issues/42',
+      body: 'Private body',
+      state: 'OPEN',
+      labels: [],
+      assignees: []
+    }
+    f.github.list.mockResolvedValue([issue])
+    await new ListProjectIssuesUseCase(f.scope, f.github, cache).execute({
+      projectDirectory: '/project'
+    })
+    const project = f.project().toSnapshot()
+    expect(cache.repository(project)?.name).toBe('owner/repo')
+    expect(cache.issue(project, 'OWNER/repo', 42)).toMatchObject({ id: 'I_42', title: 'Listed' })
+    expect(cache.issue(project, 'owner/repo', 42)).not.toHaveProperty('body')
+    f.github.issue.mockResolvedValue({ ...issue, title: 'Updated' })
+    await new GetProjectIssueUseCase(f.scope, f.github, cache).execute({
+      projectDirectory: '/project',
+      repository: 'owner/repo',
+      number: 42
+    })
+    expect(cache.issue(project, 'owner/repo', 42)?.title).toBe('Updated')
+    for (const changed of [
+      { ...project, id: 'replacement' },
+      { ...project, directory: '/other' },
+      { ...project, issueRepository: 'other/repo' }
+    ]) {
+      expect(cache.issue(changed, 'owner/repo', 42)).toBeUndefined()
+      expect(cache.repository(changed)).toBeUndefined()
+    }
+  })
   it('retains the resolved repository when listing issues fails', async () => {
     const f = fixture()
     f.github.list.mockRejectedValue(
@@ -92,7 +132,7 @@ function fixture() {
   }
   const github = {
     repository: vi.fn(async () => ({ name: 'owner/repo', defaultBranch: 'main' })),
-    list: vi.fn(async () => []),
+    list: vi.fn(async (): Promise<ProjectIssueSnapshot[]> => []),
     issue: vi.fn()
   }
   return {

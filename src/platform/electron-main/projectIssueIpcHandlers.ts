@@ -1,8 +1,11 @@
 import type {
+  IssueWorkspacePhase,
+  PrepareIssueWorkspaceQuery,
   ListProjectIssuesQuery,
   ProjectIssueQuery,
   StartIssueWorkspaceCommand
 } from '../../contexts/project/application/dto/ProjectIssues'
+import type { IpcMainInvokeEvent } from 'electron'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -17,12 +20,16 @@ export function registerProjectIssueIpcHandlers(input: {
     projectDirectory: string
     repository: string
   }) => Promise<unknown>
-  readonly start: (command: StartIssueWorkspaceCommand) => Promise<unknown>
+  readonly prepare: (query: PrepareIssueWorkspaceQuery) => Promise<void>
+  readonly start: (
+    command: StartIssueWorkspaceCommand,
+    progress?: (phase: IssueWorkspacePhase) => void
+  ) => Promise<unknown>
 }) {
   const register = (
     channel: string,
     operation: string,
-    handler: (command: unknown) => Promise<unknown>
+    handler: (command: unknown, event: unknown) => Promise<unknown>
   ) =>
     registerIpcHandler({
       channel,
@@ -58,12 +65,30 @@ export function registerProjectIssueIpcHandlers(input: {
       repository: text(value, 'repository')
     })
   })
-  register('cleancode:start-issue-workspace', 'startIssueWorkspace', (command) => {
+  register('cleancode:prepare-issue-workspace', 'prepareIssueWorkspace', (command) => {
     const value = record(command)
-    return input.start({
+    return input.prepare({ ...issueQuery(value), baseBranch: text(value, 'baseBranch') })
+  })
+  register('cleancode:start-issue-workspace', 'startIssueWorkspace', (command, event) => {
+    const value = record(command)
+    const parsed = {
       ...issueQuery(value),
       branchName: text(value, 'branchName'),
-      baseBranch: text(value, 'baseBranch')
+      baseBranch: text(value, 'baseBranch'),
+      ...(value.operationId !== undefined ? { operationId: text(value, 'operationId') } : {})
+    }
+    if (!parsed.operationId) return input.start(parsed)
+    return input.start(parsed, (phase) => {
+      const sender = (event as IpcMainInvokeEvent).sender
+      if (!sender || sender.isDestroyed()) return
+      try {
+        sender.send('cleancode:issue-workspace-progress', {
+          operationId: parsed.operationId,
+          phase
+        })
+      } catch {
+        // A renderer closed during creation must not invalidate the persisted workspace.
+      }
     })
   })
 }

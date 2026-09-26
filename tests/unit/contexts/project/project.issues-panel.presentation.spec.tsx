@@ -1,4 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type {
+  IssueWorkspaceProgress,
+  StartIssueWorkspaceCommand
+} from '../../../../src/contexts/project/application/dto/ProjectIssues'
 import { ProjectIssuesPanel } from '../../../../src/contexts/project/presentation/components/ProjectIssuesPanel'
 import { createWorkbenchSnapshot } from '../../../fixtures/presentation/appShellFixtures'
 import {
@@ -26,6 +30,59 @@ const result = {
 describe('project issues panel', () => {
   afterEach(() => {
     delete window.cleancode
+  })
+  it('prefetches the selected base and displays only the active creation progress', async () => {
+    let notify!: (event: IssueWorkspaceProgress) => void
+    let finish!: (value: boolean) => void
+    const unsubscribe = vi.fn()
+    const prepare = vi.fn(async () => undefined)
+    const onStart = vi.fn<(command: StartIssueWorkspaceCommand) => Promise<boolean>>(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve
+        })
+    )
+    window.cleancode = {
+      listProjectIssues: vi.fn(async () => result),
+      getProjectIssue: vi.fn(async () => issue),
+      prepareIssueWorkspace: prepare,
+      onIssueWorkspaceProgress: (listener: (event: IssueWorkspaceProgress) => void) => {
+        notify = listener
+        return unsubscribe
+      }
+    } as unknown as NonNullable<Window['cleancode']>
+    const close = vi.fn()
+    const { unmount } = render(
+      <ProjectIssuesPanel
+        project={createWorkbenchSnapshot('/project', 'project').project}
+        onClose={close}
+        onStart={onStart}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={vi.fn()}
+      />
+    )
+    fireEvent.click(await screen.findByRole('button', { name: issue.title }))
+    fireEvent.click(await screen.findByRole('button', { name: '开始处理' }))
+    await waitFor(() =>
+      expect(prepare).toHaveBeenCalledWith({
+        projectDirectory: '/project',
+        repository: 'owner/repo',
+        number: 42,
+        baseBranch: 'main'
+      })
+    )
+    expect(onStart).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '创建并开始' }))
+    expect(screen.getByRole('button', { name: '正在准备基准…' })).toBeDisabled()
+    const operationId = onStart.mock.calls[0]![0].operationId!
+    act(() => notify({ operationId: 'older-operation', phase: 'creating' }))
+    expect(screen.getByRole('button', { name: '正在准备基准…' })).toBeDisabled()
+    act(() => notify({ operationId, phase: 'creating' }))
+    expect(screen.getByRole('button', { name: '正在创建…' })).toBeDisabled()
+    await act(async () => finish(true))
+    expect(close).toHaveBeenCalledOnce()
+    unmount()
+    expect(unsubscribe).toHaveBeenCalledOnce()
   })
   it('uses a checked directional menu for labels with keyboard selection and focus restoration', async () => {
     const list = vi.fn(async () => result)

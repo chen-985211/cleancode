@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
@@ -12,7 +12,10 @@ import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
 import { CircleDashedIcon } from '@phosphor-icons/react/dist/csr/CircleDashed'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
-import type { StartIssueWorkspaceCommand } from '../../application/dto/ProjectIssues'
+import type {
+  IssueWorkspacePhase,
+  StartIssueWorkspaceCommand
+} from '../../application/dto/ProjectIssues'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { resolveUserFacingErrorMessage } from '../../../../presentation/shared/errors/appErrorMessages'
@@ -45,7 +48,12 @@ export function ProjectIssuesPanel({
 }) {
   const { t } = useI18n()
   const model = useProjectIssues(project, open)
-  const [action, setAction] = useState<{ projectId: string; busy: boolean; error?: unknown }>()
+  const [action, setAction] = useState<{
+    projectId: string
+    busy: boolean
+    phase?: IssueWorkspacePhase
+    error?: unknown
+  }>()
   const busy = action?.projectId === project.id && action.busy
   const [configuringProject, setConfiguringProject] = useState<string>()
   const repositoryFormRef = useRef<HTMLFormElement>(null)
@@ -59,6 +67,26 @@ export function ProjectIssuesPanel({
   useLayoutEffect(() => {
     liveProject.current = project.id
   }, [project.id])
+  const creationRef = useRef<{ operationId: string; projectId: string } | null>(null)
+  useEffect(
+    () =>
+      window.cleancode?.onIssueWorkspaceProgress?.((event) => {
+        const active = creationRef.current
+        if (
+          !active ||
+          event.operationId !== active.operationId ||
+          active.projectId !== liveProject.current
+        )
+          return
+        if (event.phase !== 'preparing' && event.phase !== 'creating') return
+        setAction((current) =>
+          current?.busy && current.projectId === active.projectId
+            ? { ...current, phase: event.phase }
+            : current
+        )
+      }),
+    []
+  )
   const selected = model.selected
   const detailVisible = Boolean(selected)
   useLayoutEffect(() => {
@@ -251,6 +279,8 @@ export function ProjectIssuesPanel({
                     {t('issues.backToList')}
                   </button>
                 }
+                projectDirectory={project.directory}
+                creationPhase={busy ? (action?.phase ?? 'preparing') : undefined}
                 issue={selected}
                 detail={model.detail}
                 loading={!model.detail && !model.detailError}
@@ -260,13 +290,21 @@ export function ProjectIssuesPanel({
                 onOpenWorkspace={onOpenWorkspace}
                 onStart={(values) =>
                   void run(async () => {
-                    const success = await onStart({
-                      projectDirectory: project.directory,
-                      repository: selected.repository,
-                      number: selected.number,
-                      ...values
-                    })
-                    if (success && liveProject.current === project.id) onWorkspaceStarted()
+                    const operationId = crypto.randomUUID()
+                    creationRef.current = { operationId, projectId: project.id }
+                    try {
+                      const success = await onStart({
+                        projectDirectory: project.directory,
+                        repository: selected.repository,
+                        number: selected.number,
+                        ...values,
+                        operationId
+                      })
+                      if (success && liveProject.current === project.id) onWorkspaceStarted()
+                    } finally {
+                      if (creationRef.current?.operationId === operationId)
+                        creationRef.current = null
+                    }
                   })
                 }
               />

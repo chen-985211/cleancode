@@ -233,6 +233,13 @@ describe('project issues', () => {
       await page.getByRole('heading', { name: 'Fix terminal resizing' }).click()
       await page.getByRole('dialog', { name: '开始处理' }).waitFor({ state: 'hidden' })
       await page.getByRole('button', { name: '开始处理', exact: true }).click()
+      // Creation from the loaded Issue and local main must not require a reachable Git remote.
+      await git([
+        'remote',
+        'set-url',
+        'origin',
+        join(workbench.registryDirectory, 'missing-remote')
+      ])
       await page.getByRole('button', { name: '创建并开始', exact: true }).click()
       await page
         .getByRole('button', { name: 'issue/42-fix-terminal-resizing 独立工作区', exact: true })

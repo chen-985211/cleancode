@@ -123,7 +123,7 @@ Issue 正文由 `react-markdown` 10.1.0 和 `remark-gfm` 4.0.1 进行只读渲�
 
 项目 Issues 使用外部 `gh` CLI 的 `repo view`、`issue list`、`issue view` JSON 接口，复用用户现有的 github.com 登录，不引入 SDK、服务端或令牌存储。需要用户安装 GitHub CLI 并完成 `gh auth login`；macOS 从 Finder 启动且 PATH 缺少 gh 时检查对应架构的 Homebrew 标准位置。子进程使用参数数组、禁用交互、限定超时和输出大小，错误映射为稳定应用错误，原始输出不进入日志。
 
-创建 Issue 工作区由本地 Git 获取明确基准分支的远程提交并拉取对象，交给现有 `git worktree add` 与工作区初始化流程。不依赖新版 gh 的 worktree 命令。Git 凭据继续使用用户既有 Git 配置，应用不配置全局凭据、不改变 remote、不上传分支。
+创建 Issue 工作区复用主进程已读 Issue 引用；由本地 Git 优先解析已有本地分支或完整提交，明确远程基准或本地缺失时再拉取对象，交给现有 `git worktree add` 与工作区初始化流程。远程预取与正式创建合并同一在途请求，成功结果短时复用；定向 fetch 不递归子模块、不写 FETCH_HEAD，并仅对该命令关闭自动维护，不改变用户 Git 配置。不依赖新版 gh 的 worktree 命令。Git 凭据继续使用用户既有 Git 配置，应用不配置全局凭据、不改变 remote、不上传分支。
 
 ## 存储层
 

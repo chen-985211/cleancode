@@ -26,6 +26,17 @@ const api = electronMocks.exposeInMainWorld.mock.calls[0]?.[1] as NonNullable<Wi
 
 describe('project issues preload contract', () => {
   beforeEach(() => electronMocks.invoke.mockReset())
+  it('unsubscribes the exact progress listener and strips the Electron event', () => {
+    const listener = vi.fn()
+    const unsubscribe = api.onIssueWorkspaceProgress(listener)
+    const [channel, receive] = electronMocks.on.mock.calls.at(-1)!
+    expect(channel).toBe('cleancode:issue-workspace-progress')
+    const progress = { operationId: 'active', phase: 'preparing' }
+    receive({ private: true }, progress)
+    expect(listener).toHaveBeenCalledWith(progress)
+    unsubscribe()
+    expect(electronMocks.removeListener).toHaveBeenCalledWith(channel, receive)
+  })
   it('preserves query and creation payloads and unwraps successful IPC responses', async () => {
     const command = {
       projectDirectory: '/project',
@@ -39,6 +50,7 @@ describe('project issues preload contract', () => {
       ['list-project-issues', () => api.listProjectIssues(command)],
       ['get-project-issue', () => api.getProjectIssue(command)],
       ['configure-project-issues', () => api.configureProjectIssues(command)],
+      ['prepare-issue-workspace', () => api.prepareIssueWorkspace(command)],
       ['start-issue-workspace', () => api.startIssueWorkspace(command)]
     ] as const
     for (const [channel, run] of entries) {

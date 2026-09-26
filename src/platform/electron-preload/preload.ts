@@ -51,6 +51,10 @@ const cleancodeApi = {
     invokeCleancode('cleancode:configure-project-issues', command),
   startIssueWorkspace: (command: unknown) =>
     invokeCleancode('cleancode:start-issue-workspace', command),
+  prepareIssueWorkspace: (command: unknown) =>
+    invokeCleancode('cleancode:prepare-issue-workspace', command),
+  onIssueWorkspaceProgress: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:issue-workspace-progress', listener),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
   reorderProject: (command: unknown) => invokeCleancode('cleancode:reorder-project', command),

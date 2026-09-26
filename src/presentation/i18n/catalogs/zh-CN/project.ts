@@ -20,6 +20,7 @@ export const zhCNProjectMessages = {
   'issues.openWorkspace': '打开工作区',
   'issues.openWorkspaceNamed': '打开工作区 {name}',
   'issues.baseBranch': '基准分支',
+  'issues.preparingBase': '正在准备基准…',
   'issues.creating': '正在创建…',
   'issues.start': '开始处理',
   'issues.refresh': '刷新 Issues',

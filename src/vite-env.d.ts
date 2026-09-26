@@ -92,6 +92,8 @@ import type {
   ProjectIssuesSnapshot,
   ProjectIssueQuery,
   ProjectIssueSnapshot,
+  PrepareIssueWorkspaceQuery,
+  IssueWorkspaceProgress,
   StartIssueWorkspaceCommand
 } from './contexts/project/application/dto/ProjectIssues'
 
@@ -147,6 +149,8 @@ declare global {
         repository: string
       }): Promise<ProjectSnapshot>
       startIssueWorkspace(command: StartIssueWorkspaceCommand): Promise<WorkbenchSnapshot>
+      prepareIssueWorkspace(query: PrepareIssueWorkspaceQuery): Promise<void>
+      onIssueWorkspaceProgress(listener: (event: IssueWorkspaceProgress) => void): () => void
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
       reorderProject(command: {

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import Markdown from 'react-markdown'
@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import type {
+  IssueWorkspacePhase,
   ProjectIssueSnapshot,
   StartIssueWorkspaceCommand
 } from '../../application/dto/ProjectIssues'
@@ -14,6 +15,8 @@ import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 export function ProjectIssueDetails({
   issue,
+  projectDirectory,
+  creationPhase,
   navigation,
   detail,
   loading,
@@ -23,6 +26,8 @@ export function ProjectIssueDetails({
   onStart,
   onOpenWorkspace
 }: {
+  readonly projectDirectory?: string
+  readonly creationPhase?: IssueWorkspacePhase
   readonly navigation?: ReactNode
   readonly issue: ProjectIssueSnapshot
   readonly detail?: ProjectIssueSnapshot
@@ -59,6 +64,22 @@ export function ProjectIssueDetails({
     return `issue/${issue.number}${slug ? `-${slug}` : ''}`
   })
   const [baseBranch, setBaseBranch] = useState(defaultBranch)
+  useEffect(() => {
+    if (!preparing || busy || workspace || !projectDirectory || !baseBranch.trim()) return
+    const timer = setTimeout(() => {
+      void window.cleancode
+        ?.prepareIssueWorkspace?.({
+          projectDirectory,
+          repository: issue.repository,
+          number: issue.number,
+          baseBranch
+        })
+        .catch(() => {
+          /* Submission reports preparation failures through the normal error boundary. */
+        })
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [preparing, busy, workspace, projectDirectory, baseBranch, issue.repository, issue.number])
   const current = detail ?? issue
   return (
     <section className="project-issues__detail" aria-label={t('issues.details')}>
@@ -158,7 +179,13 @@ export function ProjectIssueDetails({
                   type="submit"
                   disabled={busy || !branchName.trim() || !baseBranch.trim()}
                 >
-                  {t(busy ? 'issues.creating' : 'issues.confirmStart')}
+                  {t(
+                    busy
+                      ? creationPhase === 'preparing'
+                        ? 'issues.preparingBase'
+                        : 'issues.creating'
+                      : 'issues.confirmStart'
+                  )}
                 </button>
               </div>
             </form>

@@ -27,7 +27,15 @@ export interface ProjectIssueQuery {
   readonly repository: string
   readonly number: number
 }
-export interface StartIssueWorkspaceCommand extends ProjectIssueQuery {
-  readonly branchName: string
+export interface PrepareIssueWorkspaceQuery extends ProjectIssueQuery {
   readonly baseBranch: string
+}
+export interface StartIssueWorkspaceCommand extends PrepareIssueWorkspaceQuery {
+  readonly branchName: string
+  readonly operationId?: string
+}
+export type IssueWorkspacePhase = 'preparing' | 'creating'
+export interface IssueWorkspaceProgress {
+  readonly operationId: string
+  readonly phase: IssueWorkspacePhase
 }

@@ -4,6 +4,7 @@ import type { ProjectWorkspaceTransactionCoordinator } from '../../contexts/proj
 import type { PrepareWorkspaceInitializationUseCase } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { ProjectIssueScope } from '../../contexts/project/application/services/ProjectIssueScope'
+import { ProjectIssueReadCache } from '../../contexts/project/application/services/ProjectIssueReadCache'
 import { ListProjectIssuesUseCase } from '../../contexts/project/application/use-cases/ListProjectIssuesUseCase'
 import { GetProjectIssueUseCase } from '../../contexts/project/application/use-cases/GetProjectIssueUseCase'
 import { ConfigureProjectIssueRepositoryUseCase } from '../../contexts/project/application/use-cases/ConfigureProjectIssueRepositoryUseCase'
@@ -29,8 +30,9 @@ export function registerProjectIssuesRuntime(input: {
 }) {
   const scope = new ProjectIssueScope(input.projects, input.registry)
   const github = new GitHubCliIssueAdapter()
-  const list = new ListProjectIssuesUseCase(scope, github)
-  const detail = new GetProjectIssueUseCase(scope, github)
+  const cache = new ProjectIssueReadCache()
+  const list = new ListProjectIssuesUseCase(scope, github, cache)
+  const detail = new GetProjectIssueUseCase(scope, github, cache)
   const configure = new ConfigureProjectIssueRepositoryUseCase(
     scope,
     github,
@@ -40,6 +42,7 @@ export function registerProjectIssuesRuntime(input: {
   const start = new StartIssueWorkspaceUseCase({
     scope,
     github,
+    cache,
     base: new GitCliIssueBaseAdapter(),
     preparation: input.preparation,
     select: input.select
@@ -50,6 +53,7 @@ export function registerProjectIssuesRuntime(input: {
     list: (query) => list.execute(query),
     detail: (query) => detail.execute(query),
     configure: (command) => configure.execute(command),
-    start: async (command) => input.loadWorkbench(await start.execute(command))
+    prepare: (query) => start.prepare(query),
+    start: async (command, progress) => input.loadWorkbench(await start.execute(command, progress))
   })
 }
