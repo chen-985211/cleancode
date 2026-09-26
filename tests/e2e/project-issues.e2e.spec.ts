@@ -60,12 +60,19 @@ describe('project issues', () => {
   }, electronScenarioTimeoutMs)
   async function launch(issuesError?: string) {
     const workbench = resources.workbench!
-    const environment = await createGitHubCliFixture(
+    const { NODE_OPTIONS: childNodeOptions, ...environment } = await createGitHubCliFixture(
       join(workbench.registryDirectory, 'bin'),
       issuesError
     )
     app = await launchApp(workbench, { environment: createE2eTerminalEnvironment(environment) })
     resources.electronApp = app
+    if (childNodeOptions) {
+      // Playwright strips NODE_OPTIONS when launching Electron. Install the gh.exe
+      // fixture preload for child Node processes after launch, before querying Issues.
+      await app.evaluate((_electron, nodeOptions) => {
+        process.env.NODE_OPTIONS = nodeOptions
+      }, childNodeOptions)
+    }
     page = await app.firstWindow()
     resources.page = page
     await expectDesktopRuntime(page)
@@ -79,6 +86,7 @@ describe('project issues', () => {
       const panel = page.getByRole('complementary', { name: '任务', exact: true })
       const alert = panel.getByRole('alert')
       await alert.waitFor()
+      await page.locator('.task-surface[data-surface-motion-state="open"]').waitFor()
       expect(await alert.locator('p').textContent()).toBe(
         '可以在顶部选择其他 GitHub 仓库作为任务来源。'
       )
