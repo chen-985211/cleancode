@@ -62,6 +62,7 @@ export const enErrorsMessages = {
   'error.BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES':
     'The workspace has uncommitted changes and cannot be archived.',
   'error.BRANCH_WORKSPACE_NOT_FOUND': 'The branch workspace does not exist. Refresh and try again.',
+  'error.GIT_BRANCH_NAME_INVALID': 'Invalid Git branch name. Edit the name and try again.',
   'error.GIT_BRANCH_ALREADY_EXISTS':
     'The Git branch already exists, so a workspace with the same name cannot be created.',
   'error.GIT_BRANCH_CHECKED_OUT_IN_WORKTREE':

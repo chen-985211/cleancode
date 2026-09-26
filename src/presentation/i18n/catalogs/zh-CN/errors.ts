@@ -44,6 +44,7 @@ export const zhCNErrorsMessages = {
   'error.BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES': '工作区有未提交更改，无法归档。',
   'error.BRANCH_WORKSPACE_NOT_FOUND': '分支工作区不存在，请刷新后重试。',
   'error.GIT_BRANCH_ALREADY_EXISTS': 'Git 分支已存在，无法创建同名工作区。',
+  'error.GIT_BRANCH_NAME_INVALID': 'Git 分支名称无效，请修改名称后重试。',
   'error.GIT_BRANCH_CHECKED_OUT_IN_WORKTREE':
     '这个分支已经绑定到其他 worktree，无法在默认工作区切换。',
   'error.GIT_BRANCH_NOT_FOUND': 'Git 分支不存在，请刷新分支列表后重试。',

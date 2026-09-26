@@ -23,6 +23,7 @@ interface UseBranchWorkspaceActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly notifications: AppNotificationController
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
+  readonly rememberCreatedWorkspace: (workbench: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly terminateWorkspaceTerminalSessions: (
@@ -58,6 +59,7 @@ export function useBranchWorkspaceActions({
   currentWorkbench,
   notifications,
   replaceWorkbench,
+  rememberCreatedWorkspace,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
   terminateWorkspaceTerminalSessions,
@@ -302,6 +304,8 @@ export function useBranchWorkspaceActions({
         ) {
           clearCurrentBlockSelection()
           replaceWorkbench(createdWorkbench)
+        } else {
+          rememberCreatedWorkspace(createdWorkbench)
         }
         completeActionAttempt(key, occurrenceId)
         return createdWorkbench
@@ -321,6 +325,7 @@ export function useBranchWorkspaceActions({
       completeActionAttempt,
       isCurrentActionAttempt,
       publishActionError,
+      rememberCreatedWorkspace,
       replaceWorkbench
     ]
   )

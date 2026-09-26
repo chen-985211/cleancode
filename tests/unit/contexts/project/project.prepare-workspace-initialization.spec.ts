@@ -19,6 +19,22 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it.each(['issue/invalid name', 'HEAD', '-option', 'issue/../task', 'issue/task.lock'])(
+    'rejects invalid branch %s before freezing a request and permits correction',
+    async (branchName) => {
+      const f = fixture()
+      const command = { projectDirectory: '/project', requestId: 'correctable', branchName }
+      await expect(f.prepare.create(command)).rejects.toMatchObject({
+        code: 'GIT_BRANCH_NAME_INVALID'
+      })
+      expect(f.records.size).toBe(0)
+      expect(f.git.createBranchWorktree).not.toHaveBeenCalled()
+      expect(f.content.prepareTemplate).not.toHaveBeenCalled()
+      await f.prepare.create({ ...command, branchName: 'issue/fixed' })
+      expect(f.project().workspaces.find((item) => item.isCurrent)?.gitBranch).toBe('issue/fixed')
+    }
+  )
+
   it('preserves the issue and exact base across metadata failure and recovery', async () => {
     const f = fixture()
     const issue = {

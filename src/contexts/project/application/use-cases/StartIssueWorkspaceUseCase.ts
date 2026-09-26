@@ -16,13 +16,17 @@ import {
   type ProjectIssueReference
 } from '../../domain/value-objects/ProjectIssue'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  isValidNewBranchName,
+  normalizeNewBranchName
+} from '../../domain/value-objects/GitBranchName'
 
 interface Dependencies {
   readonly scope: Pick<ProjectIssueScope, 'require'>
   readonly github: GitHubIssuePort
   readonly cache?: ProjectIssueReadCache
   readonly base: IssueWorkspaceBasePort
-  readonly preparation: Pick<PrepareWorkspaceInitializationUseCase, 'create' | 'list'>
+  readonly preparation: Pick<PrepareWorkspaceInitializationUseCase, 'create' | 'list' | 'cancelOne'>
   readonly select: (command: {
     projectDirectory: string
     workspaceId: string
@@ -96,10 +100,19 @@ export class StartIssueWorkspaceUseCase {
   ): Promise<ProjectSnapshot> {
     progress?.('preparing')
     const { scope, base, preparation, select } = this.dependencies
-    const { project, repository, selectedRepository, issue, existing, pending } =
-      await this.resolveContext(command)
+    const context = await this.resolveContext(command)
+    const { project, repository, selectedRepository, issue, existing } = context
+    let { pending } = context
     if (existing)
       return select({ projectDirectory: project.directory, workspaceId: existing.workspaceId })
+    if (pending && !pending.worktreeCreated && !isValidNewBranchName(pending.branchName)) {
+      // Old versions could freeze an invalid name before Git rejected it. Only
+      // discard such an uncreated request after its replacement passes validation.
+      normalizeNewBranchName(command.branchName)
+      await preparation.cancelOne(project.directory, pending.id)
+      pending = undefined
+    }
+    const branchName = normalizeNewBranchName(pending?.branchName ?? command.branchName)
     const baseRef =
       pending?.baseRef ?? (await base.resolve(project.directory, repository, command.baseBranch))
     const latest = await scope.require(project.directory)
@@ -111,7 +124,7 @@ export class StartIssueWorkspaceUseCase {
     progress?.('creating')
     return preparation.create({
       projectDirectory: project.directory,
-      branchName: pending?.branchName ?? command.branchName,
+      branchName,
       requestId: pending?.id,
       baseRef,
       issue: pending?.issue ?? issue

@@ -1,4 +1,5 @@
 import type { ProjectIssueReference } from '../../domain/value-objects/ProjectIssue'
+import { normalizeNewBranchName } from '../../domain/value-objects/GitBranchName'
 import { Project } from '../../domain/aggregates/Project'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
@@ -49,7 +50,7 @@ export class CreateBranchWorkspaceUseCase {
       throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
     }
 
-    const branchName = command.branchName.trim()
+    const branchName = normalizeNewBranchName(command.branchName)
     const project = Project.fromSnapshot(projectSnapshot)
     const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
 

@@ -336,6 +336,7 @@ describe('branch workspace action notifications', () => {
       ({ currentWorkbench }) => {
         const actions = useBranchWorkspaceActions({
           currentWorkbench,
+          rememberCreatedWorkspace: vi.fn(),
           forgetWorkspaceTerminalStates: vi.fn(),
           notifications,
           replaceWorkbench,
@@ -431,6 +432,7 @@ function renderBranchWorkspaceActions(
     () => {
       const actions = useBranchWorkspaceActions({
         currentWorkbench: workbench,
+        rememberCreatedWorkspace: vi.fn(),
         forgetWorkspaceTerminalStates: vi.fn(),
         notifications,
         replaceWorkbench: overrides.replaceWorkbench ?? vi.fn(),

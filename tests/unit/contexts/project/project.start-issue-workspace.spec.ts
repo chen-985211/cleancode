@@ -15,6 +15,56 @@ const issue = {
 }
 
 describe('start an issue workspace', () => {
+  it('replaces a legacy invalid uncreated request after the branch name is corrected', async () => {
+    const f = fixture(true, 'issue/invalid name')
+    await f.useCase.execute({
+      projectDirectory: '/project',
+      repository: 'owner/repo',
+      number: 42,
+      branchName: 'issue/fixed',
+      baseBranch: 'main'
+    })
+    expect(f.cancelOne).toHaveBeenCalledWith('/project', 'original')
+    expect(f.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        branchName: 'issue/fixed',
+        requestId: undefined,
+        baseRef: 'b'.repeat(40)
+      })
+    )
+  })
+
+  it('keeps a legacy request when its replacement is still invalid', async () => {
+    const f = fixture(true, 'issue/invalid name')
+    await expect(
+      f.useCase.execute({
+        projectDirectory: '/project',
+        repository: 'owner/repo',
+        number: 42,
+        branchName: 'issue/still invalid',
+        baseBranch: 'main'
+      })
+    ).rejects.toMatchObject({ code: 'GIT_BRANCH_NAME_INVALID' })
+    expect(f.cancelOne).not.toHaveBeenCalled()
+    expect(f.base.resolve).not.toHaveBeenCalled()
+    expect(f.create).not.toHaveBeenCalled()
+  })
+
+  it('does not prepare a base for an invalid new branch', async () => {
+    const f = fixture(false)
+    await expect(
+      f.useCase.execute({
+        projectDirectory: '/project',
+        repository: 'owner/repo',
+        number: 42,
+        branchName: 'HEAD',
+        baseBranch: 'main'
+      })
+    ).rejects.toMatchObject({ code: 'GIT_BRANCH_NAME_INVALID' })
+    expect(f.base.resolve).not.toHaveBeenCalled()
+    expect(f.create).not.toHaveBeenCalled()
+  })
+
   it('reuses a provider-read Issue and prepares without creating or selecting a workspace', async () => {
     const f = fixture(false)
     f.cache.rememberIssue(f.project(), issue)
@@ -78,18 +128,24 @@ describe('start an issue workspace', () => {
   })
 
   it('resumes a persisted creation with its frozen base instead of fetching a new base', async () => {
-    const { useCase, create, base, github } = fixture()
+    const { useCase, create, base, github, cancelOne } = fixture()
     await useCase.execute({
       projectDirectory: '/project',
       repository: 'owner/repo',
       number: 42,
-      branchName: 'issue/42',
+      branchName: 'issue/edited-on-retry',
       baseBranch: 'main'
     })
     expect(base.resolve).not.toHaveBeenCalled()
+    expect(cancelOne).not.toHaveBeenCalled()
     expect(github.issue).not.toHaveBeenCalled()
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'original', baseRef: 'a'.repeat(40), issue })
+      expect.objectContaining({
+        requestId: 'original',
+        branchName: 'issue/42',
+        baseRef: 'a'.repeat(40),
+        issue
+      })
     )
   })
 
@@ -108,7 +164,7 @@ describe('start an issue workspace', () => {
   })
 })
 
-function fixture(withPending = true) {
+function fixture(withPending = true, pendingBranch = 'issue/42') {
   let project: ProjectSnapshot = {
     id: 'project',
     directory: '/project',
@@ -136,6 +192,9 @@ function fixture(withPending = true) {
   const base = { resolve: vi.fn(async () => 'b'.repeat(40)) }
   const github = { repository: vi.fn(), list: vi.fn(), issue: vi.fn(async () => issue) }
   const cache = new ProjectIssueReadCache()
+  const cancelOne = vi.fn(async () => {
+    withPending = false
+  })
   const useCase = new StartIssueWorkspaceUseCase({
     cache,
     scope: { require: async () => project },
@@ -143,6 +202,7 @@ function fixture(withPending = true) {
     base,
     preparation: {
       create,
+      cancelOne,
       list: async () =>
         withPending
           ? [
@@ -152,7 +212,7 @@ function fixture(withPending = true) {
                 projectDirectory: '/project',
                 workspaceId: 'workspace',
                 workspaceDirectory: '/worktree',
-                branchName: 'issue/42',
+                branchName: pendingBranch,
                 baseRef: 'a'.repeat(40),
                 issue,
                 mode: 'new-workspace' as const,
@@ -170,6 +230,7 @@ function fixture(withPending = true) {
     base,
     github,
     cache,
+    cancelOne,
     project: () => project,
     update: (value: Partial<ProjectSnapshot>) => {
       project = { ...project, ...value }

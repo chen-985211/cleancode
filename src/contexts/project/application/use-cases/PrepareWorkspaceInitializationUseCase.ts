@@ -3,6 +3,7 @@ import {
   type ProjectIssueReference
 } from '../../domain/value-objects/ProjectIssue'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import { normalizeNewBranchName } from '../../domain/value-objects/GitBranchName'
 import type { ProjectRegistryRepository } from '../ports/ProjectRegistryRepository'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { BranchWorkspaceDirectoryPort } from '../ports/BranchWorkspaceDirectoryPort'
@@ -85,8 +86,11 @@ export class PrepareWorkspaceInitializationUseCase {
     })
   }
   async create(command: CreateInitializedWorkspaceCommand): Promise<ProjectSnapshot> {
+    const branchName = normalizeNewBranchName(command.branchName)
     const requestId = command.requestId ?? globalThis.crypto.randomUUID()
-    return this.requests.run(requestId, () => this.createOnce({ ...command, requestId }))
+    return this.requests.run(requestId, () =>
+      this.createOnce({ ...command, branchName, requestId })
+    )
   }
   async beginEmpty(
     command: BeginEmptyCanvasInitializationCommand
