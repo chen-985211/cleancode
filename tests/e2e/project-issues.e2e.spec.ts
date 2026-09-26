@@ -195,11 +195,31 @@ describe('project issues', () => {
           exact: false
         })
         .waitFor()
+      const pages = page.locator('.project-issues__pages')
+      await page.locator('.project-issues__pages[data-page-motion-state="open"]').waitFor()
+      const reader = await page.locator('.project-issues__reader').elementHandle()
+      const projectBounds = await page.locator('.project-issues__project').boundingBox()
+      const navigationBounds = await page.locator('.project-issues__detail-nav').boundingBox()
+      const bodyBounds = await page.locator('.project-issues__body').boundingBox()
+      expect(navigationBounds!.x).toBeCloseTo(projectBounds!.x, 0)
+      expect(bodyBounds!.x).toBeCloseTo(projectBounds!.x, 0)
+      await page.getByRole('button', { name: '返回任务列表' }).click()
+      expect(await pages.getAttribute('data-page-motion-state')).toBe('closing')
+      expect(await reader!.evaluate((element) => element.isConnected)).toBe(true)
+      expect(
+        await page
+          .locator('.project-issues__detail-page')
+          .evaluate((el) => (el as HTMLElement).inert)
+      ).toBe(true)
+      // Dispatch a second navigation before the first spring has finished.
+      await page
+        .getByRole('button', { name: 'Fix terminal resizing', exact: true })
+        .evaluate((el) => (el as HTMLButtonElement).click())
+      expect(await reader!.evaluate((element) => element.isConnected)).toBe(true)
+      await page.locator('.project-issues__pages[data-page-motion-state="open"]').waitFor()
       await mkdir('test-results', { recursive: true })
       await page.screenshot({ path: 'test-results/project-issues-light.png' })
-      await page.locator('.project-issues__reader').evaluate(async (element) => {
-        await Promise.all(element.getAnimations().map((animation) => animation.finished))
-      })
+      await page.locator('.project-issues__pages[data-page-motion-state="open"]').waitFor()
       const bodyBefore = await page.locator('.project-issues__body').boundingBox()
       await page.getByRole('button', { name: '开始处理', exact: true }).click()
       await page
@@ -242,7 +262,14 @@ describe('project issues', () => {
       expect(bounds!.y).toBe(0)
       expect(bounds!.height).toBe(viewport.height)
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width)
+      await page.locator('.project-issues__pages[data-page-motion-state="open"]').waitFor()
       await page.screenshot({ path: 'test-results/project-issues-dark-narrow.png' })
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.getByRole('button', { name: '返回任务列表' }).click()
+      expect(await pages.getAttribute('data-page-motion-state')).toBe('closed')
+      expect(await page.locator('.project-issues__reader').count()).toBe(0)
+      await page.getByRole('button', { name: 'Fix terminal resizing', exact: true }).click()
+      expect(await pages.getAttribute('data-page-motion-state')).toBe('open')
       await page.getByRole('button', { name: '打开工作区', exact: true }).click()
       const after = await page.evaluate(
         async () => (await window.cleancode!.listWorkbenches())[0]!.project

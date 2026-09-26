@@ -5,6 +5,29 @@ import {
 import type { SpringProgressMotionFrameScheduler } from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('surface spring motion', () => {
+  it('moves a page without scaling and reverses from its live position before settling', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({ preset: 'page-right', scheduler })
+    const obsolete = vi.fn()
+    const settled = vi.fn()
+    controller.intentChanged(root, { visible: true, reducedMotion: false, onSettled: obsolete })
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+    scheduler.advanceNextFrame(100)
+    const presentation = new Map(root.properties)
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBeGreaterThan(0)
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBeLessThan(1)
+    controller.intentChanged(root, { visible: false, reducedMotion: false, onSettled: settled })
+    expect(root.properties).toEqual(presentation)
+    scheduler.advanceUntilIdle()
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(0)
+    expect(obsolete).not.toHaveBeenCalled()
+    expect(settled).toHaveBeenCalledOnce()
+    controller.intentChanged(root, { visible: true, reducedMotion: true, onSettled: vi.fn() })
+    expect(root.properties.get('--cc-surface-motion-translate-x')).toBe('0px')
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+    controller.dispose()
+  })
   it('reveals a full task surface from below and reverses continuously without changing its scale', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()

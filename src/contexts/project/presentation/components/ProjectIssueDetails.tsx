@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import Markdown from 'react-markdown'
@@ -14,6 +14,7 @@ import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 export function ProjectIssueDetails({
   issue,
+  navigation,
   detail,
   loading,
   defaultBranch,
@@ -22,6 +23,7 @@ export function ProjectIssueDetails({
   onStart,
   onOpenWorkspace
 }: {
+  readonly navigation?: ReactNode
   readonly issue: ProjectIssueSnapshot
   readonly detail?: ProjectIssueSnapshot
   readonly loading: boolean
@@ -60,12 +62,13 @@ export function ProjectIssueDetails({
   const current = detail ?? issue
   return (
     <section className="project-issues__detail" aria-label={t('issues.details')}>
-      <div className="project-issues__detail-kicker">
+      <nav className="project-issues__detail-nav">
+        {navigation}
+        <span className="project-issues__muted">#{issue.number}</span>
         <span className="project-issues__status">
           {t(current.state === 'OPEN' ? 'issues.openState' : 'issues.closedState')}
         </span>
-        <span className="project-issues__muted">#{issue.number}</span>
-      </div>
+      </nav>
       <div className="project-issues__detail-heading">
         <h2 className="project-issues__title">{current.title}</h2>
         <div className="project-issues__detail-actions">

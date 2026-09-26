@@ -322,16 +322,18 @@
   scrollbar-gutter: stable;
 }
 .project-issues__detail-nav {
-  max-width: 800px;
-  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 10px;
 }
 .project-issues__detail-nav .toolbar-button {
   padding-left: 0;
   color: var(--cc-muted-strong);
 }
 .project-issues__detail {
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
   min-width: 0;
 }
 .project-issues__detail-heading {
@@ -357,8 +359,8 @@
   font-size: 12px;
 }
 .project-issues__title {
-  margin: 10px 0 12px;
-  font-size: 26px;
+  margin: 0 0 10px;
+  font-size: 24px;
   line-height: 1.4;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -368,7 +370,8 @@
   display: none;
 }
 .project-issues__body {
-  padding: 28px 0;
+  max-width: 800px;
+  padding: 24px 0;
   color: var(--cc-foreground);
   line-height: 1.75;
   font-size: 14px;
@@ -584,11 +587,6 @@
   background: var(--cc-directional-menu-hover);
 }
 
-.project-issues__detail-kicker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 .project-issues__detail-heading {
   position: relative;
   align-items: center;
@@ -601,7 +599,7 @@
   flex-shrink: 0;
 }
 .project-issues__metadata {
-  padding-bottom: 18px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--cc-border);
 }
 .project-issues__start-popover {
@@ -632,40 +630,38 @@
 .project-issues__body li + li {
   margin-top: 4px;
 }
-.project-issues__reader {
-  animation: issue-detail-enter var(--cc-motion-duration-surface) var(--cc-easing-enter);
-}
-@keyframes issue-detail-enter {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .project-issues__reader {
-    animation: none;
-  }
-}
 
-.project-issues__browser:not([hidden]) {
-  animation: issue-list-enter var(--cc-motion-duration-surface) var(--cc-easing-enter);
+.project-issues__pages {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: clip;
 }
-@keyframes issue-list-enter {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.project-issues__list-page,
+.project-issues__detail-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
-@media (prefers-reduced-motion: reduce) {
-  .project-issues__browser:not([hidden]) {
-    animation: none;
-  }
+.project-issues__list-page {
+  opacity: calc(1 - var(--cc-surface-motion-opacity, 0));
+  transform: translateX(var(--cc-surface-motion-companion-translate-x, 0px));
+}
+.project-issues__detail-page {
+  opacity: var(--cc-surface-motion-opacity, 0);
+  transform: translateX(var(--cc-surface-motion-translate-x, 64px));
+}
+.project-issues__pages[data-page-target='detail'] > .project-issues__list-page,
+.project-issues__pages[data-page-target='list'] > .project-issues__detail-page {
+  pointer-events: none;
+}
+.project-issues__pages[data-page-motion-state='open'] > .project-issues__list-page {
+  visibility: hidden;
+}
+.project-issues__pages:is([data-page-motion-state='opening'], [data-page-motion-state='closing'])
+  > div {
+  will-change: transform, opacity;
 }

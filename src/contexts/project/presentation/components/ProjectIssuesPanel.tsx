@@ -20,6 +20,7 @@ import { isSerializedAppError } from '../../../../shared-kernel/application/erro
 import { useProjectIssues } from '../view-models/useProjectIssues'
 import { IssueMenuSelect } from './IssueMenuSelect'
 import { ProjectIssueDetails } from './ProjectIssueDetails'
+import { IssuePageTransition } from './IssuePageTransition'
 
 export function ProjectIssuesPanel({
   project,
@@ -232,183 +233,191 @@ export function ProjectIssuesPanel({
           {resolveUserFacingErrorMessage(error, 'issues.failed', t)}
         </div>
       ) : null}
-      <div className="project-issues__browser" hidden={Boolean(selected)}>
-        <form
-          className="project-issues__filters"
-          onSubmit={(event) => {
-            event.preventDefault()
-            model.update({ query: model.view.search, limit: 50 })
-          }}
-        >
-          <div className="project-issues__search">
-            <MagnifyingGlassIcon size={16} aria-hidden="true" />
-            <input
-              type="search"
-              aria-label={t('issues.search')}
-              placeholder={t('issues.search')}
-              value={model.view.search}
-              onChange={(event) => model.update({ search: event.target.value })}
-            />
-            <button
-              className="icon-button"
-              type="submit"
-              aria-label={t('issues.searchAction')}
-              title={t('issues.searchAction')}
-            >
-              <ArrowRightIcon size={15} />
-            </button>
-          </div>
-          <button
-            className="toolbar-button project-issues__filter"
-            type="button"
-            aria-pressed={model.view.assignedToMe}
-            onClick={() => model.update({ assignedToMe: !model.view.assignedToMe, limit: 50 })}
+      <IssuePageTransition
+        key={project.id}
+        detail={
+          selected && model.data ? (
+            <div className="project-issues__reader">
+              <ProjectIssueDetails
+                key={`${project.id}:${selected.id}`}
+                navigation={
+                  <button
+                    ref={backRef}
+                    className="toolbar-button"
+                    type="button"
+                    onClick={() => model.update({ detailOpen: false })}
+                  >
+                    <ArrowLeftIcon size={16} aria-hidden="true" />
+                    {t('issues.backToList')}
+                  </button>
+                }
+                issue={selected}
+                detail={model.detail}
+                loading={!model.detail && !model.detailError}
+                defaultBranch={model.data.repository.defaultBranch}
+                workspace={linked}
+                busy={busy}
+                onOpenWorkspace={onOpenWorkspace}
+                onStart={(values) =>
+                  void run(async () => {
+                    const success = await onStart({
+                      projectDirectory: project.directory,
+                      repository: selected.repository,
+                      number: selected.number,
+                      ...values
+                    })
+                    if (success && liveProject.current === project.id) onWorkspaceStarted()
+                  })
+                }
+              />
+            </div>
+          ) : null
+        }
+      >
+        <div className="project-issues__browser">
+          <form
+            className="project-issues__filters"
+            onSubmit={(event) => {
+              event.preventDefault()
+              model.update({ query: model.view.search, limit: 50 })
+            }}
           >
-            {t('issues.mine')}
-          </button>
-          <IssueMenuSelect
-            label={t('issues.label')}
-            value={model.view.label}
-            onChange={(value) => model.update({ label: value, limit: 50 })}
-            options={[
-              { value: '', label: t('issues.allLabels') },
-              ...Array.from(
-                new Set([
-                  ...(model.view.label ? [model.view.label] : []),
-                  ...(model.data?.issues.flatMap((issue) => issue.labels) ?? [])
-                ])
-              ).map((label) => ({ value: label, label }))
-            ]}
-          />
-        </form>
-        <div
-          className="project-issues__list"
-          aria-label={t('issues.list')}
-          aria-busy={model.loading}
-        >
-          <div className="project-issues__columns" aria-hidden="true">
-            <span>{t('issues.list')}</span>
-            <span>{t('issues.assignees')}</span>
-            <span>{t('issues.workspace')}</span>
-          </div>
-          {model.error ? (
-            <div role="alert" aria-atomic="true" className="project-issues__unavailable">
-              <h2>
-                {t(
-                  isSerializedAppError(model.error) && model.error.code === 'GITHUB_ISSUES_DISABLED'
-                    ? 'issues.disabledTitle'
-                    : 'issues.unavailableTitle'
-                )}
-              </h2>
-              <p>
-                {isSerializedAppError(model.error) && model.error.code === 'GITHUB_ISSUES_DISABLED'
-                  ? t('issues.disabledDescription')
-                  : resolveUserFacingErrorMessage(model.error, 'issues.failed', t)}
-              </p>
-            </div>
-          ) : model.loading ? (
-            <p className="project-issues__empty" role="status">
-              {t('issues.loading')}
-            </p>
-          ) : !model.data?.issues.length ? (
-            <div className="project-issues__unavailable">
-              <h2>{t('issues.empty')}</h2>
-              <p>{t('issues.emptyDescription')}</p>
-            </div>
-          ) : null}
-          {model.data?.issues.map((issue) => {
-            const workspace = project.workspaces.find((item) => item.issue?.id === issue.id)
-            return (
+            <div className="project-issues__search">
+              <MagnifyingGlassIcon size={16} aria-hidden="true" />
+              <input
+                type="search"
+                aria-label={t('issues.search')}
+                placeholder={t('issues.search')}
+                value={model.view.search}
+                onChange={(event) => model.update({ search: event.target.value })}
+              />
               <button
-                key={issue.id}
-                ref={model.view.selectedId === issue.id ? selectedRowRef : undefined}
-                className="project-issues__row"
-                type="button"
-                aria-label={issue.title}
-                onClick={() => model.update({ selectedId: issue.id, detailOpen: true })}
+                className="icon-button"
+                type="submit"
+                aria-label={t('issues.searchAction')}
+                title={t('issues.searchAction')}
               >
-                <span className="project-issues__row-main">
-                  <CircleDashedIcon
-                    className="project-issues__issue-icon"
-                    size={17}
-                    aria-hidden="true"
-                  />
-                  <span className="project-issues__row-content">
-                    <span className="project-issues__row-title">{issue.title}</span>
-                    <span className="project-issues__row-meta">
-                      <span>#{issue.number}</span>
-                      {issue.labels.slice(0, 3).map((label) => (
-                        <span className="project-issues__label" key={label}>
-                          {label}
-                        </span>
-                      ))}
+                <ArrowRightIcon size={15} />
+              </button>
+            </div>
+            <button
+              className="toolbar-button project-issues__filter"
+              type="button"
+              aria-pressed={model.view.assignedToMe}
+              onClick={() => model.update({ assignedToMe: !model.view.assignedToMe, limit: 50 })}
+            >
+              {t('issues.mine')}
+            </button>
+            <IssueMenuSelect
+              label={t('issues.label')}
+              value={model.view.label}
+              onChange={(value) => model.update({ label: value, limit: 50 })}
+              options={[
+                { value: '', label: t('issues.allLabels') },
+                ...Array.from(
+                  new Set([
+                    ...(model.view.label ? [model.view.label] : []),
+                    ...(model.data?.issues.flatMap((issue) => issue.labels) ?? [])
+                  ])
+                ).map((label) => ({ value: label, label }))
+              ]}
+            />
+          </form>
+          <div
+            className="project-issues__list"
+            aria-label={t('issues.list')}
+            aria-busy={model.loading}
+          >
+            <div className="project-issues__columns" aria-hidden="true">
+              <span>{t('issues.list')}</span>
+              <span>{t('issues.assignees')}</span>
+              <span>{t('issues.workspace')}</span>
+            </div>
+            {model.error ? (
+              <div role="alert" aria-atomic="true" className="project-issues__unavailable">
+                <h2>
+                  {t(
+                    isSerializedAppError(model.error) &&
+                      model.error.code === 'GITHUB_ISSUES_DISABLED'
+                      ? 'issues.disabledTitle'
+                      : 'issues.unavailableTitle'
+                  )}
+                </h2>
+                <p>
+                  {isSerializedAppError(model.error) &&
+                  model.error.code === 'GITHUB_ISSUES_DISABLED'
+                    ? t('issues.disabledDescription')
+                    : resolveUserFacingErrorMessage(model.error, 'issues.failed', t)}
+                </p>
+              </div>
+            ) : model.loading ? (
+              <p className="project-issues__empty" role="status">
+                {t('issues.loading')}
+              </p>
+            ) : !model.data?.issues.length ? (
+              <div className="project-issues__unavailable">
+                <h2>{t('issues.empty')}</h2>
+                <p>{t('issues.emptyDescription')}</p>
+              </div>
+            ) : null}
+            {model.data?.issues.map((issue) => {
+              const workspace = project.workspaces.find((item) => item.issue?.id === issue.id)
+              return (
+                <button
+                  key={issue.id}
+                  ref={model.view.selectedId === issue.id ? selectedRowRef : undefined}
+                  className="project-issues__row"
+                  type="button"
+                  aria-label={issue.title}
+                  onClick={() => model.update({ selectedId: issue.id, detailOpen: true })}
+                >
+                  <span className="project-issues__row-main">
+                    <CircleDashedIcon
+                      className="project-issues__issue-icon"
+                      size={17}
+                      aria-hidden="true"
+                    />
+                    <span className="project-issues__row-content">
+                      <span className="project-issues__row-title">{issue.title}</span>
+                      <span className="project-issues__row-meta">
+                        <span>#{issue.number}</span>
+                        {issue.labels.slice(0, 3).map((label) => (
+                          <span className="project-issues__label" key={label}>
+                            {label}
+                          </span>
+                        ))}
+                      </span>
                     </span>
                   </span>
-                </span>
-                <span className="project-issues__assignees">
-                  {issue.assignees.map((login) => `@${login}`).join(', ') || '—'}
-                </span>
-                <span className="project-issues__workspace">
-                  {workspace ? (
-                    <>
-                      <GitBranchIcon size={14} aria-hidden="true" />
-                      <span>{workspace.displayName}</span>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </span>
+                  <span className="project-issues__assignees">
+                    {issue.assignees.map((login) => `@${login}`).join(', ') || '—'}
+                  </span>
+                  <span className="project-issues__workspace">
+                    {workspace ? (
+                      <>
+                        <GitBranchIcon size={14} aria-hidden="true" />
+                        <span>{workspace.displayName}</span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+            {model.data?.hasMore ? (
+              <button
+                className="toolbar-button project-issues__more"
+                type="button"
+                disabled={model.view.limit >= 500}
+                onClick={() => model.update({ limit: Math.min(500, model.view.limit + 50) })}
+              >
+                {t(model.view.limit >= 500 ? 'issues.refineSearch' : 'issues.loadMore')}
               </button>
-            )
-          })}
-          {model.data?.hasMore ? (
-            <button
-              className="toolbar-button project-issues__more"
-              type="button"
-              disabled={model.view.limit >= 500}
-              onClick={() => model.update({ limit: Math.min(500, model.view.limit + 50) })}
-            >
-              {t(model.view.limit >= 500 ? 'issues.refineSearch' : 'issues.loadMore')}
-            </button>
-          ) : null}
+            ) : null}
+          </div>
         </div>
-      </div>
-      {selected && model.data ? (
-        <div className="project-issues__reader">
-          <nav className="project-issues__detail-nav">
-            <button
-              ref={backRef}
-              className="toolbar-button"
-              type="button"
-              onClick={() => model.update({ detailOpen: false })}
-            >
-              <ArrowLeftIcon size={16} aria-hidden="true" />
-              {t('issues.backToList')}
-            </button>
-          </nav>
-          <ProjectIssueDetails
-            key={`${project.id}:${selected.id}`}
-            issue={selected}
-            detail={model.detail}
-            loading={!model.detail && !model.detailError}
-            defaultBranch={model.data.repository.defaultBranch}
-            workspace={linked}
-            busy={busy}
-            onOpenWorkspace={onOpenWorkspace}
-            onStart={(values) =>
-              void run(async () => {
-                const success = await onStart({
-                  projectDirectory: project.directory,
-                  repository: selected.repository,
-                  number: selected.number,
-                  ...values
-                })
-                if (success && liveProject.current === project.id) onWorkspaceStarted()
-              })
-            }
-          />
-        </div>
-      ) : null}
+      </IssuePageTransition>
     </aside>
   )
 }
