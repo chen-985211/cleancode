@@ -197,6 +197,21 @@ describe('project issues', () => {
         .waitFor()
       await mkdir('test-results', { recursive: true })
       await page.screenshot({ path: 'test-results/project-issues-light.png' })
+      await page.locator('.project-issues__reader').evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((animation) => animation.finished))
+      })
+      const bodyBefore = await page.locator('.project-issues__body').boundingBox()
+      await page.getByRole('button', { name: '开始处理', exact: true }).click()
+      await page
+        .locator('.project-issues__start-popover[data-surface-motion-state="open"]')
+        .waitFor()
+      expect(await page.locator('.project-issues__body').boundingBox()).toEqual(bodyBefore)
+      await page.screenshot({ path: 'test-results/project-issues-create-popover.png' })
+      await page.getByRole('textbox', { name: '分支名称' }).press('Escape')
+      await page.getByRole('dialog', { name: '开始处理' }).waitFor({ state: 'hidden' })
+      await page.getByRole('button', { name: '开始处理', exact: true }).click()
+      await page.getByRole('heading', { name: 'Fix terminal resizing' }).click()
+      await page.getByRole('dialog', { name: '开始处理' }).waitFor({ state: 'hidden' })
       await page.getByRole('button', { name: '开始处理', exact: true }).click()
       await page.getByRole('button', { name: '创建并开始', exact: true }).click()
       await page

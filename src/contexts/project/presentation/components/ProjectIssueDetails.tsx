@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
@@ -31,6 +33,20 @@ export function ProjectIssueDetails({
 }) {
   const { t } = useI18n()
   const [preparing, setPreparing] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  function dismiss(restoreFocus: boolean) {
+    if (busy) return
+    setPreparing(false)
+    if (restoreFocus) triggerRef.current?.focus({ preventScroll: true })
+  }
+  useOutsidePointerDismiss({
+    active: preparing && !busy,
+    pointerPolicy: 'passthrough',
+    isInside: (target) =>
+      Boolean(popupRef.current?.contains(target) || triggerRef.current?.contains(target)),
+    onDismiss: () => dismiss(false)
+  })
   const [branchName, setBranchName] = useState(() => {
     const slug = issue.title
       .toLowerCase()
@@ -44,11 +60,14 @@ export function ProjectIssueDetails({
   const current = detail ?? issue
   return (
     <section className="project-issues__detail" aria-label={t('issues.details')}>
-      <div className="project-issues__detail-heading">
+      <div className="project-issues__detail-kicker">
         <span className="project-issues__status">
           {t(current.state === 'OPEN' ? 'issues.openState' : 'issues.closedState')}
         </span>
         <span className="project-issues__muted">#{issue.number}</span>
+      </div>
+      <div className="project-issues__detail-heading">
+        <h2 className="project-issues__title">{current.title}</h2>
         <div className="project-issues__detail-actions">
           <a
             className="icon-button"
@@ -60,22 +79,89 @@ export function ProjectIssueDetails({
           >
             <ArrowSquareOutIcon size={17} />
           </a>
-          {!preparing || workspace ? (
-            <button
-              className="toolbar-button toolbar-button--primary"
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                workspace ? onOpenWorkspace(workspace.workspaceId) : setPreparing(true)
+          <button
+            ref={triggerRef}
+            aria-expanded={workspace ? undefined : preparing}
+            aria-haspopup={workspace ? undefined : 'dialog'}
+            className="toolbar-button toolbar-button--primary"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              workspace
+                ? onOpenWorkspace(workspace.workspaceId)
+                : preparing
+                  ? dismiss(true)
+                  : setPreparing(true)
+            }
+          >
+            <GitBranchIcon size={15} aria-hidden="true" />
+            {t(workspace ? 'issues.openWorkspace' : 'issues.start')}
+          </button>
+          <AnchoredSurfaceMotion
+            ref={popupRef}
+            open={preparing && !workspace}
+            springPreset="directional-menu"
+            className="project-issues__start-popover anchored-surface-motion directional-menu-surface"
+            data-side="bottom"
+            role="dialog"
+            aria-label={t('issues.start')}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                dismiss(true)
               }
+            }}
+          >
+            <form
+              className="project-issues__start"
+              onSubmit={(event) => {
+                event.preventDefault()
+                onStart({ branchName, baseBranch })
+              }}
             >
-              <GitBranchIcon size={15} aria-hidden="true" />
-              {t(workspace ? 'issues.openWorkspace' : 'issues.start')}
-            </button>
-          ) : null}
+              <label>
+                {t('branchWorkspace.branchName')}
+                <input
+                  value={branchName}
+                  onChange={(event) => setBranchName(event.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus
+                />
+              </label>
+              <label>
+                {t('issues.baseBranch')}
+                <input
+                  value={baseBranch}
+                  onChange={(event) => setBaseBranch(event.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <div className="project-issues__start-actions">
+                <button
+                  className="toolbar-button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => dismiss(true)}
+                >
+                  {t('issues.cancelStart')}
+                </button>
+                <button
+                  className="toolbar-button toolbar-button--primary"
+                  type="submit"
+                  disabled={busy || !branchName.trim() || !baseBranch.trim()}
+                >
+                  {t(busy ? 'issues.creating' : 'issues.confirmStart')}
+                </button>
+              </div>
+            </form>
+          </AnchoredSurfaceMotion>
         </div>
       </div>
-      <h2>{current.title}</h2>
       <div className="project-issues__metadata">
         {current.labels.map((label) => (
           <span key={label} className="project-issues__label">
@@ -92,54 +178,6 @@ export function ProjectIssueDetails({
           </span>
         ) : null}
       </div>
-      {preparing && !workspace ? (
-        <form
-          className="project-issues__start"
-          onSubmit={(event) => {
-            event.preventDefault()
-            onStart({ branchName, baseBranch })
-          }}
-        >
-          <label>
-            {t('branchWorkspace.branchName')}
-            <input
-              value={branchName}
-              onChange={(event) => setBranchName(event.target.value)}
-              disabled={busy}
-              autoComplete="off"
-              spellCheck={false}
-              autoFocus
-            />
-          </label>
-          <label>
-            {t('issues.baseBranch')}
-            <input
-              value={baseBranch}
-              onChange={(event) => setBaseBranch(event.target.value)}
-              disabled={busy}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-          <div className="project-issues__start-actions">
-            <button
-              className="toolbar-button"
-              type="button"
-              disabled={busy}
-              onClick={() => setPreparing(false)}
-            >
-              {t('issues.cancelStart')}
-            </button>
-            <button
-              className="toolbar-button toolbar-button--primary"
-              type="submit"
-              disabled={busy || !branchName.trim() || !baseBranch.trim()}
-            >
-              {t(busy ? 'issues.creating' : 'issues.confirmStart')}
-            </button>
-          </div>
-        </form>
-      ) : null}
       <div className="project-issues__body" aria-busy={loading}>
         {loading ? (
           t('issues.loading')
