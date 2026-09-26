@@ -37,6 +37,7 @@ export function TaskSurface({
         className="task-surface anchored-surface-motion"
         data-surface-spring-preset="fullscreen-bottom"
         data-shortcut-capture=""
+        data-shortcut-allow="toggleSidebar"
         {...presence.surfaceProps}
       >
         {children}

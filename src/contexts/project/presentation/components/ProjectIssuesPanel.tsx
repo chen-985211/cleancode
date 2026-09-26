@@ -49,6 +49,12 @@ export function ProjectIssuesPanel({
 }) {
   const { t } = useI18n()
   const model = useProjectIssues(project, open)
+  const panelRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    if (open && !panelRef.current?.contains(document.activeElement)) {
+      panelRef.current?.focus({ preventScroll: true })
+    }
+  }, [open])
   const [actions, setActions] = useState<
     Record<
       string,
@@ -158,9 +164,11 @@ export function ProjectIssuesPanel({
 
   return (
     <aside
+      ref={panelRef}
       id="project-issues-panel"
       className="project-issues"
       aria-label={title ?? t('issues.panel')}
+      tabIndex={-1}
       onKeyDown={(event) => {
         event.stopPropagation()
         if (event.key !== 'Escape') return

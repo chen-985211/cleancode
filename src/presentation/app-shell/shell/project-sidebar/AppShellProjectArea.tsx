@@ -38,7 +38,11 @@ export function AppShellProjectArea({
     setOpen(false)
   }
   return (
-    <div className="task-navigation-owner" data-shortcut-capture={open ? '' : undefined}>
+    <div
+      className="task-navigation-owner"
+      data-shortcut-capture={open ? '' : undefined}
+      data-shortcut-allow={open ? 'toggleSidebar' : undefined}
+    >
       <AppShellSidebar
         {...props}
         onSelectWorkspace={(...args) => {
