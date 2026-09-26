@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight'
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft'
@@ -9,6 +10,7 @@ import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { CircleDashedIcon } from '@phosphor-icons/react/dist/csr/CircleDashed'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { StartIssueWorkspaceCommand } from '../../application/dto/ProjectIssues'
+import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { resolveUserFacingErrorMessage } from '../../../../presentation/shared/errors/appErrorMessages'
 import { isSerializedAppError } from '../../../../shared-kernel/application/errors/AppError'
@@ -42,6 +44,10 @@ export function ProjectIssuesPanel({
   const [action, setAction] = useState<{ projectId: string; busy: boolean; error?: unknown }>()
   const busy = action?.projectId === project.id && action.busy
   const [configuringProject, setConfiguringProject] = useState<string>()
+  const repositoryFormRef = useRef<HTMLFormElement>(null)
+  const restoreRepositoryFocus = useRef(true)
+  const sourceRef = useRef<HTMLButtonElement>(null)
+  const editingProjectRef = useRef<string | undefined>(undefined)
   const selectedRowRef = useRef<HTMLButtonElement>(null)
   const backRef = useRef<HTMLButtonElement>(null)
   const wasDetail = useRef(false)
@@ -68,10 +74,8 @@ export function ProjectIssuesPanel({
       setAction({ projectId, busy: false, error })
     }
   }
-  const error =
-    (action?.projectId === project.id ? action.error : undefined) ??
-    model.error ??
-    model.detailError
+  const actionError = action?.projectId === project.id ? action.error : undefined
+  const error = actionError ?? model.error ?? model.detailError
   const failedRepository = isSerializedAppError(model.error)
     ? model.error.details?.repository
     : undefined
@@ -83,6 +87,29 @@ export function ProjectIssuesPanel({
     ? project.workspaces.find((workspace) => workspace.issue?.id === selected.id)
     : undefined
   const configuring = configuringProject === project.id
+  const cancelRepositoryEdit = (restoreFocus = true) => {
+    if (busy) return
+    restoreRepositoryFocus.current = restoreFocus
+    model.update({ repositoryDraft: undefined })
+    setConfiguringProject(undefined)
+  }
+  useOutsidePointerDismiss({
+    active: configuring && open && !busy,
+    pointerPolicy: 'passthrough',
+    isInside: (target) => Boolean(repositoryFormRef.current?.contains(target)),
+    onDismiss: () => cancelRepositoryEdit(false)
+  })
+  useLayoutEffect(() => {
+    if (
+      !configuring &&
+      open &&
+      restoreRepositoryFocus.current &&
+      editingProjectRef.current === project.id
+    )
+      sourceRef.current?.focus({ preventScroll: true })
+    editingProjectRef.current = configuring ? project.id : undefined
+  }, [configuring, open, project.id])
+
   return (
     <aside
       id="project-issues-panel"
@@ -92,27 +119,86 @@ export function ProjectIssuesPanel({
         event.stopPropagation()
         if (event.key !== 'Escape') return
         event.preventDefault()
-        if (configuring) setConfiguringProject(undefined)
+        if (configuring) cancelRepositoryEdit()
         else if (selected) model.update({ detailOpen: false })
         else onClose()
       }}
     >
       <header className="project-issues__header">
         <div className="project-issues__heading">
-          <h1>{title ?? t('tasks.title')}</h1>
           <div className="project-issues__project">
             {projectSelector ?? <span>{project.name}</span>}
           </div>
-          <button
-            className="project-issues__source"
-            type="button"
-            aria-expanded={configuring}
-            title={t('issues.configureRepository')}
-            onClick={() => setConfiguringProject(configuring ? undefined : project.id)}
-          >
-            <GitBranchIcon size={14} aria-hidden="true" />
-            <span>{repository || t('issues.configureRepository')}</span>
-          </button>
+          <div className="project-issues__source-control">
+            {configuring ? (
+              <form
+                ref={repositoryFormRef}
+                className="project-issues__repository"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void run(async () => {
+                    const updated = await window.cleancode!.configureProjectIssues({
+                      projectDirectory: project.directory,
+                      repository: model.view.repositoryDraft ?? repository
+                    })
+                    onProjectChanged(updated)
+                    if (liveProject.current === project.id) {
+                      model.update({ repositoryDraft: undefined })
+                      setConfiguringProject(undefined)
+                      model.refresh()
+                    }
+                  })
+                }}
+              >
+                <GitBranchIcon size={14} aria-hidden="true" />
+                <input
+                  aria-label={t('issues.repository')}
+                  autoFocus
+                  value={model.view.repositoryDraft ?? repository}
+                  placeholder={t('issues.repositoryPlaceholder')}
+                  onChange={(event) => model.update({ repositoryDraft: event.target.value })}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  className="icon-button"
+                  aria-label={t('issues.saveRepository')}
+                  title={t('issues.saveRepository')}
+                  type="submit"
+                  disabled={busy || !(model.view.repositoryDraft ?? repository).trim()}
+                >
+                  <CheckIcon size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  disabled={busy}
+                  onClick={() => cancelRepositoryEdit()}
+                  aria-label={t('common.cancel')}
+                  title={t('common.cancel')}
+                >
+                  <XIcon size={16} aria-hidden="true" />
+                </button>
+              </form>
+            ) : (
+              <button
+                ref={sourceRef}
+                className="project-issues__source"
+                type="button"
+                aria-expanded={configuring}
+                title={t('issues.configureRepository')}
+                onClick={() => {
+                  restoreRepositoryFocus.current = true
+                  model.update({ repositoryDraft: repository })
+                  setConfiguringProject(project.id)
+                }}
+              >
+                <GitBranchIcon size={14} aria-hidden="true" />
+                <span>{repository || t('issues.configureRepository')}</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="project-issues__header-actions">
           <button
@@ -135,44 +221,7 @@ export function ProjectIssuesPanel({
           </button>
         </div>
       </header>
-      {configuring || (!repository && !model.loading) ? (
-        <form
-          className="project-issues__repository"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void run(async () => {
-              const updated = await window.cleancode!.configureProjectIssues({
-                projectDirectory: project.directory,
-                repository: model.view.repositoryDraft ?? repository
-              })
-              onProjectChanged(updated)
-              if (liveProject.current === project.id) {
-                setConfiguringProject(undefined)
-                model.refresh()
-              }
-            })
-          }}
-        >
-          <label htmlFor="issue-repository">{t('issues.repository')}</label>
-          <input
-            id="issue-repository"
-            value={model.view.repositoryDraft ?? repository}
-            placeholder={t('issues.repositoryPlaceholder')}
-            onChange={(event) => model.update({ repositoryDraft: event.target.value })}
-            disabled={busy}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button
-            className="toolbar-button"
-            type="submit"
-            disabled={busy || !(model.view.repositoryDraft ?? repository).trim()}
-          >
-            {t('issues.saveRepository')}
-          </button>
-        </form>
-      ) : null}
-      {error && !model.error ? (
+      {error && (!model.error || actionError) ? (
         <div role="alert" className="project-issues__error">
           <InfoIcon size={17} aria-hidden="true" />
           {resolveUserFacingErrorMessage(error, 'issues.failed', t)}

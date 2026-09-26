@@ -86,8 +86,31 @@ describe('project issues', () => {
       expect(await panel.getByText('没有符合条件的未关闭 Issue', { exact: true }).count()).toBe(0)
       await page.screenshot({ path: 'test-results/project-issues-disabled.png' })
       expect(await alert.getByRole('heading', { name: '此仓库未开启 Issues' }).count()).toBe(1)
+      const before = await panel.locator('.project-issues__list').boundingBox()
       await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
-      await panel.getByPlaceholder('owner/repository').waitFor()
+      const repositoryInput = panel.getByRole('textbox', { name: 'GitHub 仓库', exact: true })
+      await repositoryInput.waitFor()
+      expect(await repositoryInput.evaluate((element) => Boolean(element.closest('header')))).toBe(
+        true
+      )
+      const during = await panel.locator('.project-issues__list').boundingBox()
+      expect(during!.y).toBe(before!.y)
+      await page.screenshot({ path: 'test-results/project-issues-inline-repository.png' })
+      await repositoryInput.fill('discard/repository')
+      await repositoryInput.press('Escape')
+      expect(await panel.getByRole('heading', { name: '任务', exact: true }).count()).toBe(0)
+      await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
+      expect(await repositoryInput.inputValue()).toBe('fixture/issues')
+      await repositoryInput.fill('discard/another')
+      const search = panel.getByRole('searchbox')
+      await search.click()
+      await repositoryInput.waitFor({ state: 'hidden' })
+      expect(await search.evaluate((element) => document.activeElement === element)).toBe(true)
+      await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
+      expect(await repositoryInput.inputValue()).toBe('fixture/issues')
+      await repositoryInput.press('Enter')
+      await repositoryInput.waitFor({ state: 'hidden' })
+      expect(await panel.locator('.project-issues__list').boundingBox()).toEqual(before)
     },
     electronScenarioTimeoutMs
   )
@@ -102,6 +125,28 @@ describe('project issues', () => {
       const workspace = page.locator('.app-shell__workspace')
       expect(await workspace.evaluate((element) => (element as HTMLElement).inert)).toBe(true)
       await page.getByRole('button', { name: 'Fix terminal resizing', exact: true }).waitFor()
+      const searchInput = page.getByRole('searchbox')
+      expect(await searchInput.evaluate((element) => element === document.activeElement)).toBe(
+        false
+      )
+      const selectorSurfaces = await page
+        .locator('.project-issues__select')
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const style = getComputedStyle(element)
+            return {
+              borderWidth: style.borderTopWidth,
+              border: style.borderTopColor,
+              background: style.backgroundColor
+            }
+          })
+        )
+      expect(selectorSurfaces).toHaveLength(2)
+      for (const surface of selectorSurfaces) {
+        expect(surface.borderWidth).toBe('1px')
+        expect(surface.border).not.toBe('rgba(0, 0, 0, 0)')
+        expect(surface.background).not.toBe('rgba(0, 0, 0, 0)')
+      }
       await page.screenshot({ path: 'test-results/project-issues-list.png' })
       await page.getByRole('button', { name: '标签', exact: true }).click()
       const labels = page.getByRole('menu', { name: '标签', exact: true })

@@ -59,6 +59,88 @@ describe('project issues panel', () => {
     expect(close).not.toHaveBeenCalled()
     expect(trigger).toHaveFocus()
   })
+  it('cancels repository editing on an outside pointer without saving or stealing focus', async () => {
+    const project = createWorkbenchSnapshot('/project', 'project').project
+    const configure = vi.fn()
+    window.cleancode = {
+      listProjectIssues: vi.fn(async () => result),
+      configureProjectIssues: configure
+    } as unknown as NonNullable<Window['cleancode']>
+    render(
+      <ProjectIssuesPanel
+        project={project}
+        title="任务"
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={vi.fn()}
+      />
+    )
+    const source = await screen.findByRole('button', { name: 'owner/repo' })
+    expect(screen.queryByRole('heading', { name: '任务' })).not.toBeInTheDocument()
+    fireEvent.click(source)
+    const editor = screen.getByRole('textbox', { name: 'GitHub 仓库' })
+    fireEvent.change(editor, { target: { value: 'discard/repo' } })
+    fireEvent.pointerDown(editor)
+    expect(editor).toBeInTheDocument()
+    const search = screen.getByRole('searchbox')
+    search.focus()
+    fireEvent.pointerDown(search)
+    expect(screen.queryByRole('textbox', { name: 'GitHub 仓库' })).not.toBeInTheDocument()
+    expect(search).toHaveFocus()
+    expect(configure).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'owner/repo' }))
+    expect(screen.getByRole('textbox', { name: 'GitHub 仓库' })).toHaveValue('owner/repo')
+  })
+  it('edits the repository in its header slot and discards a cancelled draft', async () => {
+    const project = createWorkbenchSnapshot('/project', 'project').project
+    const configure = vi.fn(async () => ({ ...project, issueRepository: 'other/repo' }))
+    window.cleancode = {
+      listProjectIssues: vi.fn(async () => result),
+      configureProjectIssues: configure
+    } as unknown as NonNullable<Window['cleancode']>
+    const changed = vi.fn()
+    const close = vi.fn()
+    render(
+      <ProjectIssuesPanel
+        project={project}
+        onClose={close}
+        onStart={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onProjectChanged={changed}
+      />
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'owner/repo' }))
+    const input = screen.getByRole('textbox', { name: 'GitHub 仓库' })
+    expect(input.closest('header')).not.toBeNull()
+    expect(input).toHaveFocus()
+    fireEvent.change(input, { target: { value: 'discard/repo' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(configure).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+    const source = screen.getByRole('button', { name: 'owner/repo' })
+    expect(source).toHaveFocus()
+    fireEvent.click(source)
+    const reopened = screen.getByRole('textbox', { name: 'GitHub 仓库' })
+    expect(reopened).toHaveValue('owner/repo')
+    fireEvent.change(reopened, { target: { value: 'other/repo' } })
+    configure.mockRejectedValueOnce(new Error('Temporary failure'))
+    fireEvent.submit(reopened.closest('form')!)
+    await screen.findByRole('alert')
+    expect(reopened).toHaveValue('other/repo')
+    expect(changed).not.toHaveBeenCalled()
+    fireEvent.submit(reopened.closest('form')!)
+    await waitFor(() =>
+      expect(changed).toHaveBeenCalledWith(
+        expect.objectContaining({ issueRepository: 'other/repo' })
+      )
+    )
+    expect(configure).toHaveBeenCalledWith({
+      projectDirectory: '/project',
+      repository: 'other/repo'
+    })
+    expect(screen.queryByRole('textbox', { name: 'GitHub 仓库' })).not.toBeInTheDocument()
+  })
   it('browses a full list before opening a detail and only asks for branches when starting', async () => {
     window.cleancode = {
       listProjectIssues: vi.fn(async () => result),
