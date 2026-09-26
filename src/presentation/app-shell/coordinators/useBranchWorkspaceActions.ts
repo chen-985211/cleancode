@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import type { StartIssueWorkspaceCommand } from '../../../contexts/project/application/dto/ProjectIssues'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction
+} from 'react'
 
 import { resolveUserFacingErrorMessage } from '../../shared/errors/appErrorMessages'
 import type {
@@ -60,6 +68,11 @@ export function useBranchWorkspaceActions({
   const publishedActionErrorsRef = useRef(new Map<string, PublishedWorkspaceActionError>())
   const translateRef = useRef(t)
   const currentActionOccurrenceIdsRef = useRef(new Map<string, string>())
+  const selectionEpoch = useRef(0)
+  const currentWorkbenchRef = useRef(currentWorkbench)
+  useLayoutEffect(() => {
+    currentWorkbenchRef.current = currentWorkbench
+  }, [currentWorkbench])
   const currentSelectionAttemptRef = useRef<{
     readonly key: string
     readonly occurrenceId: string
@@ -122,6 +135,7 @@ export function useBranchWorkspaceActions({
   )
   const beginSelectionAttempt = useCallback(
     (key: string): string => {
+      selectionEpoch.current += 1
       const previous = currentSelectionAttemptRef.current
       if (
         previous &&
@@ -253,17 +267,25 @@ export function useBranchWorkspaceActions({
     async (
       workbench: WorkbenchSnapshot,
       branchName: string,
-      options?: { readonly requestId: string; readonly defaults?: WorkspaceDefaults }
+      options?: {
+        readonly requestId: string
+        readonly defaults?: WorkspaceDefaults
+        readonly issueCommand?: StartIssueWorkspaceCommand
+      }
     ): Promise<WorkbenchSnapshot | undefined> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'create')
       const occurrenceId = beginActionAttempt(key)
+      const epoch = selectionEpoch.current
+      const origin = currentWorkbenchRef.current
 
       try {
-        const createdWorkbench = await window.cleancode?.createBranchWorkspace({
-          projectDirectory: workbench.project.directory,
-          branchName,
-          ...options
-        })
+        const createdWorkbench = options?.issueCommand
+          ? await window.cleancode?.startIssueWorkspace(options.issueCommand)
+          : await window.cleancode?.createBranchWorkspace({
+              projectDirectory: workbench.project.directory,
+              branchName,
+              ...options
+            })
 
         if (!isCurrentActionAttempt(key, occurrenceId)) return
         if (!createdWorkbench) {
@@ -271,8 +293,16 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        clearCurrentBlockSelection()
-        replaceWorkbench(createdWorkbench)
+        const current = currentWorkbenchRef.current
+        if (
+          !options?.issueCommand ||
+          (selectionEpoch.current === epoch &&
+            current?.project.id === origin?.project.id &&
+            current?.graph.workspaceId === origin?.graph.workspaceId)
+        ) {
+          clearCurrentBlockSelection()
+          replaceWorkbench(createdWorkbench)
+        }
         completeActionAttempt(key, occurrenceId)
         return createdWorkbench
       } catch (error) {

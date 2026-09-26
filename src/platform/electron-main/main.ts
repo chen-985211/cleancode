@@ -1,3 +1,4 @@
+import { registerProjectIssuesRuntime } from './projectIssuesRuntime'
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
@@ -59,7 +60,7 @@ import { ProjectWorkspaceTransactionCoordinator } from '../../contexts/project/a
 import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
-import { FileSystemProjectRegistryRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRegistryRepository'
+import { createProjectRegistryProvider } from './projectRegistryRuntime'
 import {
   FileSystemProjectRepository,
   inferProjectName
@@ -154,7 +155,7 @@ const terminalProviderRuntimeImage = new TerminalProviderRuntimeImageManager({
 consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
 configureApplicationDiagnostics(appStateDirectoryPath, terminalProviderStateDirectoryPath)
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
-let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
+const getProjectRegistryRepository = createProjectRegistryProvider(appStateDirectoryPath)
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
 const canvasArrangementRuntime = createCanvasArrangementRuntime(appStateDirectoryPath)
 const blockTemplateRepository = new FileSystemBlockTemplateRepository(
@@ -390,6 +391,17 @@ registerProjectIpcHandlers({
   selectProjectDirectory
 })
 
+registerProjectIssuesRuntime({
+  projects: projectRepository,
+  registry: getProjectRegistryRepository(),
+  transactions: projectWorkspaceTransactions,
+  preparation: workspaceInitialization.preparation,
+  select: projectIpcHandlers.switchBranchWorkspace,
+  loadWorkbench,
+  ipcMain,
+  logger: consoleLogger
+})
+
 registerBlockGraphIpcHandlers({
   addQuickExecutionTarget: (command) => addQuickExecutionTargetUseCase.execute(command),
   bindQuickExecutionSlot: (command) => bindQuickExecutionSlotUseCase.execute(command),
@@ -595,19 +607,6 @@ async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
     openProject: (command) => createOrOpenProjectUseCase.execute(command),
     selectCurrentProject
   })
-}
-
-function getProjectRegistryRepository(): FileSystemProjectRegistryRepository {
-  projectRegistryRepository ??= new FileSystemProjectRegistryRepository(getProjectRegistryPath())
-
-  return projectRegistryRepository
-}
-
-function getProjectRegistryPath(): string {
-  return (
-    process.env.CLEANCODE_TEST_PROJECT_REGISTRY_PATH ??
-    join(appStateDirectoryPath, 'project-registry.json')
-  )
 }
 
 function getAppStateDirectoryPath(): string {

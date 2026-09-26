@@ -1,3 +1,4 @@
+import type { StartIssueWorkspaceCommand } from '../../../contexts/project/application/dto/ProjectIssues'
 import { WorkspaceDefaultsAutosave } from './WorkspaceDefaultsAutosave'
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
@@ -27,7 +28,11 @@ interface WorkspaceInitializationInput {
   readonly createWorkspace: (
     workbench: WorkbenchSnapshot,
     branchName: string,
-    options?: { readonly requestId: string; readonly defaults?: WorkspaceDefaults }
+    options?: {
+      readonly requestId: string
+      readonly defaults?: WorkspaceDefaults
+      readonly issueCommand?: StartIssueWorkspaceCommand
+    }
   ) => Promise<WorkbenchSnapshot | undefined>
   readonly nodeStore: WorkbenchNodeStore
   readonly protectedNodeIds: ReadonlySet<string>
@@ -222,7 +227,8 @@ export function useWorkspaceInitialization({
 
   async function createBranchWorkspace(
     workbench: WorkbenchSnapshot,
-    branchName: string
+    branchName: string,
+    issueCommand?: StartIssueWorkspaceCommand
   ): Promise<boolean> {
     if (!window.cleancode?.applyWorkspaceInitialization)
       return Boolean(await createWorkspace(workbench, branchName))
@@ -232,6 +238,7 @@ export function useWorkspaceInitialization({
     const creationCameraEpoch = cameraEpoch.current
     const result = await createWorkspace(workbench, branchName, {
       requestId,
+      issueCommand,
       defaults: autosaveStore.get(workbench.project.directory)?.value
     })
     if (!result) return false
@@ -283,6 +290,13 @@ export function useWorkspaceInitialization({
   return {
     cancelFocus,
     createBranchWorkspace,
+    createIssueWorkspace: async (
+      workbench: WorkbenchSnapshot,
+      command: StartIssueWorkspaceCommand
+    ) => {
+      await autosaveStore.flush(workbench.project.directory)
+      return createBranchWorkspace(workbench, command.branchName, command)
+    },
     renderSettings: (workbenches: readonly WorkbenchSnapshot[], onClose: () => void) => (
       <WorkspaceDefaultsSettingsPane
         autosaveStore={autosaveStore}

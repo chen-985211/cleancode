@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 import {
-  createClientAppError,
-  isSerializedAppError
+  isSerializedAppError,
+  type SerializedAppError
 } from '../../shared-kernel/application/errors/AppError'
 import type { IpcInvokeResult } from '../ipc/registerIpcHandler'
 import {
@@ -44,6 +44,13 @@ const cleancodeApi = {
     invokeCleancode('cleancode:begin-workspace-initialization', command),
   applyWorkspaceInitialization: (command: unknown) =>
     invokeCleancode('cleancode:apply-workspace-initialization', command),
+  listProjectIssues: (command: unknown) =>
+    invokeCleancode('cleancode:list-project-issues', command),
+  getProjectIssue: (command: unknown) => invokeCleancode('cleancode:get-project-issue', command),
+  configureProjectIssues: (command: unknown) =>
+    invokeCleancode('cleancode:configure-project-issues', command),
+  startIssueWorkspace: (command: unknown) =>
+    invokeCleancode('cleancode:start-issue-workspace', command),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
   reorderProject: (command: unknown) => invokeCleancode('cleancode:reorder-project', command),
@@ -246,18 +253,20 @@ async function invokeCleancode<TResult>(channel: string, command?: unknown): Pro
   const result = (await ipcRenderer.invoke(channel, command)) as IpcInvokeResult<TResult>
 
   if (isIpcFailureResult(result)) {
-    throw createClientAppError(result.error)
+    // contextBridge copies Error instances without custom fields such as code and details.
+    // Reject with the serialized value so the renderer can still identify the failure.
+    throw result.error
   }
 
   if (isIpcSuccessResult(result)) {
     return result.value
   }
 
-  throw createClientAppError({
+  throw {
     code: 'UNEXPECTED_ERROR',
     isExpected: false,
     message: 'Unexpected application error.'
-  })
+  } satisfies SerializedAppError
 }
 
 function isIpcSuccessResult<TResult>(

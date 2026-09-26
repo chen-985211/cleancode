@@ -23,6 +23,67 @@ describe('branch workspace action notifications', () => {
     })
   })
 
+  it('opens the created issue workspace when started from another project in the task panel', async () => {
+    const current = createWorkbench()
+    const target = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
+    const replaceWorkbench = vi.fn()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi(),
+        startIssueWorkspace: vi.fn(async () => target)
+      }
+    })
+    const { result } = renderBranchWorkspaceActions(current, createNotifications(), {
+      replaceWorkbench
+    })
+    await act(() =>
+      result.current.createBranchWorkspace(target, 'issue/42', {
+        requestId: 'request',
+        issueCommand: {
+          projectDirectory: target.project.directory,
+          repository: 'owner/repo',
+          number: 42,
+          branchName: 'issue/42',
+          baseBranch: 'main'
+        }
+      })
+    )
+    expect(replaceWorkbench).toHaveBeenCalledWith(target)
+  })
+
+  it('does not navigate back when an issue finishes after a newer workspace selection', async () => {
+    const workbench = createWorkbench()
+    const creation = createDeferred<WorkbenchSnapshot>()
+    const selected = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
+    const created = createWorkbenchSnapshot('/tmp/alpha-project', 'issue-result')
+    const replaceWorkbench = vi.fn()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi({ switchBranchWorkspace: vi.fn(async () => selected) }),
+        startIssueWorkspace: () => creation.promise
+      }
+    })
+    const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
+      replaceWorkbench
+    })
+    const pending = result.current.createBranchWorkspace(workbench, 'issue/42', {
+      requestId: 'request',
+      issueCommand: {
+        projectDirectory: workbench.project.directory,
+        repository: 'owner/repo',
+        number: 42,
+        branchName: 'issue/42',
+        baseBranch: 'main'
+      }
+    })
+    await act(() => result.current.selectWorkspace(selected, selected.graph.workspaceId))
+    creation.resolve(created)
+    await expect(pending).resolves.toBe(created)
+    expect(replaceWorkbench.mock.calls).toEqual([[selected]])
+  })
+
   it('routes every rejected workspace action through an independently keyed notification', async () => {
     const workbench = createWorkbench()
     const runtimeApi = createRuntimeApi({

@@ -5,6 +5,28 @@ import {
 import type { SpringProgressMotionFrameScheduler } from '../../../../src/presentation/shared/motion/springProgressMotion'
 
 describe('surface spring motion', () => {
+  it('reveals a full task surface from below and reverses continuously without changing its scale', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'fullscreen-bottom',
+      scheduler
+    })
+    controller.intentChanged(root, { visible: true, reducedMotion: false, onSettled: vi.fn() })
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe('100%')
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+    scheduler.advanceNextFrame(100)
+    const position = root.properties.get('--cc-surface-motion-translate-y')
+    expect(parseFloat(position!)).toBeGreaterThan(0)
+    expect(parseFloat(position!)).toBeLessThan(100)
+    controller.intentChanged(root, { visible: false, reducedMotion: false, onSettled: vi.fn() })
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe(position)
+    scheduler.advanceUntilIdle()
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe('100%')
+    controller.intentChanged(root, { visible: true, reducedMotion: true, onSettled: vi.fn() })
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe('0%')
+    controller.dispose()
+  })
   it.each([true, false])(
     'keeps an anchored surface visibly between its compact and full size during the transition: visible=%s',
     (visible) => {

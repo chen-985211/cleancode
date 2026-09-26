@@ -185,7 +185,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 锚定 surface 通过 `useOutsidePointerDismiss.ts` 统一接管外部 `pointerdown` 的关闭时序，不得在各组件的 document 冒泡监听器中自行关闭。关闭必须在捕获阶段同步提交，使 surface 在底层画布或控件处理同一次输入前已经进入 `closing` 与 `inert`。调用方必须显式选择输入所有权：画布上的临时菜单、选择器、状态面板和就地表单使用 consume 策略，接管该次指针及其兼容事件直到序列结束，不能把同一次按下、抬起或点击泄漏给 React Flow；只有产品明确要求一次手势同时激活外部目标时才使用 passthrough。拥有可见层级边界的菜单或模态 surface 仍可使用专用 dismiss layer 或 coordinator。输入所有权不改变退出 spring、DOM 保留或快速反向规则。
 
-带显式上、下方向箭头且用于选择选项的紧凑菜单，以默认 Agent 选择器为视觉和运动基准：`directionalMenuMotion.ts` 统一拥有约七成初始尺度、透明度提前显露和无回弹临界阻尼曲线，向上菜单只镜像垂直来源；箭头只表达固定打开方向，不因开关状态旋转。`menuOptionHighlightMotion.ts` 与 `useMenuOptionHighlightMotion.ts` 统一拥有鼠标悬停和键盘焦点共用的单一移动高亮；存在当前值的紧凑选择菜单以 Agent 的 check 与 ARIA 状态表达选中，不增加常驻选中底色，纯动作菜单不得虚构选中态，文字和图标不参与位移或弹跳。默认项目和外部打开选项菜单消费 directional surface owner；默认 Agent 选择器保留既有 canvas presence/input owner，只作为参数基准并消费共享选项高亮。三者共用同一中性 hover token；`prefers-reduced-motion` 下直接投影端点。带搜索输入的默认分支 Popover、小地图、项目卡片等 disclosure、画布上下文菜单和原生 `select` 不属于该规则，并保留各自原有选中呈现。
+带显式上、下方向箭头且用于选择选项的紧凑菜单，以默认 Agent 选择器为视觉和运动基准：`directionalMenuMotion.ts` 统一拥有约七成初始尺度、透明度提前显露和无回弹临界阻尼曲线，向上菜单只镜像垂直来源；箭头只表达固定打开方向，不因开关状态旋转。`menuOptionHighlightMotion.ts` 与 `useMenuOptionHighlightMotion.ts` 统一拥有鼠标悬停和键盘焦点共用的单一移动高亮；存在当前值的紧凑选择菜单以 Agent 的 check 与 ARIA 状态表达选中，不增加常驻选中底色，纯动作菜单不得虚构选中态，文字和图标不参与位移或弹跳。默认项目、任务项目与标签选择、外部打开选项菜单消费 directional surface owner；默认 Agent 选择器保留既有 canvas presence/input owner，只作为参数基准并消费共享选项高亮。这些选择菜单共用同一中性 hover token；`prefers-reduced-motion` 下直接投影端点。带搜索输入的默认分支 Popover、小地图、项目卡片等 disclosure、画布上下文菜单和原生 `select` 不属于该规则，并保留各自原有选中呈现。
 
 同一 Notification 的运行状态更新由 `notificationStatusMotion.ts` 保留旧状态视觉层并交接到最新状态；spinner 与结果图标的短位移、缩放和透明度由临界阻尼 spring 同步投影，标题与颜色只做短交叉淡化，不能让文字产生装饰性回弹。图标 spring 收敛后才释放旧视觉层；只有最新层保留在可访问树，连续更新继续追加最新事实并让在途层从当前 presentation 退出。可导航消息把图标和两行内容放进一个真实、透明的正文按钮，最右侧动作与关闭按钮仍是外层卡片的兄弟控件；不得在 section 上伪造 button role、形成嵌套按钮或增加第二层常驻底板。正文 hover 只使用轻微表面色，focus-visible 使用不改变几何的内嵌焦点环，active 不缩放卡片或内容。`prefers-reduced-motion` 下直接投影最新状态，停止 spinner，但进行中语义继续由静态图标、文字和可访问状态表达。
 
@@ -287,3 +287,5 @@ CSS 必须尊重 `prefers-reduced-motion`。JavaScript 驱动的 React Flow、�
 - [Designing Fluid Interfaces](https://developer.apple.com/videos/play/wwdc2018/803/)
 - [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/)
 - [Reduced Motion evaluation criteria](https://developer.apple.com/help/app-store-connect/manage-app-accessibility/reduced-motion-evaluation-criteria/)
+
+任务全画布视图复用共享 surface spring 的 `fullscreen-bottom` 预设：不透明表面从下方平移进入，不缩放正文；临界阻尼、连续反向和 reduced-motion 落位均由共享 motion owner 负责。

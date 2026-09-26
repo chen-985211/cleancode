@@ -56,10 +56,12 @@ function parseProjectSnapshot(metadata: string, directory: string): ProjectSnaps
   }
 
   return {
+    ...(parsed.issueRepository ? { issueRepository: parsed.issueRepository } : {}),
     id: parsed.id,
     name: parsed.name,
     directory,
     workspaces: parsed.workspaces.map((workspace) => ({
+      ...(workspace.issue ? { issue: workspace.issue } : {}),
       workspaceId: workspace.workspaceId,
       workspaceKind: workspace.workspaceKind,
       displayName: workspace.displayName,

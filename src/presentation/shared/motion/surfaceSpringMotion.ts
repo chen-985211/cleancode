@@ -17,6 +17,7 @@ export type SurfaceSpringPreset =
   | 'directional-menu'
   | 'drawer-right'
   | 'fullscreen-right'
+  | 'fullscreen-bottom'
 
 export type SurfaceSpringMotionRoot = SpringProgressMotionRoot
 
@@ -85,6 +86,15 @@ function presentSurface(
 }
 
 function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
+  if (preset === 'fullscreen-bottom') {
+    return {
+      contentOpacity: 1,
+      opacity: 1,
+      scale: 1,
+      translateX: '0px',
+      translateY: `${round(100 * remaining)}%`
+    }
+  }
   if (preset === 'directional-menu') {
     const presentation = resolveDirectionalMenuPresentation(1 - remaining)
     return {
@@ -150,6 +160,7 @@ function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
 }
 
 function responseForPreset(preset: SurfaceSpringPreset): number {
+  if (preset === 'fullscreen-bottom') return 0.38
   if (preset === 'directional-menu') return directionalMenuMotionProfile.springResponse
   if (preset === 'anchored') return 0.28
   if (preset === 'anchored-bottom-left' || preset === 'anchored-top-left') return 0.18

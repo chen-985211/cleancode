@@ -3,6 +3,8 @@
 @import '../../shared/styles/directional-menu-motion.css';
 @import '../../shared/styles/application-settings-switch.css';
 @import '../styles/base.css';
+@import '../../../contexts/project/presentation/styles/project-issues.css';
+@import './project-sidebar/task-surface.css';
 @import '../app-features/settings/theme-settings.css';
 @import '../../../contexts/block-graph/presentation/styles/block-template-library.css';
 @import '../app-features/settings/application-settings.css';

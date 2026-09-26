@@ -1,8 +1,15 @@
+import {
+  normalizeIssueRepository,
+  normalizeProjectIssue,
+  sameProjectIssue,
+  type ProjectIssueReference
+} from '../value-objects/ProjectIssue'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 type ProjectWorkspaceKind = 'default' | 'linked-worktree'
 
 export interface ProjectWorkspaceSnapshot {
+  readonly issue?: ProjectIssueReference
   readonly workspaceId: string
   readonly workspaceKind: ProjectWorkspaceKind
   readonly displayName: string
@@ -12,6 +19,7 @@ export interface ProjectWorkspaceSnapshot {
 }
 
 export interface ProjectSnapshot {
+  readonly issueRepository?: string
   readonly id: string
   readonly name: string
   readonly directory: string
@@ -35,7 +43,8 @@ export class Project {
     public readonly id: string,
     public readonly name: string,
     public readonly directory: string,
-    private readonly workspaceSnapshots: readonly ProjectWorkspaceSnapshot[]
+    private readonly workspaceSnapshots: readonly ProjectWorkspaceSnapshot[],
+    private readonly issueRepository?: string
   ) {}
 
   static create(input: CreateProjectInput): Project {
@@ -58,7 +67,40 @@ export class Project {
       snapshot.id,
       snapshot.name,
       snapshot.directory,
-      normalizeBranchWorkspaces(snapshot.directory, snapshot.workspaces)
+      normalizeBranchWorkspaces(snapshot.directory, snapshot.workspaces),
+      snapshot.issueRepository ? normalizeIssueRepository(snapshot.issueRepository) : undefined
+    )
+  }
+
+  bindIssueRepository(repository: string): Project {
+    return new Project(
+      this.id,
+      this.name,
+      this.directory,
+      this.workspaceSnapshots,
+      normalizeIssueRepository(repository)
+    )
+  }
+
+  linkWorkspaceIssue(workspaceId: string, value: ProjectIssueReference): Project {
+    const issue = normalizeProjectIssue(value)
+    if (!this.workspaceSnapshots.some((workspace) => workspace.workspaceId === workspaceId))
+      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+    if (
+      this.workspaceSnapshots.some(
+        (workspace) =>
+          workspace.workspaceId !== workspaceId && sameProjectIssue(workspace.issue, issue)
+      )
+    )
+      throw createExpectedAppError('PROJECT_ISSUE_ALREADY_LINKED', 'Issue already has a workspace.')
+    return new Project(
+      this.id,
+      this.name,
+      this.directory,
+      this.workspaceSnapshots.map((workspace) =>
+        workspace.workspaceId === workspaceId ? { ...workspace, issue } : workspace
+      ),
+      this.issueRepository
     )
   }
 
@@ -100,11 +142,19 @@ export class Project {
   }
 
   addLinkedWorktreeWorkspace(input: {
+    readonly issue?: ProjectIssueReference
     readonly workspaceId?: string
     readonly displayName: string
     readonly directory: string
     readonly gitBranch: string
   }): Project {
+    const issue = input.issue ? normalizeProjectIssue(input.issue) : undefined
+    if (
+      issue &&
+      this.workspaceSnapshots.some((workspace) => sameProjectIssue(workspace.issue, issue))
+    ) {
+      throw createExpectedAppError('PROJECT_ISSUE_ALREADY_LINKED', 'Issue already has a workspace.')
+    }
     const workspaceId = normalizeRequiredText(
       input.workspaceId ?? createWorkspaceId(),
       'Workspace id cannot be empty.'
@@ -140,17 +190,24 @@ export class Project {
       )
     }
 
-    return new Project(this.id, this.name, this.directory, [
-      ...this.workspaceSnapshots.map((workspace) => ({ ...workspace, isCurrent: false })),
-      {
-        workspaceId,
-        workspaceKind: 'linked-worktree',
-        displayName,
-        directory,
-        gitBranch,
-        isCurrent: true
-      }
-    ])
+    return new Project(
+      this.id,
+      this.name,
+      this.directory,
+      [
+        ...this.workspaceSnapshots.map((workspace) => ({ ...workspace, isCurrent: false })),
+        {
+          ...(issue ? { issue } : {}),
+          workspaceId,
+          workspaceKind: 'linked-worktree',
+          displayName,
+          directory,
+          gitBranch,
+          isCurrent: true
+        }
+      ],
+      this.issueRepository
+    )
   }
 
   syncGitBranchWorkspaces(input: {
@@ -175,6 +232,7 @@ export class Project {
       )
 
       return {
+        ...(existingWorkspace?.issue ? { issue: existingWorkspace.issue } : {}),
         workspaceId: existingWorkspace?.workspaceId ?? createWorkspaceId(),
         workspaceKind: 'linked-worktree' as const,
         displayName: existingWorkspace?.displayName ?? branchName,
@@ -211,7 +269,8 @@ export class Project {
               ...workspace,
               isCurrent: workspace.workspaceKind === 'default'
             }))
-      )
+      ),
+      this.issueRepository
     )
   }
 
@@ -239,7 +298,7 @@ export class Project {
       throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
     }
 
-    return new Project(this.id, this.name, this.directory, workspaces)
+    return new Project(this.id, this.name, this.directory, workspaces, this.issueRepository)
   }
 
   archiveLinkedWorktreeWorkspace(workspaceId: string): Project {
@@ -283,12 +342,14 @@ export class Project {
       this.id,
       this.name,
       this.directory,
-      normalizeBranchWorkspaces(this.directory, workspaces)
+      normalizeBranchWorkspaces(this.directory, workspaces),
+      this.issueRepository
     )
   }
 
   toSnapshot(): ProjectSnapshot {
     return {
+      ...(this.issueRepository ? { issueRepository: this.issueRepository } : {}),
       id: this.id,
       name: this.name,
       directory: this.directory,
@@ -342,6 +403,7 @@ function normalizeBranchWorkspaces(
     }
 
     return {
+      ...(workspace.issue ? { issue: normalizeProjectIssue(workspace.issue) } : {}),
       workspaceId: normalizeRequiredText(workspace.workspaceId, 'Workspace id cannot be empty.'),
       workspaceKind: workspace.workspaceKind,
       displayName: normalizeRequiredText(

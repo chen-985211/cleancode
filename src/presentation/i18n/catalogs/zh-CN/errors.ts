@@ -1,4 +1,18 @@
 export const zhCNErrorsMessages = {
+  'error.PROJECT_ISSUE_INVALID': 'Issue 或仓库已变更，请刷新后重试。',
+  'error.PROJECT_ISSUE_ALREADY_LINKED': '此 Issue 已关联工作区，请刷新并打开已有工作区。',
+  'error.GITHUB_CLI_UNAVAILABLE': '未找到 GitHub CLI。请安装 gh，并运行 gh auth login 后重试。',
+  'error.GITHUB_AUTH_REQUIRED': '请在终端运行 gh auth login 登录 GitHub，然后刷新。',
+  'error.GITHUB_REQUEST_FAILED': 'GitHub 请求失败。请检查网络、登录状态及仓库访问权限，然后重试。',
+  'error.GITHUB_ISSUES_DISABLED': '该仓库未开启 GitHub Issues。可在仓库配置中选择其他任务来源。',
+  'error.GITHUB_PERMISSION_DENIED':
+    '当前 GitHub 账号无权读取此仓库的 Issues。请检查账号及令牌权限。',
+  'error.GITHUB_RESOURCE_UNAVAILABLE':
+    '仓库或 Issue 不存在，或当前账号没有访问权限。请检查仓库配置及登录账号。',
+  'error.GITHUB_RATE_LIMITED': '已达到 GitHub API 请求限额，请稍后刷新。',
+  'error.GITHUB_REPOSITORY_NOT_CONFIGURED': '请选择此项目的 GitHub 仓库。',
+  'error.GITHUB_BASE_UNAVAILABLE': '无法获取基准分支。请检查分支名称、网络及 Git 仓库访问权限。',
+
   'error.AGENT_PROVIDER_UNAVAILABLE':
     '此 Agent Provider 当前不可用，请检查安装和 Agent 设置后重试。',
   'error.WORKSPACE_DEFAULTS_INVALID': '默认内容配置无效，请重新选择。',

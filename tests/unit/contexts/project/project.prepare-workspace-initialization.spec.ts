@@ -19,6 +19,35 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it('preserves the issue and exact base across metadata failure and recovery', async () => {
+    const f = fixture()
+    const issue = {
+      id: 'I_42',
+      repository: 'owner/repo',
+      number: 42,
+      title: 'Resize',
+      url: 'https://github.com/owner/repo/issues/42'
+    }
+    const command = {
+      projectDirectory: '/project',
+      branchName: 'issue/42',
+      requestId: 'issue-request',
+      baseRef: 'a'.repeat(40),
+      issue
+    }
+    f.projects.save.mockRejectedValueOnce(new Error('Disk unavailable'))
+    await expect(f.prepare.create(command)).rejects.toThrow()
+    expect(f.git.createBranchWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ baseRef: command.baseRef })
+    )
+    const recovered = await f.prepare.create(command)
+    expect(recovered.workspaces.find((w) => w.isCurrent)?.issue).toEqual(issue)
+    expect(f.records.get(command.requestId)).toMatchObject({ issue, baseRef: command.baseRef })
+    expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+    await expect(f.prepare.create({ ...command, baseRef: 'b'.repeat(40) })).rejects.toMatchObject({
+      code: 'WORKSPACE_INITIALIZATION_CONFLICT'
+    })
+  })
   it('removes only invalid template references and returns the canonical saved settings', async () => {
     const f = fixture()
     f.content.listTemplateIds.mockResolvedValue([])

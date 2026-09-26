@@ -1,3 +1,7 @@
+import {
+  sameProjectIssue,
+  type ProjectIssueReference
+} from '../../domain/value-objects/ProjectIssue'
 import type { ProjectRepository } from '../ports/ProjectRepository'
 import type { ProjectRegistryRepository } from '../ports/ProjectRegistryRepository'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
@@ -22,6 +26,8 @@ import {
 } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateInitializedWorkspaceCommand {
+  readonly baseRef?: string
+  readonly issue?: ProjectIssueReference
   readonly projectDirectory: string
   readonly branchName: string
   readonly requestId?: string
@@ -174,6 +180,8 @@ export class PrepareWorkspaceInitializationUseCase {
         branchName: command.branchName.trim()
       })
       const operation = WorkspaceInitialization.create({
+        ...(command.baseRef ? { baseRef: command.baseRef } : {}),
+        ...(command.issue ? { issue: command.issue } : {}),
         id: command.requestId,
         projectId: project.id,
         projectDirectory: project.directory,
@@ -189,7 +197,12 @@ export class PrepareWorkspaceInitializationUseCase {
     }
     await this.getDefaults(project.directory)
     this.assertRequest(snapshot, project, snapshot.workspaceId)
-    if (snapshot.branchName !== command.branchName.trim() || snapshot.mode !== 'new-workspace') {
+    if (
+      snapshot.branchName !== command.branchName.trim() ||
+      snapshot.mode !== 'new-workspace' ||
+      (command.baseRef !== undefined && snapshot.baseRef !== command.baseRef) ||
+      (command.issue && !sameProjectIssue(snapshot.issue, command.issue))
+    ) {
       throw createExpectedAppError(
         'WORKSPACE_INITIALIZATION_CONFLICT',
         'Workspace creation request has different contents.'
@@ -226,9 +239,13 @@ export class PrepareWorkspaceInitializationUseCase {
           snapshot = rebound.toSnapshot()
           project = await this.dependencies.transactions.run(project.directory, async () => {
             const latest = await this.requireProject(command.projectDirectory)
-            const selected = Project.fromSnapshot(latest).switchCurrentWorkspace(
-              discovered.workspaceId
-            )
+            const recovered = snapshot!.issue
+              ? Project.fromSnapshot(latest).linkWorkspaceIssue(
+                  discovered.workspaceId,
+                  snapshot!.issue
+                )
+              : Project.fromSnapshot(latest)
+            const selected = recovered.switchCurrentWorkspace(discovered.workspaceId)
             await this.dependencies.projects.save(selected)
             return selected.toSnapshot()
           })
@@ -236,6 +253,8 @@ export class PrepareWorkspaceInitializationUseCase {
       } else {
         project = await this.dependencies.createWorkspace(
           {
+            ...(snapshot.baseRef ? { baseRef: snapshot.baseRef } : {}),
+            ...(snapshot.issue ? { issue: snapshot.issue } : {}),
             projectDirectory: project.directory,
             branchName: command.branchName,
             workspaceId: snapshot.workspaceId
@@ -291,6 +310,7 @@ export class PrepareWorkspaceInitializationUseCase {
       )
         stale()
       const recovered = Project.fromSnapshot(project).addLinkedWorktreeWorkspace({
+        issue: snapshot.issue,
         workspaceId: snapshot.workspaceId,
         displayName: snapshot.branchName!,
         gitBranch: snapshot.branchName!,

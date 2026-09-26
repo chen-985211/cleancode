@@ -1,0 +1,60 @@
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { useSurfaceMotionPresence } from '../../../shared/hooks/useSurfaceMotionPresence'
+import { useSurfaceSpringMotion } from '../../../shared/hooks/useSurfaceSpringMotion'
+import { acquireSurfaceIsolationLease } from '../../../shared/motion/surfaceIsolation'
+
+export function TaskSurface({
+  open,
+  surfaceRef,
+  onExitComplete,
+  children
+}: {
+  readonly open: boolean
+  readonly surfaceRef: RefObject<HTMLDivElement | null>
+  readonly onExitComplete: () => void
+  readonly children: ReactNode
+}) {
+  const presence = useSurfaceMotionPresence(open, { onExitComplete })
+  const wasOpen = useRef(false)
+  useSurfaceSpringMotion(open, surfaceRef, presence, 'fullscreen-bottom')
+  useLayoutEffect(() => {
+    if (!open) {
+      wasOpen.current = false
+      return
+    }
+    const shell = surfaceRef.current?.closest('.app-shell')
+    const targets = shell
+      ? Array.from(
+          shell.querySelectorAll<HTMLElement>(
+            ':scope > .app-shell__workspace, :scope > .app-shell__settings'
+          )
+        )
+      : []
+    const release = acquireSurfaceIsolationLease(targets)
+    if (!wasOpen.current) {
+      const candidates = surfaceRef.current?.querySelectorAll<HTMLElement>(
+        'input[type="search"], button'
+      )
+      const target =
+        Array.from(candidates ?? []).find(
+          (element) => !element.closest('[hidden]') && element.tagName === 'INPUT'
+        ) ?? Array.from(candidates ?? []).find((element) => !element.closest('[hidden]'))
+      target?.focus()
+    }
+    wasOpen.current = true
+    return release
+  }, [open, surfaceRef])
+  return (
+    <div className="task-surface-host" hidden={!presence.isPresent}>
+      <div
+        ref={surfaceRef}
+        className="task-surface anchored-surface-motion"
+        data-surface-spring-preset="fullscreen-bottom"
+        data-shortcut-capture=""
+        {...presence.surfaceProps}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
