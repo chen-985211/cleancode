@@ -247,6 +247,16 @@ export function createSelectionIndicatorMotionController({
         return
       }
 
+      // Layout commits must not restart an in-flight spring if its target is unchanged.
+      if (
+        target.x === nextTarget.x &&
+        target.y === nextTarget.y &&
+        target.width === nextTarget.width &&
+        target.height === nextTarget.height
+      ) {
+        return
+      }
+
       const retargetTimestamp = scheduler.now()
       advancePresentation(retargetTimestamp)
       cancelMotion()
