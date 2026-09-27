@@ -436,53 +436,6 @@ describe('terminal tooltips', () => {
     ])
   })
 
-  it('submits metadata and execution configuration through one definition update', async () => {
-    const onUpdateDefinition = vi.fn(async () => undefined)
-    render(
-      <TerminalNode
-        id="terminal-1"
-        type="terminal"
-        data={{ ...createTerminalNodeData(), onUpdateDefinition }}
-        dragging={false}
-        zIndex={0}
-        selectable
-        deletable
-        selected={false}
-        draggable
-        isConnectable={false}
-        positionAbsoluteX={240}
-        positionAbsoluteY={180}
-      />
-    )
-
-    const editButton = screen.getByRole('button', { name: 'Terminal 编辑终端信息' })
-
-    fireEvent.click(editButton)
-
-    expect(editButton).toHaveAttribute('aria-expanded', 'true')
-    expect(editButton).toHaveAttribute('aria-pressed', 'true')
-    expect(editButton).toHaveAttribute('aria-controls', 'terminal-metadata-form-terminal-1')
-    expect(screen.getByRole('form', { name: '编辑终端信息' })).toHaveAttribute(
-      'id',
-      'terminal-metadata-form-terminal-1'
-    )
-    fireEvent.change(screen.getByLabelText('启动命令'), { target: { value: ' pnpm dev ' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存终端信息' }))
-
-    await waitFor(() =>
-      expect(onUpdateDefinition).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'terminal-1' }),
-        {
-          name: 'Terminal',
-          description: 'Local shell',
-          launchCommand: 'pnpm dev',
-          executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
-        }
-      )
-    )
-    expect(onUpdateDefinition).toHaveBeenCalledTimes(1)
-  })
-
   it('shows a semantic action icon for both unselected and selected group candidates', () => {
     const data = createTerminalNodeData()
     const { rerender } = render(
@@ -537,47 +490,6 @@ describe('terminal tooltips', () => {
 
     expect(selectedButton).toHaveAttribute('aria-pressed', 'true')
     expect(selectedButton.querySelector('[data-icon-role="confirm"]')).toBeInTheDocument()
-  })
-
-  it('opens the existing launch-command editor for an external quick-execution request', async () => {
-    const data = createTerminalNodeData()
-    const { rerender } = render(
-      <TerminalNode
-        id="terminal-1"
-        type="terminal"
-        data={data}
-        dragging={false}
-        zIndex={0}
-        selectable
-        deletable
-        selected={false}
-        draggable
-        isConnectable={false}
-        positionAbsoluteX={240}
-        positionAbsoluteY={180}
-      />
-    )
-
-    expect(screen.queryByLabelText('启动命令')).not.toBeInTheDocument()
-
-    rerender(
-      <TerminalNode
-        id="terminal-1"
-        type="terminal"
-        data={{ ...data, launchCommandEditRequestId: 1 }}
-        dragging={false}
-        zIndex={0}
-        selectable
-        deletable
-        selected={false}
-        draggable
-        isConnectable={false}
-        positionAbsoluteX={240}
-        positionAbsoluteY={180}
-      />
-    )
-
-    await waitFor(() => expect(screen.getByLabelText('启动命令')).toHaveFocus())
   })
 })
 

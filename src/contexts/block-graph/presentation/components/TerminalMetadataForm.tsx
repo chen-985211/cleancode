@@ -1,3 +1,5 @@
+import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
+import { TerminalMetadataFieldsMotion } from './TerminalMetadataFieldsMotion'
 import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
@@ -27,6 +29,7 @@ import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hoo
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 interface TerminalMetadataFormProps {
+  readonly open?: boolean
   readonly block: TerminalBlockSnapshot
   readonly formId?: string
   readonly shouldFocusLaunchCommand: boolean
@@ -37,7 +40,26 @@ interface TerminalMetadataFormProps {
   readonly onCancel: () => void
 }
 
-export function TerminalMetadataForm({
+export function TerminalMetadataForm({ open = true, ...props }: TerminalMetadataFormProps) {
+  const [draftSession, setDraftSession] = useState({ open, revision: 0 })
+  if (draftSession.open !== open) {
+    // Keep the exiting draft visible, but start fresh even if exit motion is interrupted.
+    setDraftSession({ open, revision: draftSession.revision + (open ? 1 : 0) })
+  }
+
+  return (
+    <AnchoredSurfaceMotion
+      open={open}
+      springPreset="anchored"
+      className="terminal-metadata-surface anchored-surface-motion nodrag nopan nowheel"
+    >
+      <TerminalMetadataFormContent key={draftSession.revision} {...props} open={open} />
+    </AnchoredSurfaceMotion>
+  )
+}
+
+function TerminalMetadataFormContent({
+  open,
   block,
   formId,
   shouldFocusLaunchCommand,
@@ -59,12 +81,13 @@ export function TerminalMetadataForm({
     () => validateExecutionConfigDraft(executionDraft, t),
     [executionDraft, t]
   )
-  const canSave = Boolean(name.trim()) && executionValidation.config !== null && !isSaving
+  const canSave = open && Boolean(name.trim()) && executionValidation.config !== null && !isSaving
 
   useLayoutEffect(() => {
+    if (!open) return
     const target = shouldFocusLaunchCommand ? launchCommandInputRef.current : nameInputRef.current
     target?.focus()
-  }, [shouldFocusLaunchCommand])
+  }, [open, shouldFocusLaunchCommand])
 
   const updateExecutionDraft = (draft: ExecutionConfigDraft): void => {
     setSaveError(null)
@@ -116,7 +139,7 @@ export function TerminalMetadataForm({
       }}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>
+      <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving || !open}>
         <header className="terminal-metadata-form__header">
           <span className="terminal-metadata-form__header-icon" aria-hidden="true">
             <TerminalMetadataIcon
@@ -182,18 +205,17 @@ export function TerminalMetadataForm({
             aria-label={t('terminalForm.workflowMode')}
           >
             <ExecutionModeSelection draft={executionDraft} onChange={updateExecutionDraft} />
-            {executionDraft.mode === 'task' ? (
-              <>
-                <div className="terminal-execution-config__grid">
-                  <TaskExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
-                </div>
-                {executionValidation.error ? (
-                  <p className="terminal-execution-config__error" role="alert">
-                    {executionValidation.error}
-                  </p>
-                ) : null}
-              </>
-            ) : (
+            <TerminalMetadataFieldsMotion open={executionDraft.mode === 'task'}>
+              <div className="terminal-execution-config__grid">
+                <TaskExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
+              </div>
+              {executionValidation.error ? (
+                <p className="terminal-execution-config__error" role="alert">
+                  {executionValidation.error}
+                </p>
+              ) : null}
+            </TerminalMetadataFieldsMotion>
+            <TerminalMetadataFieldsMotion open={executionDraft.mode === 'service'}>
               <ServiceExecutionFields
                 draft={executionDraft}
                 onChange={updateExecutionDraft}
@@ -206,7 +228,7 @@ export function TerminalMetadataForm({
                   executionValidation.errorSection === 'port' ? executionValidation.error : null
                 }
               />
-            )}
+            </TerminalMetadataFieldsMotion>
           </section>
           {saveError ? (
             <p className="terminal-metadata-form__save-error" role="alert">
@@ -365,21 +387,17 @@ function ServiceExecutionFields({
             }
           />
         </MetadataField>
-        {draft.readinessType === 'output' ? (
-          <div className="terminal-execution-config__wide-field">
-            <MetadataField label={t('terminalForm.readinessTextLabel')}>
-              <input
-                aria-label={t('terminalForm.readinessText')}
-                placeholder={t('terminalForm.readinessTextPlaceholder')}
-                value={draft.readinessText}
-                onChange={(event) =>
-                  onChange({ ...draft, readinessText: event.currentTarget.value })
-                }
-              />
-            </MetadataField>
-          </div>
-        ) : null}
       </div>
+      <TerminalMetadataFieldsMotion open={draft.readinessType === 'output'}>
+        <MetadataField label={t('terminalForm.readinessTextLabel')}>
+          <input
+            aria-label={t('terminalForm.readinessText')}
+            placeholder={t('terminalForm.readinessTextPlaceholder')}
+            value={draft.readinessText}
+            onChange={(event) => onChange({ ...draft, readinessText: event.currentTarget.value })}
+          />
+        </MetadataField>
+      </TerminalMetadataFieldsMotion>
       {readinessError ? (
         <p className="terminal-execution-config__error" role="alert">
           {readinessError}
@@ -430,97 +448,109 @@ function PortIntentFields({
           ]}
         />
       </MetadataField>
-      {hasPortIntent ? (
-        <>
-          <MetadataField label={t('terminalForm.protocol')}>
-            <ChoiceSelect
-              label={t('terminalForm.protocol')}
-              value={draft.portProtocol}
-              onChange={(value) =>
-                onChange({
-                  ...draft,
-                  portProtocol: value as ExecutionConfigDraft['portProtocol']
-                })
-              }
-              options={[
-                { value: 'http', label: 'HTTP' },
-                { value: 'https', label: 'HTTPS' },
-                { value: 'tcp', label: 'TCP' }
-              ]}
+      <TerminalMetadataFieldsMotion
+        open={hasPortIntent}
+        className="terminal-metadata-fields-motion--cell"
+      >
+        <MetadataField label={t('terminalForm.protocol')}>
+          <ChoiceSelect
+            label={t('terminalForm.protocol')}
+            value={draft.portProtocol}
+            onChange={(value) =>
+              onChange({
+                ...draft,
+                portProtocol: value as ExecutionConfigDraft['portProtocol']
+              })
+            }
+            options={[
+              { value: 'http', label: 'HTTP' },
+              { value: 'https', label: 'HTTPS' },
+              { value: 'tcp', label: 'TCP' }
+            ]}
+          />
+        </MetadataField>
+      </TerminalMetadataFieldsMotion>
+      <TerminalMetadataFieldsMotion
+        open={hasPortIntent}
+        className="terminal-execution-config__wide-field"
+        contentClassName="terminal-execution-config__grid terminal-port-intent-fields__managed"
+      >
+        <MetadataField label={t('terminalForm.portBinding')}>
+          <ChoiceSelect
+            label={t('terminalForm.portBinding')}
+            value={draft.portBinding}
+            onChange={(value) =>
+              onChange({
+                ...draft,
+                portBinding: value as ExecutionConfigDraft['portBinding']
+              })
+            }
+            options={[
+              ...(draft.portPolicy === 'fixed'
+                ? [{ value: 'none', label: t('terminalForm.noBinding') }]
+                : []),
+              { value: 'environment', label: t('terminalForm.environmentBinding') },
+              { value: 'argument', label: t('terminalForm.argumentBinding') }
+            ]}
+          />
+        </MetadataField>
+        <TerminalMetadataFieldsMotion
+          open={draft.portPolicy === 'fixed' || draft.portPolicy === 'preferred'}
+          className="terminal-metadata-fields-motion--cell"
+        >
+          <MetadataField label={t('terminalForm.servicePort')}>
+            <input
+              aria-label={t('terminalForm.servicePort')}
+              inputMode="numeric"
+              placeholder={t('terminalForm.portPlaceholder')}
+              value={draft.portNumber}
+              onChange={(event) => onChange({ ...draft, portNumber: event.currentTarget.value })}
             />
           </MetadataField>
-          {draft.portPolicy === 'fixed' || draft.portPolicy === 'preferred' ? (
-            <MetadataField label={t('terminalForm.servicePort')}>
-              <input
-                aria-label={t('terminalForm.servicePort')}
-                inputMode="numeric"
-                placeholder={t('terminalForm.portPlaceholder')}
-                value={draft.portNumber}
-                onChange={(event) => onChange({ ...draft, portNumber: event.currentTarget.value })}
-              />
-            </MetadataField>
-          ) : null}
-          <MetadataField label={t('terminalForm.portBinding')}>
-            <ChoiceSelect
-              label={t('terminalForm.portBinding')}
-              value={draft.portBinding}
-              onChange={(value) =>
-                onChange({
-                  ...draft,
-                  portBinding: value as ExecutionConfigDraft['portBinding']
-                })
+        </TerminalMetadataFieldsMotion>
+        <TerminalMetadataFieldsMotion
+          open={draft.portBinding === 'environment'}
+          className="terminal-execution-config__wide-field"
+          contentClassName="terminal-execution-config__grid"
+        >
+          <MetadataField label={t('terminalForm.environmentVariable')}>
+            <input
+              aria-label={t('terminalForm.environmentVariable')}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder={t('terminalForm.environmentPlaceholder')}
+              value={draft.environmentVariable}
+              onChange={(event) =>
+                onChange({ ...draft, environmentVariable: event.currentTarget.value })
               }
-              options={[
-                ...(draft.portPolicy === 'fixed'
-                  ? [{ value: 'none', label: t('terminalForm.noBinding') }]
-                  : []),
-                { value: 'environment', label: t('terminalForm.environmentBinding') },
-                { value: 'argument', label: t('terminalForm.argumentBinding') }
-              ]}
             />
           </MetadataField>
-          {draft.portBinding === 'environment' ? (
-            <>
-              <MetadataField label={t('terminalForm.environmentVariable')}>
-                <input
-                  aria-label={t('terminalForm.environmentVariable')}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={t('terminalForm.environmentPlaceholder')}
-                  value={draft.environmentVariable}
-                  onChange={(event) =>
-                    onChange({ ...draft, environmentVariable: event.currentTarget.value })
-                  }
-                />
-              </MetadataField>
-              <p className="terminal-port-intent-fields__hint">
-                {t('terminalForm.environmentHint')}
-              </p>
-            </>
-          ) : null}
-          {draft.portBinding === 'argument' ? (
-            <>
-              <MetadataField label={t('terminalForm.argumentSuffix')}>
-                <input
-                  aria-label={t('terminalForm.argumentSuffix')}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={t('terminalForm.argumentPlaceholder')}
-                  value={draft.argumentTemplate}
-                  onChange={(event) =>
-                    onChange({ ...draft, argumentTemplate: event.currentTarget.value })
-                  }
-                />
-              </MetadataField>
-              <p className="terminal-port-intent-fields__hint">
-                {t('terminalForm.argumentHint', { port: '{port}' })}
-              </p>
-            </>
-          ) : null}
-        </>
-      ) : null}
+          <p className="terminal-port-intent-fields__hint">{t('terminalForm.environmentHint')}</p>
+        </TerminalMetadataFieldsMotion>
+        <TerminalMetadataFieldsMotion
+          open={draft.portBinding === 'argument'}
+          className="terminal-execution-config__wide-field"
+          contentClassName="terminal-execution-config__grid"
+        >
+          <MetadataField label={t('terminalForm.argumentSuffix')}>
+            <input
+              aria-label={t('terminalForm.argumentSuffix')}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder={t('terminalForm.argumentPlaceholder')}
+              value={draft.argumentTemplate}
+              onChange={(event) =>
+                onChange({ ...draft, argumentTemplate: event.currentTarget.value })
+              }
+            />
+          </MetadataField>
+          <p className="terminal-port-intent-fields__hint">
+            {t('terminalForm.argumentHint', { port: '{port}' })}
+          </p>
+        </TerminalMetadataFieldsMotion>
+      </TerminalMetadataFieldsMotion>
     </div>
   )
 }

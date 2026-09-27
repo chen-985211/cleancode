@@ -5,7 +5,7 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 import { TerminalMetadataForm } from '../../../../../contexts/block-graph/presentation/components/TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -43,9 +43,11 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const isInteractionSuppressed =
     isDisclosureExit || isPresenceExit || isPresencePending || isParked
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
   const [isResizingBlock, setIsResizingBlock] = useState(false)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
   const metadataFormId = `terminal-metadata-form-${block.id}`
   const hasRequestedAutoStartRef = useRef(false)
   const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
@@ -195,16 +197,32 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     [block, data]
   )
 
+  const closeMetadata = useCallback(() => {
+    setShouldFocusLaunchCommand(false)
+    setIsEditingMetadata(false)
+    editButtonRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  const toggleEditingMetadata = useCallback(() => {
+    if (isSavingMetadata) return
+    if (isEditingMetadata) closeMetadata()
+    else startEditingMetadata()
+  }, [closeMetadata, isEditingMetadata, isSavingMetadata, startEditingMetadata])
+
   const saveMetadata = useCallback(
     async (
       metadata: TerminalBlockMetadataInput,
       executionConfig: TerminalExecutionConfigSnapshot
     ) => {
-      await data.onUpdateDefinition(block, { ...metadata, executionConfig })
-      setShouldFocusLaunchCommand(false)
-      setIsEditingMetadata(false)
+      setIsSavingMetadata(true)
+      try {
+        await data.onUpdateDefinition(block, { ...metadata, executionConfig })
+        closeMetadata()
+      } finally {
+        setIsSavingMetadata(false)
+      }
     },
-    [block, data]
+    [block, closeMetadata, data]
   )
 
   return (
@@ -256,8 +274,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           blockName={block.name}
           blockDescription={block.description}
           canQuickLaunch={block.launchCommand.trim().length > 0}
+          editButtonRef={editButtonRef}
           metadataFormId={metadataFormId}
           isEditingMetadata={isEditingMetadata}
+          isSavingMetadata={isSavingMetadata}
           isRunning={isRunning}
           isRecoveryPending={Boolean(session.isRecoveryPending)}
           isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
@@ -270,7 +290,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
           onSelect={() => data.onSelect?.(block)}
           onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
-          onStartEditing={startEditingMetadata}
+          onToggleEditing={toggleEditingMetadata}
           onStop={stopTerminal}
           onQuickLaunch={quickLaunchTerminal}
           onRestart={restartTerminal}
@@ -279,18 +299,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           onStopWorkflow={() => data.onStopWorkflow?.()}
           onDelete={() => data.onDelete(block)}
         />
-        {isEditingMetadata ? (
-          <TerminalMetadataForm
-            block={block}
-            formId={metadataFormId}
-            shouldFocusLaunchCommand={shouldFocusLaunchCommand}
-            onSave={saveMetadata}
-            onCancel={() => {
-              setShouldFocusLaunchCommand(false)
-              setIsEditingMetadata(false)
-            }}
-          />
-        ) : null}
+        <TerminalMetadataForm
+          open={isEditingMetadata}
+          block={block}
+          formId={metadataFormId}
+          shouldFocusLaunchCommand={shouldFocusLaunchCommand}
+          onSave={saveMetadata}
+          onCancel={closeMetadata}
+        />
         <TerminalServiceRuntimeBar
           identity={session.runIdentity ?? null}
           endpoint={session.actualEndpoint ?? null}
@@ -345,11 +361,13 @@ function toWorkbenchNodeLayoutInput(layout: ResizeParams): WorkbenchNodeLayoutIn
 }
 
 interface TerminalHeaderProps {
+  readonly editButtonRef: RefObject<HTMLButtonElement | null>
   readonly blockName: string
   readonly blockDescription: string
   readonly canQuickLaunch: boolean
   readonly metadataFormId: string
   readonly isEditingMetadata: boolean
+  readonly isSavingMetadata: boolean
   readonly isRunning: boolean
   readonly isRecoveryPending: boolean
   readonly isTerminalGroupSelectionMode: boolean
@@ -362,7 +380,7 @@ interface TerminalHeaderProps {
   readonly isStoppingWorkflow: boolean
   readonly onSelect: () => void
   readonly onToggleTerminalGroupCandidate: () => void
-  readonly onStartEditing: () => void
+  readonly onToggleEditing: () => void
   readonly onStop: () => void
   readonly onQuickLaunch: () => void
   readonly onRestart: () => void
@@ -373,11 +391,13 @@ interface TerminalHeaderProps {
 }
 
 function TerminalHeader({
+  editButtonRef,
   blockName,
   blockDescription,
   canQuickLaunch,
   metadataFormId,
   isEditingMetadata,
+  isSavingMetadata,
   isRunning,
   isRecoveryPending,
   isTerminalGroupSelectionMode,
@@ -390,7 +410,7 @@ function TerminalHeader({
   isStoppingWorkflow,
   onSelect,
   onToggleTerminalGroupCandidate,
-  onStartEditing,
+  onToggleEditing,
   onStop,
   onQuickLaunch,
   onRestart,
@@ -480,10 +500,12 @@ function TerminalHeader({
               blockName,
               action: t('terminal.action.edit')
             })}
+            ref={editButtonRef}
             aria-controls={metadataFormId}
             aria-expanded={isEditingMetadata}
             aria-pressed={isEditingMetadata}
-            onClick={onStartEditing}
+            aria-disabled={isSavingMetadata || undefined}
+            onClick={onToggleEditing}
           >
             <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />
           </button>

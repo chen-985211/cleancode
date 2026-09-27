@@ -1,10 +1,16 @@
-.terminal-metadata-form {
+.terminal-metadata-surface {
   position: absolute;
   z-index: 6;
   top: 52px;
   right: 8px;
-  display: flex;
+  --cc-anchored-surface-offset-y: -12px;
+  --cc-anchored-surface-origin: calc(100% - 44px) 0%;
   width: min(460px, calc(100% - 16px));
+}
+
+.terminal-metadata-form {
+  display: flex;
+  width: 100%;
   box-sizing: border-box;
   flex-direction: column;
   border: 1px solid var(--cc-border);
@@ -134,7 +140,6 @@
 
 .terminal-execution-config {
   display: grid;
-  gap: 8px;
   border-top: 1px solid var(--cc-divider);
   padding-top: 10px;
 }
@@ -220,12 +225,13 @@
 
 .terminal-execution-config__service {
   display: grid;
-  gap: 8px;
 }
 
 .terminal-port-intent-fields {
+  row-gap: 0;
   border-top: 1px solid var(--cc-divider);
   padding-top: 10px;
+  margin-top: 8px;
 }
 
 .terminal-metadata-field__unit {
@@ -325,4 +331,33 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.terminal-metadata-fields-motion {
+  min-width: 0;
+  opacity: var(--terminal-fields-opacity, 1);
+  transform: translateY(var(--terminal-fields-y, 0px));
+}
+
+.terminal-metadata-fields-motion:not([data-terminal-fields-motion='open']) {
+  overflow: clip;
+}
+
+.terminal-metadata-fields-motion[inert] {
+  pointer-events: none;
+}
+
+.terminal-metadata-fields-motion__content {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 8px 0 0;
+}
+
+.terminal-metadata-fields-motion--cell > .terminal-metadata-fields-motion__content {
+  padding-top: 0;
+}
+
+.terminal-port-intent-fields__managed {
+  row-gap: 0;
 }
