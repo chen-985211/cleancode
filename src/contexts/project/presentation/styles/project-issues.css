@@ -36,6 +36,9 @@
 .project-issues__heading {
   flex-wrap: wrap;
 }
+.project-issues__header-actions {
+  flex-shrink: 0;
+}
 .project-issues__project .project-issues__select {
   max-width: 240px;
 }
@@ -85,7 +88,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: fit-content;
+  /* Reserve the same header space before and during repository editing. */
+  width: 320px;
   max-width: 100%;
   min-width: 0;
 }
@@ -93,6 +97,7 @@
   display: flex;
   width: 320px;
   max-width: 100%;
+  min-width: 0;
   height: 32px;
   align-items: center;
   gap: 4px;

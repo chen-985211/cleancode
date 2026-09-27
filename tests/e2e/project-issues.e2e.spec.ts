@@ -94,31 +94,47 @@ describe('project issues', () => {
       expect(await panel.getByText('没有符合条件的未关闭 Issue', { exact: true }).count()).toBe(0)
       await page.screenshot({ path: 'test-results/project-issues-disabled.png' })
       expect(await alert.getByRole('heading', { name: '此仓库未开启 Issues' }).count()).toBe(1)
-      const before = await panel.locator('.project-issues__list').boundingBox()
-      await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
-      const repositoryInput = panel.getByRole('textbox', { name: 'GitHub 仓库', exact: true })
-      await repositoryInput.waitFor()
-      expect(await repositoryInput.evaluate((element) => Boolean(element.closest('header')))).toBe(
-        true
-      )
-      const during = await panel.locator('.project-issues__list').boundingBox()
-      expect(during!.y).toBe(before!.y)
-      await page.screenshot({ path: 'test-results/project-issues-inline-repository.png' })
-      await repositoryInput.fill('discard/repository')
-      await repositoryInput.press('Escape')
-      expect(await panel.getByRole('heading', { name: '任务', exact: true }).count()).toBe(0)
-      await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
-      expect(await repositoryInput.inputValue()).toBe('fixture/issues')
-      await repositoryInput.fill('discard/another')
-      const search = panel.getByRole('searchbox')
-      await search.click()
-      await repositoryInput.waitFor({ state: 'hidden' })
-      expect(await search.evaluate((element) => document.activeElement === element)).toBe(true)
-      await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
-      expect(await repositoryInput.inputValue()).toBe('fixture/issues')
-      await repositoryInput.press('Enter')
-      await repositoryInput.waitFor({ state: 'hidden' })
-      expect(await panel.locator('.project-issues__list').boundingBox()).toEqual(before)
+      // Include the Windows runner's 1008px content width and both sides of the
+      // task surface's responsive layout; inline editing must not move the list.
+      for (const width of [1280, 1008, 720]) {
+        await page.setViewportSize({ width, height: 681 })
+        const before = await panel.locator('.project-issues__list').boundingBox()
+        await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
+        const repositoryInput = panel.getByRole('textbox', { name: 'GitHub 仓库', exact: true })
+        await repositoryInput.waitFor()
+        expect(
+          await repositoryInput.evaluate((element) => Boolean(element.closest('header')))
+        ).toBe(true)
+        const during = await panel.locator('.project-issues__list').boundingBox()
+        expect(during).toEqual(before)
+        const controlsFitHeader = await panel.locator('header').evaluate((header) => {
+          const bounds = header.getBoundingClientRect()
+          return [...header.querySelectorAll('button, input, a')].every((control) => {
+            const rect = control.getBoundingClientRect()
+            return rect.left >= bounds.left && rect.right <= bounds.right
+          })
+        })
+        expect(controlsFitHeader).toBe(true)
+        await page.screenshot({
+          path: `test-results/project-issues-inline-repository-${width}.png`
+        })
+        await repositoryInput.fill('discard/repository')
+        await repositoryInput.press('Escape')
+        expect(await panel.getByRole('heading', { name: '任务', exact: true }).count()).toBe(0)
+        await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
+        expect(await repositoryInput.inputValue()).toBe('fixture/issues')
+        await repositoryInput.fill('discard/another')
+        const search = panel.getByRole('searchbox')
+        await search.click()
+        await repositoryInput.waitFor({ state: 'hidden' })
+        expect(await search.evaluate((element) => document.activeElement === element)).toBe(true)
+        await panel.getByRole('button', { name: 'fixture/issues', exact: true }).click()
+        expect(await repositoryInput.inputValue()).toBe('fixture/issues')
+        await repositoryInput.press('Enter')
+        await repositoryInput.waitFor({ state: 'hidden' })
+        await alert.waitFor()
+        expect(await panel.locator('.project-issues__list').boundingBox()).toEqual(before)
+      }
     },
     electronScenarioTimeoutMs
   )
