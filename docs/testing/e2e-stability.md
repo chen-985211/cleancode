@@ -150,6 +150,19 @@ pnpm test:e2e:visible tests/e2e/example.e2e.spec.ts -t "target behavior"
 
 系统剪贴板 API 可以在屏幕外窗口下使用，不属于必须前台运行的交互；但它修改的是用户机器的全局状态。剪贴板场景必须先保存原值，并在 `finally` 中恢复。同一 runner 内的 E2E 必须保持串行；CI 只有在 runner、profile、临时目录和进程完全隔离时才能按文件分片。
 
+## 隔离 Electron 组件样式检查
+
+组件样式验收的适用范围和最低要求由 [测试规范](testing.md#组件样式与真实渲染验证) 维护。局部检查可以使用临时挂载入口与验证脚本，复用项目现有 Electron、React、Vite 和 Playwright 依赖，无需启动用户的完整工作区。
+
+1. 准备最小组件入口，直接 import 生产组件、项目主题和样式，提供实际需要的 React Provider、宿主容器与可控状态输入。可通过仅监听本机回环地址的临时 Vite 服务加载源码，或加载构建后的本地页面；页面由 Electron 的 `BrowserWindow` 承载。
+2. 使用 Playwright 的 `_electron.launch` 启动项目 Electron，给本次场景分配独立 `--user-data-dir`，从继承环境移除 `ELECTRON_RUN_AS_NODE`。窗口沿用上文屏幕外非激活模式，关闭后台节流，并从主进程核实可见性、焦点和屏幕外边界。
+3. 通过真实界面输入打开或切换组件，等待可观察的完成条件，例如浮层进入打开态、布局稳定或目标控件可见。用 locator 自动等待或精确的 `waitForFunction` 条件同步，不插入固定休眠等待截图。
+4. 按验证矩阵设置主题、语言、状态和窗口尺寸。需要检查窄窗口时，通过 `BrowserWindow.setContentSize` 改变真实窗口内容尺寸；用 `page.mouse`、`page.keyboard` 或 locator 驱动悬停、点击、Tab 和 Escape，检查操作结果与焦点归属。
+5. 用 `locator.screenshot` 保存组件截图，必要时用 `page.screenshot` 保留宿主上下文。读取真实元素矩形和计算样式验证布局不变量，并打开截图检查信息层级、留白、字体和颜色；只读取 CSS 值不足以证明视觉效果。
+6. 将截图和报告保存到 `test-results/<任务名>/`，记录 Electron 版本、场景、断言结果及残余限制。失败时先保留截图与 renderer 错误，再在 `finally` 中关闭 Electron、等待进程退出、停止临时服务并清理本次 profile。
+
+现有 `_electron.launch` 与隔离 profile 的用法可参考 [终端 raster 集成测试](../../tests/integration/contexts/run/run.terminal-webgl-raster.spec.ts)；完整应用的后台窗口启动与诊断可参考 [E2E 启动支撑](../../tests/support/e2eWorkbench.ts)。这些入口提供启动模式参考，目标组件的挂载入口按本次验证范围准备。需要保留为长期测试时，遵循测试规范的目录、层级和回归规则。
+
 ## 让清理必然发生
 
 推荐的 teardown 结构是：

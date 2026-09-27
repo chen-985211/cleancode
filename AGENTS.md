@@ -74,6 +74,7 @@
 | 修改分层、依赖方向、应用层端口、跨上下文协作或 composition root            | [架构文档](docs/engineering/architecture.md)和[上下文地图](docs/engineering/context-map.md)；跨上下文时读取调用方与提供方两侧专文                    |
 | 修改稳定的用户可见行为、信息架构、对象作用域、状态含义、焦点结果或交互结果 | [UI 契约](docs/product/ui-contract.md)                                                                                                               |
 | 修改视觉、组件选择、布局、状态呈现、动效或可访问性交互                     | [UI Style Guide](docs/product/ui-style-guide.md)；只有同时改变稳定产品语义时再叠加 UI 契约                                                           |
+| 检查或验收组件样式、布局、主题或交互状态的实际渲染（含只读视觉审查）       | [测试规范](docs/testing/testing.md)的“组件样式与真实渲染验证”；[E2E 稳定性改造手册](docs/testing/e2e-stability.md)的“隔离 Electron 组件样式检查”     |
 | 修改用户可见文案、可访问名称、locale、Message key 或 i18n 门禁             | [国际化规范](docs/i18n/README.md)                                                                                                                    |
 | 讨论尚未确认或尚未实现的 UI 方向                                           | [UI 路线图](docs/product/ui-roadmap.md)；不得把路线图内容当成当前已交付行为                                                                          |
 | 修改项目登记、Git 分支、worktree、checkout、同步、归档或补偿               | [项目与分支工作区生命周期](docs/contexts/project/workspace-lifecycle.md)                                                                             |

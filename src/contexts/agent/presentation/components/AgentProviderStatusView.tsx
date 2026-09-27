@@ -171,21 +171,19 @@ export function AgentProviderStatusControl({
           visibility: position ? 'visible' : 'hidden'
         }}
       >
-        <div className="agent-provider-status-panel__header">
-          <strong>{t('agent.statusTitle')}</strong>
-          <TooltipLabel content={t('agent.statusClose')}>
-            <button
-              type="button"
-              aria-label={t('agent.statusClose')}
-              onClick={() => {
-                setIsOpen(false)
-                triggerRef.current?.focus()
-              }}
-            >
-              <AgentStatusIcon role="close" size={14} />
-            </button>
-          </TooltipLabel>
-        </div>
+        <TooltipLabel content={t('agent.statusClose')}>
+          <button
+            className="agent-provider-status-panel__close"
+            type="button"
+            aria-label={t('agent.statusClose')}
+            onClick={() => {
+              setIsOpen(false)
+              triggerRef.current?.focus()
+            }}
+          >
+            <AgentStatusIcon role="close" size={14} />
+          </button>
+        </TooltipLabel>
         <div className="agent-provider-status-panel__issues">
           {issues.map((issue) => (
             <StatusIssue
@@ -220,8 +218,6 @@ function StatusIssue({
   readonly state: AgentProviderPanelState
 }) {
   const { t } = useI18n()
-  const isNeutral = issue === 'session_ended'
-  const iconRole: AgentStatusIconRole = isNeutral ? 'paused' : 'error'
   const actions: Array<{ readonly label: string; readonly onClick: () => void }> = []
   if (issue === 'attachment_failed' && onRetryAttachment) {
     actions.push({ label: t('provider.retry'), onClick: onRetryAttachment })
@@ -250,23 +246,17 @@ function StatusIssue({
   }
 
   return (
-    <section
-      className="agent-provider-status-panel__issue"
-      data-tone={isNeutral ? 'neutral' : 'warning'}
-    >
-      <AgentStatusIcon role={iconRole} size={15} />
-      <div>
-        <p>{feedbackIssueLabel(issue, providerName, state, t)}</p>
-        {actions.length > 0 ? (
-          <div className="agent-provider-status-panel__actions">
-            {actions.map((action) => (
-              <button type="button" key={action.label} onClick={action.onClick}>
-                {action.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+    <section className="agent-provider-status-panel__issue">
+      <p>{feedbackIssueLabel(issue, providerName, state, t)}</p>
+      {actions.length > 0 ? (
+        <div className="agent-provider-status-panel__actions">
+          {actions.map((action) => (
+            <button type="button" key={action.label} onClick={action.onClick}>
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }
