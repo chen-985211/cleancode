@@ -23,7 +23,8 @@ export function focusChoiceMenu(
 }
 
 export function navigateChoiceMenu(event: KeyboardEvent<HTMLElement>, close: () => void): void {
-  event.stopPropagation()
+  // After focus returns to the trigger, its parent still owns the Tab boundary (e.g. a dialog).
+  if (event.key !== 'Tab') event.stopPropagation()
   if (event.key === 'Escape' || event.key === 'Tab') {
     if (event.key === 'Escape') event.preventDefault()
     close()

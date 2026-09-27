@@ -117,4 +117,22 @@ describe.each(cases)('%s choice menu', (_name, view) => {
     const menu = screen.getByRole('menu')
     expect(menu.lastElementChild?.contains(document.activeElement)).toBe(true)
   })
+  it.each([false, true])(
+    'returns Tab navigation to the parent after restoring the trigger (reverse: %s)',
+    (shiftKey) => {
+      const parentKeyDown = vi.fn((event) => {
+        expect(event.key).toBe('Tab')
+        expect(event.shiftKey).toBe(shiftKey)
+        expect(event.defaultPrevented).toBe(false)
+        expect(trigger).toHaveFocus()
+      })
+      render(<div onKeyDown={parentKeyDown}>{view()}</div>)
+      const trigger = screen.getAllByRole('button')[0]
+      fireEvent.click(trigger)
+      fireEvent.keyDown(screen.getByRole('menu'), { key: 'Tab', shiftKey })
+      expect(parentKeyDown).toHaveBeenCalledOnce()
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    }
+  )
 })
