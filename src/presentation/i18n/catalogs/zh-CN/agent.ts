@@ -28,7 +28,6 @@ export const zhCNAgentMessages = {
   'agent.statusClose': '关闭 Agent 状态',
   'agent.statusCount': '{agentName} 有 {count} 个状态需要处理',
   'agent.statusPanel': '{agentName} 状态',
-  'agent.statusTitle': 'Agent 状态',
   'agent.cliSession': '{provider} CLI 会话',
   'agent.noWorkspace': '未选择工作区',
   'provider.restoreFailed': '无法恢复上次对话',

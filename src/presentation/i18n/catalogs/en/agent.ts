@@ -32,7 +32,6 @@ export const enAgentMessages = {
   'agent.statusClose': 'Close Agent status',
   'agent.statusCount': '{agentName} has {count} statuses that need attention',
   'agent.statusPanel': '{agentName} status',
-  'agent.statusTitle': 'Agent status',
   'agent.cliSession': '{provider} CLI session',
   'agent.noWorkspace': 'No workspace selected',
   'provider.restoreFailed': 'Could not restore the previous conversation',
