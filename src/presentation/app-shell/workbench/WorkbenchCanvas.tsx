@@ -1,3 +1,4 @@
+import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
 import {
   Background,
   Panel,
@@ -88,7 +89,7 @@ export function WorkbenchCanvas({
   spatialMotionRef,
   statusbarMotionRef,
   minimapNodeInteraction,
-  reduceVisualNoise = true,
+  reduceVisualNoise = defaultReduceCanvasVisualNoise,
   terminalWorkflow,
   terminalWorkflowBuildPresentation = null,
   shortcutTooltips,

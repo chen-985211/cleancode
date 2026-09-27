@@ -1,6 +1,6 @@
 const canvasVisualNoisePreferenceStorageKey = 'cleancode.canvas-visual-noise-preference'
 
-export const defaultReduceCanvasVisualNoise = true
+export const defaultReduceCanvasVisualNoise = false
 
 export interface CanvasVisualNoisePreference {
   readonly reduceVisualNoise: boolean

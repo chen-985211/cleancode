@@ -71,7 +71,8 @@ describe('workbench canvas drag isolation', () => {
 
   it.each([
     { expected: 'true', reduceVisualNoise: true },
-    { expected: 'false', reduceVisualNoise: false }
+    { expected: 'false', reduceVisualNoise: false },
+    { expected: 'false', reduceVisualNoise: undefined }
   ])(
     'projects reduceVisualNoise=$reduceVisualNoise onto the canvas surface',
     ({ expected, reduceVisualNoise }) => {
@@ -321,7 +322,9 @@ describe('workbench canvas drag isolation', () => {
   it('keeps viewport presentation frames out of the React Flow tree until detail changes', () => {
     const { agentNode, terminalNode } = createNodes()
 
-    renderCanvas([agentNode, terminalNode], vi.fn())
+    renderCanvas([agentNode, terminalNode], vi.fn(), vi.fn(), vi.fn(), {
+      reduceVisualNoise: true
+    })
     const initialRenderCount = reactFlowProps.renderCount
     const initialNodes = reactFlowProps.latest?.nodes
 
