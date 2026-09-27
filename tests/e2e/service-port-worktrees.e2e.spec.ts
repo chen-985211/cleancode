@@ -341,7 +341,12 @@ async function createHttpServiceTerminal(
     await environmentVariable.waitFor()
     await environmentVariable.fill('PORT')
     await expectExpandedMetadataForm(terminal)
-    await page.locator('.choice-select-menu').waitFor({ state: 'detached' })
+    await pollUntilState({
+      description: 'all terminal configuration menus to finish closing',
+      observe: () => page.locator('.choice-select-menu').count(),
+      accept: (count) => count === 0,
+      timeoutMs: 5_000
+    })
     await page.screenshot({ path: join('test-results', 'terminal-edit-service.png') })
     await terminal.getByRole('button', { name: '保存终端信息', exact: true }).click()
     await terminal.locator('.terminal-metadata-surface').waitFor({ state: 'detached' })
