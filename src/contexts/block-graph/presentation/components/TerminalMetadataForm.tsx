@@ -1,5 +1,9 @@
 import { AnchoredSurfaceMotion } from '../../../../presentation/shared/components/SurfaceMotion'
 import { TerminalMetadataFieldsMotion } from './TerminalMetadataFieldsMotion'
+import {
+  useTerminalMetadataPlacement,
+  type TerminalMetadataPlacementEnvironment
+} from './useTerminalMetadataPlacement'
 import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
@@ -30,6 +34,7 @@ import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 interface TerminalMetadataFormProps {
   readonly open?: boolean
+  readonly placement?: TerminalMetadataPlacementEnvironment
   readonly block: TerminalBlockSnapshot
   readonly formId?: string
   readonly shouldFocusLaunchCommand: boolean
@@ -40,7 +45,13 @@ interface TerminalMetadataFormProps {
   readonly onCancel: () => void
 }
 
-export function TerminalMetadataForm({ open = true, ...props }: TerminalMetadataFormProps) {
+export function TerminalMetadataForm({
+  open = true,
+  placement,
+  ...props
+}: TerminalMetadataFormProps) {
+  const positionerRef = useRef<HTMLDivElement>(null)
+  useTerminalMetadataPlacement(open, positionerRef, placement)
   const [draftSession, setDraftSession] = useState({ open, revision: 0 })
   if (draftSession.open !== open) {
     // Keep the exiting draft visible, but start fresh even if exit motion is interrupted.
@@ -48,13 +59,15 @@ export function TerminalMetadataForm({ open = true, ...props }: TerminalMetadata
   }
 
   return (
-    <AnchoredSurfaceMotion
-      open={open}
-      springPreset="anchored"
-      className="terminal-metadata-surface anchored-surface-motion nodrag nopan nowheel"
-    >
-      <TerminalMetadataFormContent key={draftSession.revision} {...props} open={open} />
-    </AnchoredSurfaceMotion>
+    <div ref={positionerRef} className="terminal-metadata-positioner nodrag nopan nowheel">
+      <AnchoredSurfaceMotion
+        open={open}
+        springPreset="anchored"
+        className="terminal-metadata-surface anchored-surface-motion nodrag nopan nowheel"
+      >
+        <TerminalMetadataFormContent key={draftSession.revision} {...props} open={open} />
+      </AnchoredSurfaceMotion>
+    </div>
   )
 }
 
@@ -86,7 +99,7 @@ function TerminalMetadataFormContent({
   useLayoutEffect(() => {
     if (!open) return
     const target = shouldFocusLaunchCommand ? launchCommandInputRef.current : nameInputRef.current
-    target?.focus()
+    target?.focus({ preventScroll: true })
   }, [open, shouldFocusLaunchCommand])
 
   const updateExecutionDraft = (draft: ExecutionConfigDraft): void => {

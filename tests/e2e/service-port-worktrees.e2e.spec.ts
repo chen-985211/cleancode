@@ -19,7 +19,6 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
-import { setCanvasZoomFromDefault } from '../support/terminalSelectionE2e'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
@@ -241,9 +240,41 @@ async function createHttpServiceTerminal(
   }
 
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
-  // Make room for the fully expanded service editor through the canvas controls.
-  await setCanvasZoomFromDefault(page, 'out')
-  await setCanvasZoomFromDefault(page, 'out')
+  await pollUntilState({
+    description: 'terminal creation motion to finish before dragging its header',
+    observe: () =>
+      terminal.evaluate(
+        (node) =>
+          !node.matches('.workbench-object-presence--pending, .workbench-object-motion--create') &&
+          !node.querySelector('.workbench-object-motion--create')
+      ),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
+  // Reproduce opening a full editor near the window bottom without zooming the canvas out.
+  const canvasBounds = await page.locator('.react-flow').boundingBox()
+  const header = terminal.locator('.terminal-node__header')
+  const headerBounds = await header.boundingBox()
+  if (!canvasBounds || !headerBounds) throw new Error('Missing terminal or canvas geometry.')
+  const dragX = headerBounds.x + 100
+  const dragY = headerBounds.y + headerBounds.height / 2
+  const targetY = canvasBounds.y + canvasBounds.height - 200
+  await page.mouse.move(dragX, dragY)
+  await page.mouse.down()
+  await page.mouse.move(dragX, targetY, { steps: 12 })
+  await page.mouse.up()
+  await pollUntilState({
+    description: 'terminal header to reach the bottom-edge editing position',
+    observe: () => header.boundingBox(),
+    accept: (bounds) =>
+      Boolean(
+        bounds &&
+        bounds.y > canvasBounds.y + canvasBounds.height - 280 &&
+        bounds.y + bounds.height < canvasBounds.y + canvasBounds.height
+      ),
+    timeoutMs: 5_000
+  })
+  const viewportBefore = await page.locator('.react-flow__viewport').getAttribute('style')
   const motion = await terminal.evaluateHandle((node) => {
     const bounds = node.getBoundingClientRect()
     let entered = false
@@ -320,6 +351,7 @@ async function createHttpServiceTerminal(
       fieldsMoved: true,
       terminalSizeStable: true
     })
+    expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(viewportBefore)
   } finally {
     await motion.evaluate((recorder) => recorder.stop())
     await motion.dispose()
@@ -351,12 +383,27 @@ async function expectExpandedMetadataForm(terminal: Locator): Promise<void> {
     const body = node.querySelector('.terminal-metadata-form__body')
     if (!(form instanceof HTMLElement) || !(body instanceof HTMLElement)) return null
     const bounds = form.getBoundingClientRect()
+    const canvas = node.closest('.react-flow')!.getBoundingClientRect()
+    const trigger = node.querySelector('.terminal-node__action--edit')!.getBoundingClientRect()
+    const intersects = (other: DOMRect) =>
+      bounds.left < other.right &&
+      bounds.right > other.left &&
+      bounds.top < other.bottom &&
+      bounds.bottom > other.top
     const parameters = form.querySelectorAll('.terminal-execution-config__grid > label')
     const firstParameter = parameters[0]?.getBoundingClientRect()
     const secondParameter = parameters[1]?.getBoundingClientRect()
     return {
       hasInternalScroll: body.scrollHeight > body.clientHeight,
-      extendsBeyondTerminal: bounds.bottom > node.getBoundingClientRect().bottom,
+      insideCanvas:
+        bounds.left >= canvas.left &&
+        bounds.top >= canvas.top &&
+        bounds.right <= canvas.right &&
+        bounds.bottom <= canvas.bottom,
+      toggleUncovered: !intersects(trigger),
+      avoidsCanvasChrome: [
+        ...document.querySelectorAll('[data-workbench-canvas-obstruction]')
+      ].every((element) => !intersects(element.getBoundingClientRect())),
       parametersShareRow: Boolean(
         firstParameter &&
         secondParameter &&
@@ -376,7 +423,9 @@ async function expectExpandedMetadataForm(terminal: Locator): Promise<void> {
   })
   expect(layout).toEqual({
     hasInternalScroll: false,
-    extendsBeyondTerminal: true,
+    insideCanvas: true,
+    toggleUncovered: true,
+    avoidsCanvasChrome: true,
     parametersShareRow: true,
     actionsInsideForm: true
   })

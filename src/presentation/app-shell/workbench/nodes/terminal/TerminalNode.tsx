@@ -5,7 +5,7 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 
 import { TerminalMetadataForm } from '../../../../../contexts/block-graph/presentation/components/TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -29,6 +29,7 @@ import { useI18n } from '../../../../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from '../useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from '../../../../shared/components/WorkbenchIcons'
 import { useTerminalState } from '../../../../../contexts/run/presentation/view-models/terminalStateStore'
+import { readWorkbenchCanvasCreationGeometry } from '../../viewport/workbenchCanvasSafeViewport'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -48,6 +49,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [focusRequestId, setFocusRequestId] = useState(0)
   const [isResizingBlock, setIsResizingBlock] = useState(false)
   const editButtonRef = useRef<HTMLButtonElement>(null)
+  const metadataPlacement = useMemo(
+    () => ({ anchorRef: editButtonRef, readViewport: readMetadataViewport }),
+    []
+  )
   const metadataFormId = `terminal-metadata-form-${block.id}`
   const hasRequestedAutoStartRef = useRef(false)
   const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
@@ -301,6 +306,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         />
         <TerminalMetadataForm
           open={isEditingMetadata}
+          placement={metadataPlacement}
           block={block}
           formId={metadataFormId}
           shouldFocusLaunchCommand={shouldFocusLaunchCommand}
@@ -352,6 +358,21 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     </div>
   )
 })
+
+function readMetadataViewport() {
+  const canvas = document.querySelector<HTMLElement>('.react-flow')
+  if (!canvas) return null
+  const canvasRect = canvas.getBoundingClientRect()
+  if (!canvasRect.width || !canvasRect.height) return null
+  const surfaceRect = canvas.closest('.canvas-surface')?.getBoundingClientRect()
+  const { safeViewport } = readWorkbenchCanvasCreationGeometry()
+  return {
+    x: Math.max(canvasRect.left, surfaceRect?.left ?? canvasRect.left) + safeViewport.x,
+    y: Math.max(canvasRect.top, surfaceRect?.top ?? canvasRect.top) + safeViewport.y,
+    width: safeViewport.width,
+    height: safeViewport.height
+  }
+}
 
 function toWorkbenchNodeLayoutInput(layout: ResizeParams): WorkbenchNodeLayoutInput {
   return {

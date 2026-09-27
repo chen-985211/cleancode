@@ -1,11 +1,15 @@
-.terminal-metadata-surface {
+.terminal-metadata-positioner {
   position: absolute;
   z-index: 7;
   top: 52px;
   right: 8px;
+  width: min(460px, calc(100% - 16px));
+  transform-origin: 0 0;
+}
+
+.terminal-metadata-surface {
   --cc-anchored-surface-offset-y: -12px;
   --cc-anchored-surface-origin: calc(100% - 44px) 0%;
-  width: min(460px, calc(100% - 16px));
 }
 
 .terminal-metadata-form {
