@@ -19,6 +19,7 @@ import {
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
   readTerminalSessionId,
+  submitTerminalMetadataForm,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
@@ -124,8 +125,7 @@ async function configureLaunchCommand(
   await page.getByRole('button', { name: `${terminalName} 启动命令` }).click()
   const input = page.getByRole('textbox', { name: '启动命令' })
   await input.fill(command)
-  await input.press('Enter')
-  await input.waitFor({ state: 'detached' })
+  await submitTerminalMetadataForm(page.getByRole('form', { name: '编辑终端信息' }), terminalName)
 }
 
 async function connectTerminalNodes(page: Page): Promise<void> {

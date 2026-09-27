@@ -1,6 +1,8 @@
 import { act, fireEvent, render } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
+
+import { TerminalMetadataForm } from '../../../src/contexts/block-graph/presentation/components/TerminalMetadataForm'
 
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import {
@@ -65,6 +67,48 @@ describe('workbench direct zoom input', () => {
     expect(onViewportInteractionStart).toHaveBeenCalledOnce()
   })
 
+  it.each([false, true])(
+    'keeps terminal metadata wheel input out of canvas zoom (pinch: %s)',
+    (ctrlKey) => {
+      const instance = createViewportInstance()
+      const retarget = vi.spyOn(directZoom, 'retargetWorkbenchDirectZoom').mockReturnValue(true)
+      vi.spyOn(viewportMotion, 'cancelWorkbenchViewportMotion').mockImplementation(() => undefined)
+      const onViewportInteractionStart = vi.fn()
+      const view = render(
+        <DirectZoomHarness
+          instance={instance}
+          onViewportInteractionStart={onViewportInteractionStart}
+        >
+          <TerminalMetadataForm
+            block={{
+              id: 'terminal-1',
+              type: 'terminal',
+              name: 'Build',
+              description: '',
+              launchCommand: 'pnpm build',
+              position: { x: 0, y: 0 },
+              size: { width: 560, height: 360 }
+            }}
+            shouldFocusLaunchCommand={false}
+            onSave={vi.fn(async () => undefined)}
+            onCancel={vi.fn()}
+          />
+        </DirectZoomHarness>
+      )
+      for (const target of [
+        view.getByRole('form'),
+        view.getByLabelText('启动命令'),
+        view.getByRole('radio', { name: '服务' })
+      ]) {
+        fireEvent.wheel(target, { ctrlKey, deltaMode: 0, deltaY: -100 })
+      }
+      expect(retarget).not.toHaveBeenCalled()
+      expect(onViewportInteractionStart).not.toHaveBeenCalled()
+      fireEvent.wheel(view.getByTestId('pane'), { deltaMode: 0, deltaY: -100 })
+      expect(retarget).toHaveBeenCalledOnce()
+    }
+  )
+
   it('settles both canvas motion owners when reduced motion changes at runtime', () => {
     const media = createMutableMediaQueryList(false)
     vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
@@ -89,8 +133,10 @@ describe('workbench direct zoom input', () => {
 
 function DirectZoomHarness({
   instance,
-  onViewportInteractionStart
+  onViewportInteractionStart,
+  children
 }: {
+  readonly children?: ReactNode
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly onViewportInteractionStart: () => void
 }) {
@@ -116,6 +162,7 @@ function DirectZoomHarness({
       >
         <div data-testid="pane" style={{ position: 'absolute', left: 140, top: 90 }} />
         <div className="nowheel" data-testid="terminal" />
+        {children}
       </div>
     </div>
   )

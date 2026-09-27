@@ -19,11 +19,11 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
+import { setCanvasZoomFromDefault } from '../support/terminalSelectionE2e'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
-  readTerminalSessionId,
-  submitTerminalMetadataForm
+  readTerminalSessionId
 } from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
@@ -240,11 +240,13 @@ async function createHttpServiceTerminal(
   }
 
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  // Make room for the fully expanded service editor through the canvas controls.
+  await setCanvasZoomFromDefault(page, 'out')
+  await setCanvasZoomFromDefault(page, 'out')
   await terminal.getByRole('button', { name: 'Terminal 1 编辑终端信息' }).click()
   await terminal
     .getByRole('textbox', { name: '启动命令' })
     .fill(createE2eNodeScriptCommand('service-fixture.mjs', [], { replaceShell: true }))
-  await terminal.getByText('工作流高级配置', { exact: true }).click()
   async function chooseConfiguration(label: string, value: string): Promise<void> {
     await terminal.getByRole('button', { name: label, exact: true }).click()
     await page
@@ -252,7 +254,9 @@ async function createHttpServiceTerminal(
       .locator(`[data-choice-value="${value}"]`)
       .click()
   }
-  await chooseConfiguration('运行模式', 'service')
+  await expectExpandedMetadataForm(terminal)
+  await page.screenshot({ path: join('test-results', 'terminal-edit-task.png') })
+  await terminal.getByRole('radio', { name: '服务', exact: true }).check()
   await terminal.getByLabel('服务就绪方式').waitFor()
   await chooseConfiguration('服务就绪方式', 'tcp')
   await chooseConfiguration('端口策略', policy)
@@ -263,14 +267,52 @@ async function createHttpServiceTerminal(
   const environmentVariable = terminal.getByRole('textbox', { name: '环境变量名称' })
   await environmentVariable.waitFor()
   await environmentVariable.fill('PORT')
-  await submitTerminalMetadataForm(
-    terminal.getByRole('form', { name: '编辑终端信息' }),
-    'Terminal 1'
-  )
+  await expectExpandedMetadataForm(terminal)
+  await page.locator('.choice-select-menu').waitFor({ state: 'detached' })
+  await page.screenshot({ path: join('test-results', 'terminal-edit-service.png') })
+  await terminal.getByRole('button', { name: '保存终端信息', exact: true }).click()
+  await terminal.getByRole('form', { name: '编辑终端信息' }).waitFor({ state: 'detached' })
 
   if (shouldStart) await launchConfiguredTerminal(page, terminal)
 
   return terminal
+}
+
+async function expectExpandedMetadataForm(terminal: Locator): Promise<void> {
+  const layout = await terminal.evaluate((node) => {
+    const form = node.querySelector('.terminal-metadata-form')
+    const body = node.querySelector('.terminal-metadata-form__body')
+    if (!(form instanceof HTMLElement) || !(body instanceof HTMLElement)) return null
+    const bounds = form.getBoundingClientRect()
+    const parameters = form.querySelectorAll('.terminal-execution-config__grid > label')
+    const firstParameter = parameters[0]?.getBoundingClientRect()
+    const secondParameter = parameters[1]?.getBoundingClientRect()
+    return {
+      hasInternalScroll: body.scrollHeight > body.clientHeight,
+      extendsBeyondTerminal: bounds.bottom > node.getBoundingClientRect().bottom,
+      parametersShareRow: Boolean(
+        firstParameter &&
+        secondParameter &&
+        Math.abs(firstParameter.top - secondParameter.top) < 1 &&
+        firstParameter.right < secondParameter.left
+      ),
+      actionsInsideForm: [
+        '.terminal-metadata-form__header',
+        '.terminal-metadata-form__footer'
+      ].every((selector) => {
+        const element = form.querySelector(selector)
+        if (!element) return false
+        const rect = element.getBoundingClientRect()
+        return rect.top >= bounds.top && rect.bottom <= bounds.bottom
+      })
+    }
+  })
+  expect(layout).toEqual({
+    hasInternalScroll: false,
+    extendsBeyondTerminal: true,
+    parametersShareRow: true,
+    actionsInsideForm: true
+  })
 }
 
 async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {

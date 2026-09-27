@@ -23,6 +23,7 @@ export interface ExecutionConfigDraft {
 export interface ExecutionConfigDraftValidation {
   readonly config: TerminalExecutionConfigSnapshot | null
   readonly error: string | null
+  readonly errorSection: 'task' | 'readiness' | 'port' | null
 }
 
 export function createExecutionConfigDraft(
@@ -78,11 +79,11 @@ function validateTaskExecutionConfig(
     successExitCodes.length === 0 ||
     successExitCodes.some((code) => !Number.isInteger(code) || code < 0 || code > 255)
   ) {
-    return invalid(t('terminalValidation.exitCodes'))
+    return invalid(t('terminalValidation.exitCodes'), 'task')
   }
 
   if (draft.taskTimeoutSeconds.trim() && timeoutMs === null) {
-    return invalid(t('terminalValidation.taskTimeout'))
+    return invalid(t('terminalValidation.taskTimeout'), 'task')
   }
 
   return valid({
@@ -99,7 +100,7 @@ function validateServiceExecutionConfig(
   const readinessTimeoutMs = parsePositiveSeconds(draft.readinessTimeoutSeconds)
 
   if (readinessTimeoutMs === null) {
-    return invalid(t('terminalValidation.readinessTimeout'))
+    return invalid(t('terminalValidation.readinessTimeout'), 'readiness')
   }
 
   const readiness =
@@ -110,22 +111,22 @@ function validateServiceExecutionConfig(
       : ({ type: 'tcp' } as const)
 
   if (!readiness) {
-    return invalid(t('terminalValidation.readinessText'))
+    return invalid(t('terminalValidation.readinessText'), 'readiness')
   }
 
   if (draft.portPolicy === 'unmanaged') {
     return readiness.type === 'tcp'
-      ? invalid(t('terminalValidation.tcpNeedsPort'))
+      ? invalid(t('terminalValidation.tcpNeedsPort'), 'port')
       : valid({ mode: 'service', readiness, readinessTimeoutMs })
   }
 
   const policy = parsePortPolicy(draft)
   if (!policy) {
-    return invalid(t('terminalValidation.portRange'))
+    return invalid(t('terminalValidation.portRange'), 'port')
   }
 
   if (draft.portBinding === 'none' && policy.type !== 'fixed') {
-    return invalid(t('terminalValidation.noBindingFixedOnly'))
+    return invalid(t('terminalValidation.noBindingFixedOnly'), 'port')
   }
 
   const binding = parsePortBinding(draft)
@@ -133,7 +134,8 @@ function validateServiceExecutionConfig(
     return invalid(
       draft.portBinding === 'environment'
         ? t('terminalValidation.environmentVariable')
-        : t('terminalValidation.argumentTemplate')
+        : t('terminalValidation.argumentTemplate'),
+      'port'
     )
   }
 
@@ -181,11 +183,14 @@ function parsePositiveSeconds(value: string): number | null {
 }
 
 function valid(config: TerminalExecutionConfigSnapshot): ExecutionConfigDraftValidation {
-  return { config, error: null }
+  return { config, error: null, errorSection: null }
 }
 
-function invalid(error: string): ExecutionConfigDraftValidation {
-  return { config: null, error }
+function invalid(
+  error: string,
+  errorSection: NonNullable<ExecutionConfigDraftValidation['errorSection']>
+): ExecutionConfigDraftValidation {
+  return { config: null, error, errorSection }
 }
 
 const defaultTranslate: Translate = (key, variables) => translate('zh-CN', key, variables)

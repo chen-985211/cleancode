@@ -1,10 +1,16 @@
 import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
-import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
-import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import type { Icon, IconWeight } from '@phosphor-icons/react'
-import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode
+} from 'react'
 
 import {
   defaultTerminalExecutionConfig,
@@ -17,6 +23,7 @@ import {
   type ExecutionConfigDraft
 } from '../view-models/terminalExecutionConfigDraft'
 import type { TerminalBlockMetadataInput } from '../view-models/TerminalDefinitionPresentationTypes'
+import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hooks/useSelectionMotion'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 interface TerminalMetadataFormProps {
@@ -47,7 +54,7 @@ export function TerminalMetadataForm({
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
-  const launchCommandInputRef = useRef<HTMLInputElement | null>(null)
+  const launchCommandInputRef = useRef<HTMLTextAreaElement | null>(null)
   const executionValidation = useMemo(
     () => validateExecutionConfigDraft(executionDraft, t),
     [executionDraft, t]
@@ -88,7 +95,7 @@ export function TerminalMetadataForm({
   return (
     <form
       id={formId}
-      className="terminal-metadata-form nodrag"
+      className="terminal-metadata-form nodrag nopan nowheel"
       aria-label={t('terminalForm.edit')}
       aria-busy={isSaving}
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
@@ -121,8 +128,7 @@ export function TerminalMetadataForm({
             />
           </span>
           <span className="terminal-metadata-form__heading">
-            <strong>{t('terminalForm.edit')}</strong>
-            <span>{block.name}</span>
+            <strong>{t('terminalForm.editTitle')}</strong>
           </span>
         </header>
         <div className="terminal-metadata-form__body">
@@ -139,8 +145,10 @@ export function TerminalMetadataForm({
                 }}
               />
             </MetadataField>
-            <MetadataField label={t('terminalForm.description')}>
-              <input
+            <MetadataField label={t('terminalForm.description')} optional>
+              <textarea
+                rows={2}
+                wrap="soft"
                 aria-label={t('terminalForm.terminalDescription')}
                 placeholder={t('terminalForm.descriptionPlaceholder')}
                 value={description}
@@ -151,7 +159,13 @@ export function TerminalMetadataForm({
               />
             </MetadataField>
             <MetadataField label={t('terminalForm.launchCommand')}>
-              <input
+              <textarea
+                className="terminal-metadata-form__command"
+                rows={4}
+                wrap="soft"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 aria-label={t('terminalForm.launchCommand')}
                 ref={launchCommandInputRef}
                 placeholder={t('terminalForm.launchPlaceholder')}
@@ -163,37 +177,37 @@ export function TerminalMetadataForm({
               />
             </MetadataField>
           </div>
-          <details className="terminal-execution-config" open={executionDraft.mode === 'service'}>
-            <summary>{t('terminalForm.advanced')}</summary>
-            <div className="terminal-execution-config__grid">
-              <MetadataField label={t('terminalForm.runMode')}>
-                <ChoiceSelect
-                  label={t('terminalForm.runMode')}
-                  value={executionDraft.mode}
-                  onChange={(value) =>
-                    updateExecutionDraft({
-                      ...executionDraft,
-                      mode: value as ExecutionConfigDraft['mode']
-                    })
-                  }
-                  options={[
-                    { value: 'task', label: t('terminalForm.taskMode') },
-                    { value: 'service', label: t('terminalForm.serviceMode') }
-                  ]}
-                />
-              </MetadataField>
-              {executionDraft.mode === 'task' ? (
-                <TaskExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
-              ) : (
-                <ServiceExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
-              )}
-            </div>
-            {executionValidation.error ? (
-              <p className="terminal-execution-config__error" role="alert">
-                {executionValidation.error}
-              </p>
-            ) : null}
-          </details>
+          <section
+            className="terminal-execution-config"
+            aria-label={t('terminalForm.workflowMode')}
+          >
+            <ExecutionModeSelection draft={executionDraft} onChange={updateExecutionDraft} />
+            {executionDraft.mode === 'task' ? (
+              <>
+                <div className="terminal-execution-config__grid">
+                  <TaskExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
+                </div>
+                {executionValidation.error ? (
+                  <p className="terminal-execution-config__error" role="alert">
+                    {executionValidation.error}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <ServiceExecutionFields
+                draft={executionDraft}
+                onChange={updateExecutionDraft}
+                readinessError={
+                  executionValidation.errorSection === 'readiness'
+                    ? executionValidation.error
+                    : null
+                }
+                portError={
+                  executionValidation.errorSection === 'port' ? executionValidation.error : null
+                }
+              />
+            )}
+          </section>
           {saveError ? (
             <p className="terminal-metadata-form__save-error" role="alert">
               {saveError}
@@ -207,13 +221,6 @@ export function TerminalMetadataForm({
             aria-label={t('terminalForm.cancel')}
             onClick={onCancel}
           >
-            <TerminalMetadataIcon
-              IconComponent={XIcon}
-              glyph="x"
-              role="close"
-              size={14}
-              weight="bold"
-            />
             <span>{t('terminalForm.cancelShort')}</span>
           </button>
           <button
@@ -232,20 +239,52 @@ export function TerminalMetadataForm({
                 size={14}
                 weight="bold"
               />
-            ) : (
-              <TerminalMetadataIcon
-                IconComponent={CheckIcon}
-                glyph="check"
-                role="confirm"
-                size={14}
-                weight="bold"
-              />
-            )}
-            <span>{isSaving ? t('terminalForm.saving') : t('terminalForm.save')}</span>
+            ) : null}
+            <span>{isSaving ? t('terminalForm.savingShort') : t('terminalForm.saveShort')}</span>
           </button>
         </div>
       </fieldset>
     </form>
+  )
+}
+
+function ExecutionModeSelection({
+  draft,
+  onChange
+}: {
+  readonly draft: ExecutionConfigDraft
+  readonly onChange: (draft: ExecutionConfigDraft) => void
+}) {
+  const { t } = useI18n()
+  const id = useId()
+  const [containerRef, indicatorRef] = useSelectionIndicatorMotion(draft.mode)
+  return (
+    <div className="terminal-execution-config__mode-row">
+      <span id={id}>{t('terminalForm.workflowMode')}</span>
+      <div
+        ref={containerRef}
+        className="terminal-execution-mode"
+        role="radiogroup"
+        aria-label={t('terminalForm.runMode')}
+      >
+        <span
+          ref={indicatorRef}
+          className="selection-motion-indicator terminal-execution-mode__indicator"
+          aria-hidden="true"
+        />
+        {(['task', 'service'] as const).map((mode) => (
+          <label key={mode} data-selection-motion-option={mode}>
+            <input
+              type="radio"
+              name={id}
+              checked={draft.mode === mode}
+              onChange={() => onChange({ ...draft, mode })}
+            />
+            <span>{t(mode === 'task' ? 'terminalForm.taskMode' : 'terminalForm.serviceMode')}</span>
+          </label>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -267,16 +306,19 @@ function TaskExecutionFields({
           onChange={(event) => onChange({ ...draft, successExitCodes: event.currentTarget.value })}
         />
       </MetadataField>
-      <MetadataField label={t('terminalForm.taskTimeoutLabel')}>
-        <input
-          aria-label={t('terminalForm.taskTimeout')}
-          inputMode="numeric"
-          placeholder={t('terminalForm.noTimeout')}
-          value={draft.taskTimeoutSeconds}
-          onChange={(event) =>
-            onChange({ ...draft, taskTimeoutSeconds: event.currentTarget.value })
-          }
-        />
+      <MetadataField label={t('terminalForm.taskTimeout')}>
+        <span className="terminal-metadata-field__unit">
+          <input
+            aria-label={t('terminalForm.taskTimeout')}
+            inputMode="numeric"
+            placeholder={t('terminalForm.noTimeout')}
+            value={draft.taskTimeoutSeconds}
+            onChange={(event) =>
+              onChange({ ...draft, taskTimeoutSeconds: event.currentTarget.value })
+            }
+          />
+          <span>{t('terminalForm.seconds')}</span>
+        </span>
       </MetadataField>
     </>
   )
@@ -284,52 +326,72 @@ function TaskExecutionFields({
 
 function ServiceExecutionFields({
   draft,
-  onChange
+  onChange,
+  readinessError,
+  portError
 }: {
+  readonly readinessError: string | null
+  readonly portError: string | null
   readonly draft: ExecutionConfigDraft
   readonly onChange: (draft: ExecutionConfigDraft) => void
 }) {
   const { t } = useI18n()
   return (
-    <>
-      <MetadataField label={t('terminalForm.readinessMethod')}>
-        <ChoiceSelect
-          label={t('terminalForm.serviceReadinessMethod')}
-          value={draft.readinessType}
-          onChange={(value) =>
-            onChange({
-              ...draft,
-              readinessType: value as ExecutionConfigDraft['readinessType']
-            })
-          }
-          options={[
-            { value: 'output', label: t('terminalForm.outputReadiness') },
-            { value: 'tcp', label: t('terminalForm.tcpReadiness') }
-          ]}
-        />
-      </MetadataField>
-      {draft.readinessType === 'output' ? (
-        <MetadataField label={t('terminalForm.readinessTextLabel')}>
-          <input
-            aria-label={t('terminalForm.readinessText')}
-            placeholder={t('terminalForm.readinessTextPlaceholder')}
-            value={draft.readinessText}
-            onChange={(event) => onChange({ ...draft, readinessText: event.currentTarget.value })}
+    <div className="terminal-execution-config__service">
+      <div className="terminal-execution-config__grid">
+        <MetadataField label={t('terminalForm.readinessMethod')}>
+          <ChoiceSelect
+            label={t('terminalForm.serviceReadinessMethod')}
+            value={draft.readinessType}
+            onChange={(value) =>
+              onChange({
+                ...draft,
+                readinessType: value as ExecutionConfigDraft['readinessType']
+              })
+            }
+            options={[
+              { value: 'output', label: t('terminalForm.outputReadiness') },
+              { value: 'tcp', label: t('terminalForm.tcpReadiness') }
+            ]}
           />
         </MetadataField>
+        <MetadataField label={t('terminalForm.readinessTimeoutLabel')}>
+          <input
+            aria-label={t('terminalForm.readinessTimeout')}
+            inputMode="numeric"
+            value={draft.readinessTimeoutSeconds}
+            onChange={(event) =>
+              onChange({ ...draft, readinessTimeoutSeconds: event.currentTarget.value })
+            }
+          />
+        </MetadataField>
+        {draft.readinessType === 'output' ? (
+          <div className="terminal-execution-config__wide-field">
+            <MetadataField label={t('terminalForm.readinessTextLabel')}>
+              <input
+                aria-label={t('terminalForm.readinessText')}
+                placeholder={t('terminalForm.readinessTextPlaceholder')}
+                value={draft.readinessText}
+                onChange={(event) =>
+                  onChange({ ...draft, readinessText: event.currentTarget.value })
+                }
+              />
+            </MetadataField>
+          </div>
+        ) : null}
+      </div>
+      {readinessError ? (
+        <p className="terminal-execution-config__error" role="alert">
+          {readinessError}
+        </p>
       ) : null}
-      <MetadataField label={t('terminalForm.readinessTimeoutLabel')}>
-        <input
-          aria-label={t('terminalForm.readinessTimeout')}
-          inputMode="numeric"
-          value={draft.readinessTimeoutSeconds}
-          onChange={(event) =>
-            onChange({ ...draft, readinessTimeoutSeconds: event.currentTarget.value })
-          }
-        />
-      </MetadataField>
       <PortIntentFields draft={draft} onChange={onChange} />
-    </>
+      {portError ? (
+        <p className="terminal-execution-config__error" role="alert">
+          {portError}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -465,14 +527,22 @@ function PortIntentFields({
 
 function MetadataField({
   label,
-  children
+  children,
+  optional = false
 }: {
+  readonly optional?: boolean
   readonly label: string
   readonly children: ReactNode
 }) {
+  const { t } = useI18n()
   return (
     <label className="terminal-metadata-field">
-      <span>{label}</span>
+      <span className="terminal-metadata-field__label">
+        {label}
+        {optional ? (
+          <span className="terminal-metadata-field__optional">{t('terminalForm.optional')}</span>
+        ) : null}
+      </span>
       {children}
     </label>
   )
