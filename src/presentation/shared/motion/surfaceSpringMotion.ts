@@ -17,6 +17,8 @@ export type SurfaceSpringPreset =
   | 'directional-menu'
   | 'drawer-right'
   | 'fullscreen-right'
+  | 'fullscreen-bottom'
+  | 'page-right'
 
 export type SurfaceSpringMotionRoot = SpringProgressMotionRoot
 
@@ -44,6 +46,7 @@ const contentOpacityProperty = '--cc-surface-motion-content-opacity'
 const translationXProperty = '--cc-surface-motion-translate-x'
 const translationYProperty = '--cc-surface-motion-translate-y'
 const scaleProperty = '--cc-surface-motion-scale'
+const companionTranslationProperty = '--cc-surface-motion-companion-translate-x'
 const stateAttribute = 'data-surface-spring-state'
 
 export function createSurfaceSpringMotionController({
@@ -82,9 +85,30 @@ function presentSurface(
   root.style.setProperty(translationXProperty, presentation.translateX)
   root.style.setProperty(translationYProperty, presentation.translateY)
   root.style.setProperty(scaleProperty, `${round(presentation.scale)}`)
+  if (preset === 'page-right') {
+    root.style.setProperty(companionTranslationProperty, `${round(-64 * progress)}px`)
+  }
 }
 
 function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
+  if (preset === 'page-right') {
+    return {
+      contentOpacity: 1,
+      opacity: 1 - remaining,
+      scale: 1,
+      translateX: `${round(64 * remaining)}px`,
+      translateY: '0px'
+    }
+  }
+  if (preset === 'fullscreen-bottom') {
+    return {
+      contentOpacity: 1,
+      opacity: 1,
+      scale: 1,
+      translateX: '0px',
+      translateY: `${round(100 * remaining)}%`
+    }
+  }
   if (preset === 'directional-menu') {
     const presentation = resolveDirectionalMenuPresentation(1 - remaining)
     return {
@@ -150,6 +174,8 @@ function resolvePresentation(preset: SurfaceSpringPreset, remaining: number) {
 }
 
 function responseForPreset(preset: SurfaceSpringPreset): number {
+  if (preset === 'page-right') return 0.42
+  if (preset === 'fullscreen-bottom') return 0.38
   if (preset === 'directional-menu') return directionalMenuMotionProfile.springResponse
   if (preset === 'anchored') return 0.28
   if (preset === 'anchored-bottom-left' || preset === 'anchored-top-left') return 0.18
@@ -165,6 +191,7 @@ function clearPresentation(root: SurfaceSpringMotionRoot): void {
   root.style.removeProperty(translationXProperty)
   root.style.removeProperty(translationYProperty)
   root.style.removeProperty(scaleProperty)
+  root.style.removeProperty(companionTranslationProperty)
 }
 
 function round(value: number): number {

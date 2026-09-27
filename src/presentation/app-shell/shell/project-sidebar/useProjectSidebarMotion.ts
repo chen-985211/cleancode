@@ -12,6 +12,7 @@ export interface ProjectSidebarMotionRefs {
   readonly spatialRef: RefObject<HTMLDivElement | null>
   readonly statusbarRef: RefObject<HTMLElement | null>
   readonly titlebarRef: RefObject<HTMLDivElement | null>
+  readonly taskAreaRef: RefObject<HTMLDivElement | null>
 }
 
 export function useProjectSidebarMotion(
@@ -20,6 +21,7 @@ export function useProjectSidebarMotion(
 ): ProjectSidebarMotionRefs {
   const sidebarRef = useRef<HTMLDivElement | null>(null)
   const titlebarRef = useRef<HTMLDivElement | null>(null)
+  const taskAreaRef = useRef<HTMLDivElement | null>(null)
   const spatialRef = useRef<HTMLDivElement | null>(null)
   const centerRef = useRef<HTMLDivElement | null>(null)
   const statusbarRef = useRef<HTMLElement | null>(null)
@@ -43,7 +45,8 @@ export function useProjectSidebarMotion(
         sidebar: sidebarRef.current,
         spatial: spatialRef.current,
         statusbar: statusbarRef.current,
-        titlebar: titlebarRef.current
+        titlebar: titlebarRef.current,
+        taskArea: taskAreaRef.current
       },
       {
         expandedWidth: readExpandedWidth(root),
@@ -55,7 +58,7 @@ export function useProjectSidebarMotion(
 
   useEffect(() => () => controller.dispose(), [controller])
 
-  return { centerRef, sidebarRef, spatialRef, statusbarRef, titlebarRef }
+  return { centerRef, sidebarRef, spatialRef, statusbarRef, titlebarRef, taskAreaRef }
 }
 
 function readExpandedWidth(root: HTMLElement | null): number {

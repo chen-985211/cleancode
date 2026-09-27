@@ -12,6 +12,7 @@ interface AppShellSidebarProps extends Omit<
   readonly motion: {
     readonly titlebarRef: Ref<HTMLDivElement>
     readonly sidebarRef: Ref<HTMLDivElement>
+    readonly taskAreaRef?: Ref<HTMLDivElement>
   }
   readonly toggleTooltip: string
   readonly onToggle: () => void

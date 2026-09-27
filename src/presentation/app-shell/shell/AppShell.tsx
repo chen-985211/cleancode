@@ -5,8 +5,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useMemo, useRef, useState } from 'react'
 import type { TerminalBlockSnapshot } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import * as derived from './appShellDerived'
-import { useWorkspaceInitialization } from '../coordinators/useWorkspaceInitialization'
-import { useBranchWorkspaceActions } from '../coordinators/useBranchWorkspaceActions'
+import { useProjectWorkspaceLifecycle } from '../coordinators/useProjectWorkspaceLifecycle'
 import { useTerminalGroupActions } from '../coordinators/useTerminalGroupActions'
 import { useTerminalGroupDragActions } from '../coordinators/useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from '../../../contexts/block-graph/presentation/view-models/useTerminalGroupSelectionMode'
@@ -59,7 +58,7 @@ import { useTerminalLaunchCommandRequest } from '../workbench/nodes/terminal/use
 import { useAppShellNodeDragActions } from '../coordinators/useAppShellNodeDragActions'
 import { useCanvasViewportActions } from '../workbench/viewport/useCanvasViewportActions'
 import { useCanvasSelectionViewport } from '../workbench/viewport/useCanvasSelectionViewport'
-import { AppShellSidebar } from './project-sidebar/AppShellSidebar'
+import { AppShellProjectArea } from './project-sidebar/AppShellProjectArea'
 import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
 import { useAgentActivityNotificationNavigation } from '../coordinators/useAgentActivityNotificationNavigation'
 import { useProjectSidebarVisibility } from './project-sidebar/useProjectSidebarVisibility'
@@ -296,15 +295,6 @@ export function AppShell({
     setCurrentGraph,
     workbenches
   })
-  const branchWorkspaceActions = useBranchWorkspaceActions({
-    currentWorkbench,
-    notifications,
-    replaceWorkbench,
-    setHoveredTerminalBlockId,
-    setSelectedTerminalBlockId,
-    terminateWorkspaceTerminalSessions,
-    forgetWorkspaceTerminalStates
-  })
   const { addProject, isReorderingProject, removeProject, reorderProject } = useProjectActions({
     notifications,
     rememberWorkbench,
@@ -354,16 +344,21 @@ export function AppShell({
     setCurrentGraph,
     terminalWorkflowBuildMode
   })
-  const workspaceInitialization = useWorkspaceInitialization({
-    currentWorkbench,
-    notifications,
-    createWorkspace: branchWorkspaceActions.createBranchWorkspace,
-    nodeStore,
-    protectedNodeIds: protectedLayoutNodeIds,
-    reactFlowInstanceRef,
-    setCurrentWorkbench,
-    setWorkbenches
-  })
+  const { branchWorkspaceActions, workspaceInitialization, updateIssueRepository } =
+    useProjectWorkspaceLifecycle({
+      currentWorkbench,
+      notifications,
+      replaceWorkbench,
+      setHoveredTerminalBlockId,
+      setSelectedTerminalBlockId,
+      terminateWorkspaceTerminalSessions,
+      forgetWorkspaceTerminalStates,
+      nodeStore,
+      protectedNodeIds: protectedLayoutNodeIds,
+      reactFlowInstanceRef,
+      setCurrentWorkbench,
+      setWorkbenches
+    })
   const cancelAllLayoutFocus = () => {
     cancelLayoutFocus()
     workspaceInitialization.cancelFocus()
@@ -602,7 +597,7 @@ export function AppShell({
           {...{ resetAllBindings, reduceVisualNoise, shortcutPlatform }}
           {...{ terminalScrollbackRows, terminalWorkflowBuildMode }}
         />
-        <AppShellSidebar
+        <AppShellProjectArea
           {...{ workbenches, currentWorkbench, isDesktopRuntime, shortcutTooltips }}
           isCollapsed={isProjectSidebarCollapsed}
           toggleRef={projectSidebarToggleRef}
@@ -614,6 +609,8 @@ export function AppShell({
           onAddProject={addProject}
           onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
           onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+          onCreateIssueWorkspace={workspaceInitialization.createIssueWorkspace}
+          onProjectChanged={updateIssueRepository}
           onCreateBranchWorkspace={workspaceInitialization.createBranchWorkspace}
           onRemoveProject={removeProject}
           onReorderProject={reorderProject}
@@ -675,10 +672,10 @@ export function AppShell({
           onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
           editingTerminalGroupId={editingTerminalGroupId}
-          selectedTerminalGroupCandidateCount={
-            graph?.terminalGroups.find((group) => group.id === editingTerminalGroupId)
-              ?.memberBlockIds.length ?? 0
-          }
+          selectedTerminalGroupCandidateCount={derived.groupMemberCount(
+            graph,
+            editingTerminalGroupId
+          )}
           onNodesChange={workbenchNodeSelection.onNodesChange}
           onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
           onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}

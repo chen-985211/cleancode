@@ -186,7 +186,7 @@ describe('git branch workspaces e2e', () => {
       const notificationViewport = page.getByLabel('通知', { exact: true })
       const errorAlert = notificationViewport.getByRole('alert')
       await errorAlert.getByText('创建分支工作区失败', { exact: true }).waitFor()
-      await errorAlert.getByText('无法创建分支工作区。', { exact: true }).waitFor()
+      await errorAlert.getByText('Git 分支已存在，无法创建同名工作区。', { exact: true }).waitFor()
 
       expect(await projectCard.getByRole('alert').count()).toBe(0)
     },

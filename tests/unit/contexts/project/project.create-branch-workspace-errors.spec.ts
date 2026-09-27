@@ -10,7 +10,7 @@ import type {
 } from '../../../../src/contexts/project/application/ports/GitWorkspacePort'
 import type { ProjectRepository } from '../../../../src/contexts/project/application/ports/ProjectRepository'
 import type { ProjectSnapshot } from '../../../../src/contexts/project/application/dto/ProjectSnapshot'
-import type { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
+import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
 class InMemoryProjectRepository implements ProjectRepository {
   private readonly projects = new Map<string, ProjectSnapshot>()
@@ -68,6 +68,38 @@ class FakeBranchWorkspaceDirectoryPort implements BranchWorkspaceDirectoryPort {
 }
 
 describe('create branch workspace errors', () => {
+  it('rechecks the issue repository inside the write transaction before touching Git', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    git.inspection = {
+      isGitRepository: true,
+      currentBranch: 'main',
+      localBranches: ['main'],
+      branches: []
+    }
+    await repository.save(
+      Project.create({ directory: '/work/app', name: 'app' }).bindIssueRepository('new/repo')
+    )
+    await expect(
+      new CreateBranchWorkspaceUseCase(
+        repository,
+        git,
+        new FakeBranchWorkspaceDirectoryPort()
+      ).execute({
+        projectDirectory: '/work/app',
+        branchName: 'issue/42',
+        baseRef: 'a'.repeat(40),
+        issue: {
+          id: 'I_42',
+          repository: 'old/repo',
+          number: 42,
+          title: 'Issue',
+          url: 'https://github.com/old/repo/issues/42'
+        }
+      })
+    ).rejects.toMatchObject({ code: 'PROJECT_ISSUE_INVALID' })
+    expect(git.createBranchWorktreeCalls).toEqual([])
+  })
   it('uses the workspace identity reserved by a persisted initialization request', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()

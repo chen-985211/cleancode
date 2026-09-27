@@ -57,48 +57,57 @@ describe('Agent connection approval location', () => {
     expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
   })
 
-  it('retains the approval card when an approved tool returns a structured failure', async () => {
-    let approvalListener: ((request: AgentToolApprovalPresentationRequest) => void) | null = null
-    const approveAgentTool = vi.fn(async () => ({
-      error: {
-        code: 'TERMINAL_CONNECTION_NOT_FOUND',
-        isExpected: true,
-        message: 'Terminal connection no longer exists.'
-      },
-      status: 'failed' as const
-    }))
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: createRuntimeApi({
-        approveAgentTool,
-        onAgentToolApprovalRequested: vi.fn((listener) => {
-          approvalListener = listener
-          return vi.fn()
+  it.each(['result', 'rejection'])(
+    'retains the approval card for a structured failure via %s',
+    async (delivery) => {
+      let approvalListener: ((request: AgentToolApprovalPresentationRequest) => void) | null = null
+      const approveAgentTool = vi.fn(async () => ({
+        error: {
+          code: 'TERMINAL_CONNECTION_NOT_FOUND',
+          isExpected: true,
+          message: 'Terminal connection no longer exists.'
+        },
+        status: 'failed' as const
+      }))
+      if (delivery === 'rejection')
+        approveAgentTool.mockRejectedValue({
+          code: 'TERMINAL_CONNECTION_NOT_FOUND',
+          isExpected: true,
+          message: 'Terminal connection no longer exists.'
+        })
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({
+          approveAgentTool,
+          onAgentToolApprovalRequested: vi.fn((listener) => {
+            approvalListener = listener
+            return vi.fn()
+          })
         })
       })
-    })
-    const { result } = renderHook(() =>
-      useAgentToolApprovals({
-        graph,
-        projectDirectory: '/repo/app',
-        reactFlowInstanceRef: { current: null },
-        setCurrentGraph: vi.fn(),
-        workspaceId: 'main'
-      })
-    )
+      const { result } = renderHook(() =>
+        useAgentToolApprovals({
+          graph,
+          projectDirectory: '/repo/app',
+          reactFlowInstanceRef: { current: null },
+          setCurrentGraph: vi.fn(),
+          workspaceId: 'main'
+        })
+      )
 
-    act(() => approvalListener?.(connectionApproval))
-    await act(async () => result.current.approve(connectionApproval))
+      act(() => approvalListener?.(connectionApproval))
+      await act(async () => result.current.approve(connectionApproval))
 
-    expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-connection-1' })
-    expect(result.current.approvals).toEqual([
-      {
-        errorMessage: '操作未完成：Terminal connection no longer exists.',
-        phase: 'failed',
-        request: connectionApproval
-      }
-    ])
-  })
+      expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-connection-1' })
+      expect(result.current.approvals).toEqual([
+        {
+          errorMessage: '操作未完成：Terminal connection no longer exists.',
+          phase: 'failed',
+          request: connectionApproval
+        }
+      ])
+    }
+  )
 })
 
 function stubReducedMotionPreference(): void {

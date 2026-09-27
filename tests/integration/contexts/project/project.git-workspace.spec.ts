@@ -3,6 +3,8 @@ import { access, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/prom
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
+import { GitCliIssueBaseAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliIssueBaseAdapter'
 
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../../../src/contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
 import { CreateOrOpenProjectUseCase } from '../../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
@@ -24,6 +26,52 @@ describe('project git workspace adapter', () => {
   afterEach(async () => {
     await rm(projectDirectory, { recursive: true, force: true })
     await rm(appStateDirectory, { recursive: true, force: true })
+  })
+
+  it('creates an issue workspace at the explicit base instead of the currently checked out branch', async () => {
+    await initializeGitProject(projectDirectory)
+    const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: projectDirectory })
+    await execFileAsync('git', ['checkout', '-b', 'unrelated'], { cwd: projectDirectory })
+    await writeFile(join(projectDirectory, 'unrelated.txt'), 'Not part of this issue')
+    await execFileAsync('git', ['add', '.'], { cwd: projectDirectory })
+    await execFileAsync('git', ['commit', '-m', 'unrelated work'], { cwd: projectDirectory })
+    const worktreeDirectory = join(appStateDirectory, 'issue-42')
+    await new GitCliWorkspaceAdapter().createBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      branchName: 'issue/42',
+      worktreeDirectory,
+      baseRef: stdout.trim()
+    })
+    await expect(access(join(worktreeDirectory, 'unrelated.txt'))).rejects.toMatchObject({
+      code: 'ENOENT'
+    })
+    expect(await getCurrentBranch(projectDirectory)).toBe('unrelated')
+  })
+
+  it('fetches the selected remote base as an immutable commit without changing checkout or FETCH_HEAD', async () => {
+    await initializeGitProject(projectDirectory)
+    const git = (args: string[]) => execFileAsync('git', args, { cwd: projectDirectory })
+    const base = (await git(['rev-parse', 'main'])).stdout.trim()
+    await git(['remote', 'add', 'origin', 'https://github.com/fixture/issues.git'])
+    await git([
+      'config',
+      `url.${pathToFileURL(projectDirectory).href}.insteadOf`,
+      'https://github.com/fixture/issues.git'
+    ])
+    await git(['checkout', '-b', 'unrelated'])
+    await writeFile(join(projectDirectory, '.git', 'FETCH_HEAD'), 'preserve existing fetch')
+    const adapter = new GitCliIssueBaseAdapter()
+    await expect(adapter.resolve(projectDirectory, 'fixture/issues', 'main')).resolves.toBe(base)
+    expect(await getCurrentBranch(projectDirectory)).toBe('unrelated')
+    expect(await readFile(join(projectDirectory, '.git', 'FETCH_HEAD'), 'utf8')).toBe(
+      'preserve existing fetch'
+    )
+    await expect(
+      adapter.resolve(projectDirectory, 'fixture/issues', 'missing')
+    ).rejects.toMatchObject({ code: 'GITHUB_BASE_UNAVAILABLE' })
+    await expect(
+      adapter.resolve(projectDirectory, 'fixture/issues', '--upload-pack=other')
+    ).rejects.toMatchObject({ code: 'GITHUB_BASE_UNAVAILABLE' })
   })
 
   it('reports a non-git project without a branch binding', async () => {

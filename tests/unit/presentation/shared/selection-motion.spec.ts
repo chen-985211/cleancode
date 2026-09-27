@@ -109,6 +109,29 @@ describe('selection motion', () => {
     expect(root.attributes.get('data-selection-motion-state')).toBe('settled')
   })
 
+  it('keeps the current compositor animation when layout commits repeat the same target', async () => {
+    const scheduler = createFrameScheduler()
+    const animationDriver = createAnimationDriver()
+    const root = createRoot()
+    const controller = createSelectionIndicatorMotionController({ animationDriver, scheduler })
+
+    controller.targetChanged(root, target(0, 0), { reducedMotion: false })
+    controller.targetChanged(root, target(0, 132), { reducedMotion: false })
+    scheduler.elapse(72)
+    controller.targetChanged(root, target(0, 132), { reducedMotion: false })
+
+    expect(animationDriver.animations).toHaveLength(1)
+    expect(animationDriver.animations[0]?.cancelled()).toBe(false)
+    animationDriver.animations[0]?.finish()
+    await settlePromises()
+    expect(readNumber(root, '--cc-selection-motion-y')).toBe(132)
+    expect(root.attributes.get('data-selection-motion-state')).toBe('settled')
+
+    controller.targetChanged(root, target(0, 132, 224, 40), { reducedMotion: false })
+    expect(readNumber(root, '--cc-selection-motion-width')).toBe(224)
+    expect(readNumber(root, '--cc-selection-motion-height')).toBe(40)
+  })
+
   it('redirects compositor motion from its analytic presentation and ignores stale completion', async () => {
     const scheduler = createFrameScheduler()
     const animationDriver = createAnimationDriver()

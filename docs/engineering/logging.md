@@ -131,7 +131,7 @@ Electron main 进程不得直接裸用 `ipcMain.handle`。
 - 按 handler 显式配置记录成功日志。
 - 默认记录结构化失败日志；只有 handler 明确声明且 owner 文档列出的预期生命周期收敛可以保持静默，错误仍须结构化返回调用方。
 
-preload 层负责解包 IPC 结果，并把失败结果恢复成 renderer 可识别的 `AppError`。
+preload 层负责解包 IPC 结果，失败时以普通 `SerializedAppError` 数据拒绝 Promise，使错误码、details 和 correlationId 完整通过 contextBridge。不得在跨 contextBridge 前恢复为 Error 实例，因为 Electron 会丢弃自定义字段。renderer 使用统一错误识别函数读取稳定错误码。
 
 ## 表现层规则
 

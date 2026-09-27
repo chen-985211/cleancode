@@ -62,8 +62,9 @@ export function useSelectionIndicatorMotion(selectedKey: string): SelectionIndic
   }, [cancelScheduledProjection, project])
 
   useLayoutEffect(() => {
+    // A list can insert or reorder options without changing the selected key.
     if (!project(false)) scheduleProjection()
-  }, [project, reducedMotion, scheduleProjection, selectedKey])
+  })
 
   useEffect(() => {
     const projectResize = (): void => {

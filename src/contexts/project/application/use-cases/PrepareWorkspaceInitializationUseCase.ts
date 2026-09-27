@@ -1,4 +1,9 @@
+import {
+  sameProjectIssue,
+  type ProjectIssueReference
+} from '../../domain/value-objects/ProjectIssue'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import { normalizeNewBranchName } from '../../domain/value-objects/GitBranchName'
 import type { ProjectRegistryRepository } from '../ports/ProjectRegistryRepository'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { BranchWorkspaceDirectoryPort } from '../ports/BranchWorkspaceDirectoryPort'
@@ -22,6 +27,9 @@ import {
 } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateInitializedWorkspaceCommand {
+  readonly selectWorkspace?: boolean
+  readonly baseRef?: string
+  readonly issue?: ProjectIssueReference
   readonly projectDirectory: string
   readonly branchName: string
   readonly requestId?: string
@@ -79,8 +87,11 @@ export class PrepareWorkspaceInitializationUseCase {
     })
   }
   async create(command: CreateInitializedWorkspaceCommand): Promise<ProjectSnapshot> {
+    const branchName = normalizeNewBranchName(command.branchName)
     const requestId = command.requestId ?? globalThis.crypto.randomUUID()
-    return this.requests.run(requestId, () => this.createOnce({ ...command, requestId }))
+    return this.requests.run(requestId, () =>
+      this.createOnce({ ...command, branchName, requestId })
+    )
   }
   async beginEmpty(
     command: BeginEmptyCanvasInitializationCommand
@@ -174,6 +185,8 @@ export class PrepareWorkspaceInitializationUseCase {
         branchName: command.branchName.trim()
       })
       const operation = WorkspaceInitialization.create({
+        ...(command.baseRef ? { baseRef: command.baseRef } : {}),
+        ...(command.issue ? { issue: command.issue } : {}),
         id: command.requestId,
         projectId: project.id,
         projectDirectory: project.directory,
@@ -189,7 +202,12 @@ export class PrepareWorkspaceInitializationUseCase {
     }
     await this.getDefaults(project.directory)
     this.assertRequest(snapshot, project, snapshot.workspaceId)
-    if (snapshot.branchName !== command.branchName.trim() || snapshot.mode !== 'new-workspace') {
+    if (
+      snapshot.branchName !== command.branchName.trim() ||
+      snapshot.mode !== 'new-workspace' ||
+      (command.baseRef !== undefined && snapshot.baseRef !== command.baseRef) ||
+      (command.issue && !sameProjectIssue(snapshot.issue, command.issue))
+    ) {
       throw createExpectedAppError(
         'WORKSPACE_INITIALIZATION_CONFLICT',
         'Workspace creation request has different contents.'
@@ -226,19 +244,29 @@ export class PrepareWorkspaceInitializationUseCase {
           snapshot = rebound.toSnapshot()
           project = await this.dependencies.transactions.run(project.directory, async () => {
             const latest = await this.requireProject(command.projectDirectory)
-            const selected = Project.fromSnapshot(latest).switchCurrentWorkspace(
-              discovered.workspaceId
-            )
+            const recovered = snapshot!.issue
+              ? Project.fromSnapshot(latest).linkWorkspaceIssue(
+                  discovered.workspaceId,
+                  snapshot!.issue
+                )
+              : Project.fromSnapshot(latest)
+            const selected =
+              command.selectWorkspace === false
+                ? recovered
+                : recovered.switchCurrentWorkspace(discovered.workspaceId)
             await this.dependencies.projects.save(selected)
             return selected.toSnapshot()
           })
-        } else project = await this.recoverWorkspace(snapshot)
+        } else project = await this.recoverWorkspace(snapshot, command.selectWorkspace)
       } else {
         project = await this.dependencies.createWorkspace(
           {
+            ...(snapshot.baseRef ? { baseRef: snapshot.baseRef } : {}),
+            ...(snapshot.issue ? { issue: snapshot.issue } : {}),
             projectDirectory: project.directory,
             branchName: command.branchName,
-            workspaceId: snapshot.workspaceId
+            workspaceId: snapshot.workspaceId,
+            selectWorkspace: command.selectWorkspace
           },
           async () => {
             const confirmed = WorkspaceInitialization.restore(snapshot!)
@@ -250,6 +278,7 @@ export class PrepareWorkspaceInitializationUseCase {
       }
     }
     if (
+      command.selectWorkspace !== false &&
       !project.workspaces.some(
         (workspace) => workspace.workspaceId === snapshot!.workspaceId && workspace.isCurrent
       )
@@ -269,7 +298,8 @@ export class PrepareWorkspaceInitializationUseCase {
   }
 
   private async recoverWorkspace(
-    snapshot: WorkspaceInitializationSnapshot
+    snapshot: WorkspaceInitializationSnapshot,
+    selectWorkspace = true
   ): Promise<ProjectSnapshot> {
     return this.dependencies.transactions.run(snapshot.projectDirectory, async () => {
       const project = await this.requireProject(snapshot.projectDirectory)
@@ -291,6 +321,8 @@ export class PrepareWorkspaceInitializationUseCase {
       )
         stale()
       const recovered = Project.fromSnapshot(project).addLinkedWorktreeWorkspace({
+        selectWorkspace,
+        issue: snapshot.issue,
         workspaceId: snapshot.workspaceId,
         displayName: snapshot.branchName!,
         gitBranch: snapshot.branchName!,

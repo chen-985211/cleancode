@@ -14,6 +14,7 @@ export interface GitRepositoryInspection {
 }
 
 export interface CreateBranchWorktreeCommand {
+  readonly baseRef?: string
   readonly repositoryDirectory: string
   readonly branchName: string
   readonly worktreeDirectory: string

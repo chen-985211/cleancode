@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import type { BlockGraphSnapshot } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { isSerializedAppError } from '../../../shared-kernel/application/errors/AppError'
 import { resolveAgentApprovalPresentation } from '../projections/agentApprovalPresentation'
 import type {
   AgentToolApprovalController,
@@ -189,7 +190,7 @@ function setApprovalFailure(
 }
 
 function readApprovalError(error: unknown, t: Translate): string {
-  return error instanceof Error && error.message
+  return (error instanceof Error || isSerializedAppError(error)) && error.message
     ? t('approval.failedWithMessage', { message: error.message })
     : t('approval.failedFallback')
 }

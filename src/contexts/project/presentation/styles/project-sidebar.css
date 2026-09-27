@@ -38,6 +38,40 @@
   letter-spacing: 0.04em;
 }
 
+.project-sidebar__task-navigation {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+}
+
+.project-sidebar__task-navigation:hover:not(:disabled),
+.project-sidebar__task-navigation[aria-expanded='true'] {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.project-sidebar__task-navigation:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+
+.project-sidebar__task-navigation:disabled {
+  color: var(--cc-muted);
+  cursor: default;
+}
+
 .project-sidebar__add {
   color: var(--cc-muted);
 }

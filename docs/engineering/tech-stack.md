@@ -117,6 +117,14 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 
 CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Provider 在 MCP 初始化或失败时仍可正常运行；注册失败或认证握手超时只把 MCP 投影为 `failed`。Provider session ref 保存失败只把 binding 标记为 `persistence_failed`，不得把仍在运行的 launch 或活动误报为失败。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
+## GitHub Issues
+
+Issue 正文由 `react-markdown` 10.1.0 和 `remark-gfm` 4.0.1 进行只读渲染，忽略原始 HTML，限制资源与链接为 HTTP(S)。
+
+项目 Issues 使用外部 `gh` CLI 的 `repo view`、`issue list`、`issue view` JSON 接口，复用用户现有的 github.com 登录，不引入 SDK、服务端或令牌存储。需要用户安装 GitHub CLI 并完成 `gh auth login`；macOS 从 Finder 启动且 PATH 缺少 gh 时检查对应架构的 Homebrew 标准位置。子进程使用参数数组、禁用交互、限定超时和输出大小，错误映射为稳定应用错误，原始输出不进入日志。
+
+创建 Issue 工作区复用主进程已读 Issue 引用；由本地 Git 优先解析已有本地分支或完整提交，明确远程基准或本地缺失时再拉取对象，交给现有 `git worktree add` 与工作区初始化流程。远程预取与正式创建合并同一在途请求，成功结果短时复用；定向 fetch 不递归子模块、不写 FETCH_HEAD，并仅对该命令关闭自动维护，不改变用户 Git 配置。不依赖新版 gh 的 worktree 命令。Git 凭据继续使用用户既有 Git 配置，应用不配置全局凭据、不改变 remote、不上传分支。
+
 ## 存储层
 
 当前桌面应用在按运行渠道和开发源码 worktree 隔离的 Electron 应用数据目录中，以 `project-state-v2` 作为当前业务状态根，使用版本化 JSON 保存项目、积木图、应用级收藏模板库、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。积木图写入 v5 并兼容读取 v2、v3、v4 与 v5，收藏模板库使用独立的 `block-template-library.json` 并只接受 schema v1，Agent 定义写入 schema v6 并兼容读取 v5；图和 Agent 都以稳定 `workspaceId` 定位，模板库则以稳定 `projectId` 区分项目作用域并保留独立的全局作用域。项目内 `.cleancode` 和旧应用状态根不会被读取、迁移或回写。产品尚未公开期间旧测试数据不构成兼容性约束，旧状态保留在原位置但不加载。发布包与人工发布测试共享正式目录，每个未打包源码 worktree 使用稳定独立的开发 profile，自动化测试通过显式临时目录隔离。Run 终端恢复目录使用独立 schema v2 JSON checkpoint 与 schema v1 有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
