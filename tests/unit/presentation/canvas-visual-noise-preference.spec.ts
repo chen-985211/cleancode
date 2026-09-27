@@ -5,23 +5,24 @@ import {
 } from '../../../src/presentation/app-shell/app-features/settings/canvasVisualNoisePreference'
 
 describe('canvas visual noise preference', () => {
-  it('defaults missing, malformed, and unsupported stored values to reducing visual noise', () => {
+  it('defaults missing, malformed, and unsupported stored values to full visual detail', () => {
+    expect(defaultReduceCanvasVisualNoise).toBe(false)
     expect(readCanvasVisualNoisePreference(createStorage())).toEqual({
-      reduceVisualNoise: defaultReduceCanvasVisualNoise
+      reduceVisualNoise: false
     })
     expect(readCanvasVisualNoisePreference(createStorage('{broken'))).toEqual({
-      reduceVisualNoise: true
+      reduceVisualNoise: false
     })
     expect(
       readCanvasVisualNoisePreference(
         createStorage(JSON.stringify({ reduceVisualNoise: false, version: 2 }))
       )
-    ).toEqual({ reduceVisualNoise: true })
+    ).toEqual({ reduceVisualNoise: false })
     expect(
       readCanvasVisualNoisePreference(
         createStorage(JSON.stringify({ reduceVisualNoise: 'sometimes', version: 1 }))
       )
-    ).toEqual({ reduceVisualNoise: true })
+    ).toEqual({ reduceVisualNoise: false })
   })
 
   it.each([true, false])(

@@ -6,6 +6,10 @@ import {
 } from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object motion', () => {
+  it.each([1, 0.779, 0.519])('defaults zoom %s to full visual detail', (zoom) => {
+    expect(resolveWorkbenchCanvasDetailLevel(zoom)).toBe('full')
+  })
+
   it.each([
     { expected: 'full', reduceVisualNoise: true, zoom: 1 },
     { expected: 'full', reduceVisualNoise: true, zoom: 0.78 },

@@ -1,3 +1,4 @@
+import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
 import type { Edge } from '@xyflow/react'
 
 import { resolveNodeSize } from '../workbench/nodes/resolveNodeSize'
@@ -38,7 +39,7 @@ const groupMemberContentDelayMs = 220
 
 export function resolveWorkbenchCanvasDetailLevel(
   zoom: number,
-  reduceVisualNoise = true
+  reduceVisualNoise = defaultReduceCanvasVisualNoise
 ): WorkbenchCanvasDetailLevel {
   if (!reduceVisualNoise) return 'full'
   if (!Number.isFinite(zoom) || zoom <= 0 || zoom >= compactCanvasZoom) {
