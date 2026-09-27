@@ -3,6 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { TerminalNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
+import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
+import { supportedLocales, type Locale } from '../../../src/presentation/i18n/locale'
+import { translate } from '../../../src/presentation/i18n/messages'
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => null,
@@ -11,6 +14,46 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 describe('terminal metadata editing', () => {
+  it.each(supportedLocales)('describes the current edit or cancel action in %s', async (locale) => {
+    const cancelLabels = { 'zh-CN': '取消编辑', en: 'Cancel editing' } satisfies Record<
+      Locale,
+      string
+    >
+    render(
+      <I18nProvider initialLocale={locale}>
+        <TerminalNode
+          id="terminal-1"
+          type="terminal"
+          data={createTerminalNodeData()}
+          dragging={false}
+          zIndex={0}
+          selectable
+          deletable
+          selected={false}
+          draggable
+          isConnectable={false}
+          positionAbsoluteX={240}
+          positionAbsoluteY={180}
+        />
+      </I18nProvider>
+    )
+    const namedAction = (action: string) =>
+      translate(locale, 'terminal.namedAction', {
+        blockName: 'Terminal',
+        action
+      })
+    const editLabel = namedAction(translate(locale, 'terminal.action.edit'))
+    const trigger = screen.getByRole('button', { name: editLabel })
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAccessibleName(namedAction(cancelLabels[locale]))
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(trigger)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(cancelLabels[locale])
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAccessibleName(editLabel)
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('submits metadata and execution configuration through one definition update', async () => {
     const onUpdateDefinition = vi.fn(async () => undefined)
     render(

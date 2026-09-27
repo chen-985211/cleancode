@@ -184,7 +184,7 @@ function TerminalMetadataFormContent({
             <MetadataField label={t('terminalForm.launchCommand')}>
               <textarea
                 className="terminal-metadata-form__command"
-                rows={4}
+                rows={2}
                 wrap="soft"
                 autoCapitalize="none"
                 autoCorrect="off"

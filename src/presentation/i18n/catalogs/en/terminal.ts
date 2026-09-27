@@ -85,6 +85,7 @@ export const enTerminalMessages = {
   'terminal.action.restartEmptyDescription':
     'Restart with an empty terminal session without running the launch command',
   'terminal.action.edit': 'Edit terminal details',
+  'terminal.action.cancelEdit': 'Cancel editing',
   'terminal.action.delete': 'Delete terminal',
   'terminal.retention.enable': 'Keep this session running after the app exits',
   'terminal.retention.disable': 'Stop keeping this session after the app exits',

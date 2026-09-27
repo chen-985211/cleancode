@@ -77,6 +77,7 @@ export const zhCNTerminalMessages = {
   'terminal.action.restartEmpty': '重开空终端会话',
   'terminal.action.restartEmptyDescription': '重开空终端会话，不执行启动命令',
   'terminal.action.edit': '编辑终端信息',
+  'terminal.action.cancelEdit': '取消编辑',
   'terminal.action.delete': '删除终端',
   'terminal.retention.enable': '应用退出后继续运行此会话',
   'terminal.retention.disable': '应用退出后不再保留此会话',

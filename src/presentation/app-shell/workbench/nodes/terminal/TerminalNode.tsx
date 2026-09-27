@@ -420,6 +420,9 @@ function TerminalHeader({
   onDelete
 }: TerminalHeaderProps) {
   const { t } = useI18n()
+  const editActionLabel = t(
+    isEditingMetadata ? 'terminal.action.cancelEdit' : 'terminal.action.edit'
+  )
   const terminalGroupSelectionLabel = isSelectedForTerminalGroup
     ? t('terminal.action.selected')
     : t('terminal.action.select')
@@ -486,7 +489,7 @@ function TerminalHeader({
           onRestart={onRestart}
         />
         <span className="terminal-node__action-divider" aria-hidden="true" />
-        <TooltipLabel content={t('terminal.action.edit')}>
+        <TooltipLabel content={editActionLabel}>
           <button
             className={[
               'terminal-node__action',
@@ -498,7 +501,7 @@ function TerminalHeader({
             type="button"
             aria-label={t('terminal.namedAction', {
               blockName,
-              action: t('terminal.action.edit')
+              action: editActionLabel
             })}
             ref={editButtonRef}
             aria-controls={metadataFormId}
