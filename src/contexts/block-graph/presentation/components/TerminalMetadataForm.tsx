@@ -1,3 +1,4 @@
+import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
@@ -166,19 +167,20 @@ export function TerminalMetadataForm({
             <summary>{t('terminalForm.advanced')}</summary>
             <div className="terminal-execution-config__grid">
               <MetadataField label={t('terminalForm.runMode')}>
-                <select
-                  aria-label={t('terminalForm.runMode')}
+                <ChoiceSelect
+                  label={t('terminalForm.runMode')}
                   value={executionDraft.mode}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     updateExecutionDraft({
                       ...executionDraft,
-                      mode: event.currentTarget.value as ExecutionConfigDraft['mode']
+                      mode: value as ExecutionConfigDraft['mode']
                     })
                   }
-                >
-                  <option value="task">{t('terminalForm.taskMode')}</option>
-                  <option value="service">{t('terminalForm.serviceMode')}</option>
-                </select>
+                  options={[
+                    { value: 'task', label: t('terminalForm.taskMode') },
+                    { value: 'service', label: t('terminalForm.serviceMode') }
+                  ]}
+                />
               </MetadataField>
               {executionDraft.mode === 'task' ? (
                 <TaskExecutionFields draft={executionDraft} onChange={updateExecutionDraft} />
@@ -291,19 +293,20 @@ function ServiceExecutionFields({
   return (
     <>
       <MetadataField label={t('terminalForm.readinessMethod')}>
-        <select
-          aria-label={t('terminalForm.serviceReadinessMethod')}
+        <ChoiceSelect
+          label={t('terminalForm.serviceReadinessMethod')}
           value={draft.readinessType}
-          onChange={(event) =>
+          onChange={(value) =>
             onChange({
               ...draft,
-              readinessType: event.currentTarget.value as ExecutionConfigDraft['readinessType']
+              readinessType: value as ExecutionConfigDraft['readinessType']
             })
           }
-        >
-          <option value="output">{t('terminalForm.outputReadiness')}</option>
-          <option value="tcp">{t('terminalForm.tcpReadiness')}</option>
-        </select>
+          options={[
+            { value: 'output', label: t('terminalForm.outputReadiness') },
+            { value: 'tcp', label: t('terminalForm.tcpReadiness') }
+          ]}
+        />
       </MetadataField>
       {draft.readinessType === 'output' ? (
         <MetadataField label={t('terminalForm.readinessTextLabel')}>
@@ -343,11 +346,11 @@ function PortIntentFields({
   return (
     <div className="terminal-port-intent-fields">
       <MetadataField label={t('terminalForm.portPolicy')}>
-        <select
-          aria-label={t('terminalForm.portPolicy')}
+        <ChoiceSelect
+          label={t('terminalForm.portPolicy')}
           value={draft.portPolicy}
-          onChange={(event) => {
-            const portPolicy = event.currentTarget.value as ExecutionConfigDraft['portPolicy']
+          onChange={(value) => {
+            const portPolicy = value as ExecutionConfigDraft['portPolicy']
             onChange({
               ...draft,
               portPolicy,
@@ -357,30 +360,32 @@ function PortIntentFields({
                   : draft.portBinding
             })
           }}
-        >
-          <option value="unmanaged">{t('terminalForm.portUnmanaged')}</option>
-          <option value="fixed">{t('terminalForm.portFixed')}</option>
-          <option value="preferred">{t('terminalForm.portPreferred')}</option>
-          <option value="auto">{t('terminalForm.portAuto')}</option>
-        </select>
+          options={[
+            { value: 'unmanaged', label: t('terminalForm.portUnmanaged') },
+            { value: 'fixed', label: t('terminalForm.portFixed') },
+            { value: 'preferred', label: t('terminalForm.portPreferred') },
+            { value: 'auto', label: t('terminalForm.portAuto') }
+          ]}
+        />
       </MetadataField>
       {hasPortIntent ? (
         <>
           <MetadataField label={t('terminalForm.protocol')}>
-            <select
-              aria-label={t('terminalForm.protocol')}
+            <ChoiceSelect
+              label={t('terminalForm.protocol')}
               value={draft.portProtocol}
-              onChange={(event) =>
+              onChange={(value) =>
                 onChange({
                   ...draft,
-                  portProtocol: event.currentTarget.value as ExecutionConfigDraft['portProtocol']
+                  portProtocol: value as ExecutionConfigDraft['portProtocol']
                 })
               }
-            >
-              <option value="http">HTTP</option>
-              <option value="https">HTTPS</option>
-              <option value="tcp">TCP</option>
-            </select>
+              options={[
+                { value: 'http', label: 'HTTP' },
+                { value: 'https', label: 'HTTPS' },
+                { value: 'tcp', label: 'TCP' }
+              ]}
+            />
           </MetadataField>
           {draft.portPolicy === 'fixed' || draft.portPolicy === 'preferred' ? (
             <MetadataField label={t('terminalForm.servicePort')}>
@@ -394,22 +399,23 @@ function PortIntentFields({
             </MetadataField>
           ) : null}
           <MetadataField label={t('terminalForm.portBinding')}>
-            <select
-              aria-label={t('terminalForm.portBinding')}
+            <ChoiceSelect
+              label={t('terminalForm.portBinding')}
               value={draft.portBinding}
-              onChange={(event) =>
+              onChange={(value) =>
                 onChange({
                   ...draft,
-                  portBinding: event.currentTarget.value as ExecutionConfigDraft['portBinding']
+                  portBinding: value as ExecutionConfigDraft['portBinding']
                 })
               }
-            >
-              {draft.portPolicy === 'fixed' ? (
-                <option value="none">{t('terminalForm.noBinding')}</option>
-              ) : null}
-              <option value="environment">{t('terminalForm.environmentBinding')}</option>
-              <option value="argument">{t('terminalForm.argumentBinding')}</option>
-            </select>
+              options={[
+                ...(draft.portPolicy === 'fixed'
+                  ? [{ value: 'none', label: t('terminalForm.noBinding') }]
+                  : []),
+                { value: 'environment', label: t('terminalForm.environmentBinding') },
+                { value: 'argument', label: t('terminalForm.argumentBinding') }
+              ]}
+            />
           </MetadataField>
           {draft.portBinding === 'environment' ? (
             <>

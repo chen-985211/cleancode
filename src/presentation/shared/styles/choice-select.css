@@ -1,0 +1,58 @@
+.choice-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.choice-select-trigger:focus-visible,
+.choice-select-menu button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
+}
+.choice-select-menu {
+  --cc-menu-option-highlight-inset: 5px;
+  position: fixed;
+  z-index: 1600;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
+  background: var(--cc-surface-overlay);
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-floating);
+  font-size: 13px;
+}
+.choice-select-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.choice-select-menu button:disabled {
+  color: var(--cc-muted-strong);
+  cursor: default;
+}
+.choice-select-menu button > svg {
+  flex-shrink: 0;
+  color: var(--cc-primary);
+}

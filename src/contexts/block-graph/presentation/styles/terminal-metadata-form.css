@@ -118,7 +118,7 @@
 }
 
 .terminal-metadata-form input,
-.terminal-metadata-form select {
+.terminal-metadata-form .choice-select-trigger {
   min-width: 0;
   height: 34px;
   box-sizing: border-box;
@@ -142,7 +142,7 @@
 }
 
 .terminal-metadata-form input:focus,
-.terminal-metadata-form select:focus {
+.terminal-metadata-form .choice-select-trigger:focus {
   border-color: var(--cc-primary-border);
   background: var(--cc-surface);
   box-shadow:

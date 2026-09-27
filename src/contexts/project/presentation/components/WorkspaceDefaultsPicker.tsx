@@ -1,3 +1,8 @@
+import { useMenuOptionHighlightMotion } from '../../../../presentation/shared/hooks/useMenuOptionHighlightMotion'
+import {
+  focusChoiceMenu,
+  navigateChoiceMenu
+} from '../../../../presentation/shared/menus/choiceMenuNavigation'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import {
   useEffect,
@@ -32,6 +37,8 @@ export function WorkspaceDefaultsPicker({
   }[]
   readonly onAdd: (id: string) => void
 }) {
+  const { highlightRef, interactionProps } = useMenuOptionHighlightMotion()
+  const initialFocus = useRef<'container' | 'first' | 'last'>('container')
   const [open, setOpen] = useState(false)
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
@@ -50,9 +57,7 @@ export function WorkspaceDefaultsPicker({
       right: Math.max(16, window.innerWidth - rect.right),
       maxHeight: Math.max(48, Math.min(320, room >= 220 ? room : rect.top - 24))
     })
-    const focusTarget =
-      popup.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? popup.current
-    focusTarget?.focus({ preventScroll: true })
+    focusChoiceMenu(popup.current, initialFocus.current)
   }, [open])
   useOutsidePointerDismiss({
     active: open,
@@ -82,7 +87,17 @@ export function WorkspaceDefaultsPicker({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          initialFocus.current = 'container'
+          setOpen((current) => !current)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+          event.preventDefault()
+          event.stopPropagation()
+          initialFocus.current = event.key === 'ArrowDown' ? 'first' : 'last'
+          setOpen(true)
+        }}
         className="workspace-defaults-add"
       >
         <PlusIcon size={14} aria-hidden="true" />
@@ -92,46 +107,26 @@ export function WorkspaceDefaultsPicker({
         ref={popup}
         id={id}
         open={open}
-        springPreset={position.bottom === undefined ? 'anchored-top-right' : 'anchored-bottom-left'}
+        springPreset="directional-menu"
+        data-side={position.bottom === undefined ? 'bottom' : 'top'}
         portalContainer={document.body}
-        className="workspace-defaults-picker anchored-surface-motion"
+        className="workspace-defaults-picker anchored-surface-motion directional-menu-surface menu-option-highlight-container"
+        {...interactionProps}
         style={position}
         role="menu"
         tabIndex={-1}
         aria-label={label}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault()
-            event.stopPropagation()
-            close(true)
-          }
-          if (event.key === 'Tab') {
-            event.preventDefault()
-            event.stopPropagation()
-            close(true)
-          }
-          if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
-            event.preventDefault()
-            const buttons = [
-              ...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
-            ]
-            const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
-            const next =
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? buttons.length - 1
-                  : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
-            buttons[next]?.focus()
-          }
-        }}
+        onKeyDown={(event) => navigateChoiceMenu(event, () => close(true))}
       >
+        <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
         {groups.map((group) => (
           <div role="group" aria-label={group.name} key={group.name}>
             <p className="workspace-defaults-picker-heading">{group.name}</p>
             {group.choices.length ? (
               group.choices.map((choice) => (
                 <button
+                  className="menu-option-highlight-target"
+                  data-menu-option-highlight
                   type="button"
                   role="menuitem"
                   aria-label={choice.name}

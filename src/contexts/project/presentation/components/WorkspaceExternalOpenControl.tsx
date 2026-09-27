@@ -1,14 +1,10 @@
+import {
+  focusChoiceMenu,
+  navigateChoiceMenu
+} from '../../../../presentation/shared/menus/choiceMenuNavigation'
 import { CaretUpIcon } from '@phosphor-icons/react/dist/csr/CaretUp'
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen'
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent
-} from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
@@ -33,7 +29,7 @@ interface MenuPosition {
   readonly top: number
 }
 
-type MenuInitialFocus = 'first' | 'last'
+type MenuInitialFocus = 'container' | 'first' | 'last'
 
 export function WorkspaceExternalOpenControl({
   capabilities,
@@ -120,7 +116,7 @@ function WorkspaceExternalOpenSplitControl({
     if (!isMenuOpen || !menuPosition || !initialFocus) return
 
     pendingInitialFocusRef.current = null
-    focusMenuBoundary(menuRef.current, initialFocus)
+    focusChoiceMenu(menuRef.current, initialFocus)
   }, [isMenuOpen, menuPosition])
 
   useLayoutEffect(() => {
@@ -204,7 +200,7 @@ function WorkspaceExternalOpenSplitControl({
               event.preventDefault()
               const initialFocus = event.key === 'ArrowDown' ? 'first' : 'last'
               if (isMenuOpen) {
-                if (!focusMenuBoundary(menuRef.current, initialFocus)) {
+                if (!focusChoiceMenu(menuRef.current, initialFocus)) {
                   pendingInitialFocusRef.current = initialFocus
                 }
                 return
@@ -225,6 +221,7 @@ function WorkspaceExternalOpenSplitControl({
         springPreset="directional-menu"
         portalContainer={document.body}
         role="menu"
+        tabIndex={-1}
         aria-labelledby={triggerId}
         {...highlightInteractionProps}
         onExitComplete={() => {
@@ -233,7 +230,7 @@ function WorkspaceExternalOpenSplitControl({
         onBlur={(event) => {
           if (!isWithinComposite(event.relatedTarget)) closeMenu()
         }}
-        onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+        onKeyDown={(event) => navigateChoiceMenu(event, () => closeMenu(true))}
         style={{
           left: menuPosition?.left ?? 0,
           top: menuPosition?.top ?? 0,
@@ -287,7 +284,7 @@ function WorkspaceExternalOpenSplitControl({
     void onOpen(target)
   }
 
-  function openMenu(initialFocus: MenuInitialFocus | null = null): void {
+  function openMenu(initialFocus: MenuInitialFocus = 'container'): void {
     pendingInitialFocusRef.current = initialFocus
     setIsMenuOpen(true)
   }
@@ -329,40 +326,4 @@ function resolveMenuPosition(input: {
       maximumTop
     )
   }
-}
-
-function moveMenuFocus(event: ReactKeyboardEvent<HTMLElement>, menu: HTMLElement | null): void {
-  if (!menu || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-  const items = Array.from(
-    menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
-  )
-  if (items.length === 0) return
-
-  event.preventDefault()
-  const currentIndex = items.findIndex((item) => item === document.activeElement)
-  if (event.key === 'Home') {
-    items[0]?.focus()
-    return
-  }
-  if (event.key === 'End') {
-    items.at(-1)?.focus()
-    return
-  }
-
-  if (currentIndex < 0) {
-    items[event.key === 'ArrowDown' ? 0 : items.length - 1]?.focus()
-    return
-  }
-
-  const direction = event.key === 'ArrowDown' ? 1 : -1
-  const nextIndex = (currentIndex + direction + items.length) % items.length
-  items[nextIndex]?.focus()
-}
-
-function focusMenuBoundary(menu: HTMLElement | null, boundary: MenuInitialFocus): boolean {
-  const items = menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
-  if (!items || items.length === 0) return false
-
-  items[boundary === 'first' ? 0 : items.length - 1]?.focus()
-  return true
 }

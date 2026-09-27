@@ -41,8 +41,35 @@ describe('workspace defaults picker', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByRole('menu')).toHaveStyle({ bottom: '88px' })
+    expect(screen.getByRole('menu')).toHaveFocus()
     fireEvent.keyDown(screen.getByRole('menuitem'), { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
+})
+
+it('places the shared highlight relative to the menu for nested group geometry', () => {
+  render(
+    <WorkspaceDefaultsPicker
+      label="Add"
+      groups={[
+        { name: 'Group', empty: 'Empty', choices: [{ id: 'one', name: 'One', selected: false }] }
+      ]}
+      onAdd={vi.fn()}
+    />
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+  const menu = screen.getByRole('menu')
+  const option = screen.getByRole('menuitem')
+  const group = screen.getByRole('group')
+  const highlight = menu.querySelector<HTMLElement>('.menu-option-highlight-motion')!
+  Object.defineProperties(option, {
+    offsetTop: { value: 30 },
+    offsetParent: { value: group },
+    offsetHeight: { value: 34 }
+  })
+  Object.defineProperties(group, { offsetTop: { value: 50 }, offsetParent: { value: menu } })
+  Object.defineProperty(highlight, 'offsetParent', { value: menu })
+  fireEvent.pointerOver(option)
+  expect(highlight).toHaveAttribute('data-target-y', '80')
 })

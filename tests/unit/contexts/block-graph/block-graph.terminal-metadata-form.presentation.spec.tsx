@@ -4,6 +4,27 @@ import type { TerminalBlockSnapshot } from '../../../../src/contexts/block-graph
 import { TerminalMetadataForm } from '../../../../src/contexts/block-graph/presentation/components/TerminalMetadataForm'
 
 describe('terminal workflow advanced configuration', () => {
+  it('closes a configuration menu with Escape without cancelling or submitting the form', () => {
+    const onCancel = vi.fn()
+    const onSave = vi.fn(async () => undefined)
+    render(
+      <TerminalMetadataForm
+        block={createBlock()}
+        shouldFocusLaunchCommand={false}
+        onSave={onSave}
+        onCancel={onCancel}
+      />
+    )
+    const trigger = screen.getByRole('button', { name: '运行模式' })
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
   it('opens with a visible editing context, focuses the intended field, and cancels with Escape', () => {
     const onCancel = vi.fn()
     const { rerender } = render(
@@ -48,7 +69,7 @@ describe('terminal workflow advanced configuration', () => {
       />
     )
 
-    fireEvent.change(screen.getByLabelText('运行模式'), { target: { value: 'service' } })
+    choose('运行模式', 'service')
     fireEvent.change(screen.getByLabelText('服务就绪文本'), {
       target: { value: ' API ready ' }
     })
@@ -76,12 +97,12 @@ describe('terminal workflow advanced configuration', () => {
       />
     )
 
-    fireEvent.change(screen.getByLabelText('运行模式'), { target: { value: 'service' } })
-    fireEvent.change(screen.getByLabelText('服务就绪方式'), { target: { value: 'tcp' } })
-    fireEvent.change(screen.getByLabelText('端口策略'), { target: { value: 'fixed' } })
-    fireEvent.change(screen.getByLabelText('访问协议'), { target: { value: 'tcp' } })
+    choose('运行模式', 'service')
+    choose('服务就绪方式', 'tcp')
+    choose('端口策略', 'fixed')
+    choose('访问协议', 'tcp')
     fireEvent.change(screen.getByLabelText('服务端口'), { target: { value: '4321' } })
-    fireEvent.change(screen.getByLabelText('端口注入方式'), { target: { value: 'none' } })
+    choose('端口注入方式', 'none')
     fireEvent.click(screen.getByLabelText('保存终端信息'))
 
     await waitFor(() =>
@@ -108,10 +129,12 @@ describe('terminal workflow advanced configuration', () => {
       />
     )
 
-    fireEvent.change(screen.getByLabelText('运行模式'), { target: { value: 'service' } })
-    fireEvent.change(screen.getByLabelText('端口策略'), { target: { value: 'preferred' } })
+    choose('运行模式', 'service')
+    choose('端口策略', 'preferred')
 
-    expect(screen.getByLabelText('端口注入方式')).toHaveValue('environment')
+    expect(screen.getByRole('button', { name: '端口注入方式' })).toHaveTextContent(
+      '环境变量（推荐）'
+    )
     expect(screen.getByLabelText('环境变量名称')).toHaveValue('')
     expect(screen.getByLabelText('服务端口')).toHaveValue('')
     fireEvent.change(screen.getByLabelText('服务端口'), { target: { value: '5173' } })
@@ -130,9 +153,9 @@ describe('terminal workflow advanced configuration', () => {
       />
     )
 
-    fireEvent.change(screen.getByLabelText('运行模式'), { target: { value: 'service' } })
-    fireEvent.change(screen.getByLabelText('端口策略'), { target: { value: 'auto' } })
-    fireEvent.change(screen.getByLabelText('端口注入方式'), { target: { value: 'argument' } })
+    choose('运行模式', 'service')
+    choose('端口策略', 'auto')
+    choose('端口注入方式', 'argument')
     fireEvent.change(screen.getByLabelText('端口参数后缀'), {
       target: { value: '--port {port}; rm -rf project' }
     })
@@ -202,4 +225,13 @@ function createBlock(): TerminalBlockSnapshot {
     position: { x: 0, y: 0 },
     size: { width: 560, height: 360 }
   }
+}
+
+function choose(label: string, value: string): void {
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  const option = screen
+    .getByRole('menu')
+    .querySelector<HTMLButtonElement>(`[data-choice-value="${value}"]`)
+  expect(option).not.toBeNull()
+  fireEvent.click(option!)
 }
