@@ -1,10 +1,14 @@
 import {
+  focusChoiceMenu,
+  navigateChoiceMenu,
+  type ChoiceMenuInitialFocus
+} from '../../../shared/menus/choiceMenuNavigation'
+import {
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type KeyboardEvent,
   type MouseEvent as ReactMouseEvent
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -34,7 +38,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const initialFocus = useRef<ChoiceMenuInitialFocus>('container')
   const { highlightRef, interactionProps: highlightInteractionProps } =
     useMenuOptionHighlightMotion()
   const [menuPosition, setMenuPosition] = useState<{
@@ -56,7 +60,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
 
   useEffect(() => {
     if (!isOpen) return undefined
-    menuRef.current?.focus({ preventScroll: true })
+    focusChoiceMenu(menuRef.current, initialFocus.current)
     const closeOutside = (event: globalThis.PointerEvent): void => {
       if (
         event.target instanceof Node &&
@@ -113,55 +117,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     setIsOpen(true)
   }
 
-  const handleItemKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
-    itemIndex: number,
-    onSelect: () => void
-  ): void => {
-    const itemCount = props.providers.length + 1
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMenu()
-      return
-    }
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onSelect()
-      return
-    }
-    const nextIndex =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? itemCount - 1
-          : event.key === 'ArrowDown'
-            ? (itemIndex + 1) % itemCount
-            : event.key === 'ArrowUp'
-              ? (itemIndex - 1 + itemCount) % itemCount
-              : null
-    if (nextIndex === null) return
-    event.preventDefault()
-    itemRefs.current[nextIndex]?.focus()
-  }
-
-  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.target !== event.currentTarget) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMenu()
-      return
-    }
-    const nextIndex =
-      event.key === 'ArrowDown' || event.key === 'Home'
-        ? 0
-        : event.key === 'ArrowUp' || event.key === 'End'
-          ? props.providers.length
-          : null
-    if (nextIndex === null) return
-    event.preventDefault()
-    itemRefs.current[nextIndex]?.focus()
-  }
-
   return (
     <div className="agent-create-split" data-disabled={isDisabled} ref={rootRef}>
       <TooltipLabel content={props.shortcutTooltip} side="bottom">
@@ -184,6 +139,14 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
       </TooltipLabel>
       <button
         ref={triggerRef}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+          event.preventDefault()
+          event.stopPropagation()
+          initialFocus.current = event.key === 'ArrowDown' ? 'first' : 'last'
+          if (isOpen) focusChoiceMenu(menuRef.current, initialFocus.current)
+          else openMenu()
+        }}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={t('toolbar.chooseDefaultAgent')}
@@ -193,7 +156,10 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
         onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
           event.stopPropagation()
           if (isOpen) closeMenu()
-          else openMenu()
+          else {
+            initialFocus.current = 'container'
+            openMenu()
+          }
         }}
       >
         <WorkbenchIcon role="disclosure" size={14} />
@@ -218,7 +184,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           onRequestClose={closeMenu}
           onPresenceChange={setIsMenuPresent}
           {...highlightInteractionProps}
-          onKeyDown={handleMenuKeyDown}
+          onKeyDown={(event) => navigateChoiceMenu(event, closeMenu)}
         >
           <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
           {props.providers.length === 0 ? (
@@ -226,7 +192,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
               {t('toolbar.noAvailableAgents')}
             </div>
           ) : (
-            props.providers.map((provider, index) => {
+            props.providers.map((provider) => {
               const providerId = provider.descriptor.id
               const select = (): void => {
                 props.onSelectDefault(providerId)
@@ -235,9 +201,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
               }
               return (
                 <button
-                  ref={(element) => {
-                    itemRefs.current[index] = element
-                  }}
                   aria-checked={providerId === props.defaultProviderId}
                   className="agent-create-menu__item menu-option-highlight-target"
                   data-menu-option-highlight
@@ -245,7 +208,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
                   role="menuitemradio"
                   type="button"
                   onClick={select}
-                  onKeyDown={(event) => handleItemKeyDown(event, index, select)}
                 >
                   <span className="agent-create-menu__icon" aria-hidden="true">
                     <AgentProviderIcon icon={provider.descriptor.icon} />
@@ -263,9 +225,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           )}
           <div className="agent-create-menu__separator" role="separator" />
           <button
-            ref={(element) => {
-              itemRefs.current[props.providers.length] = element
-            }}
             className="agent-create-menu__item agent-create-menu__item--settings menu-option-highlight-target"
             data-menu-option-highlight
             role="menuitem"
@@ -274,12 +233,6 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
               closeMenu()
               props.onOpenAgentSettings()
             }}
-            onKeyDown={(event) =>
-              handleItemKeyDown(event, props.providers.length, () => {
-                closeMenu()
-                props.onOpenAgentSettings()
-              })
-            }
           >
             <span className="agent-create-menu__icon" aria-hidden="true">
               <WorkbenchIcon role="settings" size={16} />

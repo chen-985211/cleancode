@@ -1,3 +1,7 @@
+import {
+  focusChoiceMenu,
+  navigateChoiceMenu
+} from '../../../../presentation/shared/menus/choiceMenuNavigation'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { FolderIcon } from '@phosphor-icons/react/dist/csr/Folder'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
@@ -13,7 +17,7 @@ interface ProjectChoice {
   readonly directory: string
 }
 
-type ProjectMenuInitialFocus = 'selected' | 'first' | 'last'
+type ProjectMenuInitialFocus = 'container' | 'first' | 'last'
 
 export function WorkspaceDefaultsProjectPicker({
   projects,
@@ -28,7 +32,7 @@ export function WorkspaceDefaultsProjectPicker({
   const id = useId()
   const anchor = useRef<HTMLButtonElement>(null)
   const popup = useRef<HTMLDivElement>(null)
-  const initialFocus = useRef<ProjectMenuInitialFocus>('selected')
+  const initialFocus = useRef<ProjectMenuInitialFocus>('container')
   const { highlightRef, interactionProps: highlightInteractionProps } =
     useMenuOptionHighlightMotion()
   const [open, setOpen] = useState(false)
@@ -49,20 +53,8 @@ export function WorkspaceDefaultsProjectPicker({
       ...(upward ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
       maxHeight: Math.max(48, Math.min(360, upward ? rect.top - 24 : below))
     })
-    const options = [
-      ...(popup.current?.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitemradio"]:not(:disabled)'
-      ) ?? [])
-    ]
-    const option =
-      initialFocus.current === 'first'
-        ? options[0]
-        : initialFocus.current === 'last'
-          ? options[options.length - 1]
-          : (options.find((item) => item.getAttribute('aria-checked') === 'true') ?? options[0])
-    if (option) option.focus({ preventScroll: true })
-    else popup.current?.focus({ preventScroll: true })
-  }, [open, selected.id])
+    focusChoiceMenu(popup.current, initialFocus.current)
+  }, [open])
   useOutsidePointerDismiss({
     active: open,
     pointerPolicy: 'passthrough',
@@ -100,7 +92,7 @@ export function WorkspaceDefaultsProjectPicker({
             close(false)
             return
           }
-          initialFocus.current = 'selected'
+          initialFocus.current = 'container'
           setOpen(true)
         }}
         onKeyDown={(event) => {
@@ -136,33 +128,7 @@ export function WorkspaceDefaultsProjectPicker({
         tabIndex={-1}
         aria-label={t('workspaceDefaults.project')}
         {...highlightInteractionProps}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' || event.key === 'Tab') {
-            if (event.key === 'Escape') event.preventDefault()
-            event.stopPropagation()
-            close(true)
-          }
-          const options = [
-            ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')
-          ]
-          const index = options.indexOf(document.activeElement as HTMLButtonElement)
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            event.stopPropagation()
-            options[index]?.click()
-          }
-          if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
-            event.preventDefault()
-            event.stopPropagation()
-            const next =
-              event.key === 'Home' || (event.key === 'ArrowDown' && index < 0)
-                ? 0
-                : event.key === 'End' || (event.key === 'ArrowUp' && index < 0)
-                  ? options.length - 1
-                  : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
-            options[next]?.focus()
-          }
-        }}
+        onKeyDown={(event) => navigateChoiceMenu(event, () => close(true))}
       >
         <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
         {projects.map((project) => (

@@ -1,6 +1,12 @@
 import type { zhCNTerminalMessages } from '../zh-CN/terminal'
 
 export const enTerminalMessages = {
+  'terminalForm.editTitle': 'Edit terminal',
+  'terminalForm.optional': 'Optional',
+  'terminalForm.saveShort': 'Save',
+  'terminalForm.savingShort': 'Saving…',
+  'terminalForm.workflowMode': 'Workflow run mode',
+  'terminalForm.seconds': 's',
   'terminalForm.edit': 'Edit terminal details',
   'terminalForm.saveFailed': 'Could not save. Try again.',
   'terminalForm.name': 'Name',
@@ -11,14 +17,13 @@ export const enTerminalMessages = {
   'terminalForm.descriptionPlaceholder': 'For example: Local development server',
   'terminalForm.launchCommand': 'Launch command',
   'terminalForm.launchPlaceholder': 'For example: pnpm dev',
-  'terminalForm.advanced': 'Advanced workflow settings',
   'terminalForm.runMode': 'Run mode',
-  'terminalForm.taskMode': 'Task (finishes with an exit code)',
-  'terminalForm.serviceMode': 'Service (continues when ready)',
+  'terminalForm.taskMode': 'Task',
+  'terminalForm.serviceMode': 'Service',
   'terminalForm.save': 'Save terminal details',
   'terminalForm.saving': 'Saving terminal details',
   'terminalForm.cancel': 'Cancel terminal editing',
-  'terminalForm.cancelShort': 'Cancel editing',
+  'terminalForm.cancelShort': 'Cancel',
   'terminalForm.successExitCodes': 'Successful exit codes',
   'terminalForm.exitCodesPlaceholder': '0 or 0,2',
   'terminalForm.taskTimeoutLabel': 'Task timeout (seconds, optional)',
@@ -80,6 +85,7 @@ export const enTerminalMessages = {
   'terminal.action.restartEmptyDescription':
     'Restart with an empty terminal session without running the launch command',
   'terminal.action.edit': 'Edit terminal details',
+  'terminal.action.cancelEdit': 'Cancel editing',
   'terminal.action.delete': 'Delete terminal',
   'terminal.retention.enable': 'Keep this session running after the app exits',
   'terminal.retention.disable': 'Stop keeping this session after the app exits',

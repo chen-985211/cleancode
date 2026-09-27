@@ -91,9 +91,9 @@ export function readWorkbenchCanvasCreationGeometry(): {
     measuredVisibleCanvasRect.width > 0 && measuredVisibleCanvasRect.height > 0
       ? measuredVisibleCanvasRect
       : resolvePreLayoutCanvasRect(canvas)
-  const obstructionRects = Array.from(
-    document.querySelectorAll<HTMLElement>(`[${workbenchCanvasObstructionAttribute}]`)
-  ).map((element) => element.getBoundingClientRect())
+  const obstructionRects = readWorkbenchCanvasObstructions().map((element) =>
+    element.getBoundingClientRect()
+  )
 
   return {
     canvasSize: {
@@ -102,6 +102,12 @@ export function readWorkbenchCanvasCreationGeometry(): {
     },
     safeViewport: resolveWorkbenchSafeViewport({ canvasRect, obstructionRects })
   }
+}
+
+export function readWorkbenchCanvasObstructions(): readonly HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(`[${workbenchCanvasObstructionAttribute}]`)
+  )
 }
 
 function spansVerticalCenter(rect: ClientRect, canvasVerticalCenter: number): boolean {

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import packageJson from '../../../package.json'
 import { ApplicationSettingsRoot } from '../../../src/presentation/app-shell/app-features/settings/ApplicationSettingsRoot'
+import { WorkspaceDefaultsPicker } from '../../../src/contexts/project/presentation/components/WorkspaceDefaultsPicker'
 import {
   defaultApplicationShortcutBindings,
   type ApplicationShortcutBinding,
@@ -11,6 +12,42 @@ import {
 } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 
 describe('application settings', () => {
+  it.each(['container', 'option', 'empty'] as const)(
+    'keeps focus inside settings when Tab closes the last picker from its %s',
+    (focus) => {
+      render(
+        <SettingsHarness
+          initiallyOpen
+          workspaceDefaultsSettings={
+            <WorkspaceDefaultsPicker
+              label="添加模板"
+              groups={[
+                {
+                  name: '模板',
+                  empty: '尚无模板',
+                  choices: focus === 'empty' ? [] : [{ id: 'test', name: 'Test', selected: false }]
+                }
+              ]}
+              onAdd={vi.fn()}
+            />
+          }
+        />
+      )
+      fireEvent.click(screen.getByRole('button', { name: '工作区' }))
+      const trigger = screen.getByRole('button', { name: '添加模板' })
+      fireEvent.click(trigger)
+      if (focus === 'option') fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' })
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      fireEvent(document.activeElement!, tab)
+      expect(tab.defaultPrevented).toBe(true)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '返回工作区' })).toHaveFocus()
+      expect(screen.getByRole('dialog', { name: '设置' })).toContainElement(
+        document.activeElement as HTMLElement
+      )
+    }
+  )
+
   it('restores the platform-specific Alt arrow default for a single navigation action', () => {
     render(<SettingsHarness initiallyOpen platform="other" />)
     fireEvent.click(screen.getByRole('button', { name: '恢复“选择左侧节点”的默认快捷键' }))
@@ -328,10 +365,12 @@ describe('application settings', () => {
 
 function SettingsHarness({
   initiallyOpen = false,
-  platform = 'mac'
+  platform = 'mac',
+  workspaceDefaultsSettings
 }: {
   readonly initiallyOpen?: boolean
   readonly platform?: 'mac' | 'other'
+  readonly workspaceDefaultsSettings?: ReactNode
 }) {
   const [isOpen, setIsOpen] = useState(initiallyOpen)
   const [bindings, setBindings] = useState<ApplicationShortcutBindings>(
@@ -353,6 +392,7 @@ function SettingsHarness({
 
   return (
     <ApplicationSettingsRoot
+      workspaceDefaultsSettings={workspaceDefaultsSettings}
       bindings={bindings}
       isOpen={isOpen}
       platform={platform}

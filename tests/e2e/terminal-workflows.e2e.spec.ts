@@ -19,6 +19,7 @@ import {
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
   readTerminalSessionId,
+  submitTerminalMetadataForm,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
@@ -43,6 +44,8 @@ describe('terminal workflows e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
+    // Compact CI geometry lets closing editors overlap neighboring connection handles.
+    await page.setViewportSize({ width: 1024, height: 681 })
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -105,6 +108,8 @@ async function createTwoRunningTerminals(
   await page.getByRole('button', { name: '添加项目' }).click()
   await selectBlankCanvasAction(page, '新建终端积木')
   const firstSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
+  // The next canvas placement must use the settled viewport, not the creation animation.
+  await waitForTerminalViewportGeometry(page, firstSessionId)
 
   await selectBlankCanvasAction(page, '新建终端积木')
   const secondSessionId = await waitForTerminalShellReady(page, 'Terminal 2')
@@ -124,8 +129,7 @@ async function configureLaunchCommand(
   await page.getByRole('button', { name: `${terminalName} 启动命令` }).click()
   const input = page.getByRole('textbox', { name: '启动命令' })
   await input.fill(command)
-  await input.press('Enter')
-  await input.waitFor({ state: 'detached' })
+  await submitTerminalMetadataForm(page.getByRole('form', { name: '编辑终端信息' }), terminalName)
 }
 
 async function connectTerminalNodes(page: Page): Promise<void> {

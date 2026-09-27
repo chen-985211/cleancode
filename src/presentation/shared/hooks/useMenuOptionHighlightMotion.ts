@@ -17,6 +17,7 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 const optionSelector = '[data-menu-option-highlight]:not(:disabled)'
 
 interface MenuOptionHighlightInteractionProps {
+  readonly onBlurCapture: FocusEventHandler<HTMLElement>
   readonly onFocusCapture: FocusEventHandler<HTMLElement>
   readonly onPointerLeave: PointerEventHandler<HTMLElement>
   readonly onPointerOver: PointerEventHandler<HTMLElement>
@@ -41,6 +42,7 @@ const resolveOption = (
 export function useMenuOptionHighlightMotion(): UseMenuOptionHighlightMotionResult {
   const highlightRef = useRef<HTMLSpanElement>(null)
   const controllerRef = useRef<MenuOptionHighlightMotionController | null>(null)
+  const hoveredOption = useRef<HTMLElement | null>(null)
   const reducedMotion = usePrefersReducedMotion()
 
   const ensureController = useCallback((): MenuOptionHighlightMotionController | null => {
@@ -62,10 +64,14 @@ export function useMenuOptionHighlightMotion(): UseMenuOptionHighlightMotionResu
       }
       const highlight = highlightRef.current
       if (!highlight) return
-      ensureController()?.moveTo(highlight, {
-        height: option.offsetHeight,
-        top: option.offsetTop
-      })
+      // Group wrappers may establish their own offset parent; highlight coordinates belong to the menu.
+      let top = option.offsetTop
+      let parent = option.offsetParent as HTMLElement | null
+      while (parent && parent !== highlight.offsetParent) {
+        top += parent.offsetTop
+        parent = parent.offsetParent as HTMLElement | null
+      }
+      ensureController()?.moveTo(highlight, { height: option.offsetHeight, top })
     },
     [ensureController]
   )
@@ -84,13 +90,24 @@ export function useMenuOptionHighlightMotion(): UseMenuOptionHighlightMotionResu
 
   const interactionProps = useMemo<MenuOptionHighlightInteractionProps>(
     () => ({
+      onBlurCapture: (event) => {
+        activateOption(
+          resolveOption(event.relatedTarget, event.currentTarget) ?? hoveredOption.current
+        )
+      },
       onFocusCapture: (event) => {
+        if (event.target === event.currentTarget) hoveredOption.current = null
         activateOption(resolveOption(event.target, event.currentTarget))
       },
       onPointerOver: (event) => {
-        activateOption(resolveOption(event.target, event.currentTarget))
+        hoveredOption.current = resolveOption(event.target, event.currentTarget)
+        activateOption(
+          hoveredOption.current ??
+            resolveOption(event.currentTarget.ownerDocument.activeElement, event.currentTarget)
+        )
       },
       onPointerLeave: (event) => {
+        hoveredOption.current = null
         const activeElement = event.currentTarget.ownerDocument.activeElement
         activateOption(resolveOption(activeElement, event.currentTarget))
       }

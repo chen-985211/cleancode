@@ -26,7 +26,7 @@ describe('language settings', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     const menu = screen.getByRole('menu', { name: '语言' })
     expect(menu).toBeInTheDocument()
-    expect(menu).toHaveAttribute('data-surface-spring-preset', 'anchored-top-right')
+    expect(menu).toHaveAttribute('data-surface-spring-preset', 'directional-menu')
     expect(screen.getByRole('menuitemradio', { name: '简体中文' })).toHaveAttribute(
       'aria-checked',
       'true'
@@ -35,7 +35,7 @@ describe('language settings', () => {
       'aria-checked',
       'false'
     )
-    expect(screen.getByRole('menuitemradio', { name: '简体中文' })).toHaveFocus()
+    expect(menu).toHaveFocus()
   })
 
   it('switches immediately, persists the choice, closes, and returns focus', () => {

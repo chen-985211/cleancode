@@ -22,8 +22,7 @@ import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
-  readTerminalSessionId,
-  submitTerminalMetadataForm
+  readTerminalSessionId
 } from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
@@ -63,6 +62,7 @@ describe('service port management across worktrees e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
   }, electronScenarioTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -240,30 +240,195 @@ async function createHttpServiceTerminal(
   }
 
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
-  await terminal.getByRole('button', { name: 'Terminal 1 编辑终端信息' }).click()
-  await terminal
-    .getByRole('textbox', { name: '启动命令' })
-    .fill(createE2eNodeScriptCommand('service-fixture.mjs', [], { replaceShell: true }))
-  await terminal.getByText('工作流高级配置', { exact: true }).click()
-  await terminal.getByLabel('运行模式').selectOption('service')
-  await terminal.getByLabel('服务就绪方式').waitFor()
-  await terminal.getByLabel('服务就绪方式').selectOption('tcp')
-  await terminal.getByLabel('端口策略').selectOption(policy)
-  await terminal.getByRole('textbox', { name: '服务端口' }).waitFor()
-  await terminal.getByLabel('访问协议').selectOption('http')
-  await terminal.getByRole('textbox', { name: '服务端口' }).fill(String(port))
-  await terminal.getByLabel('端口注入方式').selectOption('environment')
-  const environmentVariable = terminal.getByRole('textbox', { name: '环境变量名称' })
-  await environmentVariable.waitFor()
-  await environmentVariable.fill('PORT')
-  await submitTerminalMetadataForm(
-    terminal.getByRole('form', { name: '编辑终端信息' }),
-    'Terminal 1'
-  )
+  await pollUntilState({
+    description: 'terminal creation motion to finish before dragging its header',
+    observe: () =>
+      terminal.evaluate(
+        (node) =>
+          !node.matches('.workbench-object-presence--pending, .workbench-object-motion--create') &&
+          !node.querySelector('.workbench-object-motion--create')
+      ),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
+  // Reproduce opening a full editor near the window bottom without zooming the canvas out.
+  const canvasBounds = await page.locator('.react-flow').boundingBox()
+  const header = terminal.locator('.terminal-node__header')
+  const headerBounds = await header.boundingBox()
+  if (!canvasBounds || !headerBounds) throw new Error('Missing terminal or canvas geometry.')
+  const dragX = headerBounds.x + 100
+  const dragY = headerBounds.y + headerBounds.height / 2
+  const targetY = canvasBounds.y + canvasBounds.height - 200
+  await page.mouse.move(dragX, dragY)
+  await page.mouse.down()
+  await page.mouse.move(dragX, targetY, { steps: 12 })
+  await page.mouse.up()
+  await pollUntilState({
+    description: 'terminal header to reach the bottom-edge editing position',
+    observe: () => header.boundingBox(),
+    accept: (bounds) =>
+      Boolean(
+        bounds &&
+        bounds.y > canvasBounds.y + canvasBounds.height - 280 &&
+        bounds.y + bounds.height < canvasBounds.y + canvasBounds.height
+      ),
+    timeoutMs: 5_000
+  })
+  const viewportBefore = await page.locator('.react-flow__viewport').getAttribute('style')
+  const motion = await terminal.evaluateHandle((node) => {
+    const bounds = node.getBoundingClientRect()
+    let entered = false
+    let exited = false
+    let fieldsMoved = false
+    let terminalSizeStable = true
+    let frame = 0
+    const sample = () => {
+      const current = node.getBoundingClientRect()
+      terminalSizeStable &&=
+        Math.abs(current.width - bounds.width) < 1 && Math.abs(current.height - bounds.height) < 1
+      const surface = node.querySelector('.terminal-metadata-surface')
+      if (surface) {
+        const opacity = Number(getComputedStyle(surface).opacity)
+        entered ||= opacity > 0 && opacity < 1
+        exited ||= surface.getAttribute('data-surface-motion-state') === 'closing'
+      }
+      for (const fields of node.querySelectorAll('[data-terminal-fields-motion]')) {
+        const opacity = Number(getComputedStyle(fields).opacity)
+        fieldsMoved ||= opacity > 0 && opacity < 1 && fields.getBoundingClientRect().height > 0
+      }
+      frame = requestAnimationFrame(sample)
+    }
+    frame = requestAnimationFrame(sample)
+    return {
+      stop: () => {
+        cancelAnimationFrame(frame)
+        return { entered, exited, fieldsMoved, terminalSizeStable }
+      }
+    }
+  })
+  try {
+    const editButton = terminal.getByRole('button', { name: 'Terminal 1 编辑终端信息' })
+    await editButton.click()
+    await terminal.getByRole('textbox', { name: '启动命令' }).fill('unsaved command')
+    await expectExpandedMetadataForm(terminal)
+    await page.screenshot({ path: join('test-results', 'terminal-edit-short-command.png') })
+    await terminal.getByRole('button', { name: 'Terminal 1 取消编辑' }).click()
+    expect(await editButton.getAttribute('aria-expanded')).toBe('false')
+    expect(await terminal.getByRole('form').count()).toBe(0)
+    await editButton.click()
+    expect(await terminal.getByRole('textbox', { name: '启动命令' }).inputValue()).toBe('')
+    await terminal
+      .getByRole('textbox', { name: '启动命令' })
+      .fill(createE2eNodeScriptCommand('service-fixture.mjs', [], { replaceShell: true }))
+    async function chooseConfiguration(label: string, value: string): Promise<void> {
+      await terminal.getByRole('button', { name: label, exact: true }).click()
+      await page
+        .getByRole('menu', { name: label, exact: true })
+        .locator(`[data-choice-value="${value}"]`)
+        .click()
+    }
+    await expectExpandedMetadataForm(terminal)
+    await page.screenshot({ path: join('test-results', 'terminal-edit-task.png') })
+    await terminal.getByRole('radio', { name: '服务', exact: true }).check()
+    await terminal.getByLabel('服务就绪方式').waitFor()
+    await chooseConfiguration('服务就绪方式', 'tcp')
+    await chooseConfiguration('端口策略', policy)
+    await terminal.getByRole('textbox', { name: '服务端口' }).waitFor()
+    await chooseConfiguration('访问协议', 'http')
+    await terminal.getByRole('textbox', { name: '服务端口' }).fill(String(port))
+    await chooseConfiguration('端口注入方式', 'environment')
+    const environmentVariable = terminal.getByRole('textbox', { name: '环境变量名称' })
+    await environmentVariable.waitFor()
+    await environmentVariable.fill('PORT')
+    await expectExpandedMetadataForm(terminal)
+    await page.locator('.choice-select-menu').waitFor({ state: 'detached' })
+    await page.screenshot({ path: join('test-results', 'terminal-edit-service.png') })
+    await terminal.getByRole('button', { name: '保存终端信息', exact: true }).click()
+    await terminal.locator('.terminal-metadata-surface').waitFor({ state: 'detached' })
+    expect(await motion.evaluate((recorder) => recorder.stop())).toEqual({
+      entered: true,
+      exited: true,
+      fieldsMoved: true,
+      terminalSizeStable: true
+    })
+    expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(viewportBefore)
+  } finally {
+    await motion.evaluate((recorder) => recorder.stop())
+    await motion.dispose()
+  }
 
   if (shouldStart) await launchConfiguredTerminal(page, terminal)
 
   return terminal
+}
+
+async function expectExpandedMetadataForm(terminal: Locator): Promise<void> {
+  await pollUntilState({
+    description: 'terminal metadata surface and field motion to settle',
+    observe: () =>
+      terminal.evaluate(
+        (node) =>
+          node
+            .querySelector('.terminal-metadata-surface')
+            ?.getAttribute('data-surface-motion-state') === 'open' &&
+          [...node.querySelectorAll('[data-terminal-fields-motion]')].every(
+            (fields) => fields.getAttribute('data-terminal-fields-motion') === 'open'
+          )
+      ),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
+  const layout = await terminal.evaluate((node) => {
+    const form = node.querySelector('.terminal-metadata-form')
+    const body = node.querySelector('.terminal-metadata-form__body')
+    if (!(form instanceof HTMLElement) || !(body instanceof HTMLElement)) return null
+    const bounds = form.getBoundingClientRect()
+    const canvas = node.closest('.react-flow')!.getBoundingClientRect()
+    const trigger = node.querySelector('.terminal-node__action--edit')!.getBoundingClientRect()
+    const intersects = (other: DOMRect) =>
+      bounds.left < other.right &&
+      bounds.right > other.left &&
+      bounds.top < other.bottom &&
+      bounds.bottom > other.top
+    const parameters = form.querySelectorAll('.terminal-execution-config__grid > label')
+    const firstParameter = parameters[0]?.getBoundingClientRect()
+    const secondParameter = parameters[1]?.getBoundingClientRect()
+    return {
+      hasInternalScroll: body.scrollHeight > body.clientHeight,
+      insideCanvas:
+        bounds.left >= canvas.left &&
+        bounds.top >= canvas.top &&
+        bounds.right <= canvas.right &&
+        bounds.bottom <= canvas.bottom,
+      toggleUncovered: !intersects(trigger),
+      avoidsCanvasChrome: [
+        ...document.querySelectorAll('[data-workbench-canvas-obstruction]')
+      ].every((element) => !intersects(element.getBoundingClientRect())),
+      parametersShareRow: Boolean(
+        firstParameter &&
+        secondParameter &&
+        Math.abs(firstParameter.top - secondParameter.top) < 1 &&
+        firstParameter.right < secondParameter.left
+      ),
+      actionsInsideForm: [
+        '.terminal-metadata-form__header',
+        '.terminal-metadata-form__footer'
+      ].every((selector) => {
+        const element = form.querySelector(selector)
+        if (!element) return false
+        const rect = element.getBoundingClientRect()
+        return rect.top >= bounds.top && rect.bottom <= bounds.bottom
+      })
+    }
+  })
+  expect(layout).toEqual({
+    hasInternalScroll: false,
+    insideCanvas: true,
+    toggleUncovered: true,
+    avoidsCanvasChrome: true,
+    parametersShareRow: true,
+    actionsInsideForm: true
+  })
 }
 
 async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {

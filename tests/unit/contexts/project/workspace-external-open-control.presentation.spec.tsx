@@ -221,7 +221,7 @@ describe('workspace external open control', () => {
     controlRect.mockRestore()
   })
 
-  it('keeps click focus on the trigger and moves focus into the menu for arrow-key open', async () => {
+  it('focuses the container on click and an option on arrow-key open', async () => {
     const { unmount } = renderControl({
       capabilities: { vscode: { available: true } }
     })
@@ -229,7 +229,7 @@ describe('workspace external open control', () => {
     pointerTrigger.focus()
 
     fireEvent.click(pointerTrigger)
-    expect(pointerTrigger).toHaveFocus()
+    expect(screen.getByRole('menu')).toHaveFocus()
     unmount()
 
     renderControl({

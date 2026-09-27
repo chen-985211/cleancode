@@ -58,7 +58,7 @@ describe('workspace defaults project picker', () => {
       )
       expect(options[0]).toHaveAccessibleDescription('/first/project')
       expect(options[1]).toHaveAccessibleDescription('/second/project')
-      expect(options[1]).toHaveFocus()
+      expect(menu).toHaveFocus()
       fireEvent.keyDown(menu, { key: 'Escape' })
       expect(escape).not.toHaveBeenCalled()
       expect(trigger).toHaveFocus()

@@ -65,20 +65,17 @@ describe('surface motion styles', () => {
     )
   })
 
-  it('scales the anchored menu material without resampling its text content', () => {
+  it('keeps generic anchored translation and uses a normal material for directional language menus', () => {
     const anchoredTopRightRule = readRule(
       surfaceMotionStyles,
       ".anchored-surface-motion[data-surface-spring-preset='anchored-top-right']"
     )
-    const languageMaterialRule = readRule(
-      languageSettingsStyles,
-      ".language-settings-menu[data-surface-spring-preset='anchored-top-right']::before"
-    )
+    const languageMaterialRule = readRule(languageSettingsStyles, '.language-settings-menu')
 
     expect(anchoredTopRightRule).toContain('var(--cc-surface-motion-translate-x, 0)')
     expect(anchoredTopRightRule).not.toContain('scale(')
-    expect(languageMaterialRule).toContain('scale(var(--cc-surface-motion-scale, 1))')
-    expect(languageMaterialRule).toContain('will-change: transform;')
+    expect(languageMaterialRule).toContain('background: var(--cc-surface-overlay)')
+    expect(languageMaterialRule).not.toContain('transform:')
   })
 
   it.each([

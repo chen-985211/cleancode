@@ -1,6 +1,8 @@
+import { focusChoiceMenu, navigateChoiceMenu } from '../../../shared/menus/choiceMenuNavigation'
+import { useMenuOptionHighlightMotion } from '../../../shared/hooks/useMenuOptionHighlightMotion'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useI18n } from '../../../i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../shell/AppShellSurfaceMotion'
@@ -11,7 +13,9 @@ import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarU
 export function LanguageSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const optionRefs = useRef(new Map<Locale, HTMLButtonElement>())
+  const menuRef = useRef<HTMLDivElement>(null)
+  const initialFocus = useRef<'container' | 'first' | 'last'>('container')
+  const { highlightRef, interactionProps } = useMenuOptionHighlightMotion()
   const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
   const { locale, selectLocale, t } = useI18n()
 
@@ -25,9 +29,9 @@ export function LanguageSettingsRoot() {
       return undefined
     }
 
-    optionRefs.current.get(locale)?.focus()
+    focusChoiceMenu(menuRef.current, initialFocus.current)
     return undefined
-  }, [isOpen, locale])
+  }, [isOpen])
 
   return (
     <div className="language-settings">
@@ -52,35 +56,45 @@ export function LanguageSettingsRoot() {
           aria-expanded={isOpen}
           aria-haspopup="menu"
           {...triggerMotionProps}
-          onClick={() => setIsOpen((current) => !current)}
+          onClick={() => {
+            initialFocus.current = 'container'
+            setIsOpen((current) => !current)
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+            event.preventDefault()
+            event.stopPropagation()
+            initialFocus.current = event.key === 'ArrowDown' ? 'first' : 'last'
+            setIsOpen(true)
+          }}
         >
           <TranslateIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
       <AnchoredSurfaceMotion
+        ref={menuRef}
+        tabIndex={-1}
+        {...interactionProps}
+        onKeyDown={(event) => navigateChoiceMenu(event, closeMenu)}
+        data-side="bottom"
         id="language-settings-menu"
-        className="language-settings-menu anchored-surface-motion"
-        springPreset="anchored-top-right"
+        className="language-settings-menu anchored-surface-motion directional-menu-surface menu-option-highlight-container"
+        springPreset="directional-menu"
         role="menu"
         aria-label={t('language.settings')}
         open={isOpen}
       >
-        {supportedLocales.map((optionLocale, index) => (
+        <span ref={highlightRef} aria-hidden="true" className="menu-option-highlight-motion" />
+        {supportedLocales.map((optionLocale) => (
           <button
             key={optionLocale}
-            ref={(element) => {
-              if (element) {
-                optionRefs.current.set(optionLocale, element)
-              } else {
-                optionRefs.current.delete(optionLocale)
-              }
-            }}
-            className="language-settings-option"
+
+            className="language-settings-option menu-option-highlight-target"
+            data-menu-option-highlight
             type="button"
             role="menuitemradio"
             aria-checked={locale === optionLocale}
             onClick={() => chooseLocale(optionLocale)}
-            onKeyDown={(event) => handleOptionKeyDown(event, index)}
           >
             <span>{t(localeDefinitions[optionLocale].labelKey)}</span>
             {locale === optionLocale ? (
@@ -96,43 +110,4 @@ export function LanguageSettingsRoot() {
     selectLocale(nextLocale)
     closeMenu()
   }
-
-  function handleOptionKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMenu()
-      return
-    }
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      chooseLocale(supportedLocales[index])
-      return
-    }
-
-    const nextIndex = resolveNextOptionIndex(event.key, index)
-    if (nextIndex === null) {
-      return
-    }
-
-    event.preventDefault()
-    optionRefs.current.get(supportedLocales[nextIndex])?.focus()
-  }
-}
-
-function resolveNextOptionIndex(key: string, currentIndex: number): number | null {
-  if (key === 'ArrowDown' || key === 'ArrowRight') {
-    return (currentIndex + 1) % supportedLocales.length
-  }
-  if (key === 'ArrowUp' || key === 'ArrowLeft') {
-    return (currentIndex - 1 + supportedLocales.length) % supportedLocales.length
-  }
-  if (key === 'Home') {
-    return 0
-  }
-  if (key === 'End') {
-    return supportedLocales.length - 1
-  }
-
-  return null
 }
