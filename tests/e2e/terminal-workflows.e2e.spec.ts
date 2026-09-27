@@ -44,6 +44,8 @@ describe('terminal workflows e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
+    // Compact CI geometry lets closing editors overlap neighboring connection handles.
+    await page.setViewportSize({ width: 1024, height: 681 })
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -106,6 +108,8 @@ async function createTwoRunningTerminals(
   await page.getByRole('button', { name: '添加项目' }).click()
   await selectBlankCanvasAction(page, '新建终端积木')
   const firstSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
+  // The next canvas placement must use the settled viewport, not the creation animation.
+  await waitForTerminalViewportGeometry(page, firstSessionId)
 
   await selectBlankCanvasAction(page, '新建终端积木')
   const secondSessionId = await waitForTerminalShellReady(page, 'Terminal 2')

@@ -127,7 +127,9 @@ describe('terminal metadata editing', () => {
       fireEvent.click(trigger)
       const form = screen.getByRole('form', { name: '编辑终端信息' })
       const surface = form.closest('.terminal-metadata-surface')!
+      const positioner = form.closest('.terminal-metadata-positioner')!
       expect(surface).toHaveAttribute('data-surface-motion-state', 'opening')
+      expect(positioner).not.toHaveAttribute('inert')
       fireEvent.change(screen.getByLabelText('终端名称'), { target: { value: 'Unsaved name' } })
       fireEvent.change(screen.getByLabelText('启动命令'), { target: { value: 'unsaved command' } })
       fireEvent.change(screen.getByLabelText('任务超时'), { target: { value: 'invalid timeout' } })
@@ -141,10 +143,13 @@ describe('terminal metadata editing', () => {
       expect(surface).toHaveAttribute('data-surface-motion-state', 'closing')
       expect(form).toBeInTheDocument()
       expect(form.closest('[inert]')).not.toBeNull()
+      // The positioning wrapper can overlap other nodes even after the surface stops receiving input.
+      expect(positioner).toHaveAttribute('inert')
       expect(screen.queryByRole('form')).not.toBeInTheDocument()
       fireEvent.click(trigger)
       expect(screen.getByRole('form').closest('.terminal-metadata-surface')).toBe(surface)
       expect(surface).toHaveAttribute('data-surface-motion-state', 'opening')
+      expect(positioner).not.toHaveAttribute('inert')
       expect(screen.getByLabelText('终端名称')).toHaveValue('Terminal')
       expect(screen.getByLabelText('启动命令')).toHaveValue('')
       expect(screen.getByLabelText('任务超时')).toHaveValue('')

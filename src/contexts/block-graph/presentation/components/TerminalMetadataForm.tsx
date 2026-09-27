@@ -59,7 +59,11 @@ export function TerminalMetadataForm({
   }
 
   return (
-    <div ref={positionerRef} className="terminal-metadata-positioner nodrag nopan nowheel">
+    <div
+      ref={positionerRef}
+      className="terminal-metadata-positioner nodrag nopan nowheel"
+      inert={!open}
+    >
       <AnchoredSurfaceMotion
         open={open}
         springPreset="anchored"
