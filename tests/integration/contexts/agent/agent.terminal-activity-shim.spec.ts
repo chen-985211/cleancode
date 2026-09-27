@@ -292,6 +292,12 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
     const shell = ['/bin/zsh', '/bin/bash', '/bin/sh'].find(existsSync)
     if (!shell) throw new Error('Expected a POSIX shell for the PTY integration test.')
     await Promise.all([mkdir(providerDirectory), mkdir(homeDirectory)])
+    const shellPrompt = 'cleancode-ignored-interrupt-shell-ready> '
+    await Promise.all(
+      ['.bashrc', '.zshrc'].map((file) =>
+        writeFile(join(homeDirectory, file), `PS1="${shellPrompt}"\n`)
+      )
+    )
     await writeSignalIgnoringFakeProvider(join(providerDirectory, 'codex'))
     const providerPath = [providerDirectory, dirname(process.execPath), '/usr/bin', '/bin'].join(
       delimiter
@@ -310,7 +316,7 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
       await runtime.initialize()
       const prepared = await runtime.launchEnvironmentPreparation.prepare({
         ...runCommand,
-        environment: { HOME: homeDirectory, PATH: providerPath, SHELL: shell },
+        environment: { HOME: homeDirectory, PATH: providerPath, PS1: shellPrompt, SHELL: shell },
         shell
       })
       const environment: Readonly<Record<string, string>> = {
@@ -330,6 +336,7 @@ describe.runIf(process.platform !== 'win32')('ordinary terminal Agent activity i
         shell: prepared.shell,
         workingDirectory: root
       })
+      await vi.waitFor(() => expect(output).toContain(shellPrompt), { timeout: 5_000 })
       adapter.write(runCommand.scope.sessionId, 'codex --model ignored-interrupt\r')
 
       const capture = await waitForJsonFile(capturePath)
