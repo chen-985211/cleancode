@@ -46,18 +46,51 @@ export function ChoiceSelect({
   }
   useLayoutEffect(() => {
     if (!open) return
+    let frame: number | null = null
     const positionMenu = () => {
       if (!anchor.current) return
       const rect = anchor.current.getBoundingClientRect()
       const width = Math.min(300, Math.max(200, rect.width), window.innerWidth - 32)
       const below = window.innerHeight - rect.bottom - 22
       const upward = below < 180 && rect.top > below
-      setPosition({
+      const nextPosition: CSSProperties = {
         ...(upward ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
         left: Math.max(16, Math.min(rect.left, window.innerWidth - width - 16)),
         width,
         maxHeight: Math.max(48, Math.min(320, upward ? rect.top - 22 : below))
+      }
+      setPosition((current) =>
+        current.top === nextPosition.top &&
+        current.bottom === nextPosition.bottom &&
+        current.left === nextPosition.left &&
+        current.width === nextPosition.width &&
+        current.maxHeight === nextPosition.maxHeight
+          ? current
+          : nextPosition
+      )
+    }
+    const schedulePosition = () => {
+      if (frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        positionMenu()
       })
+    }
+    // Canvas and editor motion changes ancestor transforms without a DOM scroll event.
+    const ancestors: HTMLElement[] = []
+    for (
+      let element: HTMLElement | null = anchor.current;
+      element;
+      element = element.parentElement
+    ) {
+      ancestors.push(element)
+    }
+    const mutations = new MutationObserver(schedulePosition)
+    const resize =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedulePosition)
+    for (const element of ancestors) {
+      mutations.observe(element, { attributes: true, attributeFilter: ['style', 'class'] })
+      resize?.observe(element)
     }
     const scroll = (event: Event) => {
       if (!popup.current?.contains(event.target as Node)) positionMenu()
@@ -67,6 +100,9 @@ export function ChoiceSelect({
     window.addEventListener('resize', positionMenu)
     document.addEventListener('scroll', scroll, true)
     return () => {
+      mutations.disconnect()
+      resize?.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
       window.removeEventListener('resize', positionMenu)
       document.removeEventListener('scroll', scroll, true)
     }

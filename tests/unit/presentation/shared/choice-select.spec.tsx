@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { ChoiceSelect } from '../../../../src/presentation/shared/components/ChoiceSelect'
 
 it('skips disabled choices, scrolls keyboard targets and only commits on activation', () => {
@@ -96,4 +96,119 @@ it('keeps the opened menu anchored when the form finishes scrolling its trigger 
   expect(screen.getByRole('menu')).toBe(menu)
   expect(menu).toHaveFocus()
   expect(menu).toHaveStyle({ top: '118px' })
+})
+
+describe('choice menu geometry updates', () => {
+  const frames = new Map<number, FrameRequestCallback>()
+  let resize: ResizeObserverCallback
+  let observed: Element[]
+  let disconnect: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    frames.clear()
+    observed = []
+    let nextFrame = 0
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.set(++nextFrame, callback)
+      return nextFrame
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => frames.delete(id))
+    disconnect = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback
+        }
+        observe = (element: Element) => {
+          observed.push(element)
+        }
+        disconnect = disconnect
+      }
+    )
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  function setup() {
+    const change = vi.fn()
+    const view = render(
+      <div data-testid="canvas-transform">
+        <ChoiceSelect
+          label="Choice"
+          value="a"
+          options={[{ value: 'a', label: 'A' }]}
+          onChange={change}
+        />
+      </div>
+    )
+    const trigger = screen.getByRole('button', { name: 'Choice' })
+    const bounds = vi
+      .spyOn(trigger, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(300, 180, 240, 32))
+    fireEvent.click(trigger)
+    const menu = screen.getByRole('menu')
+    return {
+      ...view,
+      trigger,
+      bounds,
+      menu,
+      change,
+      ancestor: screen.getByTestId('canvas-transform')
+    }
+  }
+
+  function flush() {
+    act(() => {
+      const pending = [...frames.values()]
+      frames.clear()
+      pending.forEach((callback) => callback(performance.now()))
+    })
+  }
+
+  it.each(['style', 'class'] as const)(
+    'follows ancestor %s changes without losing focus or selection',
+    async (attribute) => {
+      const { ancestor, bounds, menu, change } = setup()
+      expect(menu).toHaveStyle({ left: '300px', top: '218px' })
+      bounds.mockReturnValue(new DOMRect(430, 270, 192, 26))
+      await act(async () => {
+        ancestor.setAttribute(attribute, attribute === 'style' ? 'transform: scale(0.8)' : 'moved')
+      })
+      flush()
+      expect(screen.getByRole('menu')).toBe(menu)
+      expect(menu).toHaveStyle({ left: '430px', top: '302px' })
+      expect(menu).toHaveFocus()
+      expect(screen.getByRole('menuitemradio')).toHaveAttribute('aria-checked', 'true')
+      expect(change).not.toHaveBeenCalled()
+    }
+  )
+
+  it('remeasures resized triggers and releases observation on close and unmount', async () => {
+    const { trigger, ancestor, bounds, menu, unmount } = setup()
+    expect(observed).toContain(trigger)
+    expect(observed).toContain(ancestor)
+    bounds.mockReturnValue(new DOMRect(280, 220, 280, 32))
+    act(() => resize([], {} as ResizeObserver))
+    flush()
+    expect(menu).toHaveStyle({ left: '280px', top: '258px', width: '280px' })
+    bounds.mockReturnValue(new DOMRect(90, 80, 280, 32))
+    await act(async () => {
+      ancestor.style.transform = 'translateX(20px)'
+    })
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    expect(disconnect).toHaveBeenCalledOnce()
+    expect(trigger).toHaveFocus()
+    bounds.mockClear()
+    flush()
+    expect(bounds).not.toHaveBeenCalled()
+    expect(menu).toHaveStyle({ left: '280px', top: '258px', width: '280px' })
+    fireEvent.click(trigger)
+    await act(async () => {
+      ancestor.style.transform = 'translateX(40px)'
+    })
+    unmount()
+    expect(disconnect).toHaveBeenCalledTimes(2)
+    expect(frames.size).toBe(0)
+  })
 })

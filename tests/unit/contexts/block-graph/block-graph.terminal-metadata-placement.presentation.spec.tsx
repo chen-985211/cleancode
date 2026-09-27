@@ -11,15 +11,26 @@ let height = 700
 function Harness({ open }: { readonly open: boolean }) {
   const anchorRef = useRef<HTMLButtonElement>(null)
   const positionerRef = useRef<HTMLDivElement>(null)
-  const environment = useMemo(() => ({ anchorRef, readViewport: () => viewport }), [])
+  const environment = useMemo(
+    () => ({
+      anchorRef,
+      readViewport: () => viewport,
+      readViewportObstructions: () =>
+        Array.from(document.querySelectorAll<HTMLElement>('[data-obstruction]'))
+    }),
+    []
+  )
   useTerminalMetadataPlacement(open, positionerRef, environment)
   return (
-    <div data-parent="">
-      <button ref={anchorRef}>Edit</button>
-      <div ref={positionerRef} data-positioner="">
-        <div>Editor</div>
+    <>
+      <div data-obstruction="" />
+      <div data-parent="">
+        <button ref={anchorRef}>Edit</button>
+        <div ref={positionerRef} data-positioner="">
+          <div>Editor</div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -27,6 +38,7 @@ describe('terminal metadata placement measurement', () => {
   const frames = new Map<number, FrameRequestCallback>()
   let resize: ResizeObserverCallback
   let disconnect: ReturnType<typeof vi.fn>
+  let observed: Element[]
 
   beforeEach(() => {
     viewport = { x: 280, y: 120, width: 900, height: 620 }
@@ -34,6 +46,7 @@ describe('terminal metadata placement measurement', () => {
     zoom = 1
     height = 700
     frames.clear()
+    observed = []
     let nextFrame = 0
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       frames.set(++nextFrame, callback)
@@ -47,7 +60,9 @@ describe('terminal metadata placement measurement', () => {
         constructor(callback: ResizeObserverCallback) {
           resize = callback
         }
-        observe = vi.fn()
+        observe = (element: Element) => {
+          observed.push(element)
+        }
         disconnect = disconnect
       }
     )
@@ -134,4 +149,32 @@ describe('terminal metadata placement measurement', () => {
     expect(frames.size).toBe(0)
     expect(disconnect).toHaveBeenCalledTimes(2)
   })
+
+  it.each(['style', 'class', 'resize'] as const)(
+    'refits when sibling canvas chrome changes through %s',
+    async (change) => {
+      const view = render(<Harness open />)
+      const positioner = view.container.querySelector<HTMLElement>('[data-positioner]')!
+      const obstruction = view.container.querySelector<HTMLElement>('[data-obstruction]')!
+      expectVisible(positioner)
+      viewport = { x: 280, y: 300, width: 900, height: 420 }
+      if (change === 'resize') {
+        expect(observed).toContain(obstruction)
+        act(() => resize([], {} as ResizeObserver))
+      } else {
+        await act(async () => {
+          obstruction.setAttribute(change, change === 'style' ? 'height: 220px' : 'expanded')
+        })
+      }
+      flush()
+      expectVisible(positioner)
+      const before = positioner.style.transform
+      view.rerender(<Harness open={false} />)
+      await act(async () => {
+        obstruction.style.height = '40px'
+      })
+      expect(frames.size).toBe(0)
+      expect(positioner.style.transform).toBe(before)
+    }
+  )
 })

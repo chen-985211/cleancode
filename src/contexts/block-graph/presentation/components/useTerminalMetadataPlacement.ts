@@ -8,6 +8,7 @@ import {
 export interface TerminalMetadataPlacementEnvironment {
   readonly anchorRef: RefObject<HTMLElement | null>
   readonly readViewport: () => TerminalMetadataRect | null
+  readonly readViewportObstructions?: () => readonly HTMLElement[]
 }
 
 export function useTerminalMetadataPlacement(
@@ -62,16 +63,20 @@ export function useTerminalMetadataPlacement(
     const schedule = () => {
       if (frame === null) frame = requestAnimationFrame(place)
     }
-    // Observe only the anchor's ancestors, never our own presentation writes.
+    // Observe external geometry dependencies, never our own presentation writes.
     const ancestors: HTMLElement[] = []
     for (let element: HTMLElement | null = anchor; element; element = element.parentElement) {
       ancestors.push(element)
     }
+    const geometryElements = new Set([
+      ...ancestors,
+      ...(environment.readViewportObstructions?.() ?? [])
+    ])
     const mutations = new MutationObserver(schedule)
-    for (const element of ancestors)
+    for (const element of geometryElements)
       mutations.observe(element, { attributes: true, attributeFilter: ['style', 'class'] })
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
-    for (const element of [positioner, ...ancestors]) resize?.observe(element)
+    for (const element of [positioner, ...geometryElements]) resize?.observe(element)
     window.addEventListener('resize', schedule)
     document.addEventListener('scroll', schedule, true)
     place()

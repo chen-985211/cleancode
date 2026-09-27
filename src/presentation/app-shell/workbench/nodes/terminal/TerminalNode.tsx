@@ -29,7 +29,10 @@ import { useI18n } from '../../../../i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from '../useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from '../../../../shared/components/WorkbenchIcons'
 import { useTerminalState } from '../../../../../contexts/run/presentation/view-models/terminalStateStore'
-import { readWorkbenchCanvasCreationGeometry } from '../../viewport/workbenchCanvasSafeViewport'
+import {
+  readWorkbenchCanvasCreationGeometry,
+  readWorkbenchCanvasObstructions
+} from '../../viewport/workbenchCanvasSafeViewport'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -50,7 +53,11 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [isResizingBlock, setIsResizingBlock] = useState(false)
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const metadataPlacement = useMemo(
-    () => ({ anchorRef: editButtonRef, readViewport: readMetadataViewport }),
+    () => ({
+      anchorRef: editButtonRef,
+      readViewport: readMetadataViewport,
+      readViewportObstructions: readWorkbenchCanvasObstructions
+    }),
     []
   )
   const metadataFormId = `terminal-metadata-form-${block.id}`
