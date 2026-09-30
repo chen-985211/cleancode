@@ -212,6 +212,25 @@
   overflow: auto;
   scrollbar-gutter: stable;
 }
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar-track,
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: var(--cc-scrollbar);
+  background-clip: padding-box;
+}
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar-thumb:hover,
+:is(.project-issues__list, .project-issues__reader)::-webkit-scrollbar-thumb:active {
+  background-color: var(--cc-muted-strong);
+}
 .project-issues__columns,
 .project-issues__row {
   position: relative;
