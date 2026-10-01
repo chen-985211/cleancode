@@ -19,12 +19,12 @@ export function QuickExecutionProxyCard({
         .join(' ')}
     >
       <div className="quick-execution__content quick-execution__drag-proxy-content">
-        <kbd>{preview.number}</kbd>
         <TypeIcon type={preview.projection.type} />
         <span className="quick-execution__copy">
           <strong>{preview.projection.name}</strong>
           {preview.isUnavailable ? <small>{unavailableLabel}</small> : null}
         </span>
+        <kbd>{preview.number}</kbd>
       </div>
     </div>
   )

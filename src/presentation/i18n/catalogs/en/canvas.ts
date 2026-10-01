@@ -37,6 +37,9 @@ export const enCanvasMessages = {
   'quickExecution.chooseSlot': 'Choose a quick slot',
   'quickExecution.slotActions': 'Quick slot actions',
   'quickExecution.addObject': 'Add canvas object',
+  'quickExecution.arrange': 'Arrange quick slots',
+  'quickExecution.doneArranging': 'Done arranging',
+  'quickExecution.addFavorites': 'Add a favorite',
   'quickExecution.boundSlot':
     'Quick slot {number}: {name}. Click to locate; run with the keyboard shortcut only.',
   'quickExecution.bindEmpty': 'Add an object to quick slot {number}',

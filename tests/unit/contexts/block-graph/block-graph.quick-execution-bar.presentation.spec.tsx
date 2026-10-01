@@ -152,6 +152,8 @@ describe('quick execution bar', () => {
     fireEvent.pointerLeave(boundSlot)
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
 
+    fireEvent.click(screen.getByRole('button', { name: '添加画布对象' }))
+    fireEvent.click(screen.getByRole('button', { name: '整理快捷位' }))
     const emptySlot = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
     fireEvent.pointerMove(emptySlot, { pointerType: 'mouse' })
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
@@ -218,8 +220,8 @@ describe('quick execution bar', () => {
     )
 
     const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-    const destination = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
     fireEvent.dragStart(source)
+    const destination = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
     fireEvent.dragOver(destination)
     fireEvent.drop(destination)
 
@@ -324,7 +326,7 @@ describe('quick execution bar', () => {
       transform: 'translate3d(90px, 0px, 0)',
       width: '85px'
     })
-    expect(dragProxy).toHaveTextContent('2Worker')
+    expect(dragProxy).toHaveTextContent('Worker2')
     expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
     expect(dataTransfer.setData).toHaveBeenCalledWith(
       'application/x-cleancode-quick-execution-slot',
@@ -387,7 +389,7 @@ describe('quick execution bar', () => {
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-48px')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-scale')).toBe('1')
-    expect(clearAnimation).toHaveTextContent('2Worker')
+    expect(clearAnimation).toHaveTextContent('Worker2')
     expect(blackHole).toHaveClass(
       'quick-execution__black-hole--visible',
       'quick-execution__black-hole--target',
