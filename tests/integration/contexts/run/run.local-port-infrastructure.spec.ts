@@ -6,6 +6,7 @@ import { ServicePortLeaseRegistry } from '../../../../src/contexts/run/domain/se
 import { NodeLocalPortReservationAdapter } from '../../../../src/contexts/run/infrastructure/network/NodeLocalPortReservationAdapter'
 import { NodeTcpListenerInspectionAdapter } from '../../../../src/contexts/run/infrastructure/network/NodeTcpListenerInspectionAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import { NodeTcpReadinessAdapter } from '../../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
 
 describe('local port infrastructure', () => {
   it('holds a real loopback reservation until explicitly released', async () => {
@@ -200,6 +201,7 @@ describe('local port infrastructure', () => {
 
     const processes = new NodePtyTerminalProcessAdapter()
     let output = ''
+    let exitCode: number | null | undefined
     const program = [
       'const net = require("node:net")',
       `net.createServer().listen(${port}, "127.0.0.1", () => console.log("OWNED_READY"))`
@@ -214,11 +216,24 @@ describe('local port infrastructure', () => {
       onOutput: (event) => {
         output += event.data
       },
-      onExit: () => undefined
+      onExit: (event) => {
+        exitCode = event.exitCode
+      }
     })
     const inspector = new NodeTcpListenerInspectionAdapter()
     try {
-      await waitUntil(() => output.includes('OWNED_READY'), 15_000)
+      // ConPTY output is a stream of terminal control sequences, not a readiness protocol.
+      // Wait for the actual listener, then independently prove its managed ancestry below.
+      await new NodeTcpReadinessAdapter()
+        .waitUntilReady({ host: '127.0.0.1', port, signal: AbortSignal.timeout(15_000) })
+        .catch((error: unknown) => {
+          throw new Error(
+            `Managed PTY listener on port ${port} did not become reachable; ` +
+              `exitCode=${exitCode === undefined ? 'running' : exitCode}; ` +
+              `outputTail=${JSON.stringify(output.slice(-4_096))}`,
+            { cause: error }
+          )
+        })
       await expect(
         inspector.inspect({ host: '127.0.0.1', port, rootProcessId: handle.processId })
       ).resolves.toMatchObject({ ownership: 'owned' })
@@ -373,12 +388,4 @@ function shellQuote(value: string): string {
   return process.platform === 'win32'
     ? `'${value.replaceAll("'", "''")}'`
     : `'${value.replaceAll("'", `'"'"'`)}'`
-}
-
-async function waitUntil(assertion: () => boolean, timeoutMs = 5_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (!assertion()) {
-    if (Date.now() >= deadline) throw new Error('Timed out waiting for listener output.')
-    await new Promise((resolve) => setTimeout(resolve, 25))
-  }
 }

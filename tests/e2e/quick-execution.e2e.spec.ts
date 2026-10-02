@@ -21,6 +21,10 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import {
+  selectTheme,
+  waitForQuickExecutionVisualToSettle
+} from '../support/quickExecutionVisualE2e'
 import { readCanvasViewportTransform } from '../support/terminalSelectionE2e'
 import {
   configureAndStartTerminalLaunchCommand,
@@ -135,6 +139,8 @@ describe('quick execution e2e', () => {
         await page.waitForFunction(() => window.innerWidth >= 1400)
       }
 
+      await page.getByRole('button', { name: '添加画布对象' }).click()
+      await page.getByRole('button', { name: '整理快捷位', exact: true }).click()
       await page
         .locator('[data-quick-execution-slot="1"]')
         .dragTo(page.locator('[data-quick-execution-slot="2"]'))
@@ -153,6 +159,8 @@ describe('quick execution e2e', () => {
         { number: 1, target: null },
         { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
       ])
+
+      await page.getByRole('button', { name: '完成整理' }).click()
 
       const boundSlot = page.getByRole('button', {
         name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
@@ -547,29 +555,6 @@ async function waitForLocatorText(
   })
 
   expect(text).toBe(expectedText)
-}
-
-async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
-  await page.getByRole('button', { name: '主题设置' }).click()
-  await page.getByText(theme === 'light' ? '浅色' : '深色', { exact: true }).click()
-  await page.waitForFunction(
-    (expectedTheme) => document.documentElement.dataset.theme === expectedTheme,
-    theme
-  )
-  await page.getByRole('button', { name: '关闭主题设置' }).click()
-  await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
-  await waitForWorkspaceInteractive(page)
-}
-
-async function waitForQuickExecutionVisualToSettle(page: Page): Promise<void> {
-  await page.locator('[data-quick-execution-bar]').evaluate(async (bar) => {
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-    })
-    await Promise.allSettled(
-      bar.getAnimations({ subtree: true }).map((animation) => animation.finished)
-    )
-  })
 }
 
 async function setQuickExecutionTargetFollowing(

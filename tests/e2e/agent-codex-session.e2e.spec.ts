@@ -16,8 +16,10 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  readAuthenticatedTerminalProviderMetadata,
   readOnlyJsonFile,
   teardownE2eScenario,
+  waitForProcessIdExit,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
@@ -87,10 +89,15 @@ describe('Codex Agent session e2e', () => {
         .locator('[data-agent-console-node]')
         .getAttribute('data-agent-console-node')
       expect(agentId).toBeTruthy()
+      const provider = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
+      expect(provider).not.toBeNull()
 
       await closeElectronApp(electronApp)
       resources.electronApp = undefined
       resources.page = undefined
+      // Electron's exit does not prove its detached Provider has finished shutdown.
+      // This scenario owns no retained terminals, so await that process before reopening.
+      await waitForProcessIdExit(provider!.processId, 5_000)
       await waitForCodexSessionEnd(fakeCodex.reportPath, fakeCodex.sessionId)
       // The CLI has allocated an identity, but its transcript store is still empty.
       await waitForCodexConversationBinding(workbench, fakeCodex.sessionId)

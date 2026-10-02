@@ -652,7 +652,6 @@ export function AppShell({
           onMoveCanvasStack={canvasArrangement.moveStack}
           onDeleteTerminalScope={blockActions.deleteTerminalScope}
           onAddQuickExecutionTarget={quickExecution.addTarget}
-          onBindQuickExecutionSlot={quickExecution.bindSlot}
           onClearQuickExecutionSlot={quickExecution.clearSlot}
           onReorderQuickExecutionSlots={quickExecution.reorderSlots}
           onQuickExecutionNodeDrop={bindQuickExecutionFromNodeDrop}

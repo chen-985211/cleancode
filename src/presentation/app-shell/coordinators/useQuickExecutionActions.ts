@@ -55,26 +55,16 @@ export function useQuickExecutionActions({
     executingTargetsRef.current.clear()
   }, [projectDirectory, workspaceId])
 
-  const updateSlot = useCallback(
-    async (
-      number: QuickExecutionSlotNumber,
-      target: QuickExecutionTargetSnapshot | null
-    ): Promise<void> => {
+  const clearSlot = useCallback(
+    async (number: QuickExecutionSlotNumber): Promise<void> => {
       if (!currentWorkbench || !currentWorkspace) return
 
       try {
-        const graph = target
-          ? await window.cleancode?.bindQuickExecutionSlot({
-              number,
-              projectDirectory: currentWorkbench.project.directory,
-              target,
-              workspaceId: currentWorkspace.workspaceId
-            })
-          : await window.cleancode?.clearQuickExecutionSlot({
-              number,
-              projectDirectory: currentWorkbench.project.directory,
-              workspaceId: currentWorkspace.workspaceId
-            })
+        const graph = await window.cleancode?.clearQuickExecutionSlot({
+          number,
+          projectDirectory: currentWorkbench.project.directory,
+          workspaceId: currentWorkspace.workspaceId
+        })
         if (graph) setCurrentGraph(graph)
       } catch (error) {
         notifications.notify({
@@ -195,10 +185,8 @@ export function useQuickExecutionActions({
 
   return {
     addTarget,
-    bindSlot: (number: QuickExecutionSlotNumber, target: QuickExecutionTargetSnapshot) =>
-      updateSlot(number, target),
     changeFollowQuickExecutionTarget,
-    clearSlot: (number: QuickExecutionSlotNumber) => updateSlot(number, null),
+    clearSlot,
     executeSlot,
     executeTarget,
     followQuickExecutionTarget,
