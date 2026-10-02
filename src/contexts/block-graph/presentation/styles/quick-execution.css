@@ -139,7 +139,6 @@
 
 .quick-execution__add:focus-visible,
 .quick-execution__slot--filled .quick-execution__content:focus-visible,
-.quick-execution__more:focus-visible,
 .quick-execution__done:focus-visible,
 .quick-execution__popover button:focus-visible {
   outline: 2px solid var(--cc-ring);
@@ -194,36 +193,6 @@
   color: var(--cc-warning-strong);
   font-size: 9px;
   line-height: 1.1;
-}
-
-.quick-execution__more {
-  position: absolute;
-  top: 8px;
-  right: 7px;
-  display: inline-flex;
-  width: 17px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 5px;
-  background: var(--cc-surface-subtle);
-  color: var(--cc-muted-strong);
-  opacity: 0;
-}
-
-.quick-execution__slot:hover .quick-execution__more,
-.quick-execution__slot:focus-within .quick-execution__more {
-  opacity: 1;
-}
-
-.quick-execution__slot:hover kbd,
-.quick-execution__slot:focus-within kbd {
-  visibility: hidden;
-}
-
-.quick-execution__slot--empty:hover kbd {
-  visibility: visible;
 }
 
 .quick-execution__done {

@@ -535,7 +535,6 @@ function renderCanvas({
       onOrganizeCanvas={onOrganizeCanvas}
       onDeleteTerminalScope={onDeleteTerminalScope}
       onAddQuickExecutionTarget={onAddQuickExecutionTarget}
-      onBindQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onClearQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onReorderQuickExecutionSlots={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onQuickExecutionNodeDrop={onQuickExecutionNodeDrop}

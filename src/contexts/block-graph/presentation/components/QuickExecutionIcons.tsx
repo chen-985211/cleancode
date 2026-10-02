@@ -1,4 +1,3 @@
-import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree'
 import { FlowArrowIcon } from '@phosphor-icons/react/dist/csr/FlowArrow'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
@@ -9,7 +8,6 @@ import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
 const definitions = {
   add: [PlusIcon, 'plus', 'bold'],
   more: [DotsThreeIcon, 'dots-three', 'bold'],
-  rebind: [ArrowClockwiseIcon, 'arrow-clockwise', 'bold'],
   terminal: [TerminalWindowIcon, 'terminal-window', 'regular'],
   'terminal-group': [StackIcon, 'stack', 'regular'],
   workflow: [FlowArrowIcon, 'flow-arrow', 'regular']
@@ -29,7 +27,7 @@ export function QuickExecutionIcon({
       {...props}
       aria-hidden="true"
       data-icon-glyph={glyph}
-      data-icon-role={role === 'rebind' ? 'restart' : role}
+      data-icon-role={role}
       data-icon-weight={weight}
       focusable="false"
       weight={weight}

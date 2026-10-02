@@ -10,7 +10,6 @@ import type {
 } from '../view-models/quickExecutionProjection'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
-import { QuickExecutionIcon } from './QuickExecutionIcons'
 import { TypeIcon } from './quickExecutionDragPresentation'
 
 interface QuickExecutionSlotsProps {
@@ -24,7 +23,6 @@ interface QuickExecutionSlotsProps {
   readonly shortcutPlatform: 'mac' | 'other'
   readonly shortcutTooltips?: Partial<Record<`quickExecution${QuickExecutionSlotNumber}`, string>>
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
-  readonly onActions: (number: QuickExecutionSlotNumber, trigger: HTMLButtonElement) => void
   readonly onDragStart: (
     event: DragEvent<HTMLDivElement>,
     number: QuickExecutionSlotNumber,
@@ -104,17 +102,6 @@ export function QuickExecutionSlots(props: QuickExecutionSlotsProps) {
                 <kbd>{slot.number}</kbd>
               </div>
             )}
-            {projection ? (
-              <button
-                className="quick-execution__more"
-                type="button"
-                draggable={false}
-                aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
-                onClick={(event) => props.onActions(slot.number, event.currentTarget)}
-              >
-                <QuickExecutionIcon role="more" size={13} />
-              </button>
-            ) : null}
           </div>
         </TooltipLabel>
       )

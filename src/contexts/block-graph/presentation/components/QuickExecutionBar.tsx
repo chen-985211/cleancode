@@ -49,10 +49,6 @@ interface QuickExecutionBarProps {
   readonly graph: BlockGraphSnapshot
   readonly open?: boolean
   readonly onAdd: (target: QuickExecutionTargetSnapshot) => Promise<void> | void
-  readonly onBind: (
-    number: QuickExecutionSlotNumber,
-    target: QuickExecutionTargetSnapshot
-  ) => Promise<void> | void
   readonly onClear: (number: QuickExecutionSlotNumber) => Promise<void> | void
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
   readonly onExitComplete?: () => void
@@ -64,12 +60,7 @@ interface QuickExecutionBarProps {
   readonly shortcutTooltips?: Partial<Record<QuickExecutionShortcutCommand, string>>
 }
 
-type PopoverState =
-  | { readonly type: 'candidates'; readonly number: QuickExecutionSlotNumber | null }
-  | { readonly type: 'actions'; readonly number: QuickExecutionSlotNumber }
-
 interface PopoverPresentation {
-  readonly content: PopoverState
   readonly open: boolean
 }
 
@@ -78,7 +69,6 @@ export function QuickExecutionBar({
   graph,
   open = true,
   onAdd,
-  onBind,
   onClear,
   onExitComplete,
   onFocus,
@@ -158,15 +148,15 @@ export function QuickExecutionBar({
     if (!open && popoverPresentation) setPopoverPresentation(null)
     if (!open && isArranging) setIsArranging(false)
   }
-  const openPopover = useCallback((content: PopoverState, trigger?: HTMLButtonElement): void => {
-    if (trigger) popoverTriggerRef.current = trigger
-    setPopoverPresentation({ content, open: true })
+  const openPopover = useCallback((trigger: HTMLButtonElement): void => {
+    popoverTriggerRef.current = trigger
+    setPopoverPresentation({ open: true })
   }, [])
   const closePopoverAndRestoreFocus = useCallback((): void => {
     closePopover()
     popoverTriggerRef.current?.focus({ preventScroll: true })
   }, [closePopover])
-  const presentedPopover = openChanged && !open ? null : (popoverPresentation?.content ?? null)
+  const presentedPopover = openChanged && !open ? null : popoverPresentation
   const isPopoverOpen = open && (popoverPresentation?.open ?? false)
 
   useOutsidePointerDismiss({
@@ -189,15 +179,8 @@ export function QuickExecutionBar({
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [closePopoverAndRestoreFocus, isPopoverOpen])
-  const bind = (
-    number: QuickExecutionSlotNumber | null,
-    target: QuickExecutionTargetSnapshot
-  ): void => {
+  const addTarget = (target: QuickExecutionTargetSnapshot): void => {
     closePopoverAndRestoreFocus()
-    if (number) {
-      void onBind(number, target)
-      return
-    }
     void onAdd(target)
   }
   const resetReorder = (): void => {
@@ -418,24 +401,12 @@ export function QuickExecutionBar({
         ref={popoverRef}
         className="quick-execution__popover anchored-surface-motion"
         role="dialog"
-        aria-label={
-          presentedPopover
-            ? t(
-                presentedPopover.type === 'actions'
-                  ? 'quickExecution.slotActions'
-                  : 'quickExecution.chooseObject'
-              )
-            : undefined
-        }
+        aria-label={t('quickExecution.chooseObject')}
       >
-        {presentedPopover?.type === 'candidates' &&
-        (presentedPopover.number !== null || firstEmptyNumber !== null) ? (
-          <QuickExecutionCandidatePicker
-            candidates={candidates}
-            onSelect={(target) => bind(presentedPopover.number, target)}
-          />
+        {presentedPopover && firstEmptyNumber !== null ? (
+          <QuickExecutionCandidatePicker candidates={candidates} onSelect={addTarget} />
         ) : null}
-        {presentedPopover?.type === 'candidates' && presentedPopover.number === null ? (
+        {presentedPopover ? (
           <div className="quick-execution__action-list quick-execution__arrange-action">
             <button
               type="button"
@@ -445,17 +416,6 @@ export function QuickExecutionBar({
               }}
             >
               {t('quickExecution.arrange')}
-            </button>
-          </div>
-        ) : null}
-        {presentedPopover?.type === 'actions' ? (
-          <div className="quick-execution__action-list">
-            <button
-              type="button"
-              onClick={() => openPopover({ type: 'candidates', number: presentedPopover.number })}
-            >
-              <QuickExecutionIcon role="rebind" size={14} />
-              {t('quickExecution.rebind')}
             </button>
           </div>
         ) : null}
@@ -479,7 +439,6 @@ export function QuickExecutionBar({
           shortcutPlatform={shortcutPlatform}
           shortcutTooltips={shortcutTooltips}
           onFocus={onFocus}
-          onActions={(number, trigger) => openPopover({ type: 'actions', number }, trigger)}
           onDragStart={beginReorder}
           onDrag={updateDragPreview}
           onDragEnd={returnReorder}
@@ -513,14 +472,8 @@ export function QuickExecutionBar({
               firstEmptyNumber !== null ? 'quickExecution.addObject' : 'quickExecution.arrange'
             )}
             aria-haspopup="dialog"
-            aria-expanded={
-              isPopoverOpen &&
-              presentedPopover?.type === 'candidates' &&
-              presentedPopover.number === null
-            }
-            onClick={(event) =>
-              openPopover({ type: 'candidates', number: null }, event.currentTarget)
-            }
+            aria-expanded={isPopoverOpen}
+            onClick={(event) => openPopover(event.currentTarget)}
           >
             <QuickExecutionIcon role={firstEmptyNumber !== null ? 'add' : 'more'} size={15} />
             {slots.every((slot) => !slot.target) ? (

@@ -22,6 +22,33 @@ describe('quick execution disclosure', () => {
     ).toBeInTheDocument()
   })
 
+  it.each([false, true])(
+    'keeps bound tags focused on locating objects without slot actions (unavailable: %s)',
+    (unavailable) => {
+      const props = mount([2, 4])
+      if (unavailable) {
+        props.rerender(
+          <QuickExecutionBar {...props.input} graph={{ ...props.input.graph, blocks: [] }} />
+        )
+      }
+
+      const slot = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+      const buttons = within(slot).getAllByRole('button')
+      expect(buttons).toHaveLength(1)
+      fireEvent.click(buttons[0]!)
+      expect(props.input.onFocus).toHaveBeenCalledWith({
+        type: 'terminal',
+        terminalBlockId: 'worker'
+      })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: '添加画布对象' }))
+      fireEvent.click(screen.getByRole('button', { name: '整理快捷位' }))
+      expect(within(slot).getAllByRole('button')).toHaveLength(1)
+      expect(screen.queryByRole('button', { name: '重新绑定' })).not.toBeInTheDocument()
+    }
+  )
+
   it('expands all fixed positions from the add menu and collapses them when done', () => {
     mount([2, 4])
     fireEvent.click(screen.getByRole('button', { name: '添加画布对象' }))
@@ -112,7 +139,6 @@ function mount(numbers: readonly QuickExecutionSlotNumber[]) {
   const input = {
     graph,
     onAdd: vi.fn(),
-    onBind: vi.fn(),
     onClear: vi.fn(),
     onFocus: vi.fn(),
     onReorder: vi.fn()

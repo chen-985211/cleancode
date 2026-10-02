@@ -11,7 +11,6 @@ describe('quick execution bar', () => {
         graph: createGraph(),
         isExternalDropTarget,
         onAdd: vi.fn(),
-        onBind: vi.fn(),
         onClear: vi.fn(),
         onFocus: vi.fn(),
         onReorder: vi.fn()
@@ -31,7 +30,6 @@ describe('quick execution bar', () => {
     const props = {
       graph: createGraph(),
       onAdd: vi.fn(),
-      onBind: vi.fn(),
       onClear: vi.fn(),
       onFocus: vi.fn(),
       onReorder: vi.fn()
@@ -57,24 +55,23 @@ describe('quick execution bar', () => {
     expect(bar).not.toHaveAttribute('inert')
   })
 
-  it('dismisses an open slot popover when arrangement controls take over', () => {
+  it('dismisses the add popover when arrangement controls take over', () => {
     const props = {
       graph: createGraph(),
       onAdd: vi.fn(),
-      onBind: vi.fn(),
       onClear: vi.fn(),
       onFocus: vi.fn(),
       onReorder: vi.fn()
     }
     const { rerender } = render(<QuickExecutionBar {...props} open />)
 
-    fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
-    expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '添加画布对象' }))
+    expect(screen.getByRole('dialog', { name: '选择要绑定的画布对象' })).toBeInTheDocument()
 
     rerender(<QuickExecutionBar {...props} open={false} />)
     rerender(<QuickExecutionBar {...props} open />)
 
-    expect(screen.queryByRole('dialog', { name: '快捷位操作' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '选择要绑定的画布对象' })).not.toBeInTheDocument()
   })
 
   it('adds a canvas object without asking the user to choose a slot', () => {
@@ -83,7 +80,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={onAdd}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -107,7 +103,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={onFocus}
         onReorder={vi.fn()}
@@ -133,7 +128,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -166,7 +160,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -187,7 +180,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -212,7 +204,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={onReorder}
@@ -229,55 +220,29 @@ describe('quick execution bar', () => {
     expectBlackHoleMediaAbsent()
   })
 
-  it('keeps only rebind in the filled-slot menu', () => {
-    render(
-      <QuickExecutionBar
-        graph={createGraph()}
-        onAdd={vi.fn()}
-        onBind={vi.fn()}
-        onClear={vi.fn()}
-        onFocus={vi.fn()}
-        onReorder={vi.fn()}
-      />
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
-
-    const rebindButton = screen.getByRole('button', { name: '重新绑定' })
-    expect(rebindButton).toBeInTheDocument()
-    expect(rebindButton.querySelector('[data-icon-role="restart"]')).toHaveAttribute(
-      'data-icon-glyph',
-      'arrow-clockwise'
-    )
-    expect(screen.queryByRole('button', { name: '向左移动' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '向右移动' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '清空快捷位' })).not.toBeInTheDocument()
-  })
-
   it('keeps the popover DOM inert while closing and reuses it when opening reverses', () => {
     render(
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
     )
 
-    const trigger = screen.getByRole('button', { name: '打开快捷位 2 的操作' })
+    const trigger = screen.getByRole('button', { name: '添加画布对象' })
     fireEvent.click(trigger)
-    const popover = screen.getByRole('dialog', { name: '快捷位操作' })
+    const popover = screen.getByRole('dialog', { name: '选择要绑定的画布对象' })
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(screen.queryByRole('dialog', { name: '快捷位操作' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '选择要绑定的画布对象' })).not.toBeInTheDocument()
     expect(popover).toHaveAttribute('data-surface-motion-state', 'closing')
     expect(popover).toHaveAttribute('inert')
 
     fireEvent.click(trigger)
-    expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBe(popover)
+    expect(screen.getByRole('dialog', { name: '选择要绑定的画布对象' })).toBe(popover)
   })
 
   it('clears a filled slot while its intact proxy springs into the black hole', async () => {
@@ -286,7 +251,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={onClear}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -409,7 +373,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
@@ -440,7 +403,6 @@ describe('quick execution bar', () => {
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
-        onBind={vi.fn()}
         onClear={onClear}
         onFocus={vi.fn()}
         onReorder={onReorder}
@@ -496,7 +458,6 @@ describe('quick execution bar', () => {
         <QuickExecutionBar
           graph={createGraph()}
           onAdd={vi.fn()}
-          onBind={vi.fn()}
           onClear={vi.fn()}
           onFocus={vi.fn()}
           onReorder={vi.fn()}
