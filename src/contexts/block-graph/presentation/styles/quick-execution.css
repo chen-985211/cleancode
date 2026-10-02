@@ -152,8 +152,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 4px;
-  background: var(--cc-neutral-overlay);
+  background: transparent;
   color: var(--cc-muted);
   font: inherit;
   font-size: 10px;
@@ -165,10 +164,6 @@
 .quick-execution__type-icon {
   flex: 0 0 auto;
   color: var(--cc-muted-strong);
-}
-
-.quick-execution__slot--empty kbd {
-  background: transparent;
 }
 
 .quick-execution__copy {
