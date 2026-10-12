@@ -127,6 +127,26 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
   }
   process.exitCode = rejected ? 1 : 0
 } else {
+  // Match the real CLI: an explicit permission choice is incompatible with remote resume.
+  const launchArgs = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
+  if (
+    launchArgs.includes('resume') &&
+    launchArgs.includes('--remote') &&
+    launchArgs.some((arg) =>
+      [
+        '--dangerously-bypass-approvals-and-sandbox',
+        '--approve-for-me',
+        '--sandbox',
+        '-s',
+        '--ask-for-approval',
+        '-a',
+        '--add-dir'
+      ].includes(arg)
+    )
+  ) {
+    process.stderr.write('Permission overrides are not supported when resuming a remote task.\n')
+    process.exit(24)
+  }
   report('tui')
   process.stdin.setRawMode?.(true)
   process.stdout.write('NATIVE_TUI_READY\n')

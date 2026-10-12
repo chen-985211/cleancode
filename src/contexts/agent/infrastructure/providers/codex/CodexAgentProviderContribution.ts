@@ -342,10 +342,10 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       },
       onTerminalTitleChanged: telemetry.onTerminalTitleChanged
     }
-    const serverArgs = projectCodexServerArguments([
-      ...this.options.baseArgs,
-      ...(command.launchProfile?.arguments ?? [])
-    ])
+    const serverArgs = projectCodexServerArguments(
+      [...this.options.baseArgs, ...(command.launchProfile?.arguments ?? [])],
+      resumeArgs.length > 0 && !discardProviderSessionRef
+    )
     return prepareCodexNativeMessageLaunch({
       command,
       nativePlan,

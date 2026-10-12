@@ -65,6 +65,8 @@ Windows relay 在实际 PTY 的 PATH 中解析原生 `.exe` / `.com` 后直接�
 
 已有显式 remote、profile、OSS 或不能安全投影到 server 的参数继续保留普通原生启动并报告 pull_only。私有 socket 路径须小于 104 字节；过长时保留原生启动。通知使用同一 message ID 去重，但已经由上游接受的队列项无法保证撤回；最多一次安静的空读取仍是允许的竞态结果。模型本身可能要求更高 CLI 版本：0.149.0 使用本机默认 gpt-6-astra 时被服务端拒绝，改用本次明确指定的 gpt-5.5 后空闲链路通过。这是模型兼容限制，不是 queue 的首次版本。
 
+恢复已有 Codex thread 时，显式 sandbox、approval、额外可写目录或权限配置覆盖不能与 CleanCode 注入的 remote 组合：0.162.1 [上游恢复分支](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/tui/src/app/startup.rs#L573) 明确拒绝该组合，并报告 `Permission overrides are not supported when resuming a remote task.`。适配器在启动前保留完整普通 resume 命令、原 thread ID、权限、首次提示和 MCP 配置，原生通知降级为 pull_only；不得通过删除权限参数或丢弃有效会话引用规避错误。新建会话、确认为不存在而转为新建的引用，以及无显式权限覆盖的恢复仍可尝试原生通知。权限覆盖识别同时覆盖 baseArgs 和 launch profile，配置按 TOML 顶层 key 区分；无法安全识别的恢复配置保留普通路径。用户配置默认值不被当成显式 launch 覆盖。
+
 ### Claude Code
 
 私有信号文件只写一次，认证 FileChanged Hook 只领取一次；同步 matcher 仅建立监听，不能抢走 asyncRewake Hook 的通知。保留用户 hooks/settings、动态 watchPaths 和权限。SessionStart 的正式握手决定运行期资源就绪，不能把另一 executable 的已验证版本充当当前 CLI 的事实。
@@ -100,7 +102,9 @@ Windows CI 修复后的提交 `3e6a2a4b425e5275c6ce816deaaf4a30e85701ad` 已通�
 
 Windows 启动性能增量新增原生命令、显式路径、PATH 顺序、目录排除及标准／自定义 PowerShell 包装的解析回归。Windows 专属测试在真实 `powershell.exe` 中检查 Unicode、内嵌引号、换行、空参数和长参数逐字到达脚本，且 bootstrap 未加载 Utility 模块；本机 macOS 跳过该用例。Codex 模拟包装在原生进程边界使用明确的 argv 转义，并报告包装逻辑确实执行，保留原有首次提示、恢复、失败回退和关闭断言。
 
-2026-10-12 的性能增量在本机 macOS 通过 pnpm verify:full：Contract 35 文件 / 171 项、单元 481 文件 / 3092 项、集成 70 文件 / 711 项、Electron E2E 22 文件 / 59 项通过；另有 22 项因平台条件跳过。终端退出 RPC 场景连续三次首次通过，并发上限及多批次停止仍由 20 个终止候选的单元场景覆盖；RPC 场景减少重复持久化准备，补上有界请求诊断与失败清理。该增量尚未运行 Windows CI，真实 Win10 Codex 0.160.0 的 MCP 启动耗时未测，不能复用此前 CI 结果宣称其 Windows 验证通过。
+2026-10-12 的性能增量在本机 macOS 通过 pnpm verify:full：Contract 35 文件 / 171 项、单元 481 文件 / 3092 项、集成 70 文件 / 711 项、Electron E2E 22 文件 / 59 项通过；另有 22 项因平台条件跳过。终端退出 RPC 场景连续三次首次通过，并发上限及多批次停止仍由 20 个终止候选的单元场景覆盖；RPC 场景减少重复持久化准备，补上有界请求诊断与失败清理。提交 `c2b8fc0e74151469d04fcfe800508cb475ac45b3` 的 23 项 CI 检查全部通过，见[跨平台质量](https://github.com/chen-985211/cleancode/actions/runs/38244336583)和 [Electron E2E](https://github.com/chen-985211/cleancode/actions/runs/38244337076)；真实 Win10 MCP 启动耗时未测，CI 不能替代 Win10 实测。
+
+同日旧会话恢复增量先复现 17 项失败，再通过本机 macOS pnpm verify:full：Contract 171 项、单元 3115 项、集成 712 项、Electron E2E 59 项，另有 22 项因平台条件跳过。恢复矩阵覆盖权限 flag、TOML 顶层与 quoted key、无法识别的配置、baseArgs 与 launch profile、新建、有效旧引用和已确认不存在的引用，断言有效 ID、权限、首次提示及 MCP 保留。CLI 夹具加入真实 remote resume 权限拒绝，通知场景使用无权限覆盖的合法恢复命令。该恢复增量尚待新 CI 和用户 Win10 Codex 0.162.1 复测，不能把之前性能增量的 Windows CI 当作本轮验收。
 
 ### 既有验证、增量调查与人工复现
 

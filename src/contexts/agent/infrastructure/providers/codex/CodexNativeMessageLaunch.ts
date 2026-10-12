@@ -15,8 +15,25 @@ import { codexNativeMessageRelay } from './CodexNativeMessageRelay'
 const socketPathSegments = ['s', 's'] as const
 
 /** Unrecognized options retain the ordinary TUI: never silently drop user configuration. */
-export function projectCodexServerArguments(args: readonly string[]): string[] | null {
+export function projectCodexServerArguments(
+  args: readonly string[],
+  resuming = false
+): string[] | null {
   const server: string[] = []
+  const permissionValues = new Set(['-a', '--ask-for-approval', '-s', '--sandbox', '--add-dir'])
+  const permissionFlags = new Set([
+    '--dangerously-bypass-approvals-and-sandbox',
+    '--approve-for-me'
+  ])
+  const permissionKeys = new Set([
+    'approval_policy',
+    'approvals_reviewer',
+    'default_permissions',
+    'sandbox_mode',
+    'sandbox_workspace_write',
+    'permissions',
+    'network'
+  ])
   const values = new Set([
     '-m',
     '--model',
@@ -36,10 +53,20 @@ export function projectCodexServerArguments(args: readonly string[]): string[] |
     const arg = args[index]!
     if (['-c', '--config', '--enable', '--disable'].includes(arg)) {
       if (args[index + 1] === undefined) return null
-      server.push(arg, args[++index]!)
+      const value = args[++index]!
+      if (resuming && ['-c', '--config'].includes(arg)) {
+        const key = /^\s*(?:"([^"]+)"|'([^']+)'|([\w-]+))\s*[.=]/.exec(value)
+        const root = key?.[1] ?? key?.[2] ?? key?.[3]
+        // Remote resume cannot apply explicit permissions. Keep the complete native command
+        // instead of stripping settings or silently restoring different saved permissions.
+        if (!root || root.includes('\\') || permissionKeys.has(root)) return null
+      }
+      server.push(arg, value)
     } else if (values.has(arg)) {
       if (args[++index] === undefined) return null
+      if (resuming && permissionValues.has(arg)) return null
     } else if (!flags.has(arg)) return null
+    else if (resuming && permissionFlags.has(arg)) return null
   }
   return server
 }

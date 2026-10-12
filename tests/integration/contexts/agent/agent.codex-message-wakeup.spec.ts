@@ -15,6 +15,7 @@ import { prepareCodexNativeMessageLaunch } from '../../../../src/contexts/agent/
 describe('Codex owned native session', () => {
   it.each([
     ['codex-cli 0.149.0', true, 'legacy'],
+    ['codex-cli 0.162.1', true, 'legacy'],
     [undefined, true, 'legacy'],
     ['codex-cli 999.0.0', false, 'legacy'],
     [undefined, true, 'stop-probes'],
@@ -37,12 +38,8 @@ describe('Codex owned native session', () => {
       const nativeArgs = [
         'resume',
         '550e8400-e29b-41d4-a716-446655440000',
-        '--sandbox',
-        'read-only',
-        '-a',
-        'on-request',
-        '--add-dir',
-        join(directory, '协作目录'),
+        '--model',
+        'selected-model',
         '-c',
         `developer_instructions='${'协作 instruction '.repeat(700)}'`
       ]

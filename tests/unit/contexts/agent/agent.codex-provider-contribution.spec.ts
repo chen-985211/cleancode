@@ -12,6 +12,68 @@ import { NodeAgentProviderCliDetector } from '../../../../src/contexts/agent/inf
 import { canvasExecutionSemanticInstructions } from '../../../../src/shared-kernel/domain/policies/CanvasExecutionSemantics'
 
 describe('Codex Agent Provider contribution', () => {
+  it.each([
+    ['resume', 'available', true, 'profile'],
+    ['resume', 'available', true, 'base'],
+    ['new', 'available', false, 'profile'],
+    ['resume', 'missing', false, 'profile']
+  ] as const)(
+    'preserves permissions and MCP for %s with thread %s, ordinary=%s, settings=%s',
+    async (entry, threadStatus, ordinary, settings) => {
+      const permission = '--dangerously-bypass-approvals-and-sandbox'
+      const contribution = new CodexAgentProviderContribution({
+        baseArgs: settings === 'base' ? [permission] : [],
+        threadResumabilityInspector: async () => threadStatus,
+        telemetryFactory: async () => ({
+          dispose: async () => undefined,
+          env: {},
+          notifyCommand: ['/usr/bin/node', '-e', 'reporter']
+        })
+      })
+      const artifacts = new AgentLaunchArtifactScope()
+      const messageDelivery = vi.fn()
+      const ref = {
+        formatVersion: 1,
+        kind: 'codex-thread',
+        value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+      } as const
+      const plan = await contribution.launcher.createLaunchPlan({
+        artifacts,
+        launchProfile: {
+          executable: 'codex',
+          arguments: settings === 'profile' ? [permission] : [],
+          environment: {}
+        },
+        cleancodeMcp: { bearerToken: 'mcp-token', serverUrl: 'http://127.0.0.1:43123/mcp' },
+        providerSessionRef: entry === 'resume' ? ref : undefined,
+        initialPrompt: '继续原任务 中文 & "quotes"',
+        onProviderSessionIdentified: () => undefined,
+        messageDelivery,
+        workspaceDirectory: '/repo/app'
+      })
+      artifacts.seal()
+      try {
+        expect(plan.env.CLEANCODE_MCP_TOKEN).toBe('mcp-token')
+        expect(plan.discardProviderSessionRef).toBe(
+          entry === 'resume' && threadStatus === 'missing'
+        )
+        if (ordinary) {
+          expect(plan.executable).toBe('codex')
+          expect(plan.args).toEqual(expect.arrayContaining([permission, 'resume', ref.value]))
+          expect(plan.args).not.toContain('--remote')
+          expect(plan.args.join('\n')).toContain('mcp_servers.cleancode=')
+          expect(plan.args.slice(-2)).toEqual(['--', '继续原任务 中文 & "quotes"'])
+          expect(messageDelivery).toHaveBeenCalledExactlyOnceWith(null)
+        } else {
+          expect(plan.executable).toBe(process.execPath)
+          expect(messageDelivery).not.toHaveBeenCalled()
+        }
+      } finally {
+        await artifacts.dispose()
+      }
+    }
+  )
+
   it('uses the shared cross-platform CLI detector by default', () => {
     const contribution = new CodexAgentProviderContribution()
 
