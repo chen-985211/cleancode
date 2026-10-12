@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, watch, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, watch, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname } from 'node:path'
 import process from 'node:process'
@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 
 const args = process.argv.slice(2)
 let descendantPid
+let socketParentAlreadyExists
 const report = (kind) =>
   appendFileSync(
     process.env.NATIVE_MESSAGE_REPORT,
@@ -17,8 +18,10 @@ const report = (kind) =>
       args,
       cwd: process.cwd(),
       inherited: process.env.NATIVE_MESSAGE_SHELL_VALUE,
+      shim: process.env.NATIVE_MESSAGE_SHIM_RAN,
       pid: process.pid,
-      descendantPid
+      descendantPid,
+      socketParentAlreadyExists
     }) + '\n'
   )
 if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
@@ -38,6 +41,7 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
           : '--remote --remote-auth-token-env'
   )
 } else if (args[1] === 'proxy') {
+  if (process.env.NATIVE_MESSAGE_REJECT_PROXY === '1') process.exit(1)
   if (!existsSync(args[args.indexOf('--sock') + 1])) process.exit(1)
   // Simulated proxy/control-socket protocol; Windows uses a marker, not a real AF_UNIX socket.
   process.stdin.once('data', (data) => {
@@ -53,20 +57,47 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
     )
   })
 } else if (args[0] === 'app-server') {
+  const endpoint = args[args.indexOf('--listen') + 1]
+  const socketPath = endpoint.slice('unix://'.length)
+  socketParentAlreadyExists = existsSync(dirname(socketPath))
+  if (
+    process.env.NATIVE_MESSAGE_SERVER_FAILURE === '1' ||
+    (process.env.NATIVE_MESSAGE_PRIVATE_DIRECTORY === '1' && socketParentAlreadyExists)
+  ) {
+    report('server-failed')
+    const errors =
+      [
+        'socket directory is not private to the current user',
+        process.env.CLEANCODE_MCP_TOKEN,
+        process.env.CLEANCODE_CODEX_NOTIFY_TOKEN,
+        process.env.NATIVE_MESSAGE_ERROR_OVERFLOW === '1' ? 'x'.repeat(100_000) : ''
+      ]
+        .filter(Boolean)
+        .join('\n') + '\n'
+    await new Promise((resolve) => process.stderr.write(errors, resolve))
+    process.exit(23)
+  }
   const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
     stdio: 'ignore'
   })
   descendantPid = descendant.pid
-  const endpoint = args[args.indexOf('--listen') + 1]
-  const server = createServer((socket) => socket.end())
-  if (endpoint.startsWith('ws://'))
-    server.listen(Number(new URL(endpoint).port), '127.0.0.1', () => report('server'))
-  else if (process.platform === 'win32') {
-    writeFileSync(endpoint.slice('unix://'.length), 'fixture socket')
+  if (process.env.NATIVE_MESSAGE_HOLD_SERVER === '1') {
     report('server')
     process.stdin.resume()
     setInterval(() => {}, 1000)
-  } else server.listen(endpoint.slice('unix://'.length), () => report('server'))
+  } else {
+    // The official CLI creates its socket parent; Windows ACL validation is simulated here.
+    mkdirSync(dirname(socketPath), { recursive: true, mode: 0o700 })
+    const server = createServer((socket) => socket.end())
+    if (endpoint.startsWith('ws://'))
+      server.listen(Number(new URL(endpoint).port), '127.0.0.1', () => report('server'))
+    else if (process.platform === 'win32') {
+      writeFileSync(endpoint.slice('unix://'.length), 'fixture socket')
+      report('server')
+      process.stdin.resume()
+      setInterval(() => {}, 1000)
+    } else server.listen(endpoint.slice('unix://'.length), () => report('server'))
+  }
 } else if (args[0] === 'queue') {
   const rejectPath = process.env.NATIVE_MESSAGE_REJECT_PATH
   const rejected =
@@ -96,6 +127,26 @@ if (args.includes('--help') && process.env.NATIVE_MESSAGE_HOLD_PROBES === '1') {
   }
   process.exitCode = rejected ? 1 : 0
 } else {
+  // Match the real CLI: an explicit permission choice is incompatible with remote resume.
+  const launchArgs = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
+  if (
+    launchArgs.includes('resume') &&
+    launchArgs.includes('--remote') &&
+    launchArgs.some((arg) =>
+      [
+        '--dangerously-bypass-approvals-and-sandbox',
+        '--approve-for-me',
+        '--sandbox',
+        '-s',
+        '--ask-for-approval',
+        '-a',
+        '--add-dir'
+      ].includes(arg)
+    )
+  ) {
+    process.stderr.write('Permission overrides are not supported when resuming a remote task.\n')
+    process.exit(24)
+  }
   report('tui')
   process.stdin.setRawMode?.(true)
   process.stdout.write('NATIVE_TUI_READY\n')

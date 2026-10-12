@@ -221,7 +221,7 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 `deliveryStatus` 的含义：`waiting` 有已挂起的 MCP 等待；`ready` 可通知；`pending` 等待启动、MCP 或原生身份就绪；`busy` 等待原生会话空闲或当前领取结束；`offline` 无当前投递资源；`pull_only` 必须由 CLI 主动调用收件箱；`notified` 原生传输已接受提醒；`failed` 通知失败但消息仍保留。发送结果是该时刻的快照，可通过 `list_agents` 再读；任何状态都不代表任务完成。
 
-Codex 不以开发时验证版本作为门槛。适配器在实际 PTY 环境中探测 queue、remote、Unix listen 和 proxy，并通过官方 proxy 的 WebSocket upgrade 确认监听就绪。macOS、Linux、Windows 均走上游 unix:// 通道；Windows 不使用 Node path socket 假装连接 AF_UNIX。用户 model、sandbox、approval 保留；不兼容的显式 remote/profile/OSS、未识别参数或过长 socket 路径保留普通原生启动与 pull_only。POSIX 后台进程组和 Windows 进程树清理覆盖本次拥有的 CLI 包装后代。
+Codex 不以开发时验证版本作为门槛。适配器在实际 PTY 环境中探测 queue、remote、Unix listen 和 proxy，并通过官方 proxy 的 WebSocket upgrade 确认监听就绪；帮助参数存在不能提前建立自动通知资格。macOS、Linux、Windows 均走上游 unix:// 通道，socket 父目录由 Codex 创建并设置原生权限；Windows 不使用 Node path socket 假装连接 AF_UNIX，也不以 Node `chmod` 代替 Windows ACL。用户 model、sandbox、approval 保留；不兼容的显式 remote/profile/OSS、未识别参数、过长 socket 路径或可选 app-server 启动失败保留普通原生启动与 pull_only。恢复已有 thread 且传入显式权限覆盖时，同样保留完整普通 resume 命令、有效会话引用和 MCP 配置，避免上游 remote resume 的权限覆盖拒绝；不通过移除权限或新建会话规避限制。失败回退只发生在 remote TUI 启动之前，先清理后台资源，保留首次提示与恢复参数；主动关闭后不得重启，也不得因已开始的 remote 会话退出而自动重放任务。POSIX 后台进程组和 Windows 进程树清理覆盖本次拥有的 CLI 包装后代。
 
 Claude Code 实现最低版本为 2.1.139，依据是该版首次提供本实现使用的 Hook exec-form args；2.1.261 只是既有验证版本。原生 SessionStart/认证 Hook 握手确认本次资源，不因未知版本字符串直接禁用通知。私有 FileChanged 信号只写一次，固定 matcher 只建立监听、不领取提醒，asyncRewake Hook 才领取一次通知，不替换用户动态 watchPaths。临时合并保留用户 settings、Hook 和权限；禁用 Hook 时通知失败，消息仍保留。
 

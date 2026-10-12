@@ -28,15 +28,26 @@ describe('terminal provider application shutdown', () => {
   let rootDirectory = ''
   let endpoint = ''
   let server: TerminalProviderServer | null = null
+  let ownedProcesses: ControlledProcessPort | undefined
+  let ownedStore: GatedTerminalRecoveryStore | undefined
 
   beforeEach(async () => {
+    server = null
+    ownedProcesses = undefined
+    ownedStore = undefined
     rootDirectory = await mkdtemp(join(tmpdir(), 'cc-provider-shutdown-'))
     endpoint = createProviderEndpoint(rootDirectory)
   })
 
   afterEach(async () => {
-    await server?.close()
-    await rm(rootDirectory, { force: true, recursive: true })
+    ownedProcesses?.releaseStops()
+    ownedStore?.releaseCheckpoints()
+    TestProviderClient.closeAll()
+    try {
+      await server?.close()
+    } finally {
+      await rm(rootDirectory, { force: true, recursive: true })
+    }
   })
 
   it('acknowledges one Provider-owned release and does not duplicate it after disconnect', async () => {
@@ -45,7 +56,9 @@ describe('terminal provider application shutdown', () => {
     await server.start()
     const client = await TestProviderClient.connect(endpoint)
     await claimController(client)
-    for (let index = 0; index < 10; index += 1) {
+    // Batch/concurrency policy is covered by the shutdown coordinator's 20-candidate unit case.
+    // This real RPC/filesystem scenario needs multiple stopped sessions and one retained session.
+    for (let index = 0; index < 2; index += 1) {
       await createAndStart(client, identity(`default-${index}`))
     }
     const retained = identity('retained')
@@ -61,14 +74,14 @@ describe('terminal provider application shutdown', () => {
       await client.request<TerminalProviderApplicationDetachReceipt>('beginApplicationDetach')
 
     expect(repeated).toEqual(first)
-    await vi.waitFor(() => expect(processes.stops).toHaveLength(8))
+    await vi.waitFor(() => expect(processes.stops).toHaveLength(2))
     const awaiting = client.request('awaitApplicationDetach', {
       releaseId: first.releaseId
     })
     void awaiting.catch(() => undefined)
     client.close()
     processes.releaseStops()
-    await vi.waitFor(() => expect(processes.stops).toHaveLength(10))
+    await vi.waitFor(() => expect(processes.stops).toHaveLength(2))
 
     const reattached = await TestProviderClient.connect(endpoint)
     await vi.waitFor(async () => {
@@ -78,7 +91,8 @@ describe('terminal provider application shutdown', () => {
       readonly sessions: readonly TerminalSessionSnapshot[]
     }>('listSessions')
     expect(listed.sessions.map(({ sessionId }) => sessionId)).toEqual(['retained'])
-    expect(new Set(processes.stops).size).toBe(10)
+    expect(processes.stops).toHaveLength(2)
+    expect(new Set(processes.stops).size).toBe(2)
     reattached.close()
   })
 
@@ -157,10 +171,12 @@ describe('terminal provider application shutdown', () => {
   })
 
   function createServer(
-    processes: TerminalProcessPort,
+    processes: ControlledProcessPort,
     onExitRequested?: () => void,
     store?: FileTerminalRecoveryStore
   ) {
+    ownedProcesses = processes
+    if (store instanceof GatedTerminalRecoveryStore) ownedStore = store
     return new TerminalProviderServer({
       endpoint,
       authToken: 'secret-token',
@@ -195,6 +211,11 @@ class GatedTerminalRecoveryStore extends FileTerminalRecoveryStore {
   releaseCheckpoint(): void {
     if (!this.activeCheckpoint) throw new Error('No checkpoint is currently blocked.')
     this.activeCheckpoint.resolve()
+  }
+
+  releaseCheckpoints(): void {
+    this.blockedCheckpoint?.resolve()
+    this.activeCheckpoint?.resolve()
   }
 
   override async writeCheckpoint(
@@ -254,10 +275,16 @@ class ControlledProcessPort implements TerminalProcessPort {
 }
 
 class TestProviderClient {
+  private static readonly clients = new Set<TestProviderClient>()
   private readonly decoder = new TerminalProviderFrameDecoder()
   private readonly responses = new Map<
     string,
-    { readonly resolve: (value: unknown) => void; readonly reject: (error: unknown) => void }
+    {
+      readonly resolve: (value: unknown) => void
+      readonly reject: (error: unknown) => void
+      readonly timeout: ReturnType<typeof setTimeout>
+      readonly method: string
+    }
   >()
   private controllerLeaseId: string | undefined
 
@@ -267,7 +294,8 @@ class TestProviderClient {
     })
     socket.on('close', () => {
       for (const pending of this.responses.values()) {
-        pending.reject(new Error('Provider connection closed.'))
+        clearTimeout(pending.timeout)
+        pending.reject(new Error(`Provider connection closed while waiting for ${pending.method}.`))
       }
       this.responses.clear()
     })
@@ -279,24 +307,25 @@ class TestProviderClient {
       socket.once('connect', resolve)
       socket.once('error', reject)
     })
-    return new TestProviderClient(socket)
+    const client = new TestProviderClient(socket)
+    this.clients.add(client)
+    return client
+  }
+
+  static closeAll(): void {
+    for (const client of this.clients) client.close()
   }
 
   request<T = void>(method: string, params?: unknown): Promise<T> {
     const requestId = randomUUID()
-    this.socket.write(
-      encodeTerminalProviderFrame({
-        type: 'request',
-        protocolVersion: terminalProviderProtocolVersion,
-        requestId,
-        authToken: 'secret-token',
-        controllerLeaseId: this.controllerLeaseId,
-        method,
-        params
-      })
-    )
     return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.responses.delete(requestId)
+        reject(new Error(`Provider request ${method} did not complete within 2500ms.`))
+      }, 2_500)
       this.responses.set(requestId, {
+        timeout,
+        method,
         resolve: (value) => {
           if (
             method === 'claimController' &&
@@ -311,10 +340,22 @@ class TestProviderClient {
         },
         reject
       })
+      this.socket.write(
+        encodeTerminalProviderFrame({
+          type: 'request',
+          protocolVersion: terminalProviderProtocolVersion,
+          requestId,
+          authToken: 'secret-token',
+          controllerLeaseId: this.controllerLeaseId,
+          method,
+          params
+        })
+      )
     })
   }
 
   close(): void {
+    TestProviderClient.clients.delete(this)
     this.socket.destroy()
   }
 
@@ -323,6 +364,7 @@ class TestProviderClient {
     if (response.type !== 'response') return
     const pending = this.responses.get(response.requestId)
     if (!pending) return
+    clearTimeout(pending.timeout)
     this.responses.delete(response.requestId)
     if (response.ok) pending.resolve(response.result)
     else pending.reject(response.error)

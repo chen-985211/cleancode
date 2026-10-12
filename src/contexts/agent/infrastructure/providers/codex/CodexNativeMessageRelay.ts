@@ -7,7 +7,7 @@ ${codexWindowsInvocation}
 import { spawn, execFile } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
 import { readFile, writeFile, rename, stat, unlink } from 'node:fs/promises';
-import { watch, writeFileSync, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
+import { watch, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
 import { isatty } from 'node:tty';
 import { dirname, join } from 'node:path';
 
@@ -15,37 +15,27 @@ const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const windowsCommand = process.platform === 'win32'
   ? resolveCodexWindowsInvocation(config.executable, config.cwd, process.env) : null;
 const directory = dirname(process.argv[2]);
-const socketPath = join(directory, 's');
+const socketPath = join(directory, ...config.socketPathSegments);
 const endpoint = 'unix://' + socketPath;
 let invocationId = 0;
 const requestPath = join(directory, 'request');
 const responsePath = join(directory, 'response');
 let closing = false;
+let nativeReady = false;
+let shutdownPromise;
 let queued;
 let lastRequest;
 const accepted = new Set();
 const children = new Set();
 const groups = new Set();
 const exits = new Map();
-const encode = value => Buffer.from(value, 'utf8').toString('base64');
 // Keep npm shim discovery in the PTY's environment; data never becomes shell syntax.
 const invocation = args => {
   if (windowsCommand) return { executable: windowsCommand.executable, args: [...windowsCommand.prefix, ...args] };
   if (process.platform !== 'win32' || /\.(exe|com)$/i.test(config.executable))
     return { executable: config.executable, args };
-  const decode = value => "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + encode(value) + "'))";
-  // Keep the PowerShell command short even when the native argv contains long instructions.
-  const argsPath = join(directory, 'argv-' + (++invocationId) + '.json');
-  writeFileSync(argsPath, JSON.stringify({executable:config.executable,args}), {mode:0o600});
-  const script = '$ErrorActionPreference="Stop"\n$spec=Get-Content -LiteralPath (' + decode(argsPath) +
-    ') -Raw -Encoding UTF8 | ConvertFrom-Json\n$cli=(Get-Command -Name $spec.executable -ErrorAction Stop | Select-Object -First 1).Path\n' +
-    // Preserve the foreground launcher’s PowerShell companion selection for npm/custom shims.
-    'if ([IO.Path]::GetExtension($cli) -eq ".cmd") {\n' +
-    '  $companion=[IO.Path]::ChangeExtension($cli,".ps1")\n' +
-    '  if (Test-Path -LiteralPath $companion -PathType Leaf) { $cli=$companion }\n}\n' +
-    '$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
-  return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-    '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], argsPath };
+  return createCodexWindowsScriptInvocation(config.executable, args,
+    join(directory, 'argv-' + (++invocationId) + '.argv'));
 };
 const stopChild = (child, force = false) => {
   if (!child?.pid || !children.has(child)) return;
@@ -84,6 +74,7 @@ const spawnOwned = (args, stdio) => {
   return child;
 };
 const capture = async args => {
+  if (closing) return '';
   const child = spawnOwned(args, ['ignore', 'pipe', 'pipe']);
   let output = '';
   const collect = chunk => { if (output.length < 65536) output += chunk.toString(); else stopChild(child, true); };
@@ -96,15 +87,19 @@ const capture = async args => {
   return code === 0 ? output : '';
 };
 ${codexNativeMessageFiles}
-const shutdown = async () => {
-  if (closing) return;
+const shutdown = () => {
+  if (shutdownPromise) return shutdownPromise;
   closing = true;
-  watcher.close();
-  for (const child of children) stopChild(child);
-  const force = setTimeout(() => { for (const child of children) stopChild(child, true); }, 1000);
-  await Promise.all([...exits.values()]);
-  clearTimeout(force);
-  await writeFile(join(directory, 'closed'), '', { mode: 0o600 }).catch(() => {});
+  nativeReady = false;
+  shutdownPromise = (async () => {
+    watcher.close();
+    for (const child of children) stopChild(child);
+    const force = setTimeout(() => { for (const child of children) stopChild(child, true); }, 1000);
+    await Promise.all([...exits.values()]);
+    clearTimeout(force);
+    await writeFile(join(directory, 'closed'), '', { mode: 0o600 }).catch(() => {});
+  })();
+  return shutdownPromise;
 };
 const remoteArgs = () => ['--remote', endpoint];
 const receive = async () => {
@@ -112,7 +107,7 @@ const receive = async () => {
   try { request = JSON.parse(await readFile(requestPath, 'utf8')); } catch { return; }
   if (request.kind === 'close') { await shutdown(); return; }
   if (request.kind === 'cancel') { if (request.id === lastRequest) stopChild(queued, true); return; }
-  if (closing || queued || request.kind !== 'notify') return;
+  if (closing || !nativeReady || queued || request.kind !== 'notify') return;
   if (typeof request.id !== 'string' || typeof request.notificationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(request.threadId)) return;
   const messageKey = request.threadId + ':' + request.notificationId;
   if (accepted.has(messageKey)) {
@@ -145,17 +140,30 @@ const has = (text, words) => words.every(word => text.includes(word));
 const supported = has(queueHelp, ['--thread', '--message', '--remote']) &&
   has(serverHelp, ['--listen']) && has(tuiHelp, ['--remote']) &&
   has(serverHelp, ['unix://']) && has(proxyHelp, ['--sock']);
-if (!closing) await publish(join(directory, 'capability'), { supported });
-if (!supported && !closing) {
-  const tui = spawnOwned([...config.tuiArgs, ...(config.initialPrompt ? ['--', config.initialPrompt] : [])], 'inherit');
-  process.exitCode = await exits.get(tui);
-  await shutdown();
-} else if (!closing) {
-  const server = spawnOwned(['app-server', '--listen', endpoint, ...config.serverArgs], ['ignore', 'ignore', 'ignore']);
-  const serverExit = exits.get(server).then(async () => { if (!closing) await shutdown(); });
+let serverExit;
+let serverExited = false;
+let remoteTuiStarted = false;
+let serverErrors = '';
+const reportServerStartupFailure = () => {
+  for (const name of ['CLEANCODE_MCP_TOKEN', 'CLEANCODE_CODEX_NOTIFY_TOKEN']) {
+    const value = process.env[name];
+    if (value) serverErrors = serverErrors.replaceAll(value, '<redacted>');
+  }
+  if (!closing) process.stderr.write(serverErrors || 'CleanCode: native Codex server did not start.\n');
+};
+if (supported && !closing) {
+  const server = spawnOwned(['app-server', '--listen', endpoint, ...config.serverArgs], ['ignore', 'ignore', 'pipe']);
+  server.stderr.on('data', chunk => {
+    serverErrors += chunk.toString().slice(0, Math.max(0, 65536 - serverErrors.length));
+  });
+  serverExit = exits.get(server).then(async () => {
+    serverExited = true;
+    if (remoteTuiStarted && !closing) await shutdown();
+  });
   // The official proxy owns AF_UNIX on Windows. Node's path sockets are named
   // pipes there; checking a socket file or opening a Node socket is not readiness.
   const connected = async () => {
+    if (closing || serverExited) return false;
     const proxy = spawnOwned(['app-server', 'proxy', '--sock', socketPath], ['pipe', 'pipe', 'ignore']);
     const accepted = await new Promise(resolve => {
       let output = '';
@@ -173,6 +181,7 @@ if (!supported && !closing) {
       });
       proxy.once('error', () => finish(false));
       proxy.once('close', () => finish(false));
+      void exits.get(server).then(() => finish(false));
       proxy.stdin.on('error', () => finish(false));
       // proxy forwards bytes; the control socket itself speaks WebSocket, not JSONL.
       proxy.stdin.write('GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + key + '\r\n\r\n');
@@ -183,16 +192,38 @@ if (!supported && !closing) {
     return accepted;
   };
   const deadline = Date.now() + 10000;
-  while (!closing && !(await connected())) {
-    if (Date.now() >= deadline) { process.stderr.write('CleanCode: native Codex server did not start.\n'); await shutdown(); break; }
+  while (!closing && !serverExited) {
+    if (await connected()) { nativeReady = !closing && !serverExited; break; }
+    if (Date.now() >= deadline) break;
     await new Promise(resolve => setTimeout(resolve, 50));
   }
+  if (!nativeReady && !closing) {
+    // The optional server may fail independently of the user's interactive CLI.
+    // Reap it before launching the ordinary TUI; explicit shutdown never falls back.
+    stopChild(server);
+    const force = setTimeout(() => stopChild(server, true), 1000);
+    await exits.get(server);
+    clearTimeout(force);
+    exits.delete(server);
+    reportServerStartupFailure();
+  }
+}
+if (!closing) {
+  await publish(join(directory, 'capability'), { supported: nativeReady });
+  // Publishing readiness is asynchronous; the server can exit or shutdown can win meanwhile.
+  if (serverExited && nativeReady) {
+    nativeReady = false;
+    await publish(join(directory, 'capability'), { supported: false });
+    reportServerStartupFailure();
+  }
   if (!closing) {
-    const tui = spawnOwned([...config.tuiArgs, ...remoteArgs(), ...(config.initialPrompt ? ['--', config.initialPrompt] : [])], 'inherit');
-    await receive();
+    remoteTuiStarted = nativeReady;
+    const tui = spawnOwned([...config.tuiArgs, ...(nativeReady ? remoteArgs() : []), ...(config.initialPrompt ? ['--', config.initialPrompt] : [])], 'inherit');
+    if (nativeReady) await receive();
     process.exitCode = await exits.get(tui);
     await shutdown();
-  } else process.exitCode = 1;
-  await serverExit;
+  }
 }
+await serverExit;
+await shutdownPromise;
 `
