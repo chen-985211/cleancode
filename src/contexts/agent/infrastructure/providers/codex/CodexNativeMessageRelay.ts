@@ -7,7 +7,7 @@ ${codexWindowsInvocation}
 import { spawn, execFile } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
 import { readFile, writeFile, rename, stat, unlink } from 'node:fs/promises';
-import { watch, writeFileSync, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
+import { watch, unlinkSync, fstatSync, openSync, closeSync } from 'node:fs';
 import { isatty } from 'node:tty';
 import { dirname, join } from 'node:path';
 
@@ -29,25 +29,13 @@ const accepted = new Set();
 const children = new Set();
 const groups = new Set();
 const exits = new Map();
-const encode = value => Buffer.from(value, 'utf8').toString('base64');
 // Keep npm shim discovery in the PTY's environment; data never becomes shell syntax.
 const invocation = args => {
   if (windowsCommand) return { executable: windowsCommand.executable, args: [...windowsCommand.prefix, ...args] };
   if (process.platform !== 'win32' || /\.(exe|com)$/i.test(config.executable))
     return { executable: config.executable, args };
-  const decode = value => "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + encode(value) + "'))";
-  // Keep the PowerShell command short even when the native argv contains long instructions.
-  const argsPath = join(directory, 'argv-' + (++invocationId) + '.json');
-  writeFileSync(argsPath, JSON.stringify({executable:config.executable,args}), {mode:0o600});
-  const script = '$ErrorActionPreference="Stop"\n$spec=Get-Content -LiteralPath (' + decode(argsPath) +
-    ') -Raw -Encoding UTF8 | ConvertFrom-Json\n$cli=(Get-Command -Name $spec.executable -ErrorAction Stop | Select-Object -First 1).Path\n' +
-    // Preserve the foreground launcher’s PowerShell companion selection for npm/custom shims.
-    'if ([IO.Path]::GetExtension($cli) -eq ".cmd") {\n' +
-    '  $companion=[IO.Path]::ChangeExtension($cli,".ps1")\n' +
-    '  if (Test-Path -LiteralPath $companion -PathType Leaf) { $cli=$companion }\n}\n' +
-    '$argv=@($spec.args)\n& $cli @argv\nexit $LASTEXITCODE';
-  return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-    '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], argsPath };
+  return createCodexWindowsScriptInvocation(config.executable, args,
+    join(directory, 'argv-' + (++invocationId) + '.argv'));
 };
 const stopChild = (child, force = false) => {
   if (!child?.pid || !children.has(child)) return;

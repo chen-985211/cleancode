@@ -60,12 +60,13 @@ describe('Codex owned native session', () => {
       )
       await chmod(executable, 0o700)
       if (process.platform === 'win32') {
-        const psQuote = (value: string) => `'${value.replaceAll("'", "''")}'`
         // The same companion contract used by the existing foreground launcher.
         // Long configuration must not pass through cmd's 8191-character boundary.
         await writeFile(
           executable.replace(/\.cmd$/, '.ps1'),
-          `& ${psQuote(process.execPath)} ${psQuote(fixture)} @args\nexit $LASTEXITCODE\n`
+          await readFile(
+            new URL('../../../fixtures/contexts/agent/codexNativeMessageShim.ps1', import.meta.url)
+          )
         )
       }
       const artifacts = new AgentLaunchArtifactScope()
@@ -108,7 +109,9 @@ describe('Codex owned native session', () => {
           CLEANCODE_CODEX_NOTIFY_TOKEN: 'private-notify-credential-for-test',
           NATIVE_MESSAGE_REJECT_PROXY: startup === 'proxy-fails' ? '1' : '0',
           NATIVE_MESSAGE_HOLD_SERVER: startup === 'stop-server' ? '1' : '0',
-          NATIVE_MESSAGE_SHELL_VALUE: 'from-shell'
+          NATIVE_MESSAGE_SHELL_VALUE: 'from-shell',
+          NATIVE_MESSAGE_CLI_EXECUTABLE: process.execPath,
+          NATIVE_MESSAGE_CLI_FIXTURE: fixture
         },
         stdio: ['pipe', 'pipe', 'pipe']
       })
@@ -274,6 +277,9 @@ describe('Codex owned native session', () => {
         expect(
           records.every((record) => record.inherited === 'from-shell' && record.cwd === directory)
         ).toBe(true)
+        if (process.platform === 'win32') {
+          expect(records.every((record) => record.shim === 'yes')).toBe(true)
+        }
         expect(records[1].args).toEqual(expect.arrayContaining([...nativeArgs, '--remote']))
         expect(records[1].args.slice(-2)).toEqual(['--', initialPrompt])
         expect(records[2].args).toEqual(

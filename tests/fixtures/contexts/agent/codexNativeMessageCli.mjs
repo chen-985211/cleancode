@@ -18,6 +18,7 @@ const report = (kind) =>
       args,
       cwd: process.cwd(),
       inherited: process.env.NATIVE_MESSAGE_SHELL_VALUE,
+      shim: process.env.NATIVE_MESSAGE_SHIM_RAN,
       pid: process.pid,
       descendantPid,
       socketParentAlreadyExists

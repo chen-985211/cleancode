@@ -61,6 +61,8 @@ POSIX 后台 server/proxy/queue 使用独立进程组，清理覆盖 npm 包装�
 
 Windows 启动继续优先选择包装配套的 `.ps1`。Electron Node 模式缺失交互 stdin 时使用绝对控制台设备路径恢复输入；真实 ConPTY 集成测试覆盖无需回车的按键与 Ctrl+C。临时配置先解析真实路径，避免短路径文件监听断言；响应发布与 Agent 偏好持久化对 Windows 短暂共享锁进行有界重试。原生按键退出超时后，先通过现有关闭 IPC 收尾 relay，再停止 PTY，覆盖能力探测尚未结束时关闭。
 
+Windows relay 在实际 PTY 的 PATH 中解析原生 `.exe` / `.com` 后直接启动，不为每次能力探测、server、proxy 或 TUI 再启动 PowerShell。无路径命令不隐式搜索当前目录，遵循 [PowerShell 命令查找规则](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence)；同名 `.ps1` 优先，只有 npm `.cmd` 与已有 `.ps1` 配套包装均完整匹配标准模板时才直达官方 JS 入口。任一模板未匹配时保留既有 PowerShell 调用及 `.ps1` 伴随选择，不直接绕过到 JS 入口。自定义脚本的私有 argv 文件使用逐项 Base64，启动脚本通过 .NET 文件和字符串操作读取，避免 JSON、管道辅助命令造成 Utility 模块冷加载，并关闭启动包装的模块初始化进度输出。参数到达自定义脚本后，其原生子进程转发仍由脚本负责；Windows PowerShell 5.1 的直接 `& exe @args` 不保证内嵌引号，见 [原生参数传递说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parsing?view=powershell-7.5#passing-arguments-that-contain-quote-characters)。
+
 已有显式 remote、profile、OSS 或不能安全投影到 server 的参数继续保留普通原生启动并报告 pull_only。私有 socket 路径须小于 104 字节；过长时保留原生启动。通知使用同一 message ID 去重，但已经由上游接受的队列项无法保证撤回；最多一次安静的空读取仍是允许的竞态结果。模型本身可能要求更高 CLI 版本：0.149.0 使用本机默认 gpt-6-astra 时被服务端拒绝，改用本次明确指定的 gpt-5.5 后空闲链路通过。这是模型兼容限制，不是 queue 的首次版本。
 
 ### Claude Code
@@ -95,6 +97,10 @@ Windows CI 修复后的提交 `3e6a2a4b425e5275c6ce816deaaf4a30e85701ad` 已通�
 - Contract/集成：四种 Provider 的初始任务；跨 Provider 的真实 MCP HTTP 收发、确认、关联回复及零 PTY 协作写入；Claude 2.1.138/139/261 及非 semver 自定义构建的模拟版本命令边界；未知版本 Hook 握手；Codex 0.149.0/未知版本的模拟 CLI、WebSocket upgrade、通知去重、孙进程清理；OpenCode 真实插件模块/HTTP + **模拟 SDK**；Gemini JSONC 策略保留与本机真实 shell 特殊路径执行。
 - 标准 npm shim 的完整模板识别、超过 8191 字符参数的直接 argv 保留，以及修改过的包装拒绝绕过均由集成测试覆盖；Windows CI 已运行这些进程/参数测试；单独的参数字符串断言仍只证明编码契约。Codex Windows 夹具用 socket marker 模拟上游 proxy，**不是 Windows AF_UNIX 实测**。上面的原生平台 CI 记录覆盖该 OS 的进程/Hook 结果。
 - Electron E2E 使用仓库原生运行底座与模拟 Agent CLI；它不证明真实厂商 CLI 具备所需接口。
+
+Windows 启动性能增量新增原生命令、显式路径、PATH 顺序、目录排除及标准／自定义 PowerShell 包装的解析回归。Windows 专属测试在真实 `powershell.exe` 中检查 Unicode、内嵌引号、换行、空参数和长参数逐字到达脚本，且 bootstrap 未加载 Utility 模块；本机 macOS 跳过该用例。Codex 模拟包装在原生进程边界使用明确的 argv 转义，并报告包装逻辑确实执行，保留原有首次提示、恢复、失败回退和关闭断言。
+
+2026-10-12 的性能增量在本机 macOS 通过 pnpm verify:full：Contract 35 文件 / 171 项、单元 481 文件 / 3092 项、集成 70 文件 / 711 项、Electron E2E 22 文件 / 59 项通过；另有 22 项因平台条件跳过。终端退出 RPC 场景连续三次首次通过，并发上限及多批次停止仍由 20 个终止候选的单元场景覆盖；RPC 场景减少重复持久化准备，补上有界请求诊断与失败清理。该增量尚未运行 Windows CI，真实 Win10 Codex 0.160.0 的 MCP 启动耗时未测，不能复用此前 CI 结果宣称其 Windows 验证通过。
 
 ### 既有验证、增量调查与人工复现
 
