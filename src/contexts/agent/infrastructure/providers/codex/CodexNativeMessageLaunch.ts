@@ -11,6 +11,9 @@ import type {
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
 import { codexNativeMessageRelay } from './CodexNativeMessageRelay'
 
+// Codex creates the socket parent with its native permissions, independently of our files.
+const socketPathSegments = ['s', 's'] as const
+
 /** Unrecognized options retain the ordinary TUI: never silently drop user configuration. */
 export function projectCodexServerArguments(args: readonly string[]): string[] | null {
   const server: string[] = []
@@ -61,6 +64,7 @@ export async function prepareCodexNativeMessageLaunch(input: {
     JSON.stringify({
       cwd: command.workspaceDirectory,
       executable: nativePlan.executable,
+      socketPathSegments,
       serverArgs: input.serverArgs,
       tuiArgs: command.initialPrompt ? nativePlan.args.slice(0, -2) : nativePlan.args,
       initialPrompt: command.initialPrompt,
@@ -69,7 +73,7 @@ export async function prepareCodexNativeMessageLaunch(input: {
   )
   const directory = dirname(config.path)
   // Darwin's Unix socket path limit is 104 bytes including the trailing NUL.
-  if (Buffer.byteLength(join(directory, 's')) >= 104) {
+  if (Buffer.byteLength(join(directory, ...socketPathSegments)) >= 104) {
     await config.dispose()
     command.messageDelivery(null)
     return nativePlan

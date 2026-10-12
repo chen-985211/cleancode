@@ -14,19 +14,29 @@ import { prepareCodexNativeMessageLaunch } from '../../../../src/contexts/agent/
 
 describe('Codex owned native session', () => {
   it.each([
-    ['codex-cli 0.149.0', true, false],
-    [undefined, true, false],
-    ['codex-cli 999.0.0', false, false],
-    [undefined, true, true]
+    ['codex-cli 0.149.0', true, 'legacy'],
+    [undefined, true, 'legacy'],
+    ['codex-cli 999.0.0', false, 'legacy'],
+    [undefined, true, 'stop-probes'],
+    ['codex-cli 0.160.0', true, 'private-directory'],
+    ['codex-cli 0.160.0', true, 'server-fails'],
+    ['codex-cli 0.160.0', true, 'server-error-overflow'],
+    ['codex-cli 0.160.0', true, 'proxy-fails'],
+    ['codex-cli 0.160.0', true, 'stop-server']
   ] as const)(
-    'probes %s, supported=%s, early stop=%s, and cleans up all owned processes',
-    async (version, supported, stopDuringProbe) => {
+    'probes %s, supported=%s, startup=%s, and cleans up all owned processes',
+    async (version, supported, startup) => {
+      const stopping = startup === 'stop-probes' || startup === 'stop-server'
+      const serverFails = startup === 'server-fails' || startup === 'server-error-overflow'
+      const nativeReady = supported && !serverFails && startup !== 'proxy-fails'
       const directory = await realpath(await mkdtemp(join(tmpdir(), 'cc native 中文 $&-')))
       const report = join(directory, 'report')
       const rejectPath = join(directory, 'reject-queue')
       const gatePath = join(directory, 'queue-gate')
       const executable = join(directory, process.platform === 'win32' ? 'codex-验证.cmd' : 'codex')
       const nativeArgs = [
+        'resume',
+        '550e8400-e29b-41d4-a716-446655440000',
         '--sandbox',
         'read-only',
         '-a',
@@ -36,6 +46,8 @@ describe('Codex owned native session', () => {
         '-c',
         `developer_instructions='${'协作 instruction '.repeat(700)}'`
       ]
+      const initialPrompt = '领取任务 中文 $value & "quotes"'
+      const expectedTuiArgs = [...nativeArgs, '--', initialPrompt]
       const fixture = fileURLToPath(
         new URL('../../../fixtures/contexts/agent/codexNativeMessageCli.mjs', import.meta.url)
       )
@@ -64,12 +76,13 @@ describe('Codex owned native session', () => {
           artifacts,
           workspaceDirectory: directory,
           providerVersion: version,
+          initialPrompt,
           onProviderSessionIdentified: () => undefined,
           messageDelivery: (value) => {
             wakeup = value
           }
         },
-        nativePlan: { executable, args: nativeArgs, env: {} },
+        nativePlan: { executable, args: expectedTuiArgs, env: {} },
         serverArgs: ['-c', 'model_provider="custom"'],
         runtimeExecutable: process.execPath,
         runtimePlatform: process.platform,
@@ -87,7 +100,14 @@ describe('Codex owned native session', () => {
           NATIVE_MESSAGE_REJECT_PATH: rejectPath,
           NATIVE_MESSAGE_QUEUE_GATE: gatePath,
           NATIVE_MESSAGE_UNSUPPORTED: supported ? '0' : '1',
-          NATIVE_MESSAGE_HOLD_PROBES: stopDuringProbe ? '1' : '0',
+          NATIVE_MESSAGE_HOLD_PROBES: startup === 'stop-probes' ? '1' : '0',
+          NATIVE_MESSAGE_PRIVATE_DIRECTORY: startup === 'private-directory' ? '1' : '0',
+          NATIVE_MESSAGE_SERVER_FAILURE: serverFails ? '1' : '0',
+          NATIVE_MESSAGE_ERROR_OVERFLOW: startup === 'server-error-overflow' ? '1' : '0',
+          CLEANCODE_MCP_TOKEN: 'private-mcp-credential-for-test',
+          CLEANCODE_CODEX_NOTIFY_TOKEN: 'private-notify-credential-for-test',
+          NATIVE_MESSAGE_REJECT_PROXY: startup === 'proxy-fails' ? '1' : '0',
+          NATIVE_MESSAGE_HOLD_SERVER: startup === 'stop-server' ? '1' : '0',
           NATIVE_MESSAGE_SHELL_VALUE: 'from-shell'
         },
         stdio: ['pipe', 'pipe', 'pipe']
@@ -116,22 +136,30 @@ describe('Codex owned native session', () => {
         ])
       let scenarioFailure: unknown
       try {
-        if (stopDuringProbe) {
+        if (stopping) {
           await pollUntilState({
             observe: async () => readFile(report, 'utf8').catch(() => ''),
-            accept: (records) => records.includes('"kind":"probe"'),
+            accept: (records) =>
+              records.includes(startup === 'stop-probes' ? '"kind":"probe"' : '"kind":"server"'),
             timeoutMs: 5_000,
-            description: 'native capability probes entered before the TUI exists'
+            description: 'native startup entered before the TUI exists'
           })
           expect(relayOutput).not.toContain('NATIVE_TUI_READY')
+          identify('550e8400-e29b-41d4-a716-446655440000')
+          expect(wakeup).toBeFalsy()
           await plan.gracefulShutdown!.onTimeout!()
           await exited
           const records = (await readFile(report, 'utf8'))
             .trim()
             .split('\n')
             .map((line) => JSON.parse(line))
-          expect(records.every((record) => record.kind === 'probe')).toBe(true)
+          expect(records.some((record) => record.kind === 'tui')).toBe(false)
           for (const record of records) expect(() => process.kill(record.pid, 0)).toThrow()
+          for (const record of records) {
+            if (record.descendantPid) {
+              await vi.waitFor(() => expect(() => process.kill(record.descendantPid, 0)).toThrow())
+            }
+          }
           await artifacts.dispose()
           return
         }
@@ -161,15 +189,28 @@ describe('Codex owned native session', () => {
           .find((record) => record.kind === 'server')
         serverPid = server?.pid
         descendantPid = server?.descendantPid
-        if (!supported) {
+        if (!nativeReady) {
           await vi.waitFor(() => expect(wakeup).toBeNull())
           const records = (await readFile(report, 'utf8'))
             .trim()
             .split('\n')
             .map((line) => JSON.parse(line))
-          expect(records).toMatchObject([{ kind: 'tui', args: nativeArgs }])
+          expect(records.filter((record) => record.kind === 'tui')).toMatchObject([
+            { kind: 'tui', args: expectedTuiArgs }
+          ])
+          if (serverFails) {
+            expect(relayErrors).toContain('socket directory is not private to the current user')
+            expect(relayErrors).not.toContain('private-mcp-credential-for-test')
+            expect(relayErrors).not.toContain('private-notify-credential-for-test')
+            expect(relayErrors.length).toBeLessThanOrEqual(65536)
+          }
+          if (serverPid) expect(() => process.kill(serverPid!, 0)).toThrow()
+          if (descendantPid) {
+            await vi.waitFor(() => expect(() => process.kill(descendantPid!, 0)).toThrow())
+          }
           await artifacts.dispose()
           await exited
+          for (const record of records) expect(() => process.kill(record.pid, 0)).toThrow()
           return
         }
         const threadId = '550e8400-e29b-41d4-a716-446655440000'
@@ -220,6 +261,7 @@ describe('Codex owned native session', () => {
           .trim()
           .split('\n')
           .map((line) => JSON.parse(line))
+        expect(records[0].socketParentAlreadyExists).toBe(false)
         expect(records.map((record) => record.kind)).toEqual([
           'server',
           'tui',
@@ -233,6 +275,7 @@ describe('Codex owned native session', () => {
           records.every((record) => record.inherited === 'from-shell' && record.cwd === directory)
         ).toBe(true)
         expect(records[1].args).toEqual(expect.arrayContaining([...nativeArgs, '--remote']))
+        expect(records[1].args.slice(-2)).toEqual(['--', initialPrompt])
         expect(records[2].args).toEqual(
           expect.arrayContaining(['--thread', threadId, '--message', agentInboxWakeupPrompt])
         )

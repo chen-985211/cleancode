@@ -53,6 +53,10 @@
 
 实际 CLI 在原 PTY 环境中探测。TUI、专属 app-server、queue 继承同一配置与环境，不接管用户 daemon。Windows 继续使用上游 AF_UNIX；**不调用 Node net.createConnection(path) 假装探测 AF_UNIX**。proxy 是字节转发，控制 socket 讲 WebSocket；就绪检测必须发送 HTTP upgrade 并核对 Sec-WebSocket-Accept，不能直接发送 JSONL。
 
+socket 使用本次 launch 临时目录下尚不存在的独立子目录，由 Codex 自己创建并设置平台原生权限。已核对的 0.153.4 没有严格 Windows DACL 检查，0.154.0 与 0.160.0 已要求已有目录具有受保护、只允许当前用户的继承 ACL，并拒绝就地修复不安全目录，见 [Windows control socket 加固](https://github.com/openai/codex/pull/42326)；Node 的 `chmod(0700)` 不能替代 Windows DACL。完整 socket 路径（含新增子目录）参与长度限制判断。此修复不降低上游权限要求，不修改用户目录的 ACL。
+
+只有正式 proxy 的 WebSocket 握手完成后才发布自动通知资格。可选 app-server 提前退出或未在有界期限内就绪时，先清理本次拥有的后台进程，再保留原参数、首次提示与恢复引用启动普通 TUI，通知降级为 pull_only；有界 CLI 错误输出保留在当前终端，CleanCode 自有认证 token 脱敏，不另存为诊断日志。主动关闭、取消或临时配置释放不会触发回退重启；已连接的 remote TUI 运行期间服务退出仍沿既有关闭路径处理，不自动重放用户任务。
+
 POSIX 后台 server/proxy/queue 使用独立进程组，清理覆盖 npm 包装进程的后代；交互 TUI 留在原终端。Windows 对标准 npm Codex .cmd 进行完整模板和包入口校验，再用该脚本原本选择的 node.exe 执行官方 bin/codex.js，保留其平台选择、环境与信号逻辑，避免 8191 字符的 cmd 上限截断 CleanCode 自身的长指令。其他包装仍由 PowerShell 读取私有参数文件执行，避免巨大的 EncodedCommand；不跳过自定义包装里的逻辑。taskkill /T 清理本次拥有的进程树。该绕过接在消息 launcher 内；显式 profile 等直接退回普通启动的路径，以及自定义或尚未识别的 .cmd 模板，仍受 cmd 长度/转义限制，应选择原生 exe。这个限制来自当前 CleanCode 启动路径，不是 Windows 不支持 AF_UNIX；本次 Windows CI 已验证模拟 CLI 的进程启动与参数保留，真实 Codex AF_UNIX 仍未实测。模板依据是 [npm cmd-shim](https://github.com/npm/cmd-shim/blob/main/lib/index.js)，官方入口见 [Codex bin/codex.js](https://github.com/openai/codex/blob/rust-v0.149.0/codex-cli/bin/codex.js)。
 
 Windows 启动继续优先选择包装配套的 `.ps1`。Electron Node 模式缺失交互 stdin 时使用绝对控制台设备路径恢复输入；真实 ConPTY 集成测试覆盖无需回车的按键与 Ctrl+C。临时配置先解析真实路径，避免短路径文件监听断言；响应发布与 Agent 偏好持久化对 Windows 短暂共享锁进行有界重试。原生按键退出超时后，先通过现有关闭 IPC 收尾 relay，再停止 PTY，覆盖能力探测尚未结束时关闭。
@@ -85,6 +89,8 @@ launch 插件持有原生 SDK，通过带随机 token 的 loopback HTTP 接收�
 
 Windows CI 修复后的提交 `3e6a2a4b425e5275c6ce816deaaf4a30e85701ad` 已通过三平台 [Full cross-platform quality](https://github.com/chen-985211/cleancode/actions/runs/34088237185) 和 [Electron E2E](https://github.com/chen-985211/cleancode/actions/runs/34088237365)，包括 Windows 两个原生集成分片、三个 Electron E2E 分片与打包冒烟。这些是对应 OS 上真实 Electron、PTY、进程和 Hook 配合**模拟厂商 CLI/SDK**的结果，不是实际厂商 CLI 的完整协作验收。后续夹具将同伴结果报告改为原子发布，修复本地读到半成品 JSON 的竞态；最终提交的验证结果记录在 PR 检查与说明中。
 
+2026-10-12 的 Codex 0.160.0 启动兼容修复在本机 macOS 通过 pnpm verify:full：Contract 35 文件 / 171 项、单元 481 文件 / 3092 项、集成 70 文件 / 709 项、Electron E2E 22 文件 / 59 项通过；另有 5 个集成文件 / 21 项因平台条件跳过。新增夹具模拟新版拒绝已有 socket 父目录、server 提前退出与 proxy 握手失败，验证普通 TUI 回退、参数保留、关闭期间不重启、错误输出脱敏及后台进程清理；真实临时文件测试覆盖完整 socket 路径的 103/104 字节边界。这些结果不构成 Windows ACL 或真实 Win10 Codex 0.160.0 验收。
+
 - 单元：共享 AgentInboxDelivery 的 idle/busy、确认、合并、失败重试、旧 launch 回调隔离；Provider 配置与身份 codec。
 - Contract/集成：四种 Provider 的初始任务；跨 Provider 的真实 MCP HTTP 收发、确认、关联回复及零 PTY 协作写入；Claude 2.1.138/139/261 及非 semver 自定义构建的模拟版本命令边界；未知版本 Hook 握手；Codex 0.149.0/未知版本的模拟 CLI、WebSocket upgrade、通知去重、孙进程清理；OpenCode 真实插件模块/HTTP + **模拟 SDK**；Gemini JSONC 策略保留与本机真实 shell 特殊路径执行。
 - 标准 npm shim 的完整模板识别、超过 8191 字符参数的直接 argv 保留，以及修改过的包装拒绝绕过均由集成测试覆盖；Windows CI 已运行这些进程/参数测试；单独的参数字符串断言仍只证明编码契约。Codex Windows 夹具用 socket marker 模拟上游 proxy，**不是 Windows AF_UNIX 实测**。上面的原生平台 CI 记录覆盖该 OS 的进程/Hook 结果。
@@ -93,6 +99,8 @@ Windows CI 修复后的提交 `3e6a2a4b425e5275c6ce816deaaf4a30e85701ad` 已通�
 ### 既有验证、增量调查与人工复现
 
 用户在引入协作功能的分支已手动验证的结果继续有效。本次仅需要验证改动涉及的较低版本、新增 OpenCode 通知和平台差异，不把已有链路当作未验证重新建设测试工具。本次调查中使用过临时真实 CLI 驱动；其 JSON 记录保留在本机 test-results/native-probe/，驱动及 package/knip 入口已撤除。失败记录可能含终端诊断片段，不自动上传；模型未执行要求的动作、未结束回合或原生 session.error 都不能改记为通过。
+
+2026-10-12 另以本机 macOS arm64 的真实 Codex 0.162.1 执行修复后的 relay，确认 Codex 创建独立 socket 父目录、正式 proxy 完成 WebSocket 握手、TUI `--help` 正常退出并完成清理；未发起模型回合，也未验证真实 Win10 或真实 Codex 0.160.0。该烟测仅证明本机新版 CLI 的启动链路。
 
 在对应原生 OS 中沿用现有 CleanCode 操作流程复现：
 
