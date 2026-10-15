@@ -156,7 +156,7 @@
   --cc-easing-loading-shimmer-wave: ease-in-out;
   --cc-canvas-node-radius: 20px;
   --cc-terminal-light-background: #ffffff;
-  --cc-terminal-light-foreground: #243142;
+  --cc-terminal-light-foreground: #172033;
   --cc-terminal-light-cursor: #172033;
   --cc-terminal-light-selection: #cbdcf8;
   --cc-terminal-light-search-active: #95630c;
@@ -176,7 +176,7 @@
   --cc-terminal-light-bright-blue: #3f7dde;
   --cc-terminal-light-bright-magenta: #a565cb;
   --cc-terminal-light-bright-cyan: #188fa8;
-  --cc-terminal-light-bright-white: #243142;
+  --cc-terminal-light-bright-white: #172033;
   --cc-terminal-dark-background: #000000;
   --cc-terminal-dark-foreground: #d6dee8;
   --cc-terminal-dark-cursor: #f8fafc;

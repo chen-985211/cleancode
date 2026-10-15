@@ -141,7 +141,7 @@ describe('headless terminal model', () => {
     },
     {
       background: '\u001b]11;rgb:ffff/ffff/ffff\u001b\\',
-      foreground: '\u001b]10;rgb:2424/3131/4242\u001b\\',
+      foreground: '\u001b]10;rgb:1717/2020/3333\u001b\\',
       theme: 'light' as const
     }
   ])(
