@@ -18,6 +18,7 @@ import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSessio
 import type { LocalPortAllocation } from './LocalPortAllocator'
 import type { LocalPortAllocator } from './LocalPortAllocator'
 import { ManagedServiceApplicationShutdown } from './ManagedServiceApplicationShutdown'
+import { OutputReadinessMatcher } from './OutputReadinessMatcher'
 import { createRunAttemptDetails } from './RunFailureDetails'
 import {
   createManagedRunId,
@@ -298,7 +299,10 @@ export class ManagedServiceLauncher {
       allocation?: LocalPortAllocation
       service?: ActiveManagedService
     } = {}
-    let outputTail = ''
+    const outputMatcher =
+      command.readiness.type === 'output'
+        ? new OutputReadinessMatcher(command.readiness.text)
+        : null
     let resolveOutput: () => void = () => undefined
     const outputReady = new Promise<void>((resolve) => {
       resolveOutput = resolve
@@ -354,14 +358,7 @@ export class ManagedServiceLauncher {
         },
         onOutput: (event) => {
           command.onOutput(event)
-          if (command.readiness.type === 'output') {
-            const combined = `${outputTail}${event.data}`
-            if (combined.includes(command.readiness.text)) {
-              resolveOutput()
-            } else {
-              outputTail = combined.slice(Math.min(0, 1 - command.readiness.text.length))
-            }
-          }
+          if (outputMatcher?.accept(event.data)) resolveOutput()
         },
         onExit: (event) => {
           rejectExit(
