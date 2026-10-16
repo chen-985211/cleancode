@@ -42,12 +42,14 @@ type HeartbeatPinMetadata = TerminalProviderHeartbeatOwner & {
 const candidateImageKey = '0.1.6-pinned0000000000'
 const unusedImageKey = '0.1.5-stale00000000000'
 
-describe('TerminalProviderRuntimeImageManager', () => {
+// Real filesystem materialization can exceed Vitest's default 5s budget on Windows CI.
+describe('TerminalProviderRuntimeImageManager', { timeout: 15_000 }, () => {
   let temporaryDirectory = ''
   let installDirectory = ''
   let runtimeRootDirectory = ''
   let providerStateDirectory = ''
   let heartbeatLeases: TerminalProviderHeartbeatLease[] = []
+  let drainArchiveCopy: (() => Promise<void>) | undefined
 
   beforeEach(async () => {
     temporaryDirectory = await mkdtemp(join(tmpdir(), 'cc-provider-runtime-image-'))
@@ -55,14 +57,19 @@ describe('TerminalProviderRuntimeImageManager', () => {
     runtimeRootDirectory = join(temporaryDirectory, 'local-app-data', 'terminal-provider-host')
     providerStateDirectory = join(temporaryDirectory, 'provider-state')
     heartbeatLeases = []
+    drainArchiveCopy = undefined
     await createPackagedWindowsFixture(installDirectory)
   })
 
   afterEach(async () => {
-    await Promise.all(heartbeatLeases.map((lease) => lease.close().catch(() => undefined)))
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    await rm(temporaryDirectory, { force: true, recursive: true })
+    try {
+      await drainArchiveCopy?.()
+    } finally {
+      await Promise.all(heartbeatLeases.map((lease) => lease.close().catch(() => undefined)))
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+      await rm(temporaryDirectory, { force: true, recursive: true })
+    }
   })
 
   it('atomically materializes the packaged Windows Provider closure under a renamed host', async () => {
@@ -241,6 +248,10 @@ describe('TerminalProviderRuntimeImageManager', () => {
       }
     })
     const pending = manager.resolveLaunchTarget()
+    drainArchiveCopy = async () => {
+      releaseArchiveCopy?.()
+      await pending
+    }
     await archiveCopyStarted
     const lockEntry = (await readdir(runtimeRootDirectory)).find((entry) =>
       entry.endsWith('.publish-lock')

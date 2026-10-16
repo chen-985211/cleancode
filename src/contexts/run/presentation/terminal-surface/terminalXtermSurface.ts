@@ -113,8 +113,8 @@ class XtermTerminalSurface implements TerminalSurface {
       convertEol: true,
       cursorBlink: true,
       fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
-      fontSize: 12,
-      fontWeight: 500,
+      fontSize: 13,
+      fontWeight: 530,
       lineHeight: 1.32,
       linkHandler: {
         activate: (_event, target) => this.onOpenLink(target)

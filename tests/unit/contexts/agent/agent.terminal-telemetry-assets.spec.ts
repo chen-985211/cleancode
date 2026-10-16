@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 
 import { TerminalAgentTelemetryAssetStore } from '../../../../src/contexts/agent/infrastructure/terminal-activity/TerminalAgentTelemetryAssetStore'
 
-describe('terminal Agent telemetry assets', () => {
+// Real filesystem materialization can exceed Vitest's default 5s budget on Windows CI.
+describe('terminal Agent telemetry assets', { timeout: 15_000 }, () => {
   it('publishes stable provider shims, hook assets, and a replaceable gateway manifest', async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), 'cleancode-agent-telemetry-assets-'))
     try {

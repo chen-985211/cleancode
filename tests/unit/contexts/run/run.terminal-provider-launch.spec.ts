@@ -15,7 +15,8 @@ import {
   type TerminalProviderMetadata
 } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
 
-describe('PersistentTerminalProviderClient Provider launch', () => {
+// Real filesystem ownership updates can exceed Vitest's default 5s budget on Windows CI.
+describe('PersistentTerminalProviderClient Provider launch', { timeout: 15_000 }, () => {
   let stateDirectory = ''
 
   beforeEach(async () => {
