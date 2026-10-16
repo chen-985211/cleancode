@@ -19,6 +19,7 @@ import type {
   ManagedServiceRunSnapshot
 } from '../../../../src/contexts/run/application/services/ManagedServiceLauncher'
 import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
+import { outputReadinessCases } from '../../../fixtures/contexts/run/outputReadinessCases'
 
 describe('terminal workflow service', () => {
   it('starts roots in parallel, schedules fan-in once, and retains completed task sessions', async () => {
@@ -108,6 +109,56 @@ describe('terminal workflow service', () => {
       expect(runtime.commandStarts.map((start) => start.blockId)).toContain('browser')
     )
     expect(onlyRun(service, createWorkflowScope())?.nodes[0]?.status).toBe('ready')
+  })
+
+  it.each(outputReadinessCases)(
+    'recognizes $name at every output split',
+    async ({ text, output }) => {
+      vi.useFakeTimers()
+      try {
+        const partitions = [
+          output.split(''),
+          ...Array.from({ length: output.length + 1 }, (_, i) => [
+            output.slice(0, i),
+            output.slice(i)
+          ])
+        ]
+        for (const chunks of partitions) {
+          const runtime = new FakeRuntime()
+          const service = createService(createOutputServicePlan(text), runtime)
+          await service.start(createStartCommand())
+          for (const chunk of chunks) runtime.output('api', chunk)
+          expect(onlyRun(service, createWorkflowScope())?.nodes[0]?.status).toBe('ready')
+          expect(runtime.commandStarts.map((start) => start.blockId)).toEqual(['api', 'browser'])
+          await vi.advanceTimersByTimeAsync(30_001)
+          expect(runtime.historyPreservingStops).toEqual([])
+          await service.stopAll()
+        }
+      } finally {
+        vi.useRealTimers()
+      }
+    }
+  )
+
+  it('does not arm a readiness timeout after output arrives during process start', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new FakeRuntime()
+      const start = runtime.startCommand.bind(runtime)
+      vi.spyOn(runtime, 'startCommand').mockImplementation(async (command) => {
+        const session = await start(command)
+        if (command.blockId === 'api') runtime.output('api', 'server ready')
+        return session
+      })
+      const service = createService(createOutputServicePlan(), runtime)
+      await service.start(createStartCommand())
+      await vi.advanceTimersByTimeAsync(30_001)
+      expect(onlyRun(service, createWorkflowScope())?.nodes[0]?.status).toBe('ready')
+      expect(runtime.historyPreservingStops).toEqual([])
+      await service.stopAll()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('fails timed-out tasks, blocks descendants, and lets independent branches finish', async () => {
@@ -483,13 +534,13 @@ function createTaskPlan(): WorkflowRunPlanSnapshot {
   return plan([task('install-a'), task('install-b'), task('build', ['install-a', 'install-b'])])
 }
 
-function createOutputServicePlan(): WorkflowRunPlanSnapshot {
+function createOutputServicePlan(text = 'server ready'): WorkflowRunPlanSnapshot {
   return plan([
     {
       ...task('api'),
       executionConfig: {
         mode: 'service',
-        readiness: { type: 'output', text: 'server ready' },
+        readiness: { type: 'output', text },
         readinessTimeoutMs: 30_000
       }
     },

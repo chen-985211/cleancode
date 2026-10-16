@@ -3,6 +3,7 @@ import type { TerminalRunOwner } from '../../domain/value-objects/TerminalRunSco
 import type { WorkflowRunPlanSnapshot } from '../dto/WorkflowRunSnapshot'
 import type { StartTerminalWorkflowCommand } from '../dto/TerminalWorkflowCommand'
 import type { RunLifecycleService } from '../use-cases/RunLifecycleService'
+import type { OutputReadinessMatcher } from './OutputReadinessMatcher'
 
 export interface ActiveWorkflowRun {
   readonly run: WorkflowRun
@@ -11,7 +12,7 @@ export interface ActiveWorkflowRun {
   readonly sessionIds: Map<string, string>
   readonly timeoutIds: Map<string, ReturnType<typeof setTimeout>>
   readonly readinessControllers: Map<string, AbortController>
-  readonly outputTails: Map<string, string>
+  readonly outputMatchers: Map<string, OutputReadinessMatcher>
   readonly pendingNodeStarts: Set<Promise<void>>
   readonly lifecycleUnregisters: Array<() => void>
   hardDisposing: boolean

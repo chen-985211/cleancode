@@ -12,6 +12,7 @@ import type {
 import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 import { ServicePortLeaseRegistry } from '../../../../src/contexts/run/domain/services/ServicePortLeaseRegistry'
+import { outputReadinessCases } from '../../../fixtures/contexts/run/outputReadinessCases'
 
 describe('managed service launcher', () => {
   it('injects the allocated preferred fallback and proves ownership at the actual endpoint', async () => {
@@ -306,28 +307,31 @@ describe('managed service launcher', () => {
     expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
   })
 
-  it('waits for both the output marker and TCP reachability before inspecting ownership', async () => {
-    const readinessGate = deferred<void>()
-    const fixture = createFixture({
-      reservations: [41_001],
-      inspections: [{ ownership: 'owned', listenerProcessId: 201 }],
-      readinessGate
-    })
-    const launching = fixture.launcher.launch({
-      ...launchCommand(),
-      readiness: { type: 'output', text: 'ready' },
-      portIntent: preferredPort()
-    })
+  it.each(outputReadinessCases)(
+    'requires output and TCP ownership for $name',
+    async ({ text, output }) => {
+      const readinessGate = deferred<void>()
+      const fixture = createFixture({
+        reservations: [41_001],
+        inspections: [{ ownership: 'owned', listenerProcessId: 201 }],
+        readinessGate
+      })
+      const launching = fixture.launcher.launch({
+        ...launchCommand(),
+        readiness: { type: 'output', text },
+        portIntent: preferredPort()
+      })
 
-    await vi.waitFor(() => expect(fixture.processes.starts).toHaveLength(1))
-    fixture.processes.outputLatest('ready')
-    await vi.waitFor(() => expect(fixture.readiness.readyCommands).toHaveLength(1))
-    expect(fixture.inspector.commands).toEqual([])
+      await vi.waitFor(() => expect(fixture.processes.starts).toHaveLength(1))
+      for (const character of output.split('')) fixture.processes.outputLatest(character)
+      await vi.waitFor(() => expect(fixture.readiness.readyCommands).toHaveLength(1))
+      expect(fixture.inspector.commands).toEqual([])
 
-    readinessGate.resolve()
-    await launching
-    expect(fixture.inspector.commands).toHaveLength(1)
-  })
+      readinessGate.resolve()
+      await launching
+      expect(fixture.inspector.commands).toHaveLength(1)
+    }
+  )
 
   it('uses one cleanup path when the process exits before readiness', async () => {
     const readinessGate = deferred<void>()

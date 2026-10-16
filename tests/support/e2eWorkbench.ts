@@ -10,7 +10,9 @@ import { expect } from 'vitest'
 
 import {
   captureE2eFailureDiagnostics,
+  captureE2eShutdownFailure,
   initializeE2eDiagnostics,
+  observeE2eShutdown,
   startE2eTracing,
   stopE2eTracing
 } from './e2eDiagnostics'
@@ -364,6 +366,7 @@ export async function launchApp(
   })
   initializeE2eDiagnostics(electronApplication)
   try {
+    await observeE2eShutdown(electronApplication)
     await startE2eTracing(electronApplication)
     if (runElectronInBackground) {
       await assertElectronRunsInBackground(electronApplication)
@@ -516,6 +519,7 @@ export async function closeElectronApp(
     )
     await processExit
   } catch (error) {
+    await captureE2eShutdownFailure(electronApp)
     electronProcess.kill('SIGKILL')
     await waitForProcessExit(electronProcess, electronCloseTimeoutMs).catch(() => undefined)
     throw error

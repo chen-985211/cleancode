@@ -19,6 +19,7 @@ import type {
   TerminalWorkflowRuntimePort
 } from '../ports/TerminalWorkflowRuntimePort'
 import type { ManagedServiceLauncher } from '../services/ManagedServiceLauncher'
+import { OutputReadinessMatcher } from '../services/OutputReadinessMatcher'
 import { TerminalWorkflowApplicationShutdown } from '../services/TerminalWorkflowApplicationShutdown'
 import {
   ActiveWorkflowRunRegistry,
@@ -80,7 +81,7 @@ export class TerminalWorkflowService {
       sessionIds: new Map(),
       timeoutIds: new Map(),
       readinessControllers: new Map(),
-      outputTails: new Map(),
+      outputMatchers: new Map(),
       pendingNodeStarts: new Set(),
       lifecycleUnregisters: [],
       hardDisposing: false,
@@ -367,6 +368,13 @@ export class TerminalWorkflowService {
   }
 
   private armNodeGuards(activeRun: ActiveWorkflowRun, node: WorkflowRunPlanNodeSnapshot): void {
+    // Output/exit can arrive before startCommand resolves.
+    if (
+      activeRun.run.toSnapshot().nodes.find((item) => item.blockId === node.blockId)?.status !==
+      'running'
+    ) {
+      return
+    }
     const timeoutMs =
       node.executionConfig.mode === 'task'
         ? node.executionConfig.timeoutMs
@@ -411,14 +419,18 @@ export class TerminalWorkflowService {
       return
     }
 
-    const text = node.executionConfig.readiness.text
-    const combined = `${activeRun.outputTails.get(blockId) ?? ''}${output.data}`
-
-    if (combined.includes(text)) {
-      this.markServiceReady(activeRun, blockId)
-    } else {
-      activeRun.outputTails.set(blockId, combined.slice(Math.min(0, 1 - text.length)))
+    if (
+      activeRun.run.toSnapshot().nodes.find((item) => item.blockId === blockId)?.status !==
+      'running'
+    ) {
+      return
     }
+    let matcher = activeRun.outputMatchers.get(blockId)
+    if (!matcher) {
+      matcher = new OutputReadinessMatcher(node.executionConfig.readiness.text)
+      activeRun.outputMatchers.set(blockId, matcher)
+    }
+    if (matcher.accept(output.data)) this.markServiceReady(activeRun, blockId)
   }
 
   private markServiceReady(activeRun: ActiveWorkflowRun, blockId: string): void {
@@ -478,6 +490,7 @@ export class TerminalWorkflowService {
   }
 
   private clearNodeGuards(activeRun: ActiveWorkflowRun, blockId: string): void {
+    activeRun.outputMatchers.delete(blockId)
     const timeoutId = activeRun.timeoutIds.get(blockId)
 
     if (timeoutId) {
@@ -520,7 +533,7 @@ export class TerminalWorkflowService {
       throw failedStop.reason
     }
 
-    activeRun.outputTails.clear()
+    activeRun.outputMatchers.clear()
     this.activeRuns.remove(activeRun)
     for (const unregister of activeRun.lifecycleUnregisters.splice(0)) unregister()
     this.publishRun(activeRun)

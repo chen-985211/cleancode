@@ -83,6 +83,7 @@ jobs:
         if: runner.os != 'Linux'
         env:
           CLEANCODE_E2E_PREBUILT: '1'
+          CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: pnpm test:e2e --shard=${{ matrix.shard }}/3
 
       - name: Summarize test timings
