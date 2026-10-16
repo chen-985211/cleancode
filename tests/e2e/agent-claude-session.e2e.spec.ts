@@ -66,13 +66,8 @@ describe('Claude Code Agent session e2e', () => {
     })
   })
 
-  it.each(
-    Array.from(
-      { length: process.env.CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS === '1' ? 20 : 1 },
-      (_, index) => index + 1
-    )
-  )(
-    'restores the last Claude session selected through /resume (run %i)',
+  it(
+    'restores the last Claude session selected through /resume',
     async () => {
       await expectDesktopRuntime(page)
       const firstLaunchReady = waitForAgentLaunchReady(page)

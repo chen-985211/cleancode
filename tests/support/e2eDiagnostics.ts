@@ -43,6 +43,13 @@ export async function observeE2eShutdown(electronApp: ElectronApplication): Prom
     .catch(() => undefined)
   shutdownDiagnostics.set(electronApp, async () => {
     if (!launcherPid || !mainPid) return
+    const processes = [launcherPid, mainPid].map((pid) => {
+      try {
+        return { pid, alive: process.kill(pid, 0) }
+      } catch (error) {
+        return { pid, error: (error as NodeJS.ErrnoException).code ?? String(error) }
+      }
+    })
     const { stdout, stderr } = await promisify(execFile)(
       'powershell.exe',
       [
@@ -55,7 +62,7 @@ export async function observeE2eShutdown(electronApp: ElectronApplication): Prom
     ).catch((error: unknown) => ({ stdout: '', stderr: String(error) }))
     console.error(
       '[e2e-shutdown-timeout]',
-      JSON.stringify({ launcherPid, mainPid, stdout, stderr })
+      JSON.stringify({ launcherPid, mainPid, processes, stdout, stderr })
     )
   })
 }

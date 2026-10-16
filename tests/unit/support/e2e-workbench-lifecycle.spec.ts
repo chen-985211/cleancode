@@ -37,6 +37,7 @@ import {
   type E2eWorkbench
 } from '../../support/e2eWorkbench'
 import { runE2eTeardown, withE2eDeadline } from '../../support/e2eLifecycle'
+import * as e2eDiagnostics from '../../support/e2eDiagnostics'
 
 const workbench: E2eWorkbench = {
   appStateDirectory: '/tmp/cleancode-e2e-state',
@@ -208,6 +209,29 @@ describe('E2E workbench lifecycle', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('captures the live shutdown state before forced cleanup and preserves the close failure', async () => {
+    const closeError = new Error('Electron application close failed')
+    const order: string[] = []
+    const electronProcess = createElectronProcess()
+    vi.spyOn(e2eDiagnostics, 'captureE2eShutdownFailure').mockImplementation(async () => {
+      order.push('capture live shutdown state')
+    })
+    electronProcess.kill.mockImplementation(() => {
+      order.push('force cleanup')
+      electronProcess.signalCode = 'SIGKILL'
+      electronProcess.emit('exit', null, 'SIGKILL')
+      return true
+    })
+    const electronApp = {
+      close: vi.fn().mockRejectedValue(closeError),
+      process: () => electronProcess
+    } as unknown as ElectronApplication
+
+    await expect(closeElectronApp(electronApp)).rejects.toBe(closeError)
+    expect(order).toEqual(['capture live shutdown state', 'force cleanup'])
+    expect(electronProcess.kill).toHaveBeenCalledWith('SIGKILL')
   })
 
   it('closes the application and cleans the scenario when diagnostics fail', async () => {
