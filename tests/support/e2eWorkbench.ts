@@ -11,6 +11,7 @@ import { expect } from 'vitest'
 import {
   captureE2eFailureDiagnostics,
   initializeE2eDiagnostics,
+  observeE2eShutdown,
   startE2eTracing,
   stopE2eTracing
 } from './e2eDiagnostics'
@@ -490,6 +491,7 @@ export async function closeElectronApp(
     return
   }
 
+  const captureShutdown = await observeE2eShutdown(electronApp)
   let tracingError: unknown
 
   try {
@@ -516,6 +518,7 @@ export async function closeElectronApp(
     )
     await processExit
   } catch (error) {
+    await captureShutdown()
     electronProcess.kill('SIGKILL')
     await waitForProcessExit(electronProcess, electronCloseTimeoutMs).catch(() => undefined)
     throw error

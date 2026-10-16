@@ -1,6 +1,7 @@
-import type { ChildProcess } from 'node:child_process'
+import { execFile, type ChildProcess } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 
 import type { ElectronApplication, Page } from 'playwright'
 
@@ -21,6 +22,44 @@ interface DiagnosticWorkbench {
 const e2eArtifactDirectory = join(process.cwd(), 'test-results', 'e2e')
 const e2eDiagnosticOperationTimeoutMs = 5_000
 const applicationDiagnostics = new WeakMap<ElectronApplication, ApplicationDiagnostics>()
+
+export async function observeE2eShutdown(
+  electronApp: ElectronApplication
+): Promise<() => Promise<void>> {
+  if (process.env.CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS !== '1') return async () => undefined
+  const launcherPid = electronApp.process().pid
+  const mainPid = await electronApp
+    .evaluate(({ app, BrowserWindow }) => {
+      const report = (event: string) => {
+        process.stderr.write(
+          `[e2e-shutdown] ${JSON.stringify({ event, pid: process.pid, at: Date.now(), windows: BrowserWindow.getAllWindows().length })}\n`
+        )
+      }
+      report('close-requested')
+      app.on('before-quit', () => report('before-quit'))
+      app.on('will-quit', () => report('will-quit'))
+      app.on('quit', () => report('quit'))
+      return process.pid
+    })
+    .catch(() => undefined)
+  return async () => {
+    if (!launcherPid || !mainPid) return
+    const { stdout, stderr } = await promisify(execFile)(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -in @(${launcherPid},${mainPid}) -or $_.ParentProcessId -in @(${launcherPid},${mainPid}) } | Select-Object -First 20 ProcessId,ParentProcessId,Name,CreationDate | ConvertTo-Json -Compress`
+      ],
+      { timeout: 3_000, maxBuffer: 32_768 }
+    ).catch((error: unknown) => ({ stdout: '', stderr: String(error) }))
+    console.error(
+      '[e2e-shutdown-timeout]',
+      JSON.stringify({ launcherPid, mainPid, stdout, stderr })
+    )
+  }
+}
 
 export function initializeE2eDiagnostics(electronApp: ElectronApplication): void {
   const diagnostics: ApplicationDiagnostics = {
