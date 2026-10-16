@@ -22,11 +22,10 @@ interface DiagnosticWorkbench {
 const e2eArtifactDirectory = join(process.cwd(), 'test-results', 'e2e')
 const e2eDiagnosticOperationTimeoutMs = 5_000
 const applicationDiagnostics = new WeakMap<ElectronApplication, ApplicationDiagnostics>()
+const shutdownDiagnostics = new WeakMap<ElectronApplication, () => Promise<void>>()
 
-export async function observeE2eShutdown(
-  electronApp: ElectronApplication
-): Promise<() => Promise<void>> {
-  if (process.env.CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS !== '1') return async () => undefined
+export async function observeE2eShutdown(electronApp: ElectronApplication): Promise<void> {
+  if (process.env.CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS !== '1') return
   const launcherPid = electronApp.process().pid
   const mainPid = await electronApp
     .evaluate(({ app, BrowserWindow }) => {
@@ -35,14 +34,14 @@ export async function observeE2eShutdown(
           `[e2e-shutdown] ${JSON.stringify({ event, pid: process.pid, at: Date.now(), windows: BrowserWindow.getAllWindows().length })}\n`
         )
       }
-      report('close-requested')
+      report('launch-observed')
       app.on('before-quit', () => report('before-quit'))
       app.on('will-quit', () => report('will-quit'))
       app.on('quit', () => report('quit'))
       return process.pid
     })
     .catch(() => undefined)
-  return async () => {
+  shutdownDiagnostics.set(electronApp, async () => {
     if (!launcherPid || !mainPid) return
     const { stdout, stderr } = await promisify(execFile)(
       'powershell.exe',
@@ -58,7 +57,11 @@ export async function observeE2eShutdown(
       '[e2e-shutdown-timeout]',
       JSON.stringify({ launcherPid, mainPid, stdout, stderr })
     )
-  }
+  })
+}
+
+export async function captureE2eShutdownFailure(electronApp: ElectronApplication): Promise<void> {
+  await shutdownDiagnostics.get(electronApp)?.()
 }
 
 export function initializeE2eDiagnostics(electronApp: ElectronApplication): void {
