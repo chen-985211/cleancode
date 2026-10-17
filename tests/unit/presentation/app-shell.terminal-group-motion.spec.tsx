@@ -188,6 +188,83 @@ describe('app shell terminal group object motion', () => {
 
     await expectMemberMotion('group-expand')
   })
+
+  it.each([false, true])(
+    'retains mounted node order through collapse and expansion (complete collapse: %s)',
+    async (completeCollapse) => {
+      const grouped = createWorkbenchWithTerminalGroup(false)
+      const workbench = {
+        ...grouped,
+        graph: {
+          ...grouped.graph,
+          blocks: [
+            ...grouped.graph.blocks,
+            createTerminalBlock('outside-terminal', { x: 1400, y: 240 })
+          ]
+        }
+      }
+      const runtimeApi = createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+      runtimeApi.setTerminalGroupCollapsed
+        .mockResolvedValueOnce(withGroupCollapsed(workbench.graph, true))
+        .mockResolvedValueOnce(workbench.graph)
+      installRuntimeApi(runtimeApi)
+      render(<AppShell />)
+      const groupNode = await findGroupNode(false)
+      const mountedOrder = reactFlowProps.latest!.nodes.map((node) => node.id)
+
+      await act(async () => {
+        await groupNode.data.onToggleGroupCollapsed(groupNode.data.group, true)
+      })
+      await expectMemberMotion('group-collapse')
+      expect(reactFlowProps.latest!.nodes.map((node) => node.id)).toEqual(mountedOrder)
+
+      if (completeCollapse) {
+        act(() => {
+          currentMemberNodes().forEach((member) =>
+            member.data.onObjectMotionComplete?.(member.data.objectMotion!.id)
+          )
+        })
+        expect(reactFlowProps.latest!.nodes.map((node) => node.id)).toEqual(mountedOrder)
+      }
+      const collapsedGroup = await findGroupNode(true)
+      await act(async () => {
+        await collapsedGroup.data.onToggleGroupCollapsed(collapsedGroup.data.group, false)
+      })
+      await expectMemberMotion('group-expand')
+      expect(reactFlowProps.latest!.nodes.map((node) => node.id)).toEqual(mountedOrder)
+    }
+  )
+
+  it('keeps graph paint order when previously unmounted members first expand', async () => {
+    const grouped = createWorkbenchWithTerminalGroup(true)
+    const workbench = {
+      ...grouped,
+      graph: {
+        ...grouped.graph,
+        blocks: [
+          ...grouped.graph.blocks,
+          createTerminalBlock('outside-terminal', { x: 780, y: 240 })
+        ]
+      }
+    }
+    const runtimeApi = createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    runtimeApi.setTerminalGroupCollapsed.mockResolvedValue(
+      withGroupCollapsed(workbench.graph, false)
+    )
+    installRuntimeApi(runtimeApi)
+    render(<AppShell />)
+    const groupNode = await findGroupNode(true)
+    await act(async () => {
+      await groupNode.data.onToggleGroupCollapsed(groupNode.data.group, false)
+    })
+    await expectMemberMotion('group-expand')
+    expect(reactFlowProps.latest!.nodes.map((node) => node.id)).toEqual([
+      'development-group',
+      'backend-terminal',
+      'frontend-terminal',
+      'outside-terminal'
+    ])
+  })
 })
 
 interface MockReactFlowProps {

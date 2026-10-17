@@ -80,34 +80,58 @@ describe('app shell terminal group edit mode', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not re-render the canvas for a terminal drag preview outside group edit mode', async () => {
-    const workbench = createWorkbenchWithTerminalGroup()
-    const runtimeApi = createRuntimeApi({
-      listWorkbenches: vi.fn(async () => [workbench])
-    })
+  it.each(['terminal-title', 'collapsed-group-member'])(
+    'preserves selection and avoids preview re-renders when dragging %s outside group edit mode',
+    async (region) => {
+      const initial = createWorkbenchWithTerminalGroup({ memberBlockIds: ['frontend-terminal'] })
+      const workbench = {
+        ...initial,
+        graph: {
+          ...initial.graph,
+          terminalGroups: initial.graph.terminalGroups.map((group) => ({
+            ...group,
+            isCollapsed: true
+          }))
+        }
+      }
+      const runtimeApi = createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
 
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: runtimeApi
-    })
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: runtimeApi
+      })
 
-    render(<AppShell />)
+      render(<AppShell />)
 
-    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
+      await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
 
-    const terminalNode = reactFlowProps.latest?.nodes.find(
-      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
-    )
-    const renderCountBeforePreview = reactFlowProps.renderCount
-
-    expect(terminalNode).toBeDefined()
-
-    act(() => {
-      reactFlowProps.latest?.onNodeDrag?.({} as MouseEvent, terminalNode!)
-    })
-
-    expect(reactFlowProps.renderCount).toBe(renderCountBeforePreview)
-  })
+      const selected = reactFlowProps.latest?.nodes.find(
+        (node): node is TerminalFlowNode =>
+          node.id === 'worker-terminal' && node.type === 'terminal'
+      )
+      if (!selected) throw new Error('Expected the worker terminal to be available.')
+      act(() => selected.data.onSelect?.(selected.data.block))
+      const dragged = reactFlowProps.latest?.nodes.find(
+        (node) =>
+          node.id === (region === 'terminal-title' ? 'backend-terminal' : 'development-group')
+      )
+      if (!dragged) throw new Error('Expected the dragged node to be available.')
+      const target = document.createElement('span')
+      target.className =
+        region === 'terminal-title' ? 'terminal-node__title' : 'terminal-group-node__member-name'
+      const event = { target } as unknown as MouseEvent
+      act(() => reactFlowProps.latest?.onNodeDragStart?.(event, dragged))
+      const renderCountBeforePreview = reactFlowProps.renderCount
+      act(() => reactFlowProps.latest?.onNodeDrag?.(event, dragged))
+      expect(reactFlowProps.renderCount).toBe(renderCountBeforePreview)
+      act(() => reactFlowProps.latest?.onNodeDragStop?.(event, dragged))
+      expect(
+        reactFlowProps.latest?.nodes.filter((node) => node.selected).map((node) => node.id)
+      ).toEqual(['worker-terminal'])
+    }
+  )
 
   it('updates dragged node geometry without re-rendering the app shell sidebar', async () => {
     const workbench = createWorkbenchWithTerminalBlocks()

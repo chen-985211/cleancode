@@ -33,7 +33,9 @@ export function renderTerminalRasterFixture(
         URL.revokeObjectURL(url)
       }
     }
-    const terminalModule = (await importSource(xtermSource)) as { Terminal: typeof Terminal }
+    const terminalModule = (await importSource(
+      entry === 'esm' ? xtermSource : `${xtermSource}\nexport const Terminal = globalThis.Terminal;`
+    )) as { Terminal: typeof Terminal }
     const addonModule = (await importSource(
       entry === 'esm'
         ? addonSource
@@ -124,7 +126,25 @@ export function renderTerminalRasterFixture(
     container.style.left = '19.3px'
     container.style.top = '21.7px'
     addon.refreshRasterAlignment()
+    // Budget changes on group disclosure can resize any visible surface. Sample
+    // before yielding to another frame, when Chromium can present the bitmap.
+    const rasterTransitions = [rasterScale === 1 ? 1.6 : 1, rasterScale].map((scale) => {
+      addon.setRasterScale(scale)
+      const frame = new Uint8Array(canvas.width * canvas.height * 4)
+      gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, frame)
+      let inkPixels = 0
+      for (let index = 0; index < frame.length; index += 4) {
+        if (
+          frame[index + 3]! > 0 &&
+          (theme === 'light' ? frame[index]! < 200 : frame[index]! > 100)
+        ) {
+          inkPixels += 1
+        }
+      }
+      return { scale, inkPixels }
+    })
     return {
+      rasterTransitions,
       timings: {
         moduleLoadMs: modulesLoadedAt - startedAt,
         prepareMs: preparedAt - modulesLoadedAt,

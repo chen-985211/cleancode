@@ -11,6 +11,138 @@ describe('canvas selection viewport', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
+    document.body.replaceChildren()
+  })
+
+  it.each(['terminal', 'agentConsole'] as const)(
+    'activates the selected %s input only after centering completes',
+    async (type) => {
+      vi.useFakeTimers()
+      const { node, input } = renderSelectedInput(type)
+      const { instance, setViewport } = createReactFlowInstance([node])
+      let complete!: (completed: boolean) => void
+      setViewport.mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (complete = resolve))
+      )
+      const { result } = renderSelectionViewportHook(instance)
+
+      act(() => result.current.focusSelectedWorkbenchNode(node.id))
+      await act(() => vi.advanceTimersByTimeAsync(200))
+      expect(input).not.toHaveFocus()
+
+      await act(async () => {
+        complete(true)
+        await vi.advanceTimersByTimeAsync(200)
+      })
+      expect(input).toHaveFocus()
+    }
+  )
+
+  it.each([
+    'pointer',
+    'drag',
+    'focus',
+    'keyboard',
+    'wheel',
+    'blur',
+    'deselection',
+    'workspace',
+    'unmount'
+  ] as const)(
+    'does not activate an outdated selected input after %s changes the user intent',
+    async (interruption) => {
+      vi.useFakeTimers()
+      const { node, input } = renderSelectedInput('terminal')
+      const nodes = [node]
+      const { instance } = createReactFlowInstance(nodes)
+      const { result, unmount } = renderSelectionViewportHook(instance)
+      act(() => result.current.focusSelectedWorkbenchNode(node.id))
+
+      act(() => {
+        if (interruption === 'pointer') document.dispatchEvent(new Event('pointerdown'))
+        if (interruption === 'drag') {
+          document.dispatchEvent(new Event('pointerdown'))
+          node.dragging = true
+        }
+        if (interruption === 'keyboard') document.dispatchEvent(new Event('keydown'))
+        if (interruption === 'wheel') document.dispatchEvent(new Event('wheel'))
+        if (interruption === 'blur') window.dispatchEvent(new Event('blur'))
+        if (interruption === 'focus') {
+          const button = document.createElement('button')
+          document.body.append(button)
+          button.focus()
+        }
+        if (interruption === 'deselection') node.selected = false
+        if (interruption === 'workspace') {
+          nodes[0] = {
+            ...node,
+            data: { ...node.data, identity: { ...node.data.identity, workspaceId: 'other' } }
+          } as WorkbenchFlowNode
+        }
+        if (interruption === 'unmount') unmount()
+      })
+      if (interruption === 'drag') {
+        await act(() => vi.advanceTimersByTimeAsync(100))
+        node.dragging = false
+      }
+      await act(() => vi.advanceTimersByTimeAsync(2_500))
+      expect(input).not.toHaveFocus()
+    }
+  )
+
+  it('waits for the exact attached terminal session before activating its input', async () => {
+    vi.useFakeTimers()
+    const { node, input, viewport } = renderSelectedInput('terminal')
+    viewport.setAttribute('data-terminal-attached-session-id', 'old-session')
+    const { instance } = createReactFlowInstance([node])
+    const { result } = renderSelectionViewportHook(instance)
+
+    act(() => result.current.focusSelectedWorkbenchNode(node.id))
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(input).not.toHaveFocus()
+
+    viewport.setAttribute('data-terminal-attached-session-id', 'session-1')
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(input).toHaveFocus()
+  })
+
+  it('reactivates an already selected input on another title click without continuously stealing focus', async () => {
+    vi.useFakeTimers()
+    const { node, input } = renderSelectedInput('terminal')
+    const { instance } = createReactFlowInstance([node])
+    const { result } = renderSelectionViewportHook(instance)
+    act(() => result.current.focusSelectedWorkbenchNode(node.id))
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(input).toHaveFocus()
+
+    const button = document.createElement('button')
+    document.body.append(button)
+    button.focus()
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(button).toHaveFocus()
+
+    act(() => result.current.focusSelectedWorkbenchNode(node.id))
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(input).toHaveFocus()
+  })
+
+  it('activates only the latest selected node when a second title interrupts the first transition', async () => {
+    vi.useFakeTimers()
+    const terminal = renderSelectedInput('terminal')
+    const agent = renderSelectedInput('agentConsole')
+    agent.node.selected = false
+    const { instance } = createReactFlowInstance([terminal.node, agent.node])
+    const { result } = renderSelectionViewportHook(instance)
+    act(() => {
+      result.current.focusSelectedWorkbenchNode(terminal.node.id)
+      terminal.node.selected = false
+      agent.node.selected = true
+      result.current.focusSelectedWorkbenchNode(agent.node.id)
+    })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(agent.input).toHaveFocus()
+    expect(terminal.input).not.toHaveFocus()
   })
 
   it.each(['terminal', 'terminalGroup', 'agentConsole'] as const)(
@@ -237,6 +369,44 @@ function createNode(
     position,
     type
   } as unknown as WorkbenchFlowNode
+}
+
+function renderSelectedInput(type: 'terminal' | 'agentConsole') {
+  const node = {
+    ...createNode(
+      type === 'terminal' ? 'terminal-1' : 'agent:agent-1',
+      { x: 240, y: 180 },
+      { width: 400, height: 300 },
+      type
+    ),
+    selected: true,
+    data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: type === 'terminal' ? 'terminal' : 'agent',
+        objectId: type === 'terminal' ? 'terminal-1' : 'agent-1'
+      }
+    }
+  } as WorkbenchFlowNode
+  const container = document.createElement('section')
+  container.setAttribute(
+    type === 'terminal' ? 'data-terminal-block-id' : 'data-agent-console-node',
+    type === 'terminal' ? node.id : 'agent-1'
+  )
+  const viewport = document.createElement('div')
+  viewport.className = type === 'terminal' ? 'terminal-viewport' : 'agent-terminal-viewport'
+  viewport.setAttribute('data-terminal-attached-session-id', 'session-1')
+  viewport.setAttribute('data-agent-terminal-view-session-id', 'session-1')
+  const input = document.createElement('textarea')
+  input.className = 'xterm-helper-textarea'
+  viewport.append(input)
+  const tail = document.createElement('pre')
+  tail.setAttribute('data-terminal-output-tail', 'true')
+  tail.setAttribute('data-terminal-session-id', 'session-1')
+  container.append(viewport, tail)
+  document.body.append(container)
+  return { node, input, viewport }
 }
 
 function stubReducedMotionPreference(): void {

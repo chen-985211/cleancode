@@ -16,6 +16,7 @@ import {
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
+import { useSelectedWorkbenchNodeInput } from '../nodes/useSelectedWorkbenchNodeInput'
 
 const globalCanvasViewZoom = 0.5
 
@@ -31,6 +32,8 @@ export function useCanvasSelectionViewport({
   reactFlowInstanceRef
 }: UseCanvasSelectionViewportInput) {
   const overviewRequestRef = useRef<OverviewRequest | null>(null)
+  const { activateSelectedWorkbenchNodeInput, cancelSelectedNodeInput } =
+    useSelectedWorkbenchNodeInput(reactFlowInstanceRef)
 
   const focusSelectedWorkbenchNode = useCallback(
     (nodeId: string): void => {
@@ -46,7 +49,7 @@ export function useCanvasSelectionViewport({
         nodeSize: resolveWorkbenchNodeSize(node)
       })
 
-      void transitionWorkbenchViewport(instance, {
+      const transitionCompletion = transitionWorkbenchViewport(instance, {
         center: resolveWorkbenchNodeCenter(node),
         intent: {
           canvasSize: canvasSizeRef.current,
@@ -55,12 +58,14 @@ export function useCanvasSelectionViewport({
         type: 'center',
         zoom
       })
+      activateSelectedWorkbenchNodeInput(nodeId, transitionCompletion)
     },
-    [canvasSizeRef, onUserAction, reactFlowInstanceRef]
+    [activateSelectedWorkbenchNodeInput, canvasSizeRef, onUserAction, reactFlowInstanceRef]
   )
 
   const returnToGlobalCanvasView = useCallback(
     (anchorNodeId: string | null): void => {
+      cancelSelectedNodeInput()
       onUserAction()
       const instance = reactFlowInstanceRef.current
       if (!instance) return
@@ -108,10 +113,13 @@ export function useCanvasSelectionViewport({
         () => clearOverviewRequest(overviewRequestRef, overviewRequest)
       )
     },
-    [canvasSizeRef, onUserAction, reactFlowInstanceRef]
+    [cancelSelectedNodeInput, canvasSizeRef, onUserAction, reactFlowInstanceRef]
   )
 
-  return { focusSelectedWorkbenchNode, returnToGlobalCanvasView }
+  return {
+    focusSelectedWorkbenchNode,
+    returnToGlobalCanvasView
+  }
 }
 
 interface OverviewRequest {
