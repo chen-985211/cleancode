@@ -130,6 +130,7 @@ export function WorkbenchCanvas({
   onNodesChange,
   onNodeClick,
   onPaneClick,
+  onNodeDragSelection,
   onNodeDrag,
   onNodeDragStart,
   onCancelNodeDrag,
@@ -475,6 +476,9 @@ export function WorkbenchCanvas({
                 onPaneClick()
               }}
               onNodeDragStart={(event, node) => {
+                cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
+                cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
+                onViewportInteractionStart?.()
                 setIsQuickExecutionDropTarget(false)
                 if (viewportMoveCompletionRef.current === 'node-drag') {
                   viewportMoveCompletionRef.current = null
@@ -482,6 +486,9 @@ export function WorkbenchCanvas({
                 activeDraggedNodeRef.current = node
                 canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
                 canvasArrangement.dragging.begin(event, node)
+                if ((templateInteraction.canvasSelection?.items.length ?? 0) < 2) {
+                  onNodeDragSelection?.(node, true)
+                }
               }}
               onNodeDrag={(event, node) => {
                 if (canvasArrangement.dragging.preview(node)) return
@@ -504,6 +511,9 @@ export function WorkbenchCanvas({
                   canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
                   if (canvasArrangement.dragging.commit(node)) {
                     setIsQuickExecutionDropTarget(false)
+                    if ((templateInteraction.canvasSelection?.items.length ?? 0) < 2) {
+                      onNodeDragSelection?.(node, false)
+                    }
                     return
                   }
                   const target = resolveQuickExecutionNodeTarget(
@@ -519,6 +529,9 @@ export function WorkbenchCanvas({
                     return
                   }
                   onNodeDragStop(event, node)
+                  if ((templateInteraction.canvasSelection?.items.length ?? 0) < 2) {
+                    onNodeDragSelection?.(node, false)
+                  }
                 } finally {
                   activeDraggedNodeRef.current = null
                   if (viewportMoveCompletionRef.current === 'node-drag') {

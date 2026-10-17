@@ -115,6 +115,7 @@ export interface WorkbenchCanvasProps {
   readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onPaneClick: () => void
+  readonly onNodeDragSelection?: (node: WorkbenchFlowNode, isDragging: boolean) => void
   readonly onNodeDrag: (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart: (
     event: globalThis.MouseEvent | TouchEvent,

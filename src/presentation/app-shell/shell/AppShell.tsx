@@ -369,6 +369,7 @@ export function AppShell({
     reactFlowInstanceRef
   })
   const workbenchNodeSelection = useWorkbenchNodeSelection({
+    activateSelectedWorkbenchNodeInput: selectionViewport.activateSelectedWorkbenchNodeInput,
     focusSelectedWorkbenchNode: selectionViewport.focusSelectedWorkbenchNode,
     isTerminalGroupSelectionMode,
     returnToGlobalCanvasView: selectionViewport.returnToGlobalCanvasView,
@@ -679,6 +680,7 @@ export function AppShell({
           onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
           onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
           onNodeDrag={previewTerminalGroupDrop}
+          onNodeDragSelection={workbenchNodeSelection.selectWorkbenchNodeFromDrag}
           onNodeDragStart={onNodeDragStart}
           onCancelNodeDrag={cancelNodeDrag}
           onNodeDragStop={commitWorkbenchNodeDrag}

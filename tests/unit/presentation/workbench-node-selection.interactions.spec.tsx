@@ -5,6 +5,35 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/workbench/nodes/useWorkbenchNodeSelection'
 
 describe('workbench node selection', () => {
+  it.each([
+    ['terminal', 'terminal-1'],
+    ['agentConsole', 'agent:reviewer']
+  ] as const)('selects a dragged %s and activates input only on release', (type, id) => {
+    const { input, result } = renderSelectionHook()
+    const node = { id, type } as WorkbenchFlowNode
+    act(() => result.current.selectWorkbenchNodeFromDrag(node, true))
+    if (type === 'terminal') expect(input.selectTerminalBlock).toHaveBeenCalledWith(id, false)
+    else expect(input.setSelectedAgentId).toHaveBeenCalledWith('reviewer')
+    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+    expect(input.activateSelectedWorkbenchNodeInput).not.toHaveBeenCalled()
+
+    act(() => result.current.selectWorkbenchNodeFromDrag(node, false))
+    expect(input.activateSelectedWorkbenchNodeInput).toHaveBeenCalledWith(id)
+    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+  })
+
+  it('preserves terminal-group candidate selection while dragging instead of activating input', () => {
+    const { input, result } = renderSelectionHook({ isTerminalGroupSelectionMode: true })
+    const node = { id: 'terminal-1', type: 'terminal' } as WorkbenchFlowNode
+    act(() => {
+      result.current.selectWorkbenchNodeFromDrag(node, true)
+      result.current.selectWorkbenchNodeFromDrag(node, false)
+    })
+    expect(input.selectTerminalBlock).not.toHaveBeenCalled()
+    expect(input.activateSelectedWorkbenchNodeInput).not.toHaveBeenCalled()
+    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+  })
+
   it('clears terminal, terminal group, and Agent selection from the canvas pane', () => {
     const { input, result } = renderSelectionHook({
       selectedTerminalBlockIds: ['backend-terminal']
@@ -142,6 +171,7 @@ function renderSelectionHook(
   } = {}
 ) {
   const input = {
+    activateSelectedWorkbenchNodeInput: vi.fn(),
     focusSelectedWorkbenchNode: vi.fn(),
     isTerminalGroupSelectionMode: options.isTerminalGroupSelectionMode ?? false,
     returnToGlobalCanvasView: vi.fn(),

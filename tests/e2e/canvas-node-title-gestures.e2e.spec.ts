@@ -1,12 +1,18 @@
 // @vitest-environment node
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { Locator, Page } from 'playwright'
 
 import type { workbenchNodeTypes } from '../../src/presentation/app-shell/workbench/nodes/workbenchNodeTypes'
+import {
+  readFakeCodexCliReports,
+  type FakeCodexCliFixture
+} from '../fixtures/contexts/agent/fakeCodexCli'
 import { waitForCanvasViewportZoomCommit } from '../support/e2eCanvasViewport'
+import { agentCliReadyTimeoutMs } from '../support/e2eAgentRuntime'
+import { createE2eFileCommand } from '../support/e2eTerminal'
 import { pollUntilState } from '../support/e2ePolling'
 import {
   electronLaunchTimeoutMs,
@@ -37,12 +43,14 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
   let workbench: E2eWorkbench
   let resources: E2eScenarioResources
   let node: Locator
+  let fakeCodex: FakeCodexCliFixture
 
   beforeEach(async () => {
     resources = {}
     const launched = await launchWorkspaceAgentsE2e(resources, 'cleancode-node-title-gestures')
     page = launched.page
     workbench = launched.workbench
+    fakeCodex = launched.fakeCodex
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expectDesktopRuntime(page)
     await page.getByRole('button', { name: '添加项目' }).click()
@@ -70,6 +78,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
     'selects exclusively without moving when a title click contains small pointer movements',
     async () => {
       for (const zoomIn of [false, true]) {
+        await page.emulateMedia({ reducedMotion: zoomIn ? 'reduce' : 'no-preference' })
         for (const movement of clickMovements) {
           await clearSelection(page)
           if (zoomIn) {
@@ -87,7 +96,10 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
           const selected = await pollUntilState({
             description: `${nodeType} selection after title movement ${JSON.stringify(movement)}`,
             observe: () => readNodeState(node),
-            accept: (state) => state.selected && state.hasOutline,
+            accept: (state) =>
+              state.selected &&
+              state.hasOutline &&
+              (nodeType === 'terminalGroup' || state.inputFocused),
             timeoutMs: 3_000
           })
           expect(selected.position).toEqual(before.position)
@@ -96,6 +108,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
         }
       }
 
+      await assertKeyboardInputReachesNode(page, nodeType, workbench, fakeCodex)
       const artifactDirectory = join(process.cwd(), 'test-results', 'node-title-gestures')
       await mkdir(artifactDirectory, { recursive: true })
       await node.screenshot({ path: join(artifactDirectory, `${nodeType}-selected.png`) })
@@ -104,7 +117,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
   )
 
   it(
-    'drags selected and unselected nodes from the title without triggering a click',
+    'selects dragged nodes and activates their input on release without recentering',
     async () => {
       for (const initiallySelected of [false, true]) {
         await clearSelection(page)
@@ -121,7 +134,8 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
               state.position.y > before.position.y + 15,
             timeoutMs: 3_000
           })
-          expect(dragging.selected).toBe(initiallySelected)
+          expect(dragging.selected).toBe(true)
+          expect(dragging.inputFocused).toBe(false)
         })
 
         const committed = await pollUntilState({
@@ -138,16 +152,73 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
             Math.abs(persisted.y - rendered.position.y) < 0.01,
           timeoutMs: 5_000
         })
-        expect(committed.rendered.selected).toBe(initiallySelected)
-        expect(committed.rendered.hasOutline).toBe(initiallySelected)
+        expect(committed.rendered.selected).toBe(true)
+        expect(committed.rendered.hasOutline).toBe(true)
+        if (nodeType !== 'terminalGroup') {
+          await pollUntilState({
+            description: `${nodeType} input to activate after releasing the dragged title`,
+            observe: () => readNodeState(node),
+            accept: (state) => state.inputFocused,
+            timeoutMs: 3_000
+          })
+        }
         expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(
           viewportBefore
         )
       }
+      await assertKeyboardInputReachesNode(page, nodeType, workbench, fakeCodex)
     },
     electronScenarioTimeoutMs
   )
 })
+
+async function assertKeyboardInputReachesNode(
+  page: Page,
+  nodeType: string,
+  workbench: E2eWorkbench,
+  fakeCodex: FakeCodexCliFixture
+): Promise<void> {
+  if (nodeType === 'terminalGroup') return
+  if (nodeType === 'agentConsole') {
+    const ready = await pollUntilState({
+      description: 'Agent test CLI to finish starting before accepting typed commands',
+      observe: async () =>
+        (await readFakeCodexCliReports(fakeCodex.reportPath))
+          .filter((report) => report.kind === 'draw')
+          .map(({ pid }) => pid),
+      accept: (processIds) => processIds.length > 0,
+      timeoutMs: agentCliReadyTimeoutMs
+    })
+    // The test CLI supports line clearing; terminal replies can precede the test command.
+    await page.keyboard.press('Control+u')
+    await page.keyboard.type('/resume')
+    await page.keyboard.press('Enter')
+    await pollUntilState({
+      description: 'typed input to reach the selected Agent CLI',
+      observe: async () =>
+        (await readFakeCodexCliReports(fakeCodex.reportPath)).map(({ kind, pid }) => ({
+          kind,
+          pid
+        })),
+      accept: (reports) =>
+        reports.some((report) => report.kind === 'resume' && report.pid === ready.at(-1)),
+      timeoutMs: 5_000
+    })
+    return
+  }
+  const markerPath = join(workbench.projectDirectory, 'selected-node-input.txt')
+  await page.keyboard.type(
+    createE2eFileCommand({ files: { [markerPath]: 'typed-through-selected-node' } })
+  )
+  await page.keyboard.press('Enter')
+  await pollUntilState({
+    description: 'typed input to execute in the selected terminal',
+    observe: () => readFile(markerPath, 'utf8'),
+    accept: (contents) => contents === 'typed-through-selected-node',
+    retryObservationErrors: true,
+    timeoutMs: 5_000
+  })
+}
 
 async function movePointerOnTitle(
   page: Page,
@@ -202,6 +273,9 @@ async function readNodeState(node: Locator) {
     return {
       selected: element.classList.contains('selected'),
       hasOutline: element.querySelector('[data-workbench-node-selection]') !== null,
+      inputFocused:
+        document.activeElement?.matches('.xterm-helper-textarea') === true &&
+        element.contains(document.activeElement),
       position: { x: transform.e, y: transform.f }
     }
   })
