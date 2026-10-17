@@ -69,7 +69,10 @@ describe.each([1, 1.25, 1.5, 2])(
       '%s entry preserves grid and glyph alignment with matched or retained bitmap resolution',
       async (entry) => {
         const page = await application!.firstWindow()
-        const xtermSource = await readFile(join(xtermDirectory, 'xterm.mjs'), 'utf8')
+        const xtermSource = await readFile(
+          join(xtermDirectory, entry === 'esm' ? 'xterm.mjs' : 'xterm.js'),
+          'utf8'
+        )
         const addonSource = await readFile(
           join(webglDirectory, entry === 'esm' ? 'addon-webgl.mjs' : 'addon-webgl.js'),
           'utf8'
@@ -161,6 +164,12 @@ describe.each([1, 1.25, 1.5, 2])(
             JSON.stringify({ zoom, ...projection })
           ).toBeLessThanOrEqual(2)
           expect(projection.hasInk).toBe(true)
+          for (const transition of projection.rasterTransitions) {
+            expect(
+              transition.inkPixels,
+              `blank bitmap after raster scale ${transition.scale}`
+            ).toBeGreaterThan(0)
+          }
           expect(projection.pannedLeft * deviceScaleFactor).toBeCloseTo(
             Math.round(projection.pannedLeft * deviceScaleFactor),
             2

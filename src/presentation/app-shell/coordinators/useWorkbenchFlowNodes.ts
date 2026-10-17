@@ -306,6 +306,22 @@ export function useWorkbenchFlowNodes({
         ...parkedCollapsedMemberNodesRef.current.values()
       ]
 
+      // Keep retained members in graph order while collapsed. Appending them as
+      // exits would move existing WebGL canvases on both collapse and expansion.
+      if (shouldPreserveTransientLayout) {
+        const graphOrder = new Map(
+          [
+            ...nextNodes.filter((node) => node.type === 'agentConsole'),
+            ...terminalNodeTemplates
+          ].map((node, index) => [node.id, index])
+        )
+        nodesWithExits.sort(
+          (left, right) =>
+            (graphOrder.get(left.id) ?? graphOrder.size) -
+            (graphOrder.get(right.id) ?? graphOrder.size)
+        )
+      }
+
       const projectedNodes = shouldPreserveTransientLayout
         ? preserveWorkbenchNodeTransientLayout(nodesWithExits, currentNodes, protectedLayoutNodeIds)
         : nodesWithExits
