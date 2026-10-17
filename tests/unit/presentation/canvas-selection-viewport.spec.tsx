@@ -41,6 +41,7 @@ describe('canvas selection viewport', () => {
 
   it.each([
     'pointer',
+    'drag',
     'focus',
     'keyboard',
     'wheel',
@@ -60,6 +61,10 @@ describe('canvas selection viewport', () => {
 
       act(() => {
         if (interruption === 'pointer') document.dispatchEvent(new Event('pointerdown'))
+        if (interruption === 'drag') {
+          document.dispatchEvent(new Event('pointerdown'))
+          node.dragging = true
+        }
         if (interruption === 'keyboard') document.dispatchEvent(new Event('keydown'))
         if (interruption === 'wheel') document.dispatchEvent(new Event('wheel'))
         if (interruption === 'blur') window.dispatchEvent(new Event('blur'))
@@ -77,6 +82,10 @@ describe('canvas selection viewport', () => {
         }
         if (interruption === 'unmount') unmount()
       })
+      if (interruption === 'drag') {
+        await act(() => vi.advanceTimersByTimeAsync(100))
+        node.dragging = false
+      }
       await act(() => vi.advanceTimersByTimeAsync(2_500))
       expect(input).not.toHaveFocus()
     }

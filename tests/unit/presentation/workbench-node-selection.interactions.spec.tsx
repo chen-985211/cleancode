@@ -5,33 +5,54 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/workbench/nodes/useWorkbenchNodeSelection'
 
 describe('workbench node selection', () => {
-  it.each([
-    ['terminal', 'terminal-1'],
-    ['agentConsole', 'agent:reviewer']
-  ] as const)('selects a dragged %s and activates input only on release', (type, id) => {
-    const { input, result } = renderSelectionHook()
-    const node = { id, type } as WorkbenchFlowNode
-    act(() => result.current.selectWorkbenchNodeFromDrag(node, true))
-    if (type === 'terminal') expect(input.selectTerminalBlock).toHaveBeenCalledWith(id, false)
-    else expect(input.setSelectedAgentId).toHaveBeenCalledWith('reviewer')
-    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
-    expect(input.activateSelectedWorkbenchNodeInput).not.toHaveBeenCalled()
+  describe.each(['terminal', 'terminalGroup', 'agentConsole'] as const)('%s drag', (type) => {
+    it.each(['none', 'self', 'other'] as const)(
+      'updates position while preserving selection=%s without requesting focus',
+      (selection) => {
+        const { input, result } = renderSelectionHook()
+        let nodes = [
+          {
+            id: 'dragged-node',
+            type,
+            position: { x: 120, y: 160 },
+            selected: selection === 'self',
+            data: { group: { memberBlockIds: [], isCollapsed: true } }
+          },
+          {
+            id: 'other-node',
+            type: 'terminal',
+            position: { x: 800, y: 160 },
+            selected: selection === 'other',
+            data: {}
+          }
+        ] as WorkbenchFlowNode[]
+        input.setNodes.mockImplementation((update) => {
+          nodes = update(nodes)
+        })
 
-    act(() => result.current.selectWorkbenchNodeFromDrag(node, false))
-    expect(input.activateSelectedWorkbenchNodeInput).toHaveBeenCalledWith(id)
-    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
-  })
-
-  it('preserves terminal-group candidate selection while dragging instead of activating input', () => {
-    const { input, result } = renderSelectionHook({ isTerminalGroupSelectionMode: true })
-    const node = { id: 'terminal-1', type: 'terminal' } as WorkbenchFlowNode
-    act(() => {
-      result.current.selectWorkbenchNodeFromDrag(node, true)
-      result.current.selectWorkbenchNodeFromDrag(node, false)
-    })
-    expect(input.selectTerminalBlock).not.toHaveBeenCalled()
-    expect(input.activateSelectedWorkbenchNodeInput).not.toHaveBeenCalled()
-    expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+        for (const dragging of [true, false]) {
+          act(() =>
+            result.current.onNodesChange([
+              { id: 'dragged-node', type: 'position', position: { x: 180, y: 200 }, dragging }
+            ])
+          )
+          expect(nodes[0]).toMatchObject({
+            position: { x: 180, y: 200 },
+            selected: selection === 'self'
+          })
+          expect(nodes[1]).toMatchObject({
+            position: { x: 800, y: 160 },
+            selected: selection === 'other'
+          })
+        }
+        expect(input.selectTerminalBlock).not.toHaveBeenCalled()
+        expect(input.selectTerminalGroup).not.toHaveBeenCalled()
+        expect(input.setSelectedAgentId).not.toHaveBeenCalled()
+        expect(input.setSelectedTerminalBlockIds).not.toHaveBeenCalled()
+        expect(input.setSelectedTerminalGroupId).not.toHaveBeenCalled()
+        expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+      }
+    )
   })
 
   it('clears terminal, terminal group, and Agent selection from the canvas pane', () => {
@@ -171,7 +192,6 @@ function renderSelectionHook(
   } = {}
 ) {
   const input = {
-    activateSelectedWorkbenchNodeInput: vi.fn(),
     focusSelectedWorkbenchNode: vi.fn(),
     isTerminalGroupSelectionMode: options.isTerminalGroupSelectionMode ?? false,
     returnToGlobalCanvasView: vi.fn(),

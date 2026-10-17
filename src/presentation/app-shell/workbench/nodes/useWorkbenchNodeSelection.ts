@@ -9,7 +9,6 @@ import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
 
 export function useWorkbenchNodeSelection({
-  activateSelectedWorkbenchNodeInput,
   focusSelectedWorkbenchNode,
   isTerminalGroupSelectionMode,
   returnToGlobalCanvasView,
@@ -23,7 +22,6 @@ export function useWorkbenchNodeSelection({
   setSelectedTerminalBlockIds,
   setSelectedTerminalGroupId
 }: {
-  readonly activateSelectedWorkbenchNodeInput: (nodeId: string) => void
   readonly focusSelectedWorkbenchNode: (nodeId: string) => void
   readonly isTerminalGroupSelectionMode: boolean
   readonly returnToGlobalCanvasView: (anchorNodeId: string | null) => void
@@ -152,25 +150,11 @@ export function useWorkbenchNodeSelection({
     setSelectedTerminalGroupId
   ])
 
-  const selectWorkbenchNodeFromDrag = useCallback(
-    (node: WorkbenchFlowNode, isDragging: boolean): void => {
-      if (isTerminalGroupSelectionMode) return
-      if (isDragging) selectWorkbenchNodeFromShortcut(node)
-      else activateSelectedWorkbenchNodeInput(node.id)
-    },
-    [
-      activateSelectedWorkbenchNodeInput,
-      isTerminalGroupSelectionMode,
-      selectWorkbenchNodeFromShortcut
-    ]
-  )
-
   return {
     clearWorkbenchSelection,
     onNodesChange,
     selectAgentFromTitle,
     selectTerminalFromTitle,
-    selectWorkbenchNodeFromDrag,
     selectWorkbenchNodeFromShortcut,
     selectWorkbenchNode
   }

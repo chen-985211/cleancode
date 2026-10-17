@@ -45,7 +45,7 @@ export function useSelectedWorkbenchNodeInput(
   }, [cancelSelectedNodeInput])
 
   const activateSelectedWorkbenchNodeInput = useCallback(
-    (nodeId: string, transitionCompletion: Promise<boolean> = Promise.resolve(true)): void => {
+    (nodeId: string, transitionCompletion: Promise<boolean>): void => {
       cancelSelectedNodeInput()
       const instance = instanceRef.current
       const node = instance?.getNode(nodeId)

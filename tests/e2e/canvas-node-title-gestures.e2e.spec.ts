@@ -61,7 +61,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
       await selectBlankCanvasAction(page, nodeType === 'terminal' ? '新建终端积木' : '组合终端')
       if (nodeType === 'terminalGroup') await page.getByRole('button', { name: '完成' }).click()
     }
-    node = page.locator(`.react-flow__node-${nodeType}`)
+    node = page.locator(`.react-flow__node-${nodeType}`).first()
     await node.locator(scenario.title).waitFor({ state: 'visible' })
     await node.locator(scenario.title).click({ trial: true })
   }, electronLaunchTimeoutMs)
@@ -117,13 +117,26 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
   )
 
   it(
-    'selects dragged nodes and activates their input on release without recentering',
+    'moves dragged nodes without changing selection, recentering, or activating input',
     async () => {
-      for (const initiallySelected of [false, true]) {
+      const otherNode = await createAdditionalTerminal(page, nodeType === 'terminal' ? 2 : 1)
+      const fitCanvas = page.getByRole('button', { name: '适应画布', exact: true })
+      for (const selection of ['none', 'self', 'other'] as const) {
         await clearSelection(page)
-        if (initiallySelected) await node.locator(scenario.title).click()
+        await fitCanvas.click()
+        if (selection === 'self') await node.locator(scenario.title).click()
+        if (selection === 'other') await otherNode.locator('.terminal-node__title strong').click()
+        await fitCanvas.click()
+        // Move focus away explicitly so a drag must not restore the terminal input.
+        await fitCanvas.focus()
         const before = await readNodeState(node)
-        expect(before.selected).toBe(initiallySelected)
+        expect(before.selected).toBe(selection === 'self')
+        expect(before.inputFocused).toBe(false)
+        const selectedBefore = await page
+          .locator('.react-flow__node.selected')
+          .evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute('data-id')).sort()
+          )
         const viewportBefore = await page.locator('.react-flow__viewport').getAttribute('style')
         await movePointerOnTitle(page, node.locator(scenario.title), { x: 64, y: 32 }, async () => {
           const dragging = await pollUntilState({
@@ -134,7 +147,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
               state.position.y > before.position.y + 15,
             timeoutMs: 3_000
           })
-          expect(dragging.selected).toBe(true)
+          expect(dragging.selected).toBe(before.selected)
           expect(dragging.inputFocused).toBe(false)
         })
 
@@ -144,33 +157,69 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
             rendered: await readNodeState(node),
             persisted: await readPersistedPosition(page, workbench, nodeType)
           }),
-          accept: ({ rendered, persisted }) =>
-            persisted.x > before.position.x + 30 &&
-            persisted.y > before.position.y + 15 &&
-            // CSS matrices serialize with less precision than persisted canvas coordinates.
-            Math.abs(persisted.x - rendered.position.x) < 0.01 &&
-            Math.abs(persisted.y - rendered.position.y) < 0.01,
+          accept: ({ rendered, persisted }) => {
+            // Group layout normalizes positions to integer canvas units.
+            const position =
+              nodeType === 'terminalGroup'
+                ? { x: Math.round(rendered.position.x), y: Math.round(rendered.position.y) }
+                : rendered.position
+            return (
+              persisted.x > before.position.x + 30 &&
+              persisted.y > before.position.y + 15 &&
+              // CSS matrices serialize with less precision than persisted canvas coordinates.
+              Math.abs(persisted.x - position.x) < 0.01 &&
+              Math.abs(persisted.y - position.y) < 0.01
+            )
+          },
           timeoutMs: 5_000
         })
-        expect(committed.rendered.selected).toBe(true)
-        expect(committed.rendered.hasOutline).toBe(true)
-        if (nodeType !== 'terminalGroup') {
-          await pollUntilState({
-            description: `${nodeType} input to activate after releasing the dragged title`,
-            observe: () => readNodeState(node),
-            accept: (state) => state.inputFocused,
-            timeoutMs: 3_000
-          })
-        }
+        expect(committed.rendered.selected).toBe(before.selected)
+        expect(committed.rendered.hasOutline).toBe(before.hasOutline)
+        // Observe longer than the bounded input-activation retry window to detect late focus.
+        const releasedAt = Date.now()
+        await pollUntilState({
+          description: `${nodeType} drag to preserve selection and avoid delayed input focus`,
+          observe: async () => {
+            const state = await readNodeState(node)
+            expect(state.inputFocused).toBe(false)
+            expect(
+              await page
+                .locator('.react-flow__node.selected')
+                .evaluateAll((elements) =>
+                  elements.map((element) => element.getAttribute('data-id')).sort()
+                )
+            ).toEqual(selectedBefore)
+            return Date.now() - releasedAt
+          },
+          accept: (elapsed) => elapsed >= 2_500,
+          timeoutMs: 4_000
+        })
         expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(
           viewportBefore
         )
       }
-      await assertKeyboardInputReachesNode(page, nodeType, workbench, fakeCodex)
     },
     electronScenarioTimeoutMs
   )
 })
+
+async function createAdditionalTerminal(page: Page, expectedCount: number): Promise<Locator> {
+  // Shortcut creation uses automatic placement, keeping the tested drag regions unobscured.
+  await page.getByRole('button', { name: '适应画布', exact: true }).focus()
+  await page.keyboard.press('ControlOrMeta+t')
+  await page.waitForFunction(
+    (count) => document.querySelectorAll('.react-flow__node-terminal').length === count,
+    expectedCount
+  )
+  const terminal = page.locator('.react-flow__node-terminal').last()
+  await pollUntilState({
+    description: 'the additional terminal creation to finish selecting and activating its input',
+    observe: () => readNodeState(terminal),
+    accept: (state) => state.selected && state.inputFocused,
+    timeoutMs: 5_000
+  })
+  return terminal
+}
 
 async function assertKeyboardInputReachesNode(
   page: Page,
@@ -234,7 +283,7 @@ async function movePointerOnTitle(
   await page.mouse.down()
   try {
     await page.mouse.move(point.x + movement.x, point.y + movement.y, {
-      steps: whilePressed ? 8 : 1
+      steps: 8
     })
     await whilePressed?.()
   } finally {

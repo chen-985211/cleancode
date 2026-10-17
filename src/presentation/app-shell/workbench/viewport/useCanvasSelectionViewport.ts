@@ -117,7 +117,6 @@ export function useCanvasSelectionViewport({
   )
 
   return {
-    activateSelectedWorkbenchNodeInput,
     focusSelectedWorkbenchNode,
     returnToGlobalCanvasView
   }
