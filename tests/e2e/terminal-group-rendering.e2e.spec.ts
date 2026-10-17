@@ -79,13 +79,15 @@ describe('terminal group rendering', () => {
     'preserves visible ordinary and Agent terminals at zoom $zoom with $members members',
     async ({ zoom, members }) => {
       await page.getByRole('button', { name: '添加项目' }).click()
-      await page.waitForFunction(
-        async () => (await window.cleancode!.listWorkbenches()).length === 1
-      )
+      const workbenches = await pollUntilState({
+        description: 'the added project to expose its workbench before creating graph fixtures',
+        observe: () => page.evaluate(() => window.cleancode!.listWorkbenches()),
+        accept: (workbenches) => workbenches.length === 1,
+        timeoutMs: 10_000
+      })
       const outsideId = await page.evaluate(
-        async ({ zoom, members }) => {
+        async ({ zoom, members, workbench }) => {
           const api = window.cleancode!
-          const workbench = (await api.listWorkbenches())[0]!
           const scope = {
             projectDirectory: workbench.project.directory,
             workspaceId: workbench.graph.workspaceId
@@ -123,7 +125,7 @@ describe('terminal group rendering', () => {
           await api.updateGraphViewport({ ...scope, viewport: { x: 30, y: 30, zoom } })
           return graph.blocks.find((block) => block.name === 'Outside')!.id
         },
-        { zoom, members }
+        { zoom, members, workbench: workbenches[0]! }
       )
       await page.reload()
       for (const name of [

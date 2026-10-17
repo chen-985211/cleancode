@@ -11,7 +11,7 @@ import {
   type FakeCodexCliFixture
 } from '../fixtures/contexts/agent/fakeCodexCli'
 import { waitForCanvasViewportZoomCommit } from '../support/e2eCanvasViewport'
-import { agentCliReadyTimeoutMs } from '../support/e2eAgentRuntime'
+import { agentCliReadyTimeoutMs, waitForAgentTerminalReady } from '../support/e2eAgentRuntime'
 import { createE2eFileCommand } from '../support/e2eTerminal'
 import { pollUntilState } from '../support/e2ePolling'
 import {
@@ -51,12 +51,18 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
     page = launched.page
     workbench = launched.workbench
     fakeCodex = launched.fakeCodex
+    // Keep zoomed titles clear of canvas controls on runners with small displays.
+    await resources.electronApp!.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]!.setContentSize(1440, 1000)
+    )
+    await page.waitForFunction(() => innerWidth >= 1440 && innerHeight >= 1000)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expectDesktopRuntime(page)
     await page.getByRole('button', { name: '添加项目' }).click()
 
     if (nodeType === 'agentConsole') {
       await createCodexAgent(page)
+      await waitForAgentTerminalReady(page)
     } else {
       await selectBlankCanvasAction(page, nodeType === 'terminal' ? '新建终端积木' : '组合终端')
       if (nodeType === 'terminalGroup') await page.getByRole('button', { name: '完成' }).click()
