@@ -68,6 +68,9 @@ import {
   useWorkbenchCanvasDetailLevel
 } from './viewport/workbenchCanvasViewportStore'
 
+// Share a screen-space tolerance so small pointer movements remain clicks instead of being lost.
+const nodeGestureThresholdPixels = 5
+
 export function WorkbenchCanvas({
   approvalIntents = [],
   agentProviders = [],
@@ -414,6 +417,8 @@ export function WorkbenchCanvas({
               }
               nodeTypes={nodeTypes}
               nodesDraggable={!isCanvasArrangementPending}
+              nodeClickDistance={nodeGestureThresholdPixels}
+              nodeDragThreshold={nodeGestureThresholdPixels}
               onInit={(instance) => {
                 reactFlowInstanceRef.current = instance
                 setViewportMotionInstance((currentInstance) => currentInstance ?? instance)
