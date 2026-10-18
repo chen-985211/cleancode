@@ -15,11 +15,11 @@
 </p>
 
 <p align="center">
-  <strong>A canvas-based ADE that puts each feature's Agents, terminals, and workflows into one runnable development context.</strong><br />
-  Start with branch isolation, keep context and runtime state, and turn proven setups into reusable development assets.
+  <strong>An Agent-driven canvas ADE: express your goal, let AI build the workflow, and keep what works.</strong><br />
+  Bring Agents, scripts, and terminals into a local workspace, then reuse proven setups through existing favorites and templates.
 </p>
 
-<p align="center"><em>One feature. One visible, executable development context.</em></p>
+<p align="center"><em>You express intent. AI organizes the work. Successful workflows become the next starting point.</em></p>
 
 <h3 align="center">
   <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview (macOS / Windows / Linux)</ins></a>
@@ -41,9 +41,11 @@ https://github.com/user-attachments/assets/cafe373f-97b7-4f8c-b4a4-dfbc88ab26c3
 
 ---
 
-Software development is moving from “one person writing code” to people and Agents advancing multiple development contexts together. One change may have its own branch, terminals, services, test commands, ports, and Agent conversation; another change has a similar context of its own. The problem is not a lack of tools. Once these contexts scatter across different windows, you have to keep rebuilding them from memory: which branch a terminal belongs to, whether a service is still alive, whether ports conflict, whether dependencies are ready, and whether the Agent still understands the current change. That is why I increasingly think a development environment should not be organized only around code files and editors. It should be organized around the change currently in motion. It needs to remember branches, terminals, services, ports, dependency order, and Agent context at the same time, and make them visible in a form people can understand and Agents can operate.
+Start with the outcome you want, your preferences, and your judgment of the result. Let an Agent break down the work, write scripts, configure commands, and investigate problems. CleanCode puts that work on one visible canvas: local directories, branch workspaces, terminals, services, and dependencies have clear ownership, so you can follow progress and make adjustments.
 
-**CleanCode is a canvas-based ADE (Agentic Development Environment).** In CleanCode, a change is not just a branch name. It is a development context you can keep working in: Agents, terminals, services, ports, and dependency relationships all live on the same canvas. You can see how they relate to each other and run them directly; once that context is proven, it can be saved as a project template or global favorite, becoming an asset you can reuse the next time you build.
+**CleanCode is an Agent-driven canvas ADE (Agentic Development Environment).** Borrowing the System 1 and System 2 language from _Thinking, Fast and Slow_, the user experience aims for intuitive expression and lightweight interaction, while Agents take on planning, implementation, and checking. You retain the goals and key decisions; AI handles the implementation within its tools and permissions. CleanCode MCP is the core interface for Agents to operate the canvas and collaborate with other Agents; scripts are written through each Agent's own file and shell tools.
+
+Once an approach works, existing project templates, global favorites, and quick execution slots preserve that experience. Reuse the configured workflow next time and save the repeated planning, setup, and troubleshooting; AI steps in the workflow can still process new inputs. Today's Agents, terminal workflows, and save-and-reuse features already provide the pieces for this approach.
 
 ## One Change, One Development Context
 
@@ -65,7 +67,7 @@ If two branches both need to start the same development service, CleanCode helps
 
 Many development environments do not break because the commands themselves cannot run. They break because the order and conditions are not remembered by the environment: install dependencies first, wait until the API service is actually ready, then start the web app, and finally run tests. Those details often scatter across READMEs, script comments, terminal history, and human memory. Switch branches, or come back a few days later, and the whole flow has to be checked again.
 
-In CleanCode, those startup conditions become an executable workflow on the canvas:
+Agents can configure those startup conditions as executable workflows through CleanCode MCP, and users can edit them directly:
 
 - Terminal blocks run real builds, tests, development servers, and everyday commands.
 - Directed connections declare real dependencies. Tasks without upstream dependencies can start in parallel; downstream tasks wait until every direct dependency has completed or become ready.
@@ -77,9 +79,19 @@ So the canvas is not a static flowchart. Every run produces an immutable executi
 
 If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. You can see exactly where the workflow stopped, which descendants were blocked, and what actually failed.
 
+### Automate with Scripts and AI
+
+Terminals already run Python, Node.js, HTTP clients, and non-interactive AI CLIs, so they can support research organization, content generation, and batch file processing. For example:
+
+```txt
+Prepare sources (script) ──> Analyze and extract (codex exec / claude -p) ──> Validate and generate a report (script)
+```
+
+An Agent can write the scripts, prompts, and launch commands, then create the terminals and dependencies through MCP. AI steps can use `codex exec` or `claude -p`; both support non-interactive calls and structured results, as described in the [official OpenAI documentation](https://developers.openai.com/codex/noninteractive) and [Claude Code documentation](https://code.claude.com/docs/en/headless). Agent-written wrapper scripts can adapt each CLI's response into the same downstream input. Scripts or CLIs handle file exchange, output parsing, branching, and loops; canvas connections continue to schedule dependencies. Start the workflow through the existing controls, then save and rerun it once it works. See the [automation example in the feature guide](./docs/product/feature-guide.md#让-agent-搭建资料整理自动化) for details.
+
 ## Prove It Once, Turn It into an Asset
 
-Once a development context actually works, its value no longer belongs to just that one change. The exact command, the readiness signal, the port strategy, and the layout of the nodes are all experience you had to discover. In many teams, that experience stays in someone's terminal history, chat thread, or memory. The next branch starts, and the same context has to be rebuilt.
+Once an Agent helps you complete a development or automation workflow, its commands, dependencies, readiness conditions, and port strategy become reusable experience. Save it as a starting point for the next task, and let AI refine the existing approach when needed.
 
 In CleanCode, proven terminals, workflows, or combinations can be saved as project templates; if they belong in more than one project, move them into global favorites. The next time a similar change appears, choose **Place** or **Place and run**, and CleanCode creates a new set of terminals and connections with their own identities, bringing back the commands, dependency relationships, port strategy, and relative layout together.
 
@@ -142,23 +154,23 @@ Look one layer deeper, and any Agent that can start from the command line can th
 
 <!-- agent-provider-wall:end -->
 
-## Let Agents Build the Context, Without Crossing the Boundary
+## CleanCode MCP: Let Agents Build the Context
 
-We said above that Agents can stand on the same canvas as terminals, services, and ports. But being in the development context does not mean an Agent should bypass you and edit the canvas data behind your back. Agents that support the native CleanCode MCP use stable tools to understand the current workspace: they can see existing terminals and connections, inspect the real startup commands in the project, and build a new terminal workflow from your goal.
+CleanCode MCP gives Agents the tools to inspect terminals and dependencies, configure tasks and services, atomically create complete workflows, and discover and contact collaborating Agents. From your goal, an Agent can use its own project-reading, file-editing, and shell tools to write scripts, then put the steps on the canvas.
 
 For example, you can simply tell it:
 
-> Help me set up a workflow for starting this project.
+> Organize the files in this directory into a report, and set up a reusable workflow on the canvas.
 
-The Agent first inspects the existing canvas, then reads the project to figure out what should be installed first, which services should start, and how ports and dependencies should connect. What lands on the canvas is not a suggestion, but a development context you can see, inspect, and keep running.
+The Agent can inspect the canvas and source material, prepare scripts, configure task modes and launch commands, then use MCP to submit the terminals and real dependencies in one operation. Project startup follows the same approach: the Agent identifies supported commands, readiness conditions, and port injection options.
 
-But there is an important boundary here: actions that change the structure of the context, such as deleting blocks, dissolving groups, or disconnecting dependencies, require approval in the CleanCode UI. Starting and stopping workflows also remain under human control. Agents can help build the context, but they should not turn your local development environment into a black box. What they changed, what they created, and what would run next should stay visible to you.
+MCP currently builds and checks workflows; starting, stopping, saving, and placing templates use the existing user controls and are not exposed through MCP yet. Deleting blocks, dissolving groups, and disconnecting dependencies retain UI approval. Script and AI CLI permissions belong to their respective Agents and tools. Once launched, Run schedules the configured dependencies, with the process and results visible on the canvas and in terminals.
 
 ## Let One Feature Grow into a Development Context
 
 Using CleanCode does not require planning a complete system first. Start with the feature you are working on right now: add the local project, create an isolated branch workspace for it, and bring in the Coding Agent you already use.
 
-From there, you can turn installation, builds, tests, and development servers into terminal blocks yourself, or ask an Agent that supports the CleanCode MCP to build the first startup workflow. CleanCode puts finite tasks, long-running services, readiness conditions, ports, and dependency relationships on the same canvas, so the feature becomes more than a branch. It becomes a runnable context you can inspect and keep adjusting.
+From there, tell an Agent that supports CleanCode MCP what you want to accomplish, and let it read the project, write any needed scripts, and build the workflow. Existing terminals can run installation, builds, tests, development services, and document processing. You can inspect and edit their definitions on the canvas.
 
 Once the workflow runs, start it from the root terminal and inspect startup order, runtime state, failure reasons, and actual endpoints on the canvas. After the context has been proven, save the terminals, workflow, or combination as a template, or bind it to a quick execution slot. The next time a similar feature appears, it is no longer just a configuration you repeat. It is reusable experience.
 
