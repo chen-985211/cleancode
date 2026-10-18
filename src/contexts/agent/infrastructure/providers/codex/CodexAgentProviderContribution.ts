@@ -10,7 +10,7 @@ import type {
   AgentTelemetryContribution,
   CreateAgentLaunchPlanCommand
 } from '../../../application/ports/AgentProviderContribution'
-import { cleancodeMcpDeveloperInstructions } from '../../../application/dto/AgentToolProtocol'
+import { createAgentMcpConfiguration } from '../../../application/dto/AgentMcpConfiguration'
 import {
   ProviderSessionRef,
   type ProviderSessionRefSnapshot
@@ -261,7 +261,7 @@ class CodexCleancodeCapabilityInjector implements AgentCapabilityInjector {
         '--config',
         `mcp_servers.cleancode={url=${serialize(command.serverUrl)},bearer_token_env_var=${serialize('CLEANCODE_MCP_TOKEN')},enabled=true,default_tools_approval_mode=${serialize('approve')}}`,
         '--config',
-        `developer_instructions=${serialize(cleancodeMcpDeveloperInstructions)}`
+        `developer_instructions=${serialize(createAgentMcpConfiguration(command.toolCategories).developerInstructions)}`
       ],
       env: createMcpEnvironment(command.bearerToken)
     }

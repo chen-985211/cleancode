@@ -537,6 +537,22 @@ function readAgentProviderPreferencesPatch(value: unknown): UpdateAgentProviderP
     }
     Object.assign(patch, { defaultCleancodeMcpEnabled: value.defaultCleancodeMcpEnabled })
   }
+  if ('mcpToolCategories' in value) {
+    const categories = value.mcpToolCategories
+    if (
+      !isRecord(categories) ||
+      Object.keys(categories).some((key) => key !== 'canvas' && key !== 'collaboration') ||
+      typeof categories.canvas !== 'boolean' ||
+      typeof categories.collaboration !== 'boolean'
+    ) {
+      throw invalidPreferencesPatch(
+        'mcpToolCategories must contain canvas and collaboration booleans.'
+      )
+    }
+    Object.assign(patch, {
+      mcpToolCategories: { canvas: categories.canvas, collaboration: categories.collaboration }
+    })
+  }
   if ('defaultProviderId' in value) {
     if (value.defaultProviderId !== null && typeof value.defaultProviderId !== 'string') {
       throw invalidPreferencesPatch('defaultProviderId must be a string or null.')

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
-import { cleancodeMcpDeveloperInstructions } from '../../../application/dto/AgentToolProtocol'
+import { createAgentMcpConfiguration } from '../../../application/dto/AgentMcpConfiguration'
 import type {
   AgentCapabilityInjector,
   AgentLaunchPlanner,
@@ -139,7 +139,7 @@ class ClaudeCodeCapabilityInjector implements AgentCapabilityInjector {
     const instructions = await createTemporaryProviderConfig(
       'cleancode-claude-instructions-',
       'instructions.txt',
-      cleancodeMcpDeveloperInstructions
+      createAgentMcpConfiguration(command.toolCategories).developerInstructions
     )
     command.artifacts.track('claude-mcp-instructions', instructions)
     return {

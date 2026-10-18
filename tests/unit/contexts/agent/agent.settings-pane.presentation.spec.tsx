@@ -53,12 +53,9 @@ describe('Agent settings pane', () => {
     expect(screen.getByRole('button', { name: 'Yolo' })).toHaveAttribute('aria-pressed', 'true')
     const permissionSelection = document.querySelector('.agent-settings-segmented__selection')
     expect(permissionSelection).toHaveAttribute('data-selection-motion-target', 'yolo')
-    const defaultMcpSwitch = screen.getByRole('switch', {
-      name: '新 Agent 默认启用 CleanCode MCP'
-    })
-    expect(defaultMcpSwitch).toHaveAttribute('aria-checked', 'true')
-    expect(defaultMcpSwitch).toHaveAttribute('data-selection-motion-state', 'open')
-    expect(defaultMcpSwitch.style.getPropertyValue('--cc-selection-motion-progress')).toBe('1')
+    expect(
+      screen.queryByRole('switch', { name: '新 Agent 默认启用 CleanCode MCP' })
+    ).not.toBeInTheDocument()
     expect(screen.queryByText('选择默认 Agent，并检查本机可用的 CLI。')).not.toBeInTheDocument()
     expect(
       screen.queryByText('Yolo 会在启动时加入该 Agent 支持的免确认参数。')
@@ -86,6 +83,7 @@ describe('Agent settings pane', () => {
 function AgentSettingsHarness() {
   const [preferences, setPreferences] = useState<AgentProviderPreferencesSnapshot>({
     defaultCleancodeMcpEnabled: true,
+    mcpToolCategories: { canvas: true, collaboration: true },
     defaultProviderId: 'codex',
     disabledProviderIds: [],
     permissionMode: 'yolo',

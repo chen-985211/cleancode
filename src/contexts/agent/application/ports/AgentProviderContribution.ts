@@ -1,3 +1,4 @@
+import type { AgentToolCategories } from '../../domain/value-objects/AgentToolCategories'
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentActivityStatus } from '../dto/AgentSessionProtocol'
 import type { AgentMessageWakeupPort } from './AgentMessageDeliveryPort'
@@ -134,6 +135,7 @@ export interface CreateAgentLaunchPlanCommand {
   readonly initialPrompt?: string
   readonly artifacts: AgentLaunchArtifactRegistrar
   readonly cleancodeMcp?: {
+    readonly toolCategories?: AgentToolCategories
     readonly bearerToken: string
     readonly serverUrl: string
   }
@@ -188,6 +190,7 @@ export interface AgentTelemetryContribution {
 export interface AgentCapabilityInjector {
   inject(command: {
     readonly artifacts: AgentLaunchArtifactRegistrar
+    readonly toolCategories?: AgentToolCategories
     readonly bearerToken: string
     readonly serverUrl: string
   }):

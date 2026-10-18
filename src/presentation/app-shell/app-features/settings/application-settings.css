@@ -172,6 +172,32 @@
   padding: clamp(32px, 4vh, 44px) clamp(32px, 4vw, 52px) 56px;
 }
 
+:is(.application-settings-content, .application-settings-navigation)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:is(.application-settings-content, .application-settings-navigation)::-webkit-scrollbar-track,
+:is(.application-settings-content, .application-settings-navigation)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:is(.application-settings-content, .application-settings-navigation)::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: var(--cc-scrollbar);
+  background-clip: padding-box;
+}
+
+:is(.application-settings-content, .application-settings-navigation)::-webkit-scrollbar-thumb:hover,
+:is(
+    .application-settings-content,
+    .application-settings-navigation
+  )::-webkit-scrollbar-thumb:active {
+  background-color: var(--cc-muted-strong);
+}
+
 .application-settings-pane-transition {
   position: relative;
   display: grid;

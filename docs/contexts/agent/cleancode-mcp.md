@@ -20,7 +20,7 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的
 
 当前能力包括：
 
-- 为每个工作区 Agent 持久化独立能力开关；新建和旧数据迁移默认开启。
+- 为每个工作区 Agent 持久化独立能力开关；新建和旧数据迁移默认开启。应用设置提供独立的 CleanCode MCP 页面，保存新 Agent 默认开关和应用级终端画布、Agent 协作两类工具开关。
 - 为每个已启用能力的运行中 Agent 会话注册独立 MCP 端点和 Bearer Token。
 - 由 Provider contribution 生成只作用于本次 launch 的 MCP 配置、Token 传递和画布路由 instructions，不修改用户全局配置。
 - Provider 原生预批准范围只允许当前 `cleancode` Server；CLI 自身不重复询问时，破坏性动作仍必须经过 cleancode UI 审批。
@@ -33,7 +33,7 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的
 
 当前不包括：
 
-- MCP resources、prompts、sampling 或动态工具列表。
+- MCP resources、prompts、sampling 或同一 launch 内的动态工具列表。
 - 用户自行配置或管理任意外部 MCP Server。
 - 文件读写、Shell、PTY 输入输出等通用系统工具。
 - 终端依赖工作流运行、运行状态/日志读取或自定义积木工具。
@@ -103,13 +103,19 @@ Claude Code 的完整 launch 指令存入 mode `0600` 的私有临时文件，�
 
 Provider 只声明是否支持安全的 launch 级 CleanCode MCP 注入，不声明失败策略。支持时，Provider launch 与 MCP readiness 独立投影：launch 启动后即可进入 running；认证后的 `initialize` 请求与随后 `notifications/initialized` 通知完成后，MCP 才进入 ready。端点注册失败属于确定失败，只把 MCP 投影为 `failed`，不启动 Provider 级 MCP 配置；等待握手的 30 秒软期限只在当前 Provider launch 的 started 回调被接受后开始，期限到达时投影为 `degraded`，但不得释放仍属于当前 launch 的端点。迟到的当前 registration 握手仍可把 `degraded` 恢复为 `ready`。只有 launch 退出或替换、用户关闭能力、会话释放或应用退出才释放 registration。不支持时不注册端点且 UI 不提供开关。未鉴权通知、只发 initialized 通知、旧 registration 回调、已注销回调或旧期限回调都不能发布 ready 或覆盖新 registration。
 
-关闭能力或 Provider 不支持该能力时，不注册端点，也不注入配置、Token 或画布路由 instructions。UI 对不支持的 Provider 隐藏开关，不能伪装成已启用。开启时，配置只约束画布意图路由，不改变 Provider 的 sandbox、全局 approval policy、Shell、文件、Git、网络或其他 MCP Server 权限。画布工具说明同时由 launch 级指令和 MCP `initialize` 响应提供；两者必须引用共享画布语义契约生成的同一段规范说明，不得分别手写对象定义或组合阈值。
+关闭能力、两类工具均关闭或 Provider 不支持该能力时，不注册端点，也不注入配置、Token 或画布路由 instructions。UI 对不支持的 Provider 隐藏开关，不能伪装成已启用。开启时，配置只约束画布意图路由，不改变 Provider 的 sandbox、全局 approval policy、Shell、文件、Git、网络或其他 MCP Server 权限。画布工具说明同时由 launch 级指令和 MCP `initialize` 响应提供；两者必须引用共享画布语义契约生成的同一段规范说明，不得分别手写对象定义或组合阈值。
 
 Agent launch 退出、替换或会话释放时，先同步关闭新工具调用准入并用精确 handle 注销对应端点，再取消仍在等待的审批、等待全部已经准入或开始执行的调用收束，最后由 `AgentLaunchArtifactScope` 按 LIFO 释放 Provider reporter、临时配置和插件；只有删除、挂起或上层生命周期清理才停止底层 Agent terminal。已经批准并开始的调用不能伪装成取消。首次检查返回待审批与登记审批之间也受同一关闭门控，不能在旧 launch 结束后补登记。成功清理的 artifact 不得重复执行，失败项必须保留供后续重试。应用退出时必须尝试全部会话的排空与 scope 清理并关闭 HTTP Server，再聚合报告错误。端点 URL、Token、待审批请求和进行中的 HTTP 调用都是易失状态。
 
 切换运行中 Agent 的能力时，先保存偏好，再取消旧审批、注销旧端点并替换运行时 session/launch；支持恢复的 Provider 使用原 session ref 继续对话。关闭后只移除未来调用能力，Provider 对话历史中的既有 MCP 交互仍属于 Provider。没有活动运行时时只持久化开关，待下次附加时生效。
 
 launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 MCP 初始化时读取。应用升级这些内容后，已有 launch 不热替换；必须切换一次能力、重新启动 Agent 或新建对话才能获得新版本。持久化 Provider session 可以继续恢复，不要求丢弃对话历史。
+
+分类配置由 Agent 上下文的 `AgentProviderPreferences` 及其仓储持久化，`AgentToolCategories` 是工具归属和默认值的统一 owner。偏好 schema v1 新增 `mcpToolCategories`，缺失或非法分类值分别回退到开启；读取旧数据不回写，也不改变已有 Agent 的独立开关。
+
+每次启动、恢复启动或显式重连时，应用层读取一份分类快照，由 `AgentMcpConfiguration` 派生工具目录和指令，并交给本次 registration 与 Provider launch。保存应用偏好不会中断或热修改当前 launch；当前会话继续使用原分类快照，下一次启动或重连才应用新值。关闭终端画布类时不注入画布路由说明；关闭协作类时不注入协作说明，也不注册收件箱投递和原生唤醒资源。单个 Agent 的总开关仍独立持久化，实际能力还受 Provider 支持和本次分类快照约束。
+
+`tools/list` 只返回本次启用分类中的工具。JSON-RPC 桥接层拒绝直接调用未启用的工具，Agent 应用层调用入口也执行相同快照的准入检查，不能通过绕开列表触发目标用例或审批。两类全部关闭时 Provider 正常启动，MCP 状态为 disabled，Agent 自身保存的总开关不因此改写。
 
 ## MCP 协议面
 
@@ -136,7 +142,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 ## 当前工具目录
 
-以下 16 个图工具与下节 5 个协作工具构成当前完整的 21 个工具：
+以下 16 个终端画布工具与下节 5 个 Agent 协作工具构成当前完整的 21 个工具。独立设置页完整显示名称、用途和每类数量；每类开关共同控制该类全部工具，不提供单工具开关。这里列出完整目录，具体 launch 仅暴露启用分类中的工具：
 
 | 工具                               | 行为                                           | 必填输入                           | 可选输入                                                   | UI 审批 |
 | ---------------------------------- | ---------------------------------------------- | ---------------------------------- | ---------------------------------------------------------- | ------- |
@@ -195,7 +201,7 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置
 
 消息正文上限 32768 字符，message ID 上限 128 字符；每个工作区每个应用进程最多保留 4096 条消息，包括用于去重的已确认记录。达到容量明确失败。消息、去重记录、创建意图与等待不跨应用重启恢复；审计只保存协作路由元数据，不保存任务、回复或初始提示正文。
 
-创建复用 `CreateWorkspaceAgentUseCase` 和画布统一位置预留、提交与聚焦流程。发起工作区必须仍在原画布打开；画布忙、切换作用域或 30 秒未响应时失败，调用方用同一 agent ID 重试。已存在且不属于本次创建意图的 Agent 必须改用发现与发送工具，不能通过创建接管。每个进程最多登记 256 个创建意图；创建 ID 上限 96 字符。初始任务通过 `initialMessageId` 入队，与手动创建、已有会话和恢复后的后续消息共用投递机制。创建意图只负责幂等创建与启动状态，不注入专有启动提示；对象保存、CLI 启动、MCP ready、消息接受和任务完成是不同事实。启动失败保留已创建对象，既有恢复和重试入口继续有效。
+创建复用 `CreateWorkspaceAgentUseCase` 和画布统一位置预留、提交与聚焦流程。提交协作创建前必须读取当前应用偏好，只有新 Agent 默认 MCP 总开关与 Agent 协作分类均开启才准入；调用方旧 launch 仍具备协作工具时也遵守该检查，关闭终端画布分类不影响协作创建。不满足时以 `AGENT_TOOL_UNAVAILABLE` 拒绝，不提交画布创建、不登记创建意图、不入队初始任务；重新启用后可使用原 agent ID 重试。发起工作区必须仍在原画布打开；画布忙、切换作用域或 30 秒未响应时失败，调用方用同一 agent ID 重试。已存在且不属于本次创建意图的 Agent 必须改用发现与发送工具，不能通过创建接管。每个进程最多登记 256 个创建意图；创建 ID 上限 96 字符。初始任务通过 `initialMessageId` 入队，与手动创建、已有会话和恢复后的后续消息共用投递机制。创建意图只负责幂等创建与启动状态，不注入专有启动提示；对象保存、CLI 启动、MCP ready、消息接受和任务完成是不同事实。启动失败保留已创建对象，既有恢复和重试入口继续有效。
 
 `0.8.0` 增加 launch 绑定的原生通知。若用户覆盖 executable 或 PATH，默认 CLI 的检测版本不能证明实际运行能力；由实际 CLI 的能力探测或正式 Hook/插件握手决定通知资格。所有支持且开启 MCP 的 Agent 共用收件箱；手动、MCP 创建或恢复不会改变通信资格。Agent 应用层按运行、MCP ready、正式活动状态和适配能力调度通知，已有 MCP 等待优先直接交付。Codex 的官方队列可以在忙碌时接收固定提醒；Claude 在 idle 或由 `idle_prompt` 投影的 waiting_input 时发起通知；后者表示回复结束后持续空闲，并不表示仍在执行或等待审批。其他 Provider 必须显式声明该等待状态可通知，不能统一放行所有 waiting_input。通知失败最多重试三次，未领取消息保留。旧 launch 先撤销通知，再释放配置、Hook 与本地服务；迟到回调不能重新激活已关闭的 launch。
 
@@ -259,18 +265,19 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 
 ## 状态所有权与持久化
 
-| 状态                                                | 所有权                 | 是否持久化                   |
-| --------------------------------------------------- | ---------------------- | ---------------------------- |
-| 工具目录、会话路由/instructions、安全注解和审批策略 | Agent 代码契约         | 随版本发布                   |
-| Provider 的 CleanCode Server 精确允许范围           | Agent 基础设施代码契约 | 随版本发布，不属于用户状态   |
-| Agent 稳定身份、固定 Provider、布局和 session ref   | Agent 聚合与仓储       | 是                           |
-| CleanCode MCP 能力开关                              | Agent 聚合与仓储       | 是                           |
-| 工具调用审计                                        | Agent 审计仓储         | 是，当前为 JSONL             |
-| 积木图、终端组合、执行配置和终端依赖                | BlockGraph 聚合与仓储  | 是                           |
-| MCP URL、Bearer Token、HTTP Server                  | Agent 运行时           | 否                           |
-| MCP readiness、binding persistence 状态             | Agent 运行时           | 否                           |
-| 待审批请求                                          | Agent 运行时           | 否                           |
-| MCP 调用中的图快照                                  | 应用层返回值           | 否，事实仍在 BlockGraph 仓储 |
+| 状态                                                | 所有权                          | 是否持久化                   |
+| --------------------------------------------------- | ------------------------------- | ---------------------------- |
+| 工具目录、会话路由/instructions、安全注解和审批策略 | Agent 代码契约                  | 随版本发布                   |
+| Provider 的 CleanCode Server 精确允许范围           | Agent 基础设施代码契约          | 随版本发布，不属于用户状态   |
+| Agent 稳定身份、固定 Provider、布局和 session ref   | Agent 聚合与仓储                | 是                           |
+| CleanCode MCP 能力开关                              | Agent 聚合与仓储                | 是                           |
+| MCP 工具分类开关、新 Agent 默认开关                 | AgentProviderPreferences 与仓储 | 是，schema v1                |
+| 工具调用审计                                        | Agent 审计仓储                  | 是，当前为 JSONL             |
+| 积木图、终端组合、执行配置和终端依赖                | BlockGraph 聚合与仓储           | 是                           |
+| MCP URL、Bearer Token、HTTP Server                  | Agent 运行时                    | 否                           |
+| MCP readiness、binding persistence 状态             | Agent 运行时                    | 否                           |
+| 待审批请求                                          | Agent 运行时                    | 否                           |
+| MCP 调用中的图快照                                  | 应用层返回值                    | 否，事实仍在 BlockGraph 仓储 |
 
 任何新增 MCP 工具都必须先确定业务事实 owner。Agent 可以拥有协议、权限和审计，但不得因为工具从 Agent 发起，就把目标上下文的业务规则搬入 Agent。
 
@@ -309,6 +316,8 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 | Presentation projection       | [`agentApprovalPresentation.ts`](../../../src/presentation/app-shell/projections/agentApprovalPresentation.ts)、[`useAgentLayoutCoordination.ts`](../../../src/presentation/app-shell/coordinators/useAgentLayoutCoordination.ts)、[`terminalWorkflowBuildChoreography.ts`](../../../src/presentation/app-shell/projections/terminalWorkflowBuildChoreography.ts)、[`useTerminalWorkflowBuildChoreography.ts`](../../../src/presentation/app-shell/coordinators/useTerminalWorkflowBuildChoreography.ts)、[`useWorkbenchLayoutFocus.ts`](../../../src/presentation/app-shell/workbench/viewport/useWorkbenchLayoutFocus.ts) |
 
 ## 验证矩阵
+
+分类设置由 `agent.mcp-tool-categories.spec.ts`、`agent.http-mcp-server.spec.ts` 和 `agent.ipc.spec.ts` 验证四种组合与边界拒绝；`agent.provider-preferences.spec.ts` 和真实偏好仓储集成测试覆盖兼容恢复；`agent.reconfigure-mcp-capability.spec.ts` 验证当前会话快照、重连更新和双关闭；`agent.mcp-provider-categories.spec.ts` 验证支持 launch instructions 的 Provider 注入一致性；`agent.mcp-settings.presentation.spec.tsx` 验证完整清单、分类切换、保存失败和不可用状态。
 
 协作链路由以下测试补充覆盖：
 

@@ -65,6 +65,47 @@ describe('agent IPC contract', () => {
     expect(updateAgentProviderPreferences).toHaveBeenCalledOnce()
   })
 
+  it.each([
+    { canvas: false, collaboration: true },
+    { canvas: true, collaboration: false },
+    { canvas: false, collaboration: false },
+    { canvas: true, collaboration: true }
+  ])('accepts a complete MCP category patch %j', async (mcpToolCategories) => {
+    const ipcMain = new FakeIpcMain()
+    const updateAgentProviderPreferences = vi.fn(async () => ({
+      ...createAgentProviderPreferences(),
+      mcpToolCategories
+    }))
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({ ipcMain, updateAgentProviderPreferences })
+    )
+    expect(
+      await ipcMain.invoke('cleancode:update-agent-provider-preferences', { mcpToolCategories })
+    ).toMatchObject({ ok: true })
+    expect(updateAgentProviderPreferences).toHaveBeenCalledWith({ mcpToolCategories })
+  })
+
+  it.each([
+    null,
+    [],
+    { canvas: true },
+    { canvas: false, collaboration: 'false' },
+    { canvas: true, collaboration: true, unknown: false }
+  ])(
+    'rejects malformed MCP categories %j without writing preferences',
+    async (mcpToolCategories) => {
+      const ipcMain = new FakeIpcMain()
+      const updateAgentProviderPreferences = vi.fn(async () => createAgentProviderPreferences())
+      registerAgentIpcHandlers(
+        createAgentIpcHandlersInput({ ipcMain, updateAgentProviderPreferences })
+      )
+      expect(
+        await ipcMain.invoke('cleancode:update-agent-provider-preferences', { mcpToolCategories })
+      ).toMatchObject({ ok: false, error: { code: 'INVALID_IPC_COMMAND' } })
+      expect(updateAgentProviderPreferences).not.toHaveBeenCalled()
+    }
+  )
+
   it('attaches the renderer to a workspace Codex PTY session and streams session events to it', async () => {
     const ipcMain = new FakeIpcMain()
     const sender = createSender()
@@ -598,6 +639,7 @@ function createAgentIpcHandlersInput(input: {
 function createAgentProviderPreferences() {
   return {
     defaultCleancodeMcpEnabled: true,
+    mcpToolCategories: { canvas: true, collaboration: true },
     defaultProviderId: null,
     disabledProviderIds: [],
     permissionMode: 'yolo' as const,

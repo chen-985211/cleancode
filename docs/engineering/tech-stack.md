@@ -131,6 +131,8 @@ Issue 正文由 `react-markdown` 10.1.0 和 `remark-gfm` 4.0.1 进行只读渲�
 
 Electron Platform 在应用数据目录根部使用独立的 `window-state-v1.json` 保存主窗口正常尺寸、位置与正常、最大化或全屏模式；它是 Platform 拥有的技术偏好，不属于 `project-state-v2` 业务状态根或任何限界上下文仓储。该文件只接受 schema v1，缺失、损坏或不支持的版本均回退到安全默认窗口状态；显示器变化时保存的正常窗口边界会先规范化到当前可用工作区。最小化不持久化，屏幕外后台 E2E 只恢复尺寸。写入使用临时文件、文件同步与原子重命名。
 
+Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 保存终端画布与 Agent 协作两类开关；旧记录缺少字段或分类值非法时分别回退到开启，读取不回写。新 Agent 的 MCP 默认开关与已有 Agent 的独立开关保持原有作用域。
+
 需要原子替换的 JSON 状态采用临时文件、同步和重命名流程。限界上下文业务状态的所有读写必须通过应用层仓储端口完成；Electron 自有技术状态留在 Platform 的专用存储模块内。存储文件不是供 UI、Agent 或其他上下文直接修改的共享接口。
 
 工作区默认内容和初始化进度由 Project 拥有，保存于 `workspace-initialization.json` schema v2，兼容读取 v1 的单 Agent 默认配置并在下次写入时升级，既有初始化凭据不变；冻结模板由 BlockGraph 拥有，保存于不展示在收藏列表中的 `workspace-prepared-templates.json` schema v1。图 v5 与 Agent v6 分别把初始化创建凭据与对象原子保存，避免跨上下文进度写入失败造成重复创建。它们都位于当前应用状态根，不进入 Git worktree。

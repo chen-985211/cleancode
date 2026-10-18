@@ -1,3 +1,4 @@
+import type { AgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 import type { AgentToolExecutionResult } from '../use-cases/ExecuteAgentToolUseCase'
 
@@ -10,6 +11,7 @@ export interface AgentMcpToolCallCommand {
 }
 
 export interface RegisteredAgentMcpSession {
+  readonly configuration?: AgentMcpConfiguration
   readonly executeTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
   readonly onInitialized?: () => void
   readonly projectDirectory: string

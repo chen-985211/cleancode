@@ -61,9 +61,15 @@ export class AgentCollaborationTools {
         if (!provider.descriptor.capabilities.cleancodeMcp || !command.peerCreation) {
           throw unavailable('Native peer creation is unavailable for this Provider or canvas.')
         }
-        if (!(await this.preferences.load()).defaultCleancodeMcpEnabled) {
+        const preferences = await this.preferences.load()
+        if (!preferences.defaultCleancodeMcpEnabled) {
           throw unavailable(
             'Enable CleanCode MCP for new Agents before creating a collaborating peer.'
+          )
+        }
+        if (!preferences.mcpToolCategories.collaboration) {
+          throw unavailable(
+            'Enable Agent collaboration tools in CleanCode MCP settings before creating a collaborating peer.'
           )
         }
         const created = await command.peerCreation.create(input)

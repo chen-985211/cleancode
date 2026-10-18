@@ -21,11 +21,13 @@ describe('Agent Provider preferences persistence', () => {
 
     await expect(repository.load()).resolves.toMatchObject({
       defaultCleancodeMcpEnabled: true,
+      mcpToolCategories: { canvas: true, collaboration: true },
       permissionMode: 'yolo'
     })
 
     await repository.save({
       defaultCleancodeMcpEnabled: false,
+      mcpToolCategories: { canvas: false, collaboration: true },
       defaultProviderId: 'codex',
       disabledProviderIds: ['opencode'],
       permissionMode: 'manual',
@@ -41,6 +43,7 @@ describe('Agent Provider preferences persistence', () => {
 
     await expect(repository.load()).resolves.toEqual({
       defaultCleancodeMcpEnabled: false,
+      mcpToolCategories: { canvas: false, collaboration: true },
       defaultProviderId: 'codex',
       disabledProviderIds: ['opencode'],
       permissionMode: 'manual',
@@ -59,6 +62,24 @@ describe('Agent Provider preferences persistence', () => {
     }
   })
 
+  it('loads legacy preferences without rewriting them and saves categories independently', async () => {
+    const path = join(directory, 'legacy.json')
+    const legacy = JSON.stringify({ version: 1, defaultCleancodeMcpEnabled: false })
+    await writeFile(path, legacy)
+    const repository = new FileSystemAgentProviderPreferencesRepository(path)
+    const restored = await repository.load()
+    expect(restored.mcpToolCategories).toEqual({ canvas: true, collaboration: true })
+    expect(await readFile(path, 'utf8')).toBe(legacy)
+    await repository.save({
+      ...restored,
+      mcpToolCategories: { canvas: true, collaboration: false }
+    })
+    expect(await new FileSystemAgentProviderPreferencesRepository(path).load()).toMatchObject({
+      defaultCleancodeMcpEnabled: false,
+      mcpToolCategories: { canvas: true, collaboration: false }
+    })
+  })
+
   it('recovers safely from malformed persisted JSON', async () => {
     const path = join(directory, 'agent-provider-preferences.json')
     await writeFile(path, '{malformed', 'utf8')
@@ -66,6 +87,7 @@ describe('Agent Provider preferences persistence', () => {
 
     await expect(repository.load()).resolves.toMatchObject({
       defaultCleancodeMcpEnabled: true,
+      mcpToolCategories: { canvas: true, collaboration: true },
       permissionMode: 'yolo'
     })
   })

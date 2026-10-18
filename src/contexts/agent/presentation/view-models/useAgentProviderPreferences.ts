@@ -1,3 +1,4 @@
+import { defaultAgentProviderPreferences } from '../../application/dto/AgentProviderPreferencesDefaults'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { UpdateAgentProviderPreferencesCommand } from '../../application/use-cases/UpdateAgentProviderPreferencesUseCase'
@@ -7,14 +8,7 @@ import {
   readAgentProviderPreference
 } from './agentProviderPreference'
 
-const browserPreviewPreferences: AgentProviderPreferencesSnapshot = {
-  defaultCleancodeMcpEnabled: true,
-  defaultProviderId: null,
-  disabledProviderIds: [],
-  permissionMode: 'yolo',
-  providerOverrides: {},
-  version: 1
-}
+const browserPreviewPreferences = defaultAgentProviderPreferences
 
 export type AgentProviderPreferencesState =
   | { readonly preferences: AgentProviderPreferencesSnapshot; readonly status: 'ready' }

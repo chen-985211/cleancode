@@ -1,3 +1,4 @@
+import { defaultAgentProviderPreferences } from '../../application/dto/AgentProviderPreferencesDefaults'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
 import { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise'
@@ -16,7 +17,6 @@ import type {
   AgentProviderPreferencesSnapshot
 } from '../../domain/aggregates/AgentProviderPreferences'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
-import { ApplicationSettingsSwitch } from '../../../../presentation/shared/components/ApplicationSettingsSwitch'
 import {
   useSelectionFeedbackMotion,
   useSelectionIndicatorMotion
@@ -24,14 +24,7 @@ import {
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { useAgentProviderCatalog } from '../view-models/useAgentProviderCatalog'
 
-const defaultPreferences: AgentProviderPreferencesSnapshot = {
-  defaultCleancodeMcpEnabled: true,
-  defaultProviderId: null,
-  disabledProviderIds: [],
-  permissionMode: 'yolo',
-  providerOverrides: {},
-  version: 1
-}
+const defaultPreferences = defaultAgentProviderPreferences
 
 type InspectionState =
   | { readonly status: 'checking' }
@@ -171,21 +164,6 @@ export function AgentSettingsPane({
               </button>
             ))}
           </div>
-        </div>
-        <div className="agent-settings-preference-row">
-          <span>
-            <strong>{t('settings.agents.defaultMcp')}</strong>
-          </span>
-          <ApplicationSettingsSwitch
-            checked={preferences.defaultCleancodeMcpEnabled}
-            label={t('settings.agents.defaultMcp')}
-            disabled={settingsDisabled}
-            onClick={() =>
-              void updatePreferences('defaultCleancodeMcpEnabled', {
-                defaultCleancodeMcpEnabled: !preferences.defaultCleancodeMcpEnabled
-              })
-            }
-          />
         </div>
       </section>
 

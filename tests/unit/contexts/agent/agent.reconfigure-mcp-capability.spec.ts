@@ -11,10 +11,79 @@ import type { AgentRuntimeScopeValidationPort } from '../../../../src/contexts/a
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { AgentProviderPreferences } from '../../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
+import type { AgentProviderPreferencesRepository } from '../../../../src/contexts/agent/application/ports/AgentProviderPreferencesRepository'
 import { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 
 describe('reconfigure Agent CleanCode MCP capability', () => {
+  it('keeps the running category snapshot until reconnect and blocks disabled calls in the application', async () => {
+    let preferences = AgentProviderPreferences.restore({
+      version: 1,
+      mcpToolCategories: { canvas: false, collaboration: true }
+    }).toSnapshot()
+    const processPort = new RecordingProcessPort()
+    const mcp = new RecordingMcpServerPort()
+    const service = createService(
+      new MemoryAgentRepository(createAgent(true, true)),
+      processPort,
+      mcp,
+      undefined,
+      { load: async () => preferences, save: async () => undefined }
+    )
+    const first = await service.attach(attachCommand())
+    expect(processPort.providers.launchCommands[0]?.cleancodeMcp?.toolCategories).toEqual({
+      canvas: false,
+      collaboration: true
+    })
+    await expect(
+      service.executeMcpTool({
+        sessionId: first.sessionId,
+        toolCallId: 'disabled',
+        toolName: 'delete_block',
+        input: { blockId: 'terminal-1' }
+      })
+    ).rejects.toMatchObject({ code: 'AGENT_TOOL_UNAVAILABLE' })
+    expect(service.listPendingApprovals()).toEqual([])
+    preferences = { ...preferences, mcpToolCategories: { canvas: true, collaboration: false } }
+    await service.attach(attachCommand())
+    expect(processPort.launches).toHaveLength(1)
+    expect(mcp.configurations[0]?.toolCategories).toEqual({ canvas: false, collaboration: true })
+    await service.reconfigureAgent({
+      agentId: 'agent-1',
+      projectId: 'project-1',
+      workspaceId: 'main',
+      cleancodeMcpEnabled: true
+    })
+    expect(processPort.providers.launchCommands[1]?.cleancodeMcp?.toolCategories).toEqual(
+      preferences.mcpToolCategories
+    )
+    expect(mcp.unregistered).toEqual([first.sessionId])
+    expect(processPort.providers.launchCommands[1]?.messageDelivery).toBeUndefined()
+    await service.disposeAll()
+  })
+
+  it('starts normally without an endpoint when both categories are disabled', async () => {
+    const preferences = AgentProviderPreferences.restore({
+      version: 1,
+      mcpToolCategories: { canvas: false, collaboration: false }
+    }).toSnapshot()
+    const processPort = new RecordingProcessPort()
+    const mcp = new RecordingMcpServerPort()
+    const service = createService(
+      new MemoryAgentRepository(createAgent(true)),
+      processPort,
+      mcp,
+      undefined,
+      { load: async () => preferences, save: async () => undefined }
+    )
+    const session = await service.attach(attachCommand())
+    expect(mcp.registered).toEqual([])
+    expect(processPort.launches).toHaveLength(1)
+    expect(processPort.providers.launchCommands[0]?.cleancodeMcp).toBeUndefined()
+    expect(session.runtime.mcp.status).toBe('disabled')
+    await service.disposeAll()
+  })
   it('starts a disabled Agent without registering or injecting the built-in MCP', async () => {
     const repository = new MemoryAgentRepository(createAgent(false))
     const processPort = new RecordingProcessPort()
@@ -147,10 +216,12 @@ class RecordingProcessPort extends RecordingAgentTerminalRuntime {
 }
 
 class RecordingMcpServerPort implements AgentMcpServerPort {
+  readonly configurations: RegisteredAgentMcpSession['configuration'][] = []
   readonly registered: string[] = []
   readonly unregistered: string[] = []
 
   async registerSession(session: RegisteredAgentMcpSession) {
+    this.configurations.push(session.configuration)
     this.registered.push(session.sessionId)
     return {
       bearerToken: `token-${session.sessionId}`,
@@ -187,7 +258,8 @@ function createService(
   repository: AgentSessionRepository,
   processPort: RecordingProcessPort,
   mcpServer: AgentMcpServerPort,
-  scopeValidation?: AgentRuntimeScopeValidationPort
+  scopeValidation?: AgentRuntimeScopeValidationPort,
+  preferences?: AgentProviderPreferencesRepository
 ): AgentSessionService {
   return new AgentSessionService(
     processPort,
@@ -211,7 +283,9 @@ function createService(
     repository,
     processPort.providers,
     'codex',
-    scopeValidation
+    scopeValidation,
+    undefined,
+    preferences
   )
 }
 

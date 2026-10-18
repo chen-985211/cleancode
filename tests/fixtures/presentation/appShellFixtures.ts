@@ -9,6 +9,7 @@ import type { AgentProviderPreferencesSnapshot } from '../../../src/contexts/age
 
 const defaultAgentProviderPreferences: AgentProviderPreferencesSnapshot = {
   defaultCleancodeMcpEnabled: true,
+  mcpToolCategories: { canvas: true, collaboration: true },
   defaultProviderId: 'codex',
   disabledProviderIds: [],
   permissionMode: 'yolo',

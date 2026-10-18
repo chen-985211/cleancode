@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url'
 
 import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import { agentInboxWakeupPrompt } from '../../../application/ports/AgentMessageDeliveryPort'
-import { cleancodeMcpDeveloperInstructions } from '../../../application/dto/AgentToolProtocol'
+import { createAgentMcpConfiguration } from '../../../application/dto/AgentMcpConfiguration'
 import type {
   AgentCapabilityInjector,
   AgentLaunchPlanner,
@@ -217,7 +217,7 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
       ? await createTemporaryProviderConfig(
           'cleancode-opencode-instructions-',
           'CLEANCODE.md',
-          cleancodeMcpDeveloperInstructions
+          createAgentMcpConfiguration(command.cleancodeMcp.toolCategories).developerInstructions
         )
       : undefined
     if (instructions) command.artifacts.track('opencode-mcp-instructions', instructions)
