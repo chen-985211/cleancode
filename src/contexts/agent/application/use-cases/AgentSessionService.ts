@@ -1,3 +1,4 @@
+import { createAgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type {
   AgentSessionSnapshot,
   AgentToolApprovalDecisionResult,
@@ -91,7 +92,7 @@ export class AgentSessionService {
     private readonly defaultProviderId: string,
     private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope,
     private readonly providerAvailability = new AgentProviderAvailabilityService(providers),
-    providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
+    private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
     activityRegistry: AgentActivityRegistry = new AgentActivityRegistry(),
     mailbox = new AgentMessageMailbox()
   ) {
@@ -332,6 +333,12 @@ export class AgentSessionService {
       )
     }
     const session = requireManagedAgentSession(this.sessions.values(), command.sessionId)
+    if (!session.mcpConfiguration?.tools.some((tool) => tool.name === command.toolName)) {
+      throw createExpectedAppError(
+        'AGENT_TOOL_UNAVAILABLE',
+        'This tool category is disabled for the current Agent launch.'
+      )
+    }
     return this.toolInvocations.runSessionToolCall(session.sessionId, () =>
       this.approvalCoordinator.execute(session, command)
     )
@@ -587,6 +594,9 @@ export class AgentSessionService {
     }
     this.toolInvocations.reopenSession(session.sessionId)
     try {
+      session.mcpConfiguration = createAgentMcpConfiguration(
+        (await this.providerPreferences.load()).mcpToolCategories
+      )
       await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
         this.executeMcpTool(toolCommand)
       )

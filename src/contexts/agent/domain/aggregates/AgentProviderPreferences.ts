@@ -1,3 +1,8 @@
+import {
+  normalizeAgentToolCategories,
+  type AgentToolCategories
+} from '../value-objects/AgentToolCategories'
+
 export type AgentPermissionMode = 'yolo' | 'manual'
 
 export interface AgentProviderOverrideSnapshot {
@@ -8,6 +13,7 @@ export interface AgentProviderOverrideSnapshot {
 
 export interface AgentProviderPreferencesSnapshot {
   readonly defaultCleancodeMcpEnabled: boolean
+  readonly mcpToolCategories: AgentToolCategories
   readonly defaultProviderId: string | null
   readonly disabledProviderIds: string[]
   readonly permissionMode: AgentPermissionMode
@@ -24,6 +30,7 @@ export class AgentProviderPreferences {
   static create(): AgentProviderPreferences {
     return new AgentProviderPreferences({
       defaultCleancodeMcpEnabled: true,
+      mcpToolCategories: normalizeAgentToolCategories(undefined),
       defaultProviderId: null,
       disabledProviderIds: [],
       permissionMode: 'yolo',
@@ -41,6 +48,7 @@ export class AgentProviderPreferences {
         typeof input.defaultCleancodeMcpEnabled === 'boolean'
           ? input.defaultCleancodeMcpEnabled
           : true,
+      mcpToolCategories: normalizeAgentToolCategories(input.mcpToolCategories),
       defaultProviderId:
         defaultProviderId && !disabledProviderIds.includes(defaultProviderId)
           ? defaultProviderId
@@ -98,6 +106,7 @@ export class AgentProviderPreferences {
   toSnapshot(): AgentProviderPreferencesSnapshot {
     return {
       ...this.snapshot,
+      mcpToolCategories: { ...this.snapshot.mcpToolCategories },
       disabledProviderIds: [...this.snapshot.disabledProviderIds],
       providerOverrides: Object.fromEntries(
         Object.entries(this.snapshot.providerOverrides).map(([providerId, override]) => [

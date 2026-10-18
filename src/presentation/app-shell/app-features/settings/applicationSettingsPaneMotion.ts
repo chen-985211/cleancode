@@ -7,7 +7,7 @@ import {
 import type { SpringProgressMotionFrameScheduler } from '../../../shared/motion/springProgressMotion'
 
 export type ApplicationSettingsPane =
-  'about' | 'agents' | 'canvas' | 'diagnostics' | 'shortcuts' | 'terminal' | 'workspace'
+  'about' | 'agents' | 'mcp' | 'canvas' | 'diagnostics' | 'shortcuts' | 'terminal' | 'workspace'
 export type ApplicationSettingsPaneDirection = 'backward' | 'forward' | 'none'
 
 export interface ApplicationSettingsPaneMotionRoot {
@@ -57,6 +57,7 @@ const paneOrder: readonly ApplicationSettingsPane[] = [
   'workspace',
   'terminal',
   'agents',
+  'mcp',
   'diagnostics',
   'about'
 ]

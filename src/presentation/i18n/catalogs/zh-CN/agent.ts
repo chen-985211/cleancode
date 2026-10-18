@@ -16,7 +16,7 @@ export const zhCNAgentMessages = {
   'agent.creationFailed': '无法创建 Agent',
   'agent.creationFailedDescription': '默认 Agent 当前不可用，请检查 Agent 设置后重试。',
   'agent.mcpTooltip':
-    '允许此 Agent 通过 CleanCode MCP 查看和修改当前工作区的终端积木、组合、执行配置与依赖工作流。切换会重启当前 Agent 并继续原对话，不会更改 Provider 的 sandbox 或权限配置。删除画布对象、解散组合或断开依赖仍需 CleanCode 单独确认。',
+    '允许此 Agent 使用 CleanCode MCP 设置中启用的工具分类：终端画布工具用于查看和修改终端积木、组合、执行配置与依赖工作流，Agent 协作工具用于发现、创建 Agent 和收发消息。切换会重启当前 Agent 并继续原对话，不会更改 Provider 的 sandbox 或权限配置。删除画布对象、解散组合或断开依赖仍需 CleanCode 单独确认。',
   'agent.mcpName': 'CleanCode MCP',
   'agent.mcpStatus.connecting': 'CleanCode MCP 正在连接',
   'agent.mcpStatus.degraded': 'CleanCode MCP 连接时间较长，仍在等待连接',

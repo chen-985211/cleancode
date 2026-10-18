@@ -29,13 +29,14 @@ export async function createManagedAgentLaunchPlan(command: {
   } = command
   const artifacts = new AgentLaunchArtifactScope()
   session.launchArtifacts = artifacts
-  const delivery = session.mcpRegistration
-    ? command.mailbox?.registerDelivery(session, () => ({
-        running: !session.isStopping && session.runtime.launch.status === 'running',
-        mcpReady: session.runtime.mcp.status === 'ready',
-        activity: session.runtime.activity.status
-      }))
-    : undefined
+  const delivery =
+    session.mcpRegistration && session.mcpConfiguration?.toolCategories.collaboration !== false
+      ? command.mailbox?.registerDelivery(session, () => ({
+          running: !session.isStopping && session.runtime.launch.status === 'running',
+          mcpReady: session.runtime.mcp.status === 'ready',
+          activity: session.runtime.activity.status
+        }))
+      : undefined
   session.messageDelivery = delivery
   if (!provider.descriptor.capabilities.nativeMessages) delivery?.setWakeup(null)
   try {
@@ -49,6 +50,7 @@ export async function createManagedAgentLaunchPlan(command: {
       cleancodeMcp: session.mcpRegistration
         ? {
             bearerToken: session.mcpRegistration.bearerToken,
+            toolCategories: session.mcpConfiguration?.toolCategories,
             serverUrl: session.mcpRegistration.url
           }
         : undefined,

@@ -1,8 +1,8 @@
+import { isAgentToolName } from '../../application/dto/AgentToolProtocol'
 import {
-  agentToolDefinitions,
-  cleancodeMcpInstructions,
-  isAgentToolName
-} from '../../application/dto/AgentToolProtocol'
+  createAgentMcpConfiguration,
+  type AgentMcpConfiguration
+} from '../../application/dto/AgentMcpConfiguration'
 import { createAgentToolFailedResult } from '../../application/dto/AgentToolFailure'
 import type { AgentMcpToolCallCommand } from '../../application/ports/AgentMcpServerPort'
 import type { AgentToolExecutionResult } from '../../application/use-cases/ExecuteAgentToolUseCase'
@@ -10,6 +10,7 @@ import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
 export interface CleancodeAgentJsonRpcToolBridgeInput {
   readonly executeMcpTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
+  readonly configuration?: AgentMcpConfiguration
   readonly onInitialized?: () => void
   readonly projectDirectory: string
   readonly sessionId: string
@@ -40,7 +41,11 @@ export class CleancodeAgentJsonRpcToolBridge {
   private initializeAccepted = false
   private initializedPublished = false
 
-  constructor(private readonly input: CleancodeAgentJsonRpcToolBridgeInput) {}
+  private readonly configuration: AgentMcpConfiguration
+
+  constructor(private readonly input: CleancodeAgentJsonRpcToolBridgeInput) {
+    this.configuration = input.configuration ?? createAgentMcpConfiguration()
+  }
 
   async handle(request: JsonRpcRequest, signal?: AbortSignal): Promise<JsonRpcResponse | null> {
     if (request.method === 'notifications/cancelled') {
@@ -62,7 +67,7 @@ export class CleancodeAgentJsonRpcToolBridge {
       this.initializeAccepted = true
       return createResult(request.id, {
         capabilities: { tools: { listChanged: false } },
-        instructions: cleancodeMcpInstructions,
+        instructions: this.configuration.instructions,
         protocolVersion: '2025-06-18',
         serverInfo: { name: 'cleancode-agent-tools', version: '0.9.0' }
       })
@@ -70,7 +75,7 @@ export class CleancodeAgentJsonRpcToolBridge {
 
     if (request.method === 'tools/list') {
       return createResult(request.id, {
-        tools: agentToolDefinitions.map((tool) => ({
+        tools: this.configuration.tools.map((tool) => ({
           annotations: tool.annotations,
           description: tool.description,
           inputSchema: tool.inputSchema,
@@ -86,7 +91,11 @@ export class CleancodeAgentJsonRpcToolBridge {
 
   private async callTool(request: JsonRpcRequest, signal?: AbortSignal): Promise<JsonRpcResponse> {
     const params = readToolCallParams(request.params)
-    if (!params || !isAgentToolName(params.name)) {
+    if (
+      !params ||
+      !isAgentToolName(params.name) ||
+      !this.configuration.tools.some((tool) => tool.name === params.name)
+    ) {
       return createError(request.id, -32602, 'Invalid tool call.')
     }
 

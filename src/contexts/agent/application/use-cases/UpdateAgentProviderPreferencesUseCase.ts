@@ -1,3 +1,4 @@
+import type { AgentToolCategories } from '../../domain/value-objects/AgentToolCategories'
 import type {
   AgentPermissionMode,
   AgentProviderOverrideSnapshot,
@@ -9,6 +10,7 @@ import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPo
 
 export interface UpdateAgentProviderPreferencesCommand {
   readonly defaultCleancodeMcpEnabled?: boolean
+  readonly mcpToolCategories?: AgentToolCategories
   readonly defaultProviderId?: string | null
   readonly disabledProviderIds?: readonly string[]
   readonly permissionMode?: AgentPermissionMode

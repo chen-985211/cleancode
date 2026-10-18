@@ -37,6 +37,7 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
       bearerToken,
       bridge: new CleancodeAgentJsonRpcToolBridge({
         executeMcpTool: session.executeTool,
+        configuration: session.configuration,
         onInitialized: () => {
           if (registeredSession.active) session.onInitialized?.()
         },

@@ -1,3 +1,5 @@
+import { PlugsConnectedIcon } from '@phosphor-icons/react/dist/csr/PlugsConnected'
+import { AgentMcpSettingsPane } from '../../../../contexts/agent/presentation/components/AgentMcpSettingsPane'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise'
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft'
 import { BugIcon } from '@phosphor-icons/react/dist/csr/Bug'
@@ -243,6 +245,15 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             </button>
             <button
               type="button"
+              data-selection-motion-option="mcp"
+              aria-current={activePane === 'mcp' ? 'page' : undefined}
+              onClick={() => setSelectedPane('mcp')}
+            >
+              <PlugsConnectedIcon size={17} aria-hidden="true" />
+              <span>{t('settings.mcp.title')}</span>
+            </button>
+            <button
+              type="button"
               data-selection-motion-option="diagnostics"
               aria-current={activePane === 'diagnostics' ? 'page' : undefined}
               onClick={() => setSelectedPane('diagnostics')}
@@ -277,6 +288,12 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                   preferences={props.agentProviderPreferences}
                   preferencesStatus={props.agentProviderPreferencesStatus}
                   onRefresh={props.onAgentProvidersRefresh ?? noop}
+                  onPreferencesChange={props.onAgentProviderPreferencesChange ?? noop}
+                />
+              ) : activePane === 'mcp' ? (
+                <AgentMcpSettingsPane
+                  preferences={props.agentProviderPreferences}
+                  preferencesStatus={props.agentProviderPreferencesStatus}
                   onPreferencesChange={props.onAgentProviderPreferencesChange ?? noop}
                 />
               ) : activePane === 'terminal' ? (

@@ -1,3 +1,4 @@
+import { createAgentMcpConfiguration } from '../../../../src/contexts/agent/application/dto/AgentMcpConfiguration'
 import type { Server } from 'node:http'
 
 import { CleancodeMcpHttpServer } from '../../../../src/contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
@@ -13,6 +14,30 @@ describe('cleancode HTTP MCP server', () => {
 
   afterEach(() => {
     server.dispose()
+  })
+
+  it('filters the authenticated endpoint and rejects direct calls to a disabled category', async () => {
+    const executeTool = vi.fn(async () => completedToolResult('disabled'))
+    const configuration = createAgentMcpConfiguration({ canvas: false, collaboration: true })
+    const endpoint = await server.registerSession({
+      configuration,
+      executeTool,
+      projectDirectory: '/repo/app',
+      sessionId: 'filtered-session',
+      workspaceId: 'main'
+    })
+    expect(
+      readToolNames(await postMcp(endpoint, { jsonrpc: '2.0', id: 1, method: 'tools/list' }))
+    ).toEqual(configuration.tools.map((tool) => tool.name))
+    expect(
+      await postMcp(endpoint, {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'delete_block', arguments: { blockId: 'terminal-1' } }
+      })
+    ).toMatchObject({ error: { code: -32602 } })
+    expect(executeTool).not.toHaveBeenCalled()
   })
 
   it('requires the session bearer token', async () => {

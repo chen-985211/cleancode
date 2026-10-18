@@ -20,7 +20,7 @@ export const enAgentMessages = {
   'agent.creationFailedDescription':
     'The default Agent is unavailable. Check Agent settings and try again.',
   'agent.mcpTooltip':
-    'Allow this Agent to use CleanCode MCP to view and modify terminal blocks, groups, execution settings, and dependency workflows in the current workspace. Switching restarts this Agent and continues the same conversation without changing the Provider sandbox or permission settings. Deleting canvas objects, dissolving groups, and disconnecting dependencies still require separate CleanCode confirmation.',
+    'Allow this Agent to use the tool categories enabled in CleanCode MCP settings: terminal canvas tools inspect and edit terminal blocks, groups, execution settings, and dependency workflows; Agent collaboration tools discover and create Agents and exchange messages. Switching restarts this Agent and continues the same conversation without changing the Provider sandbox or permission settings. Deleting canvas objects, dissolving groups, and disconnecting dependencies still require separate CleanCode confirmation.',
   'agent.mcpName': 'CleanCode MCP',
   'agent.mcpStatus.connecting': 'CleanCode MCP is connecting',
   'agent.mcpStatus.degraded': 'CleanCode MCP is taking longer to connect and is still waiting',

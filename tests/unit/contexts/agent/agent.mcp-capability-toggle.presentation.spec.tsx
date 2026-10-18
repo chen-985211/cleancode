@@ -22,6 +22,8 @@ describe('Agent CleanCode MCP capability toggle', () => {
     fireEvent.focus(toggle)
     const tooltip = await screen.findByRole('tooltip')
     expect(tooltip).toHaveTextContent('画布')
+    expect(tooltip).toHaveTextContent('设置中启用的工具分类')
+    expect(tooltip).toHaveTextContent('Agent 协作')
     expect(tooltip).toHaveTextContent('执行配置')
     expect(tooltip).toHaveTextContent('依赖工作流')
     expect(tooltip).toHaveTextContent('sandbox')
@@ -61,6 +63,64 @@ describe('Agent CleanCode MCP capability toggle', () => {
       expect(onChange).not.toHaveBeenCalled()
     }
   )
+
+  it.each(['ready', 'connecting', null] as const)(
+    'hides reconnect when an enabled MCP is %s',
+    (status) => {
+      render(
+        <AgentMcpCapabilityToggle
+          enabled
+          onChange={vi.fn()}
+          onReconnect={vi.fn()}
+          pending={false}
+          status={status}
+        />
+      )
+
+      expect(screen.queryByRole('button', { name: '重新连接 CleanCode MCP' })).toBeNull()
+    }
+  )
+
+  it.each(['degraded', 'unavailable'] as const)(
+    'hides reconnect when a %s MCP is disabled or recovery is unsupported',
+    (status) => {
+      const { rerender } = render(
+        <AgentMcpCapabilityToggle
+          enabled={false}
+          onChange={vi.fn()}
+          onReconnect={vi.fn()}
+          pending={false}
+          status={status}
+        />
+      )
+
+      expect(screen.queryByRole('button', { name: '重新连接 CleanCode MCP' })).toBeNull()
+
+      rerender(
+        <AgentMcpCapabilityToggle enabled onChange={vi.fn()} pending={false} status={status} />
+      )
+
+      expect(screen.queryByRole('button', { name: '重新连接 CleanCode MCP' })).toBeNull()
+    }
+  )
+
+  it('disables reconnect while a recovery request is pending', () => {
+    const onReconnect = vi.fn()
+    render(
+      <AgentMcpCapabilityToggle
+        enabled
+        onChange={vi.fn()}
+        onReconnect={onReconnect}
+        pending
+        status="degraded"
+      />
+    )
+
+    const reconnect = screen.getByRole('button', { name: '重新连接 CleanCode MCP' })
+    expect(reconnect).toBeDisabled()
+    fireEvent.click(reconnect)
+    expect(onReconnect).not.toHaveBeenCalled()
+  })
 
   it.each([
     ['ready', 'ready'],

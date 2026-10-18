@@ -42,6 +42,7 @@
 @import '../../../contexts/agent/presentation/styles/agent-provider.css';
 @import '../workbench/creation/agent-create.css';
 @import '../../../contexts/agent/presentation/styles/agent-settings.css';
+@import '../../../contexts/agent/presentation/styles/agent-mcp-settings.css';
 @import '../workbench/nodes/agent/agent-tool-approval.css';
 @import '../workbench/nodes/agent/agent-tool-approval-connection.css';
 @import '../../../contexts/agent/presentation/styles/agent-mcp-capability.css';

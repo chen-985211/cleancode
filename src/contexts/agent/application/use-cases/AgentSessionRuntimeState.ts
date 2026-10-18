@@ -1,3 +1,4 @@
+import type { AgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type {
   AgentActivityStatus,
   AgentBindingRuntimeStatus,
@@ -82,6 +83,7 @@ export interface ManagedAgentSession {
   isTerminalRunning: boolean
   isStopping: boolean
   launchArtifacts: AgentLaunchArtifactScope | null
+  mcpConfiguration?: AgentMcpConfiguration
   mcpRegistration?: ManagedAgentMcpRegistration
   readonly mcpSupported: boolean
   readonly projectDirectory: string
@@ -514,14 +516,18 @@ export async function registerAgentMcpEndpoint(
   mcpServerPort: AgentMcpServerPort,
   executeTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
 ): Promise<void> {
-  if (!session.cleancodeMcpEnabled || !session.mcpSupported) {
+  unregisterAgentMcpEndpoint(session)
+  if (
+    !session.cleancodeMcpEnabled ||
+    !session.mcpSupported ||
+    session.mcpConfiguration?.tools.length === 0
+  ) {
     transitionAgentRuntime(session, {
-      mcp: session.cleancodeMcpEnabled ? 'unsupported' : 'disabled'
+      mcp: session.cleancodeMcpEnabled && !session.mcpSupported ? 'unsupported' : 'disabled'
     })
     return
   }
 
-  unregisterAgentMcpEndpoint(session)
   transitionAgentRuntime(session, { mcp: 'initializing' })
   let registration: ManagedAgentMcpRegistration | null = null
   let initializationTimeout: ReturnType<typeof setTimeout> | null = null
@@ -540,6 +546,7 @@ export async function registerAgentMcpEndpoint(
   }
   const providerRegistration = await mcpServerPort.registerSession({
     executeTool,
+    configuration: session.mcpConfiguration,
     onInitialized: () => {
       initialized = true
       publishInitialized()
@@ -684,6 +691,7 @@ export function createAgentRuntimeSessionId(): string {
 }
 
 function inactiveAgentMcpStatus(session: ManagedAgentSession): AgentMcpRuntimeStatus {
-  if (!session.cleancodeMcpEnabled) return 'disabled'
+  if (!session.cleancodeMcpEnabled || session.mcpConfiguration?.tools.length === 0)
+    return 'disabled'
   return session.mcpSupported ? 'inactive' : 'unsupported'
 }
