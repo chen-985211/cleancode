@@ -45,12 +45,16 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 | 空间画布         | `--cc-canvas`                                    | React Flow 工作面和空间背景    |
 | 应用 chrome      | `--cc-chrome*`                                   | 导航、工具条和应用外壳         |
 | 内容表面         | `--cc-surface*`                                  | 节点、表单、菜单和局部容器     |
+| 终端与组合表面   | `--cc-terminal-shell`                            | 终端外壳、标题栏和组合表面     |
+| 终端与组合控件   | `--cc-terminal-control*`                         | 工具条按钮的表面、边界与前景   |
 | 主要动作         | `--cc-primary*`                                  | 当前流程的单一主动作与控件焦点 |
 | 成功、警告、失败 | `--cc-success*`、`--cc-warning*`、`--cc-danger*` | 只表达对应语义，不作为品牌装饰 |
 | 边界与焦点       | `--cc-border*`、`--cc-ring`                      | 分隔、输入边界与键盘焦点       |
 | 画布选择         | `--cc-workbench-selection`                       | 对象选中轮廓与选中流程连线     |
 
 同一状态必须同时具有文字、图标、形状、可访问属性或结构中的至少一种非颜色表达。正常状态不得使用大面积成功色或持续高亮。
+
+终端节点外壳、标题栏和终端组合表面共用 `--cc-terminal-shell`，与当前主题的终端默认背景衔接；画布继续使用独立的 `--cc-canvas`。终端与组合工具条按钮统一消费 `--cc-terminal-control`、`--cc-terminal-control-border`、`--cc-terminal-control-foreground` 及其 hover、pressed、active token，由主题提供明暗适配。按钮常态背景贴近所在表面，通过清晰描边保留按钮边界；悬停、按下和激活反馈使用中性表面，不因动作具有启动语义而套用主色或成功色浅底。停止等语义色例外遵循下文状态呈现规则。具体色值以 `theme.css` 为准，不在组件中复制。
 
 ### 层级与阴影
 
