@@ -3,10 +3,12 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
-  <a href="#快速开始"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-  <a href="#核心特性"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-  <a href="#核心特性"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/github/v/release/chen-985211/cleancode?include_prereleases&amp;sort=semver&amp;display_name=tag&amp;style=flat-square&amp;label=version&amp;labelColor=555555&amp;color=CB3837" alt="Latest release version" /></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-2563EB.svg?style=flat-square&amp;labelColor=555555&amp;logo=github&amp;logoColor=white" alt="Download Preview" /></a>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-64748B.svg?style=flat-square&amp;labelColor=555555" alt="macOS, Windows and Linux" /></a>
+  <a href="./docs/contexts/agent/cleancode-mcp.md"><img src="https://img.shields.io/badge/MCP-native%20tools-6366D8.svg?style=flat-square&amp;labelColor=555555" alt="Native CleanCode MCP tools" /></a>
+  <a href="#核心特性"><img src="https://img.shields.io/badge/workflow-automation-238636.svg?style=flat-square&amp;labelColor=555555" alt="Workflow automation" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-F4C430.svg?style=flat-square&amp;labelColor=555555" alt="MIT License" /></a>
 </p>
 
 <p align="center">
@@ -218,10 +220,4 @@ pnpm dist:linux
 <p align="center">
   <strong>群号：186885114</strong><br />
   <sub>以人机协同为起点，探索 AI 原生操作系统的可能。</sub>
-</p>
-
----
-
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
 </p>
