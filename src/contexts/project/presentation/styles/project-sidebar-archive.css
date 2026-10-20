@@ -75,8 +75,8 @@
 
 .workspace-row__menu-button:hover,
 .workspace-row__menu-button[aria-expanded='true'] {
-  background: var(--cc-neutral-overlay);
-  color: var(--cc-primary-hover);
+  background: var(--cc-sidebar-selection-hover);
+  color: var(--cc-sidebar-selection-foreground);
 }
 
 .workspace-row-menu {

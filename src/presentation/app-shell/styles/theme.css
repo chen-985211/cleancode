@@ -6,6 +6,22 @@
   --cc-chrome: #f3f5f8;
   --cc-chrome-raised: #f8f9fb;
   --cc-chrome-translucent: rgb(243 245 248 / 78%);
+  --cc-sidebar-hover: #eef0f3;
+  --cc-sidebar-selection: #e9ebee;
+  --cc-sidebar-selection-hover: #e3e6ea;
+  --cc-sidebar-foreground: var(--cc-muted-strong);
+  --cc-sidebar-selection-foreground: #43474c;
+  --cc-sidebar-focus-ring: #7a7a7a;
+  --cc-branch-selector-selection: color-mix(
+    in srgb,
+    var(--cc-foreground) 6%,
+    var(--cc-surface-raised)
+  );
+  --cc-branch-selector-selection-hover: color-mix(
+    in srgb,
+    var(--cc-foreground) 8%,
+    var(--cc-surface-raised)
+  );
   --cc-surface: #ffffff;
   --cc-surface-subtle: #f0f2f5;
   --cc-surface-raised: #ffffff;
@@ -84,6 +100,22 @@
   --cc-chrome: #171b22;
   --cc-chrome-raised: #1b2028;
   --cc-chrome-translucent: rgb(23 27 34 / 82%);
+  --cc-sidebar-hover: #1d2128;
+  --cc-sidebar-selection: #22262d;
+  --cc-sidebar-selection-hover: #272b32;
+  --cc-sidebar-foreground: #d0d5dc;
+  --cc-sidebar-selection-foreground: #eceff3;
+  --cc-sidebar-focus-ring: #8c8c8c;
+  --cc-branch-selector-selection: color-mix(
+    in srgb,
+    var(--cc-background) 22%,
+    var(--cc-surface-raised)
+  );
+  --cc-branch-selector-selection-hover: color-mix(
+    in srgb,
+    var(--cc-background) 30%,
+    var(--cc-surface-raised)
+  );
   --cc-surface: #1b2028;
   --cc-surface-subtle: #222831;
   --cc-surface-raised: #252c36;
@@ -150,6 +182,7 @@
 }
 
 :root {
+  --cc-branch-selector-hover: color-mix(in srgb, var(--cc-foreground) 2%, var(--cc-surface-raised));
   --cc-terminal-control: var(--cc-terminal-shell);
   --cc-terminal-control-hover: color-mix(
     in srgb,

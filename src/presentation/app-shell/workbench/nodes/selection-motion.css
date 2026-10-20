@@ -1,7 +1,7 @@
 .application-settings-navigation__selection {
   z-index: 0;
   border-radius: 9px;
-  background: transparent;
+  background: var(--cc-primary-wash);
 }
 
 .application-settings-navigation__selection::before {
@@ -17,7 +17,7 @@
 
 .application-settings-navigation:not([data-selection-motion-ready='true'])
   button[aria-current='page'] {
-  background: transparent;
+  background: var(--cc-primary-wash);
 }
 
 .application-settings-navigation:not([data-selection-motion-ready='true'])
