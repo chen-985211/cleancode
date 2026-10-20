@@ -12,6 +12,19 @@
   --cc-sidebar-foreground: var(--cc-muted-strong);
   --cc-sidebar-selection-foreground: #43474c;
   --cc-sidebar-focus-ring: #7a7a7a;
+  --cc-sidebar-current-marker: #737373;
+  --cc-sidebar-drag-surface: #e6e7e8;
+  --cc-sidebar-drag-border: #9b9b9b;
+  --cc-sidebar-drag-indicator: #737373;
+  --cc-settings-selection-surface: #d1d5d9;
+  --cc-settings-selection-foreground: #43474c;
+  --cc-settings-selection-accent: #777777;
+  --cc-settings-selection-border: #9b9b9b;
+  --cc-settings-switch-on: #6b87aa;
+  --cc-settings-switch-thumb: var(--cc-primary-contrast);
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
   --cc-branch-selector-selection: color-mix(
     in srgb,
     var(--cc-foreground) 6%,
@@ -106,6 +119,19 @@
   --cc-sidebar-foreground: #d0d5dc;
   --cc-sidebar-selection-foreground: #eceff3;
   --cc-sidebar-focus-ring: #8c8c8c;
+  --cc-sidebar-current-marker: #a3a3a3;
+  --cc-sidebar-drag-surface: #2a2c2f;
+  --cc-sidebar-drag-border: #696969;
+  --cc-sidebar-drag-indicator: #b0b0b0;
+  --cc-settings-selection-surface: #292d32;
+  --cc-settings-selection-foreground: #e4e7eb;
+  --cc-settings-selection-accent: #b0b0b0;
+  --cc-settings-selection-border: #696969;
+  --cc-settings-switch-on: #566f8a;
+  --cc-settings-switch-thumb: #e2e8f0;
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
   --cc-branch-selector-selection: color-mix(
     in srgb,
     var(--cc-background) 22%,

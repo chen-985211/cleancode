@@ -140,7 +140,7 @@
   height: 6px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--cc-primary);
+  background: var(--cc-sidebar-drag-indicator);
   box-shadow: 0 0 0 2px var(--cc-chrome);
 }
 
@@ -148,7 +148,7 @@
   height: 2px;
   flex: 1 1 auto;
   border-radius: 999px;
-  background: var(--cc-primary);
+  background: var(--cc-sidebar-drag-indicator);
   box-shadow: 0 0 0 2px var(--cc-chrome);
 }
 
@@ -166,8 +166,8 @@
 .project-card--dragging {
   z-index: 5;
   border-radius: 8px;
-  background: var(--cc-primary-soft);
-  box-shadow: 0 0 0 1px var(--cc-primary-border);
+  background: var(--cc-sidebar-drag-surface);
+  box-shadow: 0 0 0 1px var(--cc-sidebar-drag-border);
   transform: translate3d(0, var(--project-reorder-y), 0) scale(1.01);
 }
 
@@ -259,7 +259,6 @@
   opacity: 1;
 }
 
-.project-dot,
 .status-dot {
   width: 7px;
   height: 7px;
@@ -269,8 +268,29 @@
   box-shadow: 0 0 0 2px var(--cc-chrome);
 }
 
+.project-dot {
+  --cc-project-marker-progress: 0;
+
+  width: 7px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
 .project-dot--active {
-  background: var(--cc-success);
+  --cc-project-marker-progress: 1;
+}
+
+.project-dot__shape {
+  x: calc(2px * var(--cc-project-marker-progress));
+  y: calc(2.5px * (1 - var(--cc-project-marker-progress)));
+  width: calc(7px - 4px * var(--cc-project-marker-progress));
+  height: calc(7px + 5px * var(--cc-project-marker-progress));
+  rx: calc(3.5px - 2px * var(--cc-project-marker-progress));
+  fill: color-mix(
+    in srgb,
+    var(--cc-sidebar-current-marker) calc(clamp(0, var(--cc-project-marker-progress) * 4, 1) * 100%),
+    var(--cc-border-strong)
+  );
 }
 
 .status-dot--running {

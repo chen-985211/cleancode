@@ -27,15 +27,12 @@ export function AgentMcpCapabilityToggle({
     <span className="agent-mcp-capability nodrag">
       <TooltipLabel
         content={
-          statusLabel ? (
-            <span className="agent-mcp-capability__tooltip">
-              <strong>{statusLabel}</strong>
-              <span>{capabilityTooltip}</span>
-            </span>
-          ) : (
-            capabilityTooltip
-          )
+          <span className="agent-mcp-capability__tooltip">
+            {statusLabel ? <strong>{statusLabel}</strong> : null}
+            <span>{capabilityTooltip}</span>
+          </span>
         }
+        align="center"
         side="bottom"
       >
         <button
