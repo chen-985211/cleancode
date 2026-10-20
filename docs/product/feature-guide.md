@@ -12,9 +12,9 @@
 
 ## 一句话认识 cleancode
 
-cleancode 是一个由 Agent 驱动、画布优先、本地优先的可执行工作空间。用户表达目标，Agent 编写必要脚本并通过 CleanCode MCP 搭建终端工作流，用户从现有入口运行、检查并收藏成功流程。项目、Git 分支工作区、终端、工作流和 Coding Agent 共同承载这套可复用的工作现场。
+cleancode 是一个面向人机协同的画布式 ADE（Agentic Development Environment），将 Agent、终端和项目工作区组织在同一张画布上。用户表达目标、判断结果并直接调整，Agent 在已有工具和权限范围内理解可用能力、学习工具用法、规划步骤并完成具体操作。
 
-产品定位中系统一与系统二的认知分工见[架构文档的产品定位](../engineering/architecture.md#产品定位)：用户侧强调直觉表达和结果判断，AI 承担规划、配置与实现。以下用法优先展示这条路径，同时保留直接编辑与操作入口。
+产品定位中系统一与系统二的人机分工见[架构文档的产品定位](../engineering/architecture.md#产品定位)：人侧重直觉表达与直接交互，Agent 承担分析、规划、实现和检查，降低使用软件的学习与操作成本。你可以把目标交给 Agent，也可以直接在画布上操作。
 
 ```txt
 本地项目
@@ -82,6 +82,8 @@ pnpm dev
 - 添加、选择、排序和移除本地项目。
 - 记住最近项目以及上次选择的项目。
 - 为 Git 仓库创建独立分支工作区，每个工作区使用独立 worktree 目录。
+- 浏览、搜索和筛选 GitHub Issues，为 Issue 创建或打开关联的分支工作区。
+- 为每个项目设置默认 Agent 和终端模板，新建分支工作区时自动添加，并可按需开启模板自动运行。
 - 在默认工作区切换已有 Git 分支。
 - 在项目与工作区之间快速切换。
 - 归档干净的分支工作区；归档会移除 worktree，但保留 Git 分支。
@@ -92,8 +94,11 @@ pnpm dev
 
 - `main` 或默认分支上的日常工作直接使用默认工作区。
 - 同时开发多个需求时，为每个需求创建独立分支工作区。
+- 从 GitHub Issue 开始处理需求时，创建关联的分支工作区；已有关联时直接打开。
 - 需要切换项目根目录的 checkout 时，在默认工作区选择已有分支。
 - 分支工作区完成后先处理未提交改动，再执行归档。
+
+GitHub Issues 功能需要本机已安装并登录 GitHub CLI，当前支持 github.com。
 
 当前不负责 Git 合并、变基、冲突解决、分支删除或远程仓库托管，这些操作继续使用现有 Git 工具。
 
@@ -279,12 +284,13 @@ Agent 是画布内固定 Provider 的本地 CLI 控制台，不是普通终端�
 - 自动检测本机已经安装的 Provider CLI，并只把可用项放入新建菜单。
 - 为每个 Agent 固定 Provider、名称、位置、尺寸、终端和对话绑定。
 - 直接使用真实 Provider CLI 的输入、输出和 TUI。
+- 部分 Agent 可在回复完成、等待用户输入或需要授权时发送通知。
 - 重命名、移动、调整大小、重新启动、开始新对话和移除 Agent。
 - 在 Agent 设置中选择默认 Provider、启用或禁用 Provider，并配置命令、附加参数和环境变量。
 - 选择 `Yolo` 或手动权限模式，并设置新 Agent 是否默认启用 CleanCode MCP。
 - 在工作区之间切换时隔离 Agent；同一工作区的多个 Agent 共享目录和文件。
 
-cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录中文 README 的 [Agent Provider 列表](../../README_ZH.md#让-agent-回到开发现场)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
+cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录中文 README 的 [Agent Provider 列表](../../README_ZH.md#核心特性)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
 
 #### CleanCode MCP
 
@@ -297,6 +303,8 @@ cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录�
 - 配置任务、服务和端口意图。
 - 建立或断开依赖。
 - 检查工作流计划并整理终端布局。
+- 查看当前工作区的其他 Agent，并创建新的 Agent。
+- 向其他 Agent 发送任务、读取消息并回复。
 
 MCP 负责把 Agent 的方案落实为画布对象。脚本、提示词和必要文件由 Agent 自身的文件与 Shell 工具生成；这些能力由对应 Provider 的权限控制。用户可以直接交代目标，由 Agent 完成具体配置。
 
