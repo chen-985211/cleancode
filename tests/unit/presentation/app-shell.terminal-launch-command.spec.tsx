@@ -114,11 +114,15 @@ describe('app shell terminal launch command', () => {
     render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
-      name: 'Terminal 1 启动命令'
+      name: 'Terminal 1 配置启动命令'
     })
 
     expect(quickLaunchButton).toBeEnabled()
     expect(quickLaunchButton).toHaveAttribute('data-launch-command-state', 'unconfigured')
+    expect(quickLaunchButton.querySelector('[data-icon="terminal-launch"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'gear-six'
+    )
 
     fireEvent.click(quickLaunchButton)
 
@@ -146,6 +150,14 @@ describe('app shell terminal launch command', () => {
     )
     expect(window.cleancode?.startTerminal).not.toHaveBeenCalled()
     expect(window.cleancode?.writeTerminal).not.toHaveBeenCalled()
+    const configuredLaunchButton = await screen.findByRole('button', {
+      name: 'Terminal 1 启动命令'
+    })
+    expect(configuredLaunchButton).toHaveAttribute('data-launch-command-state', 'configured')
+    expect(configuredLaunchButton.querySelector('[data-icon="terminal-launch"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'play'
+    )
   })
 
   it('quick launches a configured terminal command in a replacement terminal session', async () => {

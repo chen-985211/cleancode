@@ -579,15 +579,9 @@
   box-shadow: var(--cc-shadow-xs);
 }
 
-.shortcut-recorder + .shortcut-row-action:hover:not(:disabled) {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
-}
-
 .shortcut-row-action:last-child:hover:not(:disabled) {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
+  border-color: var(--cc-border);
+  background: var(--cc-surface-raised);
   color: var(--cc-primary);
 }
 

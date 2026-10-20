@@ -244,18 +244,12 @@
 
 .project-card__branch:hover {
   border-color: transparent;
-  background: var(--cc-primary-soft);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-primary);
 }
 
 .project-card__remove {
   color: var(--cc-muted);
-}
-
-.project-card__remove:hover {
-  border-color: transparent;
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
 }
 
 .project-card:hover .project-card__branch,
@@ -320,7 +314,7 @@
 .workspace-list__selection {
   z-index: 0;
   border-radius: 7px;
-  background: var(--cc-primary-soft);
+  background: var(--cc-neutral-overlay);
 }
 
 .project-card__disclosure--collapsed .workspace-list {
@@ -370,7 +364,7 @@
 .workspace-row--active,
 .workspace-row--active:hover,
 .workspace-row--active:focus-within {
-  background: var(--cc-primary-soft);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-primary-hover);
   font-weight: 620;
 }
@@ -382,7 +376,7 @@
 }
 
 .workspace-list:not([data-selection-motion-ready='true']) .workspace-row--active {
-  background: var(--cc-primary-soft);
+  background: var(--cc-neutral-overlay);
 }
 
 .default-branch-selector {
@@ -421,7 +415,7 @@
 
 .default-branch-selector__toggle:hover,
 .default-branch-selector__toggle[aria-expanded='true'] {
-  background: var(--cc-primary-border);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-primary-hover);
 }
 
@@ -576,7 +570,7 @@
 
 .branch-selector-option--current,
 .branch-selector-option--current:hover:not(:disabled) {
-  background: var(--cc-primary-soft);
+  background: var(--cc-surface-subtle);
   color: var(--cc-primary-hover);
 }
 

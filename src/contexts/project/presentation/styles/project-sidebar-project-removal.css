@@ -53,15 +53,3 @@
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
 }
-
-.project-removal-popover__actions .project-removal-popover__confirm {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
-}
-
-.project-removal-popover__actions .project-removal-popover__confirm:hover {
-  border-color: var(--cc-danger);
-  background: var(--cc-danger);
-  color: var(--cc-surface);
-}

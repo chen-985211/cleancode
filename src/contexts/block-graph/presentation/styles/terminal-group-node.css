@@ -16,7 +16,6 @@
   --terminal-group-control-hover: var(--cc-terminal-control-hover);
   --terminal-group-foreground: var(--cc-foreground);
   --terminal-group-muted: var(--cc-muted);
-  --terminal-group-azure: var(--cc-primary);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -176,7 +175,7 @@
   border-radius: 7px;
   padding: 0 8px;
   background: var(--terminal-group-control);
-  color: var(--cc-muted-strong);
+  color: var(--cc-terminal-control-foreground);
   font: inherit;
   font-size: 11px;
   font-weight: 560;
@@ -324,8 +323,8 @@
 }
 
 .terminal-group-node__member-remove:hover {
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
+  background: var(--terminal-group-control-hover);
+  color: var(--terminal-group-foreground);
 }
 
 .terminal-group-node__member-remove:active {

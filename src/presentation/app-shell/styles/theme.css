@@ -14,6 +14,8 @@
   --cc-surface-overlay: rgb(255 255 255 / 98%);
   --cc-terminal-shell: var(--cc-terminal-light-background);
   --cc-terminal-border: #d9dee2;
+  --cc-terminal-control-border: #b8bec5;
+  --cc-terminal-control-foreground: #50565f;
   --cc-canvas-node-menu-surface: #f2f4f5;
   --cc-canvas-node-menu-hover: #e9ebec;
   --cc-canvas-node-menu-foreground: #16181a;
@@ -90,6 +92,8 @@
   --cc-surface-overlay: rgb(27 32 40 / 98%);
   --cc-terminal-shell: var(--cc-terminal-dark-background);
   --cc-terminal-border: var(--cc-border);
+  --cc-terminal-control-border: #50565c;
+  --cc-terminal-control-foreground: #c1c6cb;
   --cc-canvas-node-menu-surface: #212426;
   --cc-canvas-node-menu-hover: #373a3c;
   --cc-canvas-node-menu-foreground: #e9ebec;
@@ -147,7 +151,6 @@
 
 :root {
   --cc-terminal-control: var(--cc-terminal-shell);
-  --cc-terminal-control-border: var(--cc-border-strong);
   --cc-terminal-control-hover: color-mix(
     in srgb,
     var(--cc-foreground) 5%,
@@ -158,7 +161,7 @@
     var(--cc-foreground) 8%,
     var(--cc-terminal-shell)
   );
-  --cc-terminal-control-active: color-mix(in srgb, var(--cc-primary) 6%, var(--cc-terminal-shell));
+  --cc-terminal-control-active: var(--cc-terminal-control-hover);
   --cc-motion-duration-press: 100ms;
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;

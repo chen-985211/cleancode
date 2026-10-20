@@ -62,7 +62,7 @@
   border-radius: 7px;
   padding: 0;
   background: transparent;
-  color: var(--cc-muted-strong);
+  color: var(--cc-terminal-control-foreground);
   font: inherit;
   box-shadow: none;
   transition:
@@ -102,8 +102,8 @@
 .terminal-group-node__action[aria-pressed='true'] {
   --terminal-group-icon-cutout: var(--cc-terminal-control-active);
   background: var(--cc-terminal-control-active);
-  color: var(--cc-primary);
-  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
+  color: var(--cc-terminal-control-foreground);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-foreground) inset;
 }
 
 .terminal-group-node__action:active:not(:disabled),
@@ -114,14 +114,6 @@
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
-.terminal-group-node__action--primary {
-  color: var(--terminal-group-azure);
-}
-
-.terminal-group-node__action--primary:hover:not(:disabled) {
-  color: var(--cc-primary-hover);
-}
-
 .terminal-group-node__action-group--danger {
   width: 32px;
   margin-left: 0;
@@ -130,14 +122,6 @@
 .terminal-group-node__action-group--danger .terminal-group-node__action {
   width: 32px;
   flex-basis: 32px;
-  color: var(--cc-muted-strong);
-}
-
-.terminal-group-node__action--danger:hover:not(:disabled) {
-  --terminal-group-icon-cutout: var(--cc-danger-soft);
-  background: var(--cc-danger-soft);
-  color: var(--cc-muted-strong);
-  box-shadow: 0 0 0 1px var(--cc-danger-border) inset;
 }
 
 .terminal-group-node__action:disabled {

@@ -1,29 +1,13 @@
-.terminal-node__action--launch-configured {
-  color: var(--cc-success);
-}
-
-.terminal-node__action--launch-configured:hover:not(:disabled) {
-  color: var(--cc-success-strong);
-}
-
-.terminal-node__action--launch-unconfigured {
-  color: var(--cc-primary);
-}
-
-.terminal-node__action--launch-unconfigured:hover:not(:disabled) {
-  color: var(--cc-primary-hover);
-}
-
 .terminal-node__action--retention-active {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-terminal-control-foreground);
   background: var(--cc-terminal-control-active);
-  color: var(--cc-primary);
+  color: var(--cc-terminal-control-foreground);
 }
 
 .terminal-node__action--retention-active:hover:not(:disabled) {
-  border-color: var(--cc-primary);
+  border-color: var(--cc-terminal-control-foreground);
   background: var(--cc-terminal-control-active);
-  color: var(--cc-primary-hover);
+  color: var(--cc-terminal-control-foreground);
 }
 
 .workflow-state {
@@ -59,7 +43,7 @@
 }
 
 .terminal-node__action--workflow {
-  color: var(--cc-primary);
+  color: var(--cc-terminal-control-foreground);
 }
 
 .terminal-node__action--workflow-stop {
@@ -67,7 +51,5 @@
 }
 
 .terminal-node__action--workflow-stop:hover:not(:disabled) {
-  border-color: var(--cc-danger);
-  background: var(--cc-danger-soft);
   color: var(--cc-danger-strong);
 }

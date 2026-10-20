@@ -273,7 +273,7 @@ describe('terminal tooltips', () => {
     )
 
     await expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
-    await expectTooltip('Terminal 启动命令', '配置启动命令')
+    await expectTooltip('Terminal 配置启动命令', '配置启动命令')
     await expectTooltip('Terminal 停止当前命令', '停止当前命令')
     await expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
     await expectTooltip('Terminal 删除终端', '删除终端')
@@ -291,10 +291,10 @@ describe('terminal tooltips', () => {
     )
     expect(
       screen
-        .getByRole('button', { name: 'Terminal 启动命令' })
+        .getByRole('button', { name: 'Terminal 配置启动命令' })
         .querySelector('[data-icon="terminal-launch"]')
     ).toMatchObject({
-      dataset: expect.objectContaining({ iconGlyph: 'play', iconWeight: 'fill' })
+      dataset: expect.objectContaining({ iconGlyph: 'gear-six', iconWeight: 'bold' })
     })
     expect(
       screen
@@ -427,7 +427,7 @@ describe('terminal tooltips', () => {
 
     expect(actionNames).toEqual([
       'Terminal 从此处运行终端流程',
-      'Terminal 启动命令',
+      'Terminal 配置启动命令',
       'Terminal 停止当前命令',
       'Terminal 应用退出后继续运行此会话',
       'Terminal 重开空终端会话',

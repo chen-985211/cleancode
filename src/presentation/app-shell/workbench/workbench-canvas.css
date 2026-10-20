@@ -350,9 +350,10 @@
 }
 
 .canvas-empty[data-tone='danger'] .canvas-empty__icon {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
+  border-color: transparent;
+  background: transparent;
   color: var(--cc-danger-strong);
+  box-shadow: none;
 }
 
 .canvas-empty[data-tone='danger'] .canvas-empty__panel {

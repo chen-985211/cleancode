@@ -201,7 +201,7 @@
   border: 1px solid var(--cc-terminal-control-border);
   border-radius: 8px;
   background: var(--terminal-soft-control);
-  color: var(--cc-muted-strong);
+  color: var(--cc-terminal-control-foreground);
   box-shadow: none;
   transition:
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
@@ -250,27 +250,15 @@
 }
 
 .terminal-node__action--confirm:hover:not(:disabled) {
-  border-color: var(--cc-success-border);
-  background: var(--cc-success-soft);
   color: var(--cc-success-strong);
 }
 
 .terminal-node__action--active,
 .terminal-node__action--active:hover:not(:disabled) {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-terminal-control-foreground);
   background: var(--cc-terminal-control-active);
-  color: var(--cc-primary);
+  color: var(--cc-terminal-control-foreground);
   box-shadow: none;
-}
-
-.terminal-node__action--danger {
-  color: var(--cc-muted);
-}
-
-.terminal-node__action--danger:hover:not(:disabled) {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
 }
 
 .terminal-frame {
@@ -403,9 +391,9 @@
   align-items: center;
   gap: 8px;
   padding: 6px 7px 6px 10px;
-  border: 1px solid var(--cc-warning-border);
+  border: 1px solid var(--cc-terminal-control-border);
   border-radius: 7px;
-  background: var(--cc-warning-soft);
+  background: var(--cc-terminal-shell);
   color: var(--cc-warning-strong);
   box-shadow: var(--cc-shadow-sm);
   cursor: pointer;
@@ -429,7 +417,7 @@
 }
 
 .terminal-restore-failure:hover {
-  background: color-mix(in srgb, var(--cc-warning-soft) 90%, currentColor);
+  background: var(--cc-terminal-control-hover);
 }
 
 .terminal-restore-failure:focus-visible {
