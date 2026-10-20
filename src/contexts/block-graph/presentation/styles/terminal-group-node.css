@@ -12,8 +12,8 @@
   --terminal-group-border-strong: var(--cc-border-strong);
   --terminal-group-surface: var(--cc-terminal-shell);
   --terminal-group-toolbar: var(--terminal-group-surface);
-  --terminal-group-control: var(--cc-surface-raised);
-  --terminal-group-control-hover: var(--cc-surface-subtle);
+  --terminal-group-control: var(--cc-terminal-control);
+  --terminal-group-control-hover: var(--cc-terminal-control-hover);
   --terminal-group-foreground: var(--cc-foreground);
   --terminal-group-muted: var(--cc-muted);
   --terminal-group-azure: var(--cc-primary);
@@ -175,15 +175,12 @@
   border: 0;
   border-radius: 7px;
   padding: 0 8px;
-  background: var(--cc-canvas);
+  background: var(--terminal-group-control);
   color: var(--cc-muted-strong);
   font: inherit;
   font-size: 11px;
   font-weight: 560;
-  box-shadow:
-    0 0 0 1px var(--cc-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 2px 5px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
   transition:
     transform var(--cc-motion-duration-press) var(--cc-easing-standard),
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
@@ -197,12 +194,9 @@
 }
 
 .terminal-group-node__disclosure:hover:not(:disabled) {
-  background: var(--cc-surface-subtle);
+  background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
-  box-shadow:
-    0 0 0 1px var(--terminal-group-border-strong) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 3px 7px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__members {

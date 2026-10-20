@@ -17,8 +17,8 @@
   --terminal-border-strong: var(--cc-workbench-selection);
   --terminal-foreground: var(--cc-foreground);
   --terminal-muted: var(--cc-muted);
-  --terminal-soft-control: var(--cc-surface);
-  --terminal-soft-control-hover: var(--cc-surface-subtle);
+  --terminal-soft-control: var(--cc-terminal-control);
+  --terminal-soft-control-hover: var(--cc-terminal-control-hover);
   --terminal-screen: var(--cc-terminal-background);
   position: relative;
   display: flex;
@@ -198,7 +198,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cc-border);
+  border: 1px solid var(--cc-terminal-control-border);
   border-radius: 8px;
   background: var(--terminal-soft-control);
   color: var(--cc-muted-strong);
@@ -219,15 +219,15 @@
   shape-rendering: geometricPrecision;
 }
 
-.terminal-node__action:hover:not(:disabled):not([aria-disabled='true']) {
-  border-color: var(--cc-border-strong);
+.terminal-node__action:hover:where(:not(:disabled):not([aria-disabled='true'])) {
+  border-color: var(--cc-terminal-control-border);
   background: var(--terminal-soft-control-hover);
   color: var(--cc-foreground);
-  box-shadow: var(--cc-shadow-xs);
+  box-shadow: none;
 }
 
-.terminal-node__action:active:not(:disabled):not([aria-disabled='true']) {
-  background: var(--cc-border);
+.terminal-node__action:active:where(:not(:disabled):not([aria-disabled='true'])) {
+  background: var(--cc-terminal-control-pressed);
   box-shadow: none;
 }
 
@@ -238,8 +238,8 @@
 
 .terminal-node__action:disabled,
 .terminal-node__action[aria-disabled='true'] {
-  border-color: var(--cc-border);
-  background: var(--cc-surface-subtle);
+  border-color: var(--cc-terminal-control-border);
+  background: var(--terminal-soft-control);
   color: var(--cc-disabled);
   cursor: not-allowed;
   opacity: 1;
@@ -258,9 +258,9 @@
 .terminal-node__action--active,
 .terminal-node__action--active:hover:not(:disabled) {
   border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
+  background: var(--cc-terminal-control-active);
   color: var(--cc-primary);
-  box-shadow: 0 0 0 2px var(--cc-primary-ring);
+  box-shadow: none;
 }
 
 .terminal-node__action--danger {

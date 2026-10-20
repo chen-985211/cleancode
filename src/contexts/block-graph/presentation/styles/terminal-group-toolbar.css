@@ -75,10 +75,7 @@
 .terminal-group-node__action[data-control-surface='raised'],
 .terminal-group-node__action-group > .terminal-group-node__action {
   background: var(--terminal-group-control);
-  box-shadow:
-    0 0 0 1px var(--cc-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 2px 5px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__action svg,
@@ -99,40 +96,29 @@
   --terminal-group-icon-cutout: var(--terminal-group-control-hover);
   background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
-  box-shadow:
-    0 0 0 1px var(--cc-border-strong) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 3px 7px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__action[aria-pressed='true'] {
-  --terminal-group-icon-cutout: var(--cc-primary-soft);
-  background: var(--cc-primary-soft);
+  --terminal-group-icon-cutout: var(--cc-terminal-control-active);
+  background: var(--cc-terminal-control-active);
   color: var(--cc-primary);
   box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
 }
 
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
+  --terminal-group-icon-cutout: var(--cc-terminal-control-pressed);
   transform: translateY(1px);
-  box-shadow:
-    0 0 0 1px var(--cc-border-strong) inset,
-    0 1px 3px var(--cc-shadow-color) inset;
+  background: var(--cc-terminal-control-pressed);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__action--primary {
-  --terminal-group-icon-cutout: var(--cc-primary-soft);
-  background: var(--cc-primary-soft) !important;
   color: var(--terminal-group-azure);
-  box-shadow:
-    0 0 0 1px var(--cc-primary-border) inset !important,
-    0 1px 0 var(--cc-neutral-overlay) inset !important,
-    0 2px 5px var(--cc-shadow-color) !important;
 }
 
 .terminal-group-node__action--primary:hover:not(:disabled) {
-  --terminal-group-icon-cutout: var(--cc-primary-soft);
-  background: var(--cc-primary-soft) !important;
   color: var(--cc-primary-hover);
 }
 
@@ -151,9 +137,7 @@
   --terminal-group-icon-cutout: var(--cc-danger-soft);
   background: var(--cc-danger-soft);
   color: var(--cc-muted-strong);
-  box-shadow:
-    0 0 0 1px var(--cc-danger-border) inset,
-    0 2px 6px var(--cc-danger-border);
+  box-shadow: 0 0 0 1px var(--cc-danger-border) inset;
 }
 
 .terminal-group-node__action:disabled {
@@ -175,10 +159,7 @@
   flex-basis: 78px;
   border-radius: 7px;
   background: var(--terminal-group-control);
-  box-shadow:
-    0 0 0 1px var(--cc-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 2px 5px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__membership-actions::after {
@@ -217,10 +198,7 @@
   height: 30px;
   border-radius: 7px;
   background: var(--terminal-group-control);
-  box-shadow:
-    0 0 0 1px var(--cc-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 2px 5px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__edit-actions .terminal-group-node__action {

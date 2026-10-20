@@ -146,6 +146,19 @@
 }
 
 :root {
+  --cc-terminal-control: var(--cc-terminal-shell);
+  --cc-terminal-control-border: var(--cc-border-strong);
+  --cc-terminal-control-hover: color-mix(
+    in srgb,
+    var(--cc-foreground) 5%,
+    var(--cc-terminal-shell)
+  );
+  --cc-terminal-control-pressed: color-mix(
+    in srgb,
+    var(--cc-foreground) 8%,
+    var(--cc-terminal-shell)
+  );
+  --cc-terminal-control-active: color-mix(in srgb, var(--cc-primary) 6%, var(--cc-terminal-shell));
   --cc-motion-duration-press: 100ms;
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;
