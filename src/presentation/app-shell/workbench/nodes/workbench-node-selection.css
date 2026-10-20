@@ -3,7 +3,7 @@
   z-index: 6;
   inset: -2px;
   box-sizing: border-box;
-  border: 2px solid var(--cc-primary-border);
+  border: 2px solid var(--cc-workbench-selection);
   border-radius: inherit;
   background: transparent;
   box-shadow: var(--cc-shadow-node);

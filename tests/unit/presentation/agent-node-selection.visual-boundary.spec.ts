@@ -31,7 +31,7 @@ describe('Agent node selection visual boundary', () => {
     const selectedRule = readRule(agentConsoleStyles, '.agent-console-node--selected')
     const selectionVeilRule = readRule(selectionStyles, '.workbench-node-selection-veil')
 
-    expect(selectionVeilRule).toContain('border: 2px solid var(--cc-primary-border);')
+    expect(selectionVeilRule).toContain('border: 2px solid var(--cc-workbench-selection);')
     expect(selectionVeilRule).toContain('background: transparent;')
     expect(selectionVeilRule).toContain('box-shadow: var(--cc-shadow-node);')
     expect(selectionVeilRule).not.toContain('dashed')
@@ -41,15 +41,15 @@ describe('Agent node selection visual boundary', () => {
   it('uses the same strong solid treatment for normal and context-selected workflow edges', () => {
     const selectedEdgeRule = readRule(
       canvasStyles,
-      '.react-flow__edge.selected .react-flow__edge-path'
+      '.react-flow__edge.selected path.react-flow__edge-path'
     )
     const contextEdgeRule = readRule(
       contextMenuStyles,
-      '.terminal-workflow-edge--context-selected .react-flow__edge-path'
+      '.react-flow__edge.terminal-workflow-edge--context-selected path.react-flow__edge-path'
     )
 
     for (const rule of [selectedEdgeRule, contextEdgeRule]) {
-      expect(rule).toContain('stroke: var(--cc-primary);')
+      expect(rule).toContain('stroke: var(--cc-workbench-selection);')
       expect(rule).toContain('stroke-width: 3;')
       expect(rule).toContain('stroke-dasharray: none;')
     }

@@ -10,8 +10,8 @@
   --terminal-group-drop-scale: 1;
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);
-  --terminal-group-surface: var(--cc-surface-raised);
-  --terminal-group-toolbar: var(--cc-chrome-raised);
+  --terminal-group-surface: var(--cc-terminal-shell);
+  --terminal-group-toolbar: var(--terminal-group-surface);
   --terminal-group-control: var(--cc-surface-raised);
   --terminal-group-control-hover: var(--cc-surface-subtle);
   --terminal-group-foreground: var(--cc-foreground);
@@ -67,12 +67,8 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--cc-surface-translucent);
-  content: '';
-}
-
-.terminal-group-node--collapsed > .terminal-group-node__material::before {
   background: var(--terminal-group-surface);
+  content: '';
 }
 
 .terminal-group-node__empty-state {
@@ -138,7 +134,7 @@
   box-sizing: border-box;
   border-radius: var(--cc-canvas-node-radius) var(--cc-canvas-node-radius) 0 0;
   padding: 6px 12px 6px 15px;
-  background: var(--cc-surface-overlay);
+  background: var(--terminal-group-surface);
   overflow: visible;
 }
 

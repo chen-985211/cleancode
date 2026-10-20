@@ -14,7 +14,7 @@
 
 .agent-console-node--selected,
 .agent-console-node--context-selected {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-workbench-selection);
 }
 
 .agent-console {

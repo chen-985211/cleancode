@@ -26,7 +26,6 @@ export function createTerminalWorkflowEdges(
     )
     .map((connection) => {
       const status = nodeStatuses[connection.targetBlockId]
-      const color = resolveEdgeColor(status)
 
       return {
         id: connection.id,
@@ -36,9 +35,8 @@ export function createTerminalWorkflowEdges(
         className: ['terminal-workflow-edge', resolveEdgeStatusClassName(status)]
           .filter(Boolean)
           .join(' '),
-        style: { stroke: color },
         animated: status === 'running',
-        markerEnd: { type: MarkerType.ArrowClosed, color },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'context-stroke' },
         deletable: true,
         zIndex:
           expandedMemberIds.has(connection.sourceBlockId) ||
@@ -47,20 +45,6 @@ export function createTerminalWorkflowEdges(
             : undefined
       }
     })
-}
-
-function resolveEdgeColor(status: WorkflowRunNodeStatus | undefined): string {
-  if (status === 'running' || status === 'ready') {
-    return 'var(--cc-primary)'
-  }
-  if (status === 'succeeded') {
-    return 'var(--cc-success)'
-  }
-  if (status === 'failed' || status === 'blocked') {
-    return 'var(--cc-danger)'
-  }
-
-  return 'var(--cc-muted)'
 }
 
 function resolveEdgeStatusClassName(status: WorkflowRunNodeStatus | undefined): string {

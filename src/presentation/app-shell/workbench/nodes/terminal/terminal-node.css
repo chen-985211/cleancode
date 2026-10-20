@@ -14,7 +14,7 @@
   --terminal-shell-raised: var(--cc-terminal-shell);
   --terminal-shell-muted: var(--cc-surface-subtle);
   --terminal-border: var(--cc-terminal-border);
-  --terminal-border-strong: var(--cc-primary);
+  --terminal-border-strong: var(--cc-workbench-selection);
   --terminal-foreground: var(--cc-foreground);
   --terminal-muted: var(--cc-muted);
   --terminal-soft-control: var(--cc-surface);
@@ -42,20 +42,20 @@
 
 .terminal-node.terminal-node--selected,
 .terminal-node.terminal-node--context-selected {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-workbench-selection);
 }
 
 .terminal-node--group-selection-mode {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-workbench-selection);
 }
 
 .terminal-node--group-candidate-selected {
-  border-color: var(--cc-primary-border);
+  border-color: var(--cc-workbench-selection);
   box-shadow: var(--cc-shadow-sm);
 }
 
 .terminal-node--navigation-highlighted {
-  outline: 2px solid var(--cc-primary-border);
+  outline: 2px solid var(--cc-workbench-selection);
   outline-offset: 4px;
 }
 
@@ -122,17 +122,17 @@
 }
 
 .terminal-node__group-select:hover:not(:disabled) {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
+  border-color: var(--cc-workbench-selection);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
 }
 
 .terminal-node__group-select--selected {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
+  border-color: var(--cc-workbench-selection);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
   box-shadow:
-    0 0 0 2px var(--cc-primary-ring),
+    0 0 0 2px var(--cc-border-strong),
     0 1px 2px var(--cc-shadow-color);
 }
 
@@ -552,5 +552,5 @@
 .terminal-node-anchor:hover > .terminal-node__handle,
 .terminal-node-anchor--selected > .terminal-node__handle {
   opacity: 1;
-  background: var(--cc-primary);
+  background: var(--cc-workbench-selection);
 }

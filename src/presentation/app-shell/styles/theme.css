@@ -24,6 +24,7 @@
   --cc-disabled: #9aa2af;
   --cc-border: #dfe3ea;
   --cc-border-strong: #c9cfd9;
+  --cc-workbench-selection: #9fb3c8;
   --cc-divider: rgb(198 205 216 / 78%);
   --cc-primary: #2f67d8;
   --cc-primary-hover: #2458bd;
@@ -99,6 +100,7 @@
   --cc-disabled: #687384;
   --cc-border: #303844;
   --cc-border-strong: #46505e;
+  --cc-workbench-selection: #9fb3c8;
   --cc-divider: rgb(70 80 94 / 82%);
   --cc-primary: #75a0f5;
   --cc-primary-hover: #91b3f8;
