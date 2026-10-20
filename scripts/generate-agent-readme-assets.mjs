@@ -171,21 +171,19 @@ function renderProviderWallCopy(locale, providerCount) {
   if (locale === 'en') {
     return {
       introduction: [
-        `There is a key idea here: CleanCode is not built by binding itself to a few specific Agents. Its foundation is the terminal, so the **${providerCount} Coding Agent Providers** are more like entries we prepared first: common Agent commands, icons, detection, and default arguments are already organized.`,
-        'Look one layer deeper, and any Agent that can start from the command line can theoretically enter this canvas as a terminal process. Run the command in a terminal, then pin it to the current workspace with the pin button in the terminal header. Now it is no longer just a temporary command opened for one conversation. It becomes an Agent context that can stay in the background and keep working.'
+        `CleanCode is built on terminals and includes launch configurations for **${providerCount} Coding Agents**, with automatic detection of tools installed on your machine so you can use them in the current workspace.`,
+        'Other Agents that run from the command line can also run directly in a canvas terminal, using your familiar tools and configuration.'
       ].join('\n\n'),
-      conclusion:
-        '**Keep using the Agents you already know; CleanCode pins those CLI processes into a visible, runnable development context that stays with the work.**'
+      conclusion: '**Keep using the Agents you know and collaborate on one canvas.**'
     }
   }
   if (locale === 'zh-CN') {
     return {
       introduction: [
-        `这里有一个很关键的地方：CleanCode 并不是靠绑定某几个 Agent 来成立的。它的底座是终端，所以 **${providerCount} 个 Coding Agent Provider** 更像是我们先替你铺好的入口：常见 Agent 的命令、图标、检测方式和默认参数已经整理好。`,
-        '再往下看，只要一个 Agent 能从命令行启动，它理论上就可以先作为一个终端进程进入这张画布。你在终端里输入命令，把它跑起来，再用终端右上角的图钉把它钉在当前工作区里。这样它就不再只是某次对话里临时打开的一条命令，而是一个可以留在后台、继续工作的 Agent 现场。'
+        `CleanCode 以终端为基础，内置 **${providerCount} 种 Coding Agent** 的启动配置，可自动检测本机已安装的工具，方便在当前工作区使用。`,
+        '其他可通过命令行启动的 Agent，也可以直接在画布终端中运行，继续使用你熟悉的工具和配置。'
       ].join('\n\n'),
-      conclusion:
-        '**你继续使用熟悉的 Agent；CleanCode 负责把这些 CLI 进程钉在一张可见、可运行、可长期停留的开发现场里。**'
+      conclusion: '**继续使用你熟悉的 Agent，在同一张画布上协同工作。**'
     }
   }
   throw new Error(`Unsupported README locale: ${locale}`)

@@ -12,7 +12,9 @@
 
 ## 一句话认识 cleancode
 
-cleancode 是一个画布优先、本地优先的可执行开发工作空间。它把本地项目、Git 分支工作区、交互式终端、依赖工作流和 Coding Agent 放到同一张画布上，让开发者可以直接搭建、运行和复用自己的开发现场。
+cleancode 是一个面向人机协同的画布式 ADE（Agentic Development Environment），将 Agent、终端和项目工作区组织在同一张画布上。用户表达目标、判断结果并直接调整，Agent 在已有工具和权限范围内理解可用能力、学习工具用法、规划步骤并完成具体操作。
+
+产品定位中系统一与系统二的人机分工见[架构文档的产品定位](../engineering/architecture.md#产品定位)：人侧重直觉表达与直接交互，Agent 承担分析、规划、实现和检查，降低使用软件的学习与操作成本。你可以把目标交给 Agent，也可以直接在画布上操作。
 
 ```txt
 本地项目
@@ -62,14 +64,14 @@ pnpm dev
 
 1. 点击左侧边栏的“添加项目”，选择一个本地项目目录。
 2. 如果需要隔离开发，在项目下创建一个分支工作区；cleancode 会创建对应 Git worktree 并切换过去。
-3. 在画布空白处右键选择“新建终端积木”，或使用 `Command/Ctrl + T`；再为终端填写名称、描述和启动命令。
-4. 根据命令性质把终端配置为任务或服务：
-   - 安装、构建、测试等会结束的命令使用任务。
-   - 开发服务器、watcher 等持续运行的命令使用服务。
-5. 从上游终端输出点连接到下游终端输入点，声明真实启动依赖。
-6. 从根终端选择“从此处运行流程”，观察任务完成、服务就绪和下游启动。
-7. 把这套流程收藏为模板，或添加到快捷执行栏，方便以后复用。
-8. 如需 Agent 协助，在同一画布新建 Agent；支持的 Provider 可以开启 CleanCode MCP，让 Agent 直接检查和搭建这张画布。
+3. 在同一画布新建支持 CleanCode MCP 的 Agent，并确认已开启 MCP。
+4. 描述目标，例如：“读取当前项目，帮我搭建安装依赖、启动服务和运行检查的画布流程。”也可以提出下面的资料整理自动化目标。
+5. Agent 先检查画布和项目，使用自身工具准备必要脚本，再通过 MCP 配置终端、任务或服务模式以及真实依赖。
+6. 查看已搭建结果，从根终端选择“从此处运行流程”，观察任务完成、服务就绪和下游启动。
+7. 确认结果后，把这套流程收藏为项目模板或全局收藏，或添加到快捷执行栏。
+8. 下次使用“放置并运行”或快捷执行位复用已有配置，需要调整时再交给 Agent 修改。
+
+也可以用 `Command/Ctrl + T` 手动创建终端、编辑启动命令并连接依赖。任务适合会结束的脚本、构建和测试，服务适合开发服务器、watcher 等持续运行命令。
 
 ## 功能清单
 
@@ -80,6 +82,8 @@ pnpm dev
 - 添加、选择、排序和移除本地项目。
 - 记住最近项目以及上次选择的项目。
 - 为 Git 仓库创建独立分支工作区，每个工作区使用独立 worktree 目录。
+- 浏览、搜索和筛选 GitHub Issues，为 Issue 创建或打开关联的分支工作区。
+- 为每个项目设置默认 Agent 和终端模板，新建分支工作区时自动添加，并可按需开启模板自动运行。
 - 在默认工作区切换已有 Git 分支。
 - 在项目与工作区之间快速切换。
 - 归档干净的分支工作区；归档会移除 worktree，但保留 Git 分支。
@@ -90,8 +94,11 @@ pnpm dev
 
 - `main` 或默认分支上的日常工作直接使用默认工作区。
 - 同时开发多个需求时，为每个需求创建独立分支工作区。
+- 从 GitHub Issue 开始处理需求时，创建关联的分支工作区；已有关联时直接打开。
 - 需要切换项目根目录的 checkout 时，在默认工作区选择已有分支。
 - 分支工作区完成后先处理未提交改动，再执行归档。
+
+GitHub Issues 功能需要本机已安装并登录 GitHub CLI，当前支持 github.com。
 
 当前不负责 Git 合并、变基、冲突解决、分支删除或远程仓库托管，这些操作继续使用现有 Git 工具。
 
@@ -202,7 +209,7 @@ cleancode 会展示本次运行的实际回环端点，并在停止服务时等�
 - 一个分支失败只阻塞自己的后代，不影响无依赖的其他分支。
 - 任务通过退出码判断成功，服务通过就绪条件放行下游。
 - 工作流状态包括等待、运行、就绪、成功、失败、阻塞和已停止。
-- 同一工作区同一时间只保留一个活动工作流。
+- 同一工作区中节点集合互不重叠的多个工作流可以同时运行；与活动运行共享终端的新计划会被拒绝。
 
 常用启动入口：
 
@@ -277,12 +284,13 @@ Agent 是画布内固定 Provider 的本地 CLI 控制台，不是普通终端�
 - 自动检测本机已经安装的 Provider CLI，并只把可用项放入新建菜单。
 - 为每个 Agent 固定 Provider、名称、位置、尺寸、终端和对话绑定。
 - 直接使用真实 Provider CLI 的输入、输出和 TUI。
+- 部分 Agent 可在回复完成、等待用户输入或需要授权时发送通知。
 - 重命名、移动、调整大小、重新启动、开始新对话和移除 Agent。
 - 在 Agent 设置中选择默认 Provider、启用或禁用 Provider，并配置命令、附加参数和环境变量。
 - 选择 `Yolo` 或手动权限模式，并设置新 Agent 是否默认启用 CleanCode MCP。
 - 在工作区之间切换时隔离 Agent；同一工作区的多个 Agent 共享目录和文件。
 
-cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录中文 README 的 [Agent Provider 列表](../../README_ZH.md#让-agent-回到开发现场)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
+cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录中文 README 的 [Agent Provider 列表](../../README_ZH.md#核心特性)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
 
 #### CleanCode MCP
 
@@ -295,6 +303,10 @@ cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录�
 - 配置任务、服务和端口意图。
 - 建立或断开依赖。
 - 检查工作流计划并整理终端布局。
+- 查看当前工作区的其他 Agent，并创建新的 Agent。
+- 向其他 Agent 发送任务、读取消息并回复。
+
+MCP 负责把 Agent 的方案落实为画布对象。脚本、提示词和必要文件由 Agent 自身的文件与 Shell 工具生成；这些能力由对应 Provider 的权限控制。用户可以直接交代目标，由 Agent 完成具体配置。
 
 删除终端、解散组合和断开依赖需要在 cleancode 界面审批。MCP 当前只能搭建和检查工作流，不能启动、查询或停止工作流；Agent 完成搭建后仍由用户决定是否运行。
 
@@ -312,6 +324,48 @@ Agent 通过 MCP 创建一个终端或一次创建完整工作流后，画布会
 - 在 Agent 设置中管理 Provider、权限模式、启动覆盖和 MCP 默认值。
 
 ## 常见使用方法
+
+### 让 Agent 搭建资料整理自动化
+
+当前能力可以组合出下面的流程，脚本与命令由 Agent 在目标项目中生成和配置：
+
+```txt
+准备资料（任务） ──> AI 分析（codex exec / claude -p） ──> 校验与生成报告（任务）
+```
+
+1. 在目标工作区向已开启 MCP 的 Agent 描述：“帮我整理这个目录的资料，按主题生成报告，并在 CleanCode 画布搭好可复用流程。”
+2. Agent 检查画布、资料格式和本机工具，编写准备资料与生成报告的脚本，约定输入、输出文件位置。
+3. 分析步骤可以选择 `codex exec` 或 `claude -p`。`output/input.json` 由上游准备，输出 Schema 由 Agent 编写，输出目录由脚本提前建立，文件名仅作示意。
+
+   使用 Codex 时：
+
+   ```bash
+   codex exec --skip-git-repo-check --sandbox read-only \
+     --output-schema automation/report.schema.json \
+     --output-last-message output/analysis.json \
+     "读取 output/input.json，按主题整理资料并生成摘要"
+   ```
+
+   `--output-schema` 约束最终结果结构，`--output-last-message` 把最终结果写入指定文件，供下游脚本读取；如使用 `--json`，标准输出是单独的 JSONL 事件流。非交互调用和输出格式见 [OpenAI 官方文档](https://developers.openai.com/codex/noninteractive)。
+
+   使用 Claude Code 时，命令为小写 `claude -p`：
+
+   ```bash
+   claude -p "读取 output/input.json，按主题整理资料并生成摘要" \
+     --output-format json \
+     --json-schema "$(cat automation/report.schema.json)" \
+     > output/claude-response.json
+   ```
+
+   `--json-schema` 接受 Schema 的 JSON 内容；上面的 Bash 示例从文件读取它，包装脚本也可以直接读取文件并作为参数传入。`--output-format json` 返回带元数据的响应，符合 Schema 的结果位于 `structured_output` 字段。Agent 编写的包装脚本提取该字段并写入 `output/analysis.json` 后，下游校验与报告步骤即可使用相同输入约定。具体见 [Claude Code 官方文档](https://code.claude.com/docs/en/headless)。
+
+   两种方式都需要可运行且已完成认证的对应 CLI，并配置本次任务需要的工具权限。CLI 不在终端 PATH 中时，在启动命令或包装脚本中指定本机实际可执行路径。
+
+4. Agent 通过 MCP 创建已配置的终端和依赖，使用任务退出码表达成功或失败；校验脚本在结果不符合要求时返回非零退出码。
+5. 用户从根终端选择“从此处运行流程”，查看结果；需要调整时，把目标或失败信息交给 Agent 继续修改。
+6. 跑通后使用已有收藏入口保存流程，下一次用“放置并运行”或快捷执行位复用，省去重新编写脚本和搭建步骤。
+
+资料通过约定文件交接，分支、循环或有限重试可以写在脚本中；画布连线负责启动依赖。流程引用的脚本和提示词继续保存在目标项目中，收藏模板复用启动命令和内部依赖；在其他项目运行时也需要相应文件与依赖可用。内容生成、批量文件处理、测试结果分析等可以采用同样方式组织。
 
 ### 同时启动前端和后端
 
