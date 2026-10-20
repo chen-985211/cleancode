@@ -10,10 +10,10 @@
 }
 
 .terminal-node {
-  --terminal-shell: var(--cc-surface);
-  --terminal-shell-raised: var(--cc-surface);
+  --terminal-shell: var(--cc-terminal-shell);
+  --terminal-shell-raised: var(--cc-terminal-shell);
   --terminal-shell-muted: var(--cc-surface-subtle);
-  --terminal-border: var(--cc-border);
+  --terminal-border: var(--cc-terminal-border);
   --terminal-border-strong: var(--cc-primary);
   --terminal-foreground: var(--cc-foreground);
   --terminal-muted: var(--cc-muted);
@@ -37,7 +37,7 @@
 }
 
 .terminal-node--running {
-  border-color: var(--cc-border);
+  border-color: var(--terminal-border);
 }
 
 .terminal-node.terminal-node--selected,

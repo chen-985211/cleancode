@@ -3,7 +3,7 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  border: 1px solid var(--cc-border);
+  border: 1px solid var(--cc-terminal-border);
   border-radius: var(--cc-canvas-node-radius);
   background: var(--cc-terminal-background);
   box-shadow: var(--cc-shadow-sm);
@@ -31,7 +31,7 @@
   position: relative;
   display: grid;
   border-bottom: 1px solid var(--cc-divider);
-  background: var(--cc-surface);
+  background: var(--cc-terminal-shell);
   padding: 0 8px;
 }
 

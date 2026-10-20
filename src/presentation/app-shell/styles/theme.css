@@ -12,6 +12,8 @@
   --cc-surface-hover: rgb(255 255 255 / 64%);
   --cc-surface-translucent: rgb(255 255 255 / 90%);
   --cc-surface-overlay: rgb(255 255 255 / 98%);
+  --cc-terminal-shell: var(--cc-terminal-light-background);
+  --cc-terminal-border: #d9dee2;
   --cc-canvas-node-menu-surface: #f2f4f5;
   --cc-canvas-node-menu-hover: #e9ebec;
   --cc-canvas-node-menu-foreground: #16181a;
@@ -85,6 +87,8 @@
   --cc-surface-hover: rgb(255 255 255 / 7%);
   --cc-surface-translucent: rgb(27 32 40 / 92%);
   --cc-surface-overlay: rgb(27 32 40 / 98%);
+  --cc-terminal-shell: var(--cc-terminal-dark-background);
+  --cc-terminal-border: var(--cc-border);
   --cc-canvas-node-menu-surface: #212426;
   --cc-canvas-node-menu-hover: #373a3c;
   --cc-canvas-node-menu-foreground: #e9ebec;
@@ -155,7 +159,7 @@
   --cc-easing-brand-sweep: cubic-bezier(0.65, 0, 0.35, 1);
   --cc-easing-loading-shimmer-wave: ease-in-out;
   --cc-canvas-node-radius: 20px;
-  --cc-terminal-light-background: #ffffff;
+  --cc-terminal-light-background: #f2f4f5;
   --cc-terminal-light-foreground: #172033;
   --cc-terminal-light-cursor: #172033;
   --cc-terminal-light-selection: #cbdcf8;
@@ -177,7 +181,7 @@
   --cc-terminal-light-bright-magenta: #a565cb;
   --cc-terminal-light-bright-cyan: #188fa8;
   --cc-terminal-light-bright-white: #172033;
-  --cc-terminal-dark-background: #000000;
+  --cc-terminal-dark-background: #202326;
   --cc-terminal-dark-foreground: #d6dee8;
   --cc-terminal-dark-cursor: #f8fafc;
   --cc-terminal-dark-selection: #2d415c;
@@ -199,7 +203,6 @@
   --cc-terminal-dark-bright-magenta: #d7a8ff;
   --cc-terminal-dark-bright-cyan: #83e7f3;
   --cc-terminal-dark-bright-white: #ffffff;
-  --cc-terminal-theme-mismatch-filter: invert(1) hue-rotate(180deg);
 }
 
 :root,
