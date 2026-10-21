@@ -77,8 +77,8 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toMatch(
       /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
     )
-    expect(collapsingMemberRule).toContain('visibility: hidden;')
-    expect(collapsingMemberRule).toContain('opacity: 0;')
+    expect(collapsingMemberRule).not.toContain('visibility: hidden;')
+    expect(collapsingMemberRule).not.toContain('opacity: 0;')
     expect(collapsingMemberRule).toContain('pointer-events: none;')
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
@@ -89,7 +89,7 @@ describe('workbench object motion styles', () => {
   it('morphs one group material between committed geometries while members move', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
     const expandingHeaderRule = readRule(
-      '.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header'
+      '.terminal-group-node:is(.workbench-object-motion--group-expand, .workbench-object-motion--group-reflow) > .terminal-group-node__header'
     )
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
@@ -138,8 +138,8 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
     expect(objectMotionStyles).not.toContain('.workbench-object-motion--group-accept')
-    expect(groupRule).toContain('--terminal-group-drop-scale: 1;')
-    expect(groupRule).toContain('transform: scale(var(--terminal-group-drop-scale));')
+    expect(groupRule).not.toContain('--terminal-group-drop-scale')
+    expect(groupRule).not.toContain('transform:')
     expect(dropTargetRule).not.toContain('background:')
     expect(dropTargetRule).not.toContain('box-shadow:')
     expect(dropTargetRule).not.toMatch(/\b(border|outline|transform):/)
@@ -210,7 +210,9 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-x')
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-y')
     expect(objectMotionStyles).not.toContain('translate3d(0, -3px, 0)')
-    expect(terminalGroupStyles).toContain('.terminal-group-drop-spring--active')
+    expect(terminalGroupStyles).toContain(
+      '.terminal-group-node--drop-join > .terminal-group-node__material'
+    )
     expect(objectMotionStyles).toContain('.react-flow__node.dragging')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
     nodeRules.forEach((rule) => {
@@ -290,7 +292,13 @@ describe('workbench object motion styles', () => {
 })
 
 function readRule(selector: string): string {
-  return objectMotionStyles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+  const normalize = (value: string) =>
+    value.replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+  return (
+    normalize(objectMotionStyles)
+      .split(`${normalize(selector)} {`)[1]
+      ?.split('}')[0] ?? ''
+  )
 }
 
 function readTerminalGroupRule(selector: string): string {

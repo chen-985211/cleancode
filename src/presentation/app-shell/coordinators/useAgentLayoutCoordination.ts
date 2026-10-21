@@ -59,7 +59,9 @@ export function useAgentLayoutCoordination({
   const [layoutFocusRequest, setLayoutFocusRequest] = useState<WorkbenchLayoutFocusRequest | null>(
     null
   )
-  const dragProtectionByNodeIdRef = useRef(new Map<string, readonly string[]>())
+  const dragProtectionByNodeIdRef = useRef(
+    new Map<string, { readonly nodeIds: readonly string[] }>()
+  )
   const terminalWorkflowBuild = useTerminalWorkflowBuildChoreography({
     currentProjectId,
     currentWorkspaceId,
@@ -93,10 +95,12 @@ export function useAgentLayoutCoordination({
     [terminalWorkflowBuild.start]
   )
   const updateDragProtection = useCallback((nodeId: string, nodeIds: readonly string[] | null) => {
-    if (nodeIds) dragProtectionByNodeIdRef.current.set(nodeId, nodeIds)
+    if (nodeIds) dragProtectionByNodeIdRef.current.set(nodeId, { nodeIds })
     else dragProtectionByNodeIdRef.current.delete(nodeId)
     setProtectedLayoutNodeIds(
-      new Set([...dragProtectionByNodeIdRef.current.values()].flatMap((ids) => [...ids]))
+      new Set(
+        [...dragProtectionByNodeIdRef.current.values()].flatMap(({ nodeIds }) => [...nodeIds])
+      )
     )
   }, [])
   const onNodeDragStart = useCallback(
@@ -120,6 +124,7 @@ export function useAgentLayoutCoordination({
   )
   const onNodeDragStop = useCallback(
     async (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): Promise<void> => {
+      const protection = dragProtectionByNodeIdRef.current.get(node.id)
       try {
         if (node.type !== 'agentConsole') {
           await moveWorkbenchNode(event, node)
@@ -135,7 +140,9 @@ export function useAgentLayoutCoordination({
           throw error
         }
       } finally {
-        updateDragProtection(node.id, null)
+        // A release may finish after another drag of this same object starts.
+        if (dragProtectionByNodeIdRef.current.get(node.id) === protection)
+          updateDragProtection(node.id, null)
       }
     },
     [moveWorkbenchNode, moveWorkspaceAgent, nodeStore, updateDragProtection]

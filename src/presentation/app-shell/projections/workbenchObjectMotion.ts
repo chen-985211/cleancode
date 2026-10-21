@@ -34,8 +34,6 @@ interface WorkbenchObjectFrameScheduler {
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
 const groupMemberCollapsedScale = 0.88
-const groupMemberOpacityDelayMs = 160
-const groupMemberContentDelayMs = 220
 
 export function resolveWorkbenchCanvasDetailLevel(
   zoom: number,
@@ -80,6 +78,7 @@ function projectWorkbenchObjectMotionEdges(
     const kind = node.data.objectMotion?.kind
     if (
       kind === 'group-expand' ||
+      kind === 'group-collapse' ||
       kind === 'canvas-arrange' ||
       kind === 'group-join' ||
       kind === 'group-leave' ||
@@ -98,9 +97,15 @@ function projectWorkbenchObjectMotionEdges(
     if (cached && cached.className === edge.className) return cached.edge
 
     const classNames = new Set(edge.className?.split(/\s+/).filter(Boolean) ?? [])
-    classNames.add('workbench-object-edge--motion-pending')
+    if (edge.type !== 'terminalDependency') classNames.add('workbench-object-edge--motion-pending')
 
-    const projectedEdge = { ...edge, className: [...classNames].join(' ') }
+    const projectedEdge = {
+      ...edge,
+      className: [...classNames].join(' '),
+      ...(edge.type === 'terminalDependency'
+        ? { data: { ...edge.data, followsObjectMotion: true } }
+        : {})
+    }
     projectedBySource?.set(edge, { className: edge.className, edge: projectedEdge })
     return projectedEdge
   })
@@ -146,6 +151,14 @@ export function projectWorkbenchObjectMotion({
   const nextNodesById = new Map(nextNodes.map((node) => [node.id, node]))
   const expandingMemberMotions = resolveExpandingMemberMotions(currentNodesById, nextNodes)
   const membershipMotion = resolveGroupMembershipMotion(currentNodesById, nextNodes)
+  const hasTerminalDisclosureChange = nextNodes.some((node) => {
+    const previous = currentNodesById.get(node.id)
+    return (
+      node.type === 'terminal' &&
+      previous?.type === 'terminal' &&
+      Boolean(node.data.block.isCollapsed) !== Boolean(previous.data.block.isCollapsed)
+    )
+  })
   const nodes = nextNodes.map((node) => {
     if (node.type === 'terminalGroup') {
       const currentNode = currentNodesById.get(node.id)
@@ -154,6 +167,16 @@ export function projectWorkbenchObjectMotion({
         currentNode.data.group.isCollapsed !== node.data.group.isCollapsed
       ) {
         return withObjectMotion(node, createGroupShellMotion(currentNode, node, createMotionId))
+      }
+      if (
+        currentNode?.type === 'terminalGroup' &&
+        (currentNode.style?.width !== node.style?.width ||
+          currentNode.style?.height !== node.style?.height)
+      ) {
+        return withObjectMotion(node, {
+          ...createObjectMotion('group-reflow', node.id, { x: 0, y: 0 }, createMotionId),
+          shellRect: { from: resolveNodeRect(currentNode), to: resolveNodeRect(node) }
+        })
       }
     }
 
@@ -196,6 +219,21 @@ export function projectWorkbenchObjectMotion({
 
     const expandingMemberMotion = expandingMemberMotions.get(node.id)
     const currentNode = currentNodesById.get(node.id)
+    if (
+      (hasTerminalDisclosureChange || currentNode?.data.isObjectDragPreview) &&
+      node.type === 'terminal' &&
+      currentNode?.type === 'terminal'
+    ) {
+      const before = resolveNodeRect(currentNode),
+        after = resolveNodeRect(node)
+      const resized = before.width !== after.width || before.height !== after.height
+      if (resized || before.x !== after.x || before.y !== after.y) {
+        return withObjectMotion(node, {
+          ...createObjectMotion('group-reflow', node.id, { x: 0, y: 0 }, createMotionId),
+          shellRect: { from: before, to: after }
+        })
+      }
+    }
     if (
       node.type === 'terminal' &&
       expandingMemberMotion &&
@@ -257,11 +295,9 @@ export function projectWorkbenchObjectMotion({
       expandingMemberMotion
         ? {
             ...motion,
-            contentDelayMs: groupMemberContentDelayMs,
             contentOpacity: { from: 0, to: 1 },
             delayMs: 0,
             opacity: { from: 0, to: 1 },
-            opacityDelayMs: groupMemberOpacityDelayMs,
             scale: { from: groupMemberCollapsedScale, to: 1 }
           }
         : createAtomicObjectCreationMotion(node, motion.id)
@@ -311,13 +347,11 @@ function createGroupMemberMotion(
     delayMs,
     ...(kind === 'group-expand'
       ? {
-          contentDelayMs: groupMemberContentDelayMs,
           contentOpacity: { from: 0, to: 1 },
           opacity: { from: 0, to: 1 },
-          opacityDelayMs: groupMemberOpacityDelayMs,
           scale: { from: groupMemberCollapsedScale, to: 1 }
         }
-      : { opacity: { from: 0, to: 0 } })
+      : { opacity: { from: 1, to: 0 }, scale: { from: 1, to: groupMemberCollapsedScale } })
   }
 }
 

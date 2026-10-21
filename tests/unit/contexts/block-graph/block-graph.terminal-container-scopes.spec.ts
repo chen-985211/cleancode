@@ -37,7 +37,7 @@ describe('terminal combination container scopes', () => {
       expect.objectContaining({
         id: 'shell-space',
         position: { x: 400, y: 300 },
-        size: { width: 784, height: 612 },
+        size: { width: 624, height: 492 },
         memberBlockIds: ['shell']
       })
     ])
@@ -58,11 +58,11 @@ describe('terminal combination container scopes', () => {
 
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'install', position: { x: 432, y: 776 } }),
-      expect.objectContaining({ id: 'build', position: { x: 1_216, y: 776 } })
+      expect.objectContaining({ id: 'build', position: { x: 1_056, y: 776 } })
     ])
     expect(graph.toSnapshot().terminalGroups[0]).toMatchObject({
       position: { x: 400, y: 700 },
-      size: { width: 1_568, height: 612 },
+      size: { width: 1_248, height: 492 },
       memberBlockIds: ['install', 'build']
     })
 
@@ -70,7 +70,7 @@ describe('terminal combination container scopes', () => {
 
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'install', position: { x: 2_000, y: 300 } }),
-      expect.objectContaining({ id: 'build', position: { x: 2_784, y: 300 } })
+      expect.objectContaining({ id: 'build', position: { x: 2_624, y: 300 } })
     ])
     expect(graph.toSnapshot().terminalGroups[0]).toMatchObject({
       position: { x: 400, y: 700 },
@@ -109,34 +109,24 @@ describe('terminal combination container scopes', () => {
     ])
   })
 
-  it('allows connections only when both endpoints share the same container scope', () => {
+  it('preserves valid dependencies across container boundaries and still rejects cycles', () => {
     const graph = createGraph()
     for (const [id, x] of [
-      ['root-a', 0],
-      ['root-b', 800],
-      ['group-a', 1_600],
-      ['group-b', 2_400]
-    ] as const) {
+      ['root', 0],
+      ['inside', 800],
+      ['other', 1600]
+    ] as const)
       createTerminal(graph, id, x, 100)
-    }
-    graph.createTerminalGroup({ id: 'group', name: 'Inside', memberBlockIds: ['group-a'] })
-    graph.createTerminalGroup({ id: 'other-group', name: 'Other', memberBlockIds: ['group-b'] })
-
+    graph.createTerminalGroup({ id: 'group', name: 'Inside', memberBlockIds: ['inside'] })
+    graph.createTerminalGroup({ id: 'other-group', name: 'Other', memberBlockIds: ['other'] })
+    graph.connectTerminalBlocks({ sourceBlockId: 'root', targetBlockId: 'inside' })
+    graph.connectTerminalBlocks({ sourceBlockId: 'inside', targetBlockId: 'other' })
+    const before = graph.toSnapshot()
     expect(() =>
-      graph.connectTerminalBlocks({ sourceBlockId: 'root-a', targetBlockId: 'group-a' })
-    ).toThrow('Terminal connections must stay within one container scope.')
-    expect(() =>
-      graph.connectTerminalBlocks({ sourceBlockId: 'group-a', targetBlockId: 'root-a' })
-    ).toThrow('Terminal connections must stay within one container scope.')
-    expect(() =>
-      graph.connectTerminalBlocks({ sourceBlockId: 'group-a', targetBlockId: 'group-b' })
-    ).toThrow('Terminal connections must stay within one container scope.')
-
-    graph.connectTerminalBlocks({ sourceBlockId: 'root-a', targetBlockId: 'root-b' })
-    graph.moveTerminalWorkflowToGroup('root-b', 'group')
-    graph.connectTerminalBlocks({ sourceBlockId: 'root-a', targetBlockId: 'group-a' })
-
-    expect(graph.toSnapshot().connections).toHaveLength(2)
+      graph.connectTerminalBlocks({ sourceBlockId: 'other', targetBlockId: 'root' })
+    ).toThrow()
+    expect(BlockGraph.fromSnapshot(before).toSnapshot()).toEqual(before)
+    expect(before.connections).toHaveLength(2)
   })
 
   it('moves a complete connected workflow into and out of a combination atomically', () => {
@@ -170,8 +160,8 @@ describe('terminal combination container scopes', () => {
     graph.moveTerminalGroup('wide', { x: 500, y: 400 })
 
     const current = graph.toSnapshot().terminalGroups[0]!
-    expect(current.size.width).toBeLessThan(initial.size.width)
-    expect(current.size).toEqual({ width: 784, height: 612 })
+    expect(current.size.height).toBeLessThan(initial.size.height)
+    expect(current.size).toEqual({ width: 624, height: 492 })
     expect(current.position).toEqual({ x: 500, y: 400 })
     expect(graph.toSnapshot().blocks.find((block) => block.id === 'left')?.position).toEqual({
       x: 532,
@@ -188,6 +178,7 @@ describe('terminal combination container scopes', () => {
       name: 'Adaptive',
       memberBlockIds: ['left', 'right']
     })
+    graph.moveBlock('right', { x: 1_200, y: 100 })
     const expandedWidth = graph.toSnapshot().terminalGroups[0]!.size.width
 
     graph.moveBlock('right', { x: 900, y: 100 })
@@ -195,7 +186,7 @@ describe('terminal combination container scopes', () => {
     const contracted = graph.toSnapshot().terminalGroups[0]!
     expect(contracted.position).toEqual({ x: 68, y: 24 })
     expect(contracted.size.width).toBeLessThan(expandedWidth)
-    expect(contracted.size).toEqual({ width: 1_584, height: 612 })
+    expect(contracted.size).toEqual({ width: 1_424, height: 492 })
   })
 
   it('reflows existing terminals around the combination anchor when another unit joins', () => {
@@ -213,12 +204,12 @@ describe('terminal combination container scopes', () => {
 
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'left', position: { x: 100, y: 100 } }),
-      expect.objectContaining({ id: 'right', position: { x: 884, y: 100 } }),
-      expect.objectContaining({ id: 'incoming', position: { x: 492, y: 624 } })
+      expect.objectContaining({ id: 'right', position: { x: 100, y: 504 } }),
+      expect.objectContaining({ id: 'incoming', position: { x: 100, y: 908 } })
     ])
     expect(graph.toSnapshot().terminalGroups[0]).toMatchObject({
       position: { x: 68, y: 24 },
-      size: { width: 1_568, height: 1_136 },
+      size: { width: 624, height: 1_300 },
       memberBlockIds: ['left', 'right', 'incoming']
     })
   })
@@ -229,5 +220,11 @@ function createGraph(): BlockGraph {
 }
 
 function createTerminal(graph: BlockGraph, id: string, x: number, y: number): void {
-  graph.createTerminalBlock({ id, name: id, description: '', position: { x, y } })
+  graph.createTerminalBlock({
+    id,
+    name: id,
+    description: '',
+    size: { width: 560, height: 340 },
+    position: { x, y }
+  })
 }

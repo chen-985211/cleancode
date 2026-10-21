@@ -52,7 +52,7 @@ describe('default block graph', () => {
     expect(graph.blocks).toEqual([])
   })
 
-  it('creates terminal blocks with a spacious landscape layout', () => {
+  it('keeps the original independent terminal default size', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
       workspaceId: 'main'

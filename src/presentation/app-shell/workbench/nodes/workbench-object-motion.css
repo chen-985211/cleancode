@@ -51,7 +51,7 @@
 
 .terminal-group-node.workbench-object-motion--spatial {
   transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
-    scale(var(--workbench-object-motion-scale)) scale(var(--terminal-group-drop-scale));
+    scale(var(--workbench-object-motion-scale));
 }
 
 :is(.terminal-node-anchor, .agent-console-node):is(
@@ -71,7 +71,8 @@
 
 .terminal-group-node:is(
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-reflow
   )
   > .terminal-group-node__material {
   inset: 0 auto auto 0;
@@ -90,7 +91,11 @@
   opacity: var(--workbench-object-motion-content-opacity);
 }
 
-.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+.terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-reflow
+  )
+  > .terminal-group-node__header {
   width: var(--workbench-object-motion-shell-width);
   overflow: hidden;
   transform: translate3d(
@@ -143,9 +148,19 @@
   opacity: var(--workbench-object-motion-content-opacity);
 }
 
+.terminal-node.workbench-object-motion--group-reflow {
+  width: var(--workbench-object-motion-shell-width, 100%);
+  height: var(--workbench-object-motion-shell-height, 100%);
+  transform: translate3d(
+      calc(var(--workbench-object-motion-x) + var(--workbench-object-motion-shell-x, 0px)),
+      calc(var(--workbench-object-motion-y) + var(--workbench-object-motion-shell-y, 0px)),
+      0
+    )
+    scale(var(--workbench-object-motion-scale));
+  will-change: transform, width, height;
+}
+
 .terminal-node.workbench-object-motion--group-collapse {
-  visibility: hidden;
-  opacity: 0;
   pointer-events: none;
 }
 
@@ -318,7 +333,11 @@
     transform: none;
   }
 
-  .terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+  .terminal-group-node:is(
+      .workbench-object-motion--group-expand,
+      .workbench-object-motion--group-reflow
+    )
+    > .terminal-group-node__header {
     width: 100%;
     transform: none;
   }

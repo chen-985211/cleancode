@@ -7,8 +7,9 @@ import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <span data-testid="terminal-flow-handle" />,
-  NodeResizeControl: ({ onResizeEnd, position, style }: ResizeControlProps) => (
+  NodeResizeControl: ({ autoScale, onResizeEnd, position, style }: ResizeControlProps) => (
     <span
+      data-auto-scale={String(autoScale)}
       data-resize-position={position}
       data-testid="terminal-resize-control"
       style={style}
@@ -35,6 +36,7 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 interface ResizeControlProps {
+  readonly autoScale?: boolean
   readonly onResizeEnd?: (event: never, params: never) => void
   readonly position?: string
   readonly style?: CSSProperties
@@ -150,6 +152,7 @@ describe('terminal tooltips', () => {
     )
 
     const resizer = screen.getAllByTestId('terminal-resize-control')[0]!
+    expect(resizer).toHaveAttribute('data-auto-scale', 'false')
     expect(resizer).toHaveStyle({
       width: '24px',
       height: '24px',
@@ -432,7 +435,8 @@ describe('terminal tooltips', () => {
       'Terminal 应用退出后继续运行此会话',
       'Terminal 重开空终端会话',
       'Terminal 编辑终端信息',
-      'Terminal 删除终端'
+      'Terminal 删除终端',
+      'Terminal 折叠终端'
     ])
   })
 

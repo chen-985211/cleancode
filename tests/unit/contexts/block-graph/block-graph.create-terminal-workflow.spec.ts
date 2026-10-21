@@ -7,6 +7,30 @@ import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregat
 import type { TerminalExecutionConfigSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 
 describe('create terminal workflow use case', () => {
+  it('uses compact defaults only for dependency-connected workflow terminals', async () => {
+    const result = await new CreateTerminalWorkflowUseCase(
+      new TransactionalBlockGraphRepository(createGraph())
+    ).execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      canvasRegions: [],
+      terminals: [
+        terminal('a', 'A', 'echo A'),
+        terminal('b', 'B', 'echo B'),
+        terminal('solo', 'Solo', 'echo Solo')
+      ].map((terminal) => ({ ...terminal, size: undefined })),
+      connections: [{ sourceRef: 'a', targetRef: 'b' }]
+    })
+    expect(result.graph.blocks.find((block) => block.name === 'A')?.size).toEqual({
+      width: 420,
+      height: 280
+    })
+    expect(result.graph.blocks.find((block) => block.name === 'Solo')?.size).toEqual({
+      width: 720,
+      height: 460
+    })
+  })
+
   it('creates, configures, connects, groups, arranges, and validates one workflow atomically', async () => {
     const graph = createGraph()
     const repository = new TransactionalBlockGraphRepository(graph)
@@ -71,7 +95,7 @@ describe('create terminal workflow use case', () => {
     expect(install.position.x).toBeLessThan(api.position.x)
     expect(api.position.x).toBeLessThan(web.position.x)
     expect(worker.position).toEqual({
-      x: api.position.x,
+      x: install.position.x,
       y: install.position.y + install.size.height + 64
     })
     expect(

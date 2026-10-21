@@ -171,7 +171,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 `0.3.1` 不改变上述输入形状，而是把并行端口决策变成 Agent 可发现的协议事实。Developer Instructions、MCP 初始化说明、工具描述和嵌套 JSON Schema 统一要求：本地 HTTP/HTTPS/TCP 开发服务存在惯用端口时，默认使用 `preferred(port)` 与已经验证的注入；没有惯用端口时使用 `auto` 与已经验证的注入；只有用户或项目契约明确要求端口不可变化时才使用 `fixed`。环境变量注入只允许选择项目现有启动路径已经读取的变量，参数注入只允许选择现有 CLI 或任务包装器已经接受的安全 `{port}` 后缀；Agent 不得猜测 `PORT`、仅因日志出现 `8000` 就选择 `fixed + none`，也不得为支持动态端口擅自修改源码或项目配置。Schema 把推荐的 `preferred` 和 `auto` 分支放在 `fixed` 前，并提供可由同一 Schema 校验的结构化示例。
 
-`0.3.2` 引入共享画布语义投影；当前结构化契约 v2 允许组合为空或只包含一个完整执行单元，命中流程任意终端时 BlockGraph 仍以完整流程校验并原子提交成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
+`0.3.2` 引入共享画布语义投影；当前结构化契约 v3 允许组合为空、容纳终端与流程并保留跨组合依赖。显式终端标题拖动只调整单终端归属；Agent 的创建和流程成员工具仍以完整流程校验并原子提交成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
 
 `0.4.0` 新增 `create_terminal_workflow`。输入用一次调用内的稳定 `ref` 描述终端、内部连接和仅在用户明确组合意图时提供的可选组合；应用层把当前工作区全部 Agent 的已保存布局作为无优先级 `canvasRegions` 注入，BlockGraph 再与图内顶层对象共同寻找空位。BlockGraph 在一个仓储事务中完成定义校验、终端创建与完整执行配置、内部依赖、可选组合、确定性排列和计划校验；任一环节失败都不提交图。成功结果返回 `ref` 到持久化终端 ID、连接 ID、可选组合 ID、实际排列作用域和已验证计划，并以一次已提交图变更为 Presentation 提供连续演出事实；演出可以逐步或整体呈现，但不得把视觉阶段重新拆成多次工具调用。原有细粒度工具不删除、不改名，继续用于既有图的增量编辑。
 

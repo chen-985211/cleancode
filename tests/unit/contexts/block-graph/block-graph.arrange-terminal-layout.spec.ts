@@ -65,10 +65,10 @@ describe('terminal layout in the default block graph', () => {
     })
 
     expect(existingGroup.position).toEqual({ x: 268, y: 824 })
-    expect(existingGroup.size).toEqual({ width: 968, height: 392 })
+    expect(existingGroup.size).toEqual({ width: 520, height: 696 })
     expect(graph.blocks.find((block) => block.id === 'selected-terminal')?.position).toEqual({
-      x: 542,
-      y: 1534
+      x: 434,
+      y: 1584
     })
   })
 
@@ -108,6 +108,7 @@ describe('terminal layout in the default block graph', () => {
     expect(groupV.position.y).toBeGreaterThanOrEqual(groupU.position.y + groupU.size.height + 64)
     expect(second.graphChanged).toBe(false)
     expect(graph.toSnapshot()).toEqual(firstSnapshot)
+    expect(BlockGraph.fromSnapshot(firstSnapshot).toSnapshot()).toEqual(firstSnapshot)
   })
 
   it('recomputes complete terminal group bounds and is stable when the same layout is applied again', () => {
@@ -128,19 +129,20 @@ describe('terminal layout in the default block graph', () => {
     const second = graph.arrangeTerminalLayout(input)
 
     expect(first).toEqual({
-      arrangedBlockIds: ['install-terminal', 'workflow-companion', 'api-terminal', 'test-terminal'],
+      arrangedBlockIds: ['install-terminal', 'api-terminal', 'workflow-companion', 'test-terminal'],
       arrangedTerminalGroupIds: ['workflow-group'],
       graphChanged: true
     })
     expect(firstSnapshot.terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-group',
-        position: { x: 1_164, y: -78 },
-        size: { width: 1592, height: 756 }
+        position: { x: 246, y: 564 },
+        size: { width: 1108, height: 1060 }
       })
     ])
     expect(second).toEqual({ ...first, graphChanged: false })
     expect(graph.toSnapshot()).toEqual(firstSnapshot)
+    expect(BlockGraph.fromSnapshot(firstSnapshot).toSnapshot()).toEqual(firstSnapshot)
   })
 
   it('keeps a complete arranged group clear of an arranged ungrouped terminal', () => {
@@ -224,6 +226,7 @@ describe('terminal layout in the default block graph', () => {
     expect(first.graphChanged).toBe(true)
     expect(second.graphChanged).toBe(false)
     expect(graph.toSnapshot()).toEqual(firstSnapshot)
+    expect(BlockGraph.fromSnapshot(firstSnapshot).toSnapshot()).toEqual(firstSnapshot)
   })
 
   it('rejects a scope that contains only part of a terminal group without changing the graph', () => {

@@ -48,6 +48,14 @@ export function useWorkbenchCanvasArrangement({
   )
   const dragging = useCanvasStackDragging({
     arrangement,
+    canDragStack: (node) =>
+      node.type !== 'terminal' ||
+      (!currentWorkbench?.graph.terminalGroups.some((group) =>
+        group.memberBlockIds.includes(node.id)
+      ) &&
+        !currentWorkbench?.graph.connections?.some(
+          (edge) => edge.sourceBlockId === node.id || edge.targetBlockId === node.id
+        )),
     items,
     nodes,
     onCancelNodeDrag,

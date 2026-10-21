@@ -20,3 +20,4 @@ export {
   minimumCanvasZoom,
   minimumTerminalBlockSize
 } from '../../domain/aggregates/BlockGraph'
+export { terminalBlockVisibleSize } from '../../domain/aggregates/BlockGraph'

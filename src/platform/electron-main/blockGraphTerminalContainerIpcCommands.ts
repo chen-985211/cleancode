@@ -23,9 +23,46 @@ export interface CreateTerminalGroupIpcCommand extends TerminalContainerScope {
 }
 
 export interface MoveTerminalWorkflowToGroupIpcCommand extends TerminalContainerScope {
+  readonly expectedBlockIds?: readonly string[]
+  readonly scope?: 'terminal' | 'workflow'
   readonly blockId: string
   readonly targetTerminalGroupId: string | null
   readonly position: TerminalContainerPosition
+}
+
+export interface ResizeTerminalBlockIpcCommand extends TerminalContainerScope {
+  readonly blockId: string
+  readonly position: TerminalContainerPosition
+  readonly size: { readonly width: number; readonly height: number }
+  readonly isCollapsed?: boolean
+}
+
+export function readResizeTerminalBlockCommand(command: unknown): ResizeTerminalBlockIpcCommand {
+  if (
+    !isRecord(command) ||
+    !hasExactKeys(command, [
+      'projectDirectory',
+      'workspaceId',
+      'blockId',
+      'position',
+      'size',
+      ...('isCollapsed' in command ? ['isCollapsed'] : [])
+    ]) ||
+    typeof command.projectDirectory !== 'string' ||
+    typeof command.workspaceId !== 'string' ||
+    typeof command.blockId !== 'string' ||
+    !isPosition(command.position) ||
+    !isRecord(command.size) ||
+    !hasExactKeys(command.size, ['width', 'height']) ||
+    typeof command.size.width !== 'number' ||
+    !Number.isFinite(command.size.width) ||
+    typeof command.size.height !== 'number' ||
+    !Number.isFinite(command.size.height) ||
+    (command.isCollapsed !== undefined && typeof command.isCollapsed !== 'boolean')
+  ) {
+    throwInvalidTerminalContainerCommand()
+  }
+  return command as unknown as ResizeTerminalBlockIpcCommand
 }
 
 export function readCreateTerminalBlockCommand(command: unknown): CreateTerminalBlockIpcCommand {
@@ -72,11 +109,19 @@ export function readMoveTerminalWorkflowToGroupCommand(
       'workspaceId',
       'blockId',
       'targetTerminalGroupId',
-      'position'
+      'position',
+      ...('scope' in command ? ['scope'] : []),
+      ...('expectedBlockIds' in command ? ['expectedBlockIds'] : [])
     ]) ||
     typeof command.projectDirectory !== 'string' ||
     typeof command.workspaceId !== 'string' ||
     typeof command.blockId !== 'string' ||
+    (command.scope !== undefined && command.scope !== 'terminal' && command.scope !== 'workflow') ||
+    (command.expectedBlockIds !== undefined &&
+      (!Array.isArray(command.expectedBlockIds) ||
+        command.expectedBlockIds.length === 0 ||
+        new Set(command.expectedBlockIds).size !== command.expectedBlockIds.length ||
+        !command.expectedBlockIds.every((id) => typeof id === 'string' && id.length > 0))) ||
     !isPosition(command.position) ||
     (command.targetTerminalGroupId !== null && typeof command.targetTerminalGroupId !== 'string')
   ) {

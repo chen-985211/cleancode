@@ -13,6 +13,7 @@ const workbenchNodeResizePositions = [
 ] as const
 
 export function WorkbenchNodeResizer({
+  autoScale = true,
   className,
   isVisible = true,
   minHeight,
@@ -20,6 +21,7 @@ export function WorkbenchNodeResizer({
   onResizeEnd,
   onResizeStart
 }: {
+  readonly autoScale?: boolean
   readonly className: string
   readonly isVisible?: boolean
   readonly minHeight: number
@@ -32,6 +34,7 @@ export function WorkbenchNodeResizer({
   return workbenchNodeResizePositions.map((position) => (
     <NodeResizeControl
       key={position}
+      autoScale={autoScale}
       className={className}
       position={position}
       style={workbenchNodeResizeHandleStyle}

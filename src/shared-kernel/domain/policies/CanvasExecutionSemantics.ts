@@ -33,8 +33,8 @@ export interface CanvasExecutionSelectionAnalysis {
 export const canvasExecutionSemanticContract = Object.freeze({
   definitions: Object.freeze({
     combination: bilingual(
-      'A persistent container and connection scope for zero or more complete execution units.',
-      '组合是可持久存在的独立容器与连线作用域，可容纳零个或多个完整执行单元。'
+      'A persistent visual container for zero or more terminals and workflows, allowing dependencies across its boundary.',
+      '组合是可持久存在的独立视觉容器，可容纳零个或多个终端与流程，允许跨边界依赖。'
     ),
     terminal: bilingual('A terminal is the smallest execution unit.', '终端是最小执行单位。'),
     topLevelExecutionUnit: bilingual(
@@ -48,23 +48,23 @@ export const canvasExecutionSemanticContract = Object.freeze({
   }),
   rules: Object.freeze({
     completeWorkflowMembership: bilingual(
-      'When creating or adjusting combination membership, selecting any terminal in a workflow must include that complete workflow.',
-      '创建或调整组合成员时，命中流程中的任意终端都必须扩展为完整流程。'
+      'Creating a combination or moving workflow membership must include the complete workflow. Explicit terminal-scoped membership commands preserve external dependencies. Dragging a workflow terminal title inside a combination returns it to its fixed slot. Outside a combination, each terminal can move independently and keeps its released position, membership and dependencies; the workflow handle moves the complete workflow.',
+      '创建组合或调整流程成员时，命中流程中的任意终端都必须扩展为完整流程；显式单终端成员命令保留外部依赖；组合内的流程单节点标题拖动在松手后回到固定槽位；组合外的节点可独立拖动并保留释放位置、归属与依赖，完整流程通过流程标签移动。'
     ),
     ordinaryTerminalScope: bilingual(
       'Ordinary terminal clicks, inspection, and configuration still affect only that terminal.',
       '普通单击、查看和配置仍只作用于当前终端。'
     ),
-    connectionScopeIsolation: bilingual(
-      'A dependency connection may only join two root terminals or two terminals in the same combination.',
-      '依赖连线只能连接两个根画布终端，或同一组合中的两个终端。'
+    crossBoundaryDependencies: bilingual(
+      'Dependency connections may cross combination boundaries; membership and disclosure changes preserve those connections.',
+      '依赖连线可以跨越组合边界；成员调整与展开收起必须保留这些连接。'
     ),
     emptyCombinationPersistence: bilingual(
       'A combination may remain empty until the user explicitly dissolves or removes it.',
       '组合可以保持为空，直到用户显式解散或删除它。'
     )
   }),
-  version: 2
+  version: 3
 })
 
 export const canvasExecutionSemanticInstructions = [
@@ -79,7 +79,7 @@ export const canvasExecutionSemanticInstructions = [
   `${projectBilingual(
     canvasExecutionSemanticContract.rules.completeWorkflowMembership
   )} ${projectBilingual(
-    canvasExecutionSemanticContract.rules.connectionScopeIsolation
+    canvasExecutionSemanticContract.rules.crossBoundaryDependencies
   )} ${projectBilingual(canvasExecutionSemanticContract.rules.ordinaryTerminalScope)}`
 ].join(' ')
 

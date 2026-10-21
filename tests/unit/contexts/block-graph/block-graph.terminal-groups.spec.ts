@@ -1,6 +1,7 @@
 import {
   BlockGraph,
-  defaultTerminalGroupSize
+  defaultTerminalGroupSize,
+  defaultTerminalBlockSize
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 
 describe('terminal groups in the default block graph', () => {
@@ -34,7 +35,10 @@ describe('terminal groups in the default block graph', () => {
         type: 'terminal-group',
         name: '启动项目',
         position: { x: 288, y: 164 },
-        size: { width: 1284, height: 612 },
+        size: {
+          width: defaultTerminalBlockSize.width + 64,
+          height: 2 * defaultTerminalBlockSize.height + 64 + 152
+        },
         isCollapsed: false,
         memberBlockIds: [backend.id, frontend.id]
       }
@@ -96,7 +100,7 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
-  it('rejects a dependency that crosses a group boundary', () => {
+  it('preserves a dependency that crosses a group boundary', () => {
     const graph = createGraphWithWorkflowComponents(false)
     graph.createTerminalGroup({
       id: 'release-group',
@@ -108,7 +112,7 @@ describe('terminal groups in the default block graph', () => {
         sourceBlockId: 'build-terminal',
         targetBlockId: 'test-terminal'
       })
-    ).toThrow('Terminal connections must stay within one container scope.')
+    ).not.toThrow()
   })
 
   it('moves grouped terminals together when the group moves', () => {
@@ -121,7 +125,7 @@ describe('terminal groups in the default block graph', () => {
     })
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'backend-terminal', position: { x: 432, y: 376 } }),
-      expect.objectContaining({ id: 'frontend-terminal', position: { x: 932, y: 376 } })
+      expect.objectContaining({ id: 'frontend-terminal', position: { x: 432, y: 900 } })
     ])
   })
 
@@ -273,8 +277,11 @@ describe('terminal groups in the default block graph', () => {
     expect(graph.toSnapshot().terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-wrapper',
-        position: { x: -32, y: -76 },
-        size: { width: 1_284, height: 612 },
+        position: { x: -1_000, y: -1_000 },
+        size: {
+          width: 2 * defaultTerminalBlockSize.width + 128,
+          height: defaultTerminalBlockSize.height + 152
+        },
         memberBlockIds: ['backend-terminal', 'frontend-terminal']
       })
     ])

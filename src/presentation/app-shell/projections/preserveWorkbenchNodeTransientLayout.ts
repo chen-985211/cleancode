@@ -14,13 +14,28 @@ export function preserveWorkbenchNodeTransientLayout(
       return nextNode
     }
 
+    if (protectedNodeIds.has(nextNode.id))
+      return preserveProtectedLayoutBaseline(nextNode, currentNode)
     if (hasPersistedLayoutChanged(currentNode, nextNode)) {
-      return protectedNodeIds.has(nextNode.id)
-        ? preserveProtectedLayoutBaseline(nextNode, currentNode)
+      // A translation is not a new node. Dropping measured makes React Flow
+      // invalidate all handle bounds and remove its edges until remeasurement.
+      // A genuine size change still invalidates measurements for ResizeObserver.
+      return currentNode.measured && hasSameRenderedSize(currentNode, nextNode)
+        ? { ...nextNode, measured: currentNode.measured }
         : nextNode
     }
 
     return preserveTransientGeometry(nextNode, currentNode)
+  })
+}
+
+function hasSameRenderedSize(left: WorkbenchFlowNode, right: WorkbenchFlowNode): boolean {
+  return (['width', 'height'] as const).every((dimension) => {
+    const before = left.style?.[dimension]
+    const after = right.style?.[dimension]
+    return typeof before === 'number' && typeof after === 'number'
+      ? Math.abs(before - after) < 0.001
+      : before === after
   })
 }
 
@@ -35,6 +50,9 @@ function preserveProtectedLayoutBaseline(
       ...nodeWithTransientGeometry,
       data: {
         ...nodeWithTransientGeometry.data,
+        isObjectMotionFrozen: currentNode.data.isObjectMotionFrozen,
+        isParkedInCollapsedGroup: currentNode.data.isParkedInCollapsedGroup,
+        isObjectDragPreview: currentNode.data.isObjectDragPreview,
         block: {
           ...nodeWithTransientGeometry.data.block,
           position: currentNode.data.block.position,
@@ -49,6 +67,7 @@ function preserveProtectedLayoutBaseline(
       ...nodeWithTransientGeometry,
       data: {
         ...nodeWithTransientGeometry.data,
+        isObjectMotionFrozen: currentNode.data.isObjectMotionFrozen,
         group: {
           ...nodeWithTransientGeometry.data.group,
           position: currentNode.data.group.position,
@@ -80,10 +99,22 @@ function preserveTransientGeometry(
   nextNode: WorkbenchFlowNode,
   currentNode: WorkbenchFlowNode
 ): WorkbenchFlowNode {
+  // A data refresh can follow pointer-up before the return spring finishes.
+  // Keep its motion and completion owner visible to both nodes and edges until
+  // completion clears it, or a new authoritative layout/motion replaces it.
+  const activeMotion =
+    !nextNode.data.objectMotion &&
+    currentNode.data.objectMotion &&
+    !currentNode.data.isObjectMotionFrozen
+      ? {
+          objectMotion: currentNode.data.objectMotion,
+          onObjectMotionComplete: currentNode.data.onObjectMotionComplete
+        }
+      : {}
   if (nextNode.type === 'terminalGroup' && currentNode.type === 'terminalGroup') {
     return {
       ...nextNode,
-      data: { ...nextNode.data, dropFeedback: currentNode.data.dropFeedback },
+      data: { ...nextNode.data, ...activeMotion, dropFeedback: currentNode.data.dropFeedback },
       position: currentNode.position,
       style: currentNode.style,
       ...(currentNode.width === undefined ? {} : { width: currentNode.width }),
@@ -95,13 +126,14 @@ function preserveTransientGeometry(
 
   return {
     ...nextNode,
+    data: { ...nextNode.data, ...activeMotion },
     position: currentNode.position,
     style: currentNode.style,
     ...(currentNode.width === undefined ? {} : { width: currentNode.width }),
     ...(currentNode.height === undefined ? {} : { height: currentNode.height }),
     ...(currentNode.measured === undefined ? {} : { measured: currentNode.measured }),
     ...(currentNode.dragging === undefined ? {} : { dragging: currentNode.dragging })
-  }
+  } as WorkbenchFlowNode
 }
 
 function hasPersistedLayoutChanged(
@@ -111,7 +143,8 @@ function hasPersistedLayoutChanged(
   if (currentNode.type === 'terminal' && nextNode.type === 'terminal') {
     return (
       !isPositionEqual(currentNode.data.block.position, nextNode.data.block.position) ||
-      !isSizeEqual(currentNode.data.block.size, nextNode.data.block.size)
+      !isSizeEqual(currentNode.data.block.size, nextNode.data.block.size) ||
+      Boolean(currentNode.data.block.isCollapsed) !== Boolean(nextNode.data.block.isCollapsed)
     )
   }
 

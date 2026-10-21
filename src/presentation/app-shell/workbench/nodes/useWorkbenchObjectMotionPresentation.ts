@@ -23,7 +23,8 @@ interface WorkbenchObjectMotionPresentation {
 
 export function useWorkbenchObjectMotionPresentation(
   motion: WorkbenchObjectMotion | undefined,
-  onComplete?: (motionId: string) => void
+  onComplete?: (motionId: string) => void,
+  suspended = false
 ): WorkbenchObjectMotionPresentation {
   const [presentation, setPresentation] = useState(motion)
   const [surfaceElement, setSurfaceElement] = useState<HTMLElement | null>(null)
@@ -34,14 +35,19 @@ export function useWorkbenchObjectMotionPresentation(
   onCompleteRef.current = onComplete
 
   useLayoutEffect(() => {
-    if (!motion && presentation?.kind === 'delete') {
+    if ((suspended || (!motion && presentation?.kind === 'delete')) && presentation) {
       setPresentation(undefined)
       return
     }
-    if (motion && motion.id !== presentation?.id && motion.id !== completedMotionIdRef.current) {
+    if (
+      !suspended &&
+      motion &&
+      motion.id !== presentation?.id &&
+      motion.id !== completedMotionIdRef.current
+    ) {
       setPresentation(motion)
     }
-  }, [motion, presentation?.id])
+  }, [motion, presentation?.id, suspended])
 
   const completeSpatialMotion = useCallback((motionId: string): void => {
     completedMotionIdRef.current = motionId

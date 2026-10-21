@@ -1,3 +1,4 @@
+import { terminalBlockVisibleSize } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
@@ -24,10 +25,9 @@ import type { UpdateTerminalGroupMetadataInput } from '../../../contexts/block-g
 import type { TerminalDefinitionInput } from '../../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
 import type { TerminalViewState } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
-const collapsedTerminalGroupWidth = 360
-const collapsedTerminalGroupIdentityHeight = 44
-const collapsedTerminalGroupToolbarHeight = 44
-const collapsedTerminalGroupMemberRowHeight = 36
+import { terminalWorkflowDragHandles } from './terminalWorkflowDragHandles'
+
+const collapsedTerminalGroupSize = { width: 112, height: 112 }
 
 interface TerminalFlowNodeHandlers {
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
@@ -143,6 +143,11 @@ export function createTerminalFlowNodes({
       workflowBuildPresentation
     })
   )
+  const groupedIds = new Set(graph?.terminalGroups.flatMap((group) => group.memberBlockIds))
+  const connectedIds = new Set(
+    graph?.connections?.flatMap((edge) => [edge.sourceBlockId, edge.targetBlockId])
+  )
+  const workflowHandles = terminalWorkflowDragHandles(graph)
   const terminalNodes = (graph?.blocks ?? [])
     .filter((block) => includeCollapsedMembers || !collapsedGroupMemberIds.has(block.id))
     .map((block) => {
@@ -150,6 +155,8 @@ export function createTerminalFlowNodes({
       return createTerminalFlowNode({
         approvalIntent: approvalNodeIntents.get(block.id),
         activeWorkflowRunId,
+        workflowDragTerminalIds: workflowHandles.get(block.id),
+        isIndependentCanvasTerminal: !groupedIds.has(block.id) && !connectedIds.has(block.id),
         block,
         projectId: graph!.projectId,
         workspaceId: graph!.workspaceId,
@@ -176,6 +183,8 @@ export function createTerminalFlowNodes({
 }
 
 interface CreateTerminalFlowNodeInput {
+  readonly isIndependentCanvasTerminal?: boolean
+  readonly workflowDragTerminalIds?: readonly string[]
   readonly activeWorkflowRunId?: string
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
@@ -197,6 +206,8 @@ interface CreateTerminalFlowNodeInput {
 function createTerminalFlowNode({
   approvalIntent,
   activeWorkflowRunId,
+  workflowDragTerminalIds,
+  isIndependentCanvasTerminal,
   block,
   projectId,
   workspaceId,
@@ -220,13 +231,14 @@ function createTerminalFlowNode({
   return {
     id: block.id,
     type: 'terminal',
+    dragHandle: '.terminal-node__header',
     position: buildInitialPosition ?? block.position,
     selectable: false,
     selected: isSelected,
     zIndex: 3,
     style: {
-      width: block.size.width,
-      height: block.size.height
+      width: terminalBlockVisibleSize(block).width,
+      height: terminalBlockVisibleSize(block).height
     },
     className: undefined,
     data: {
@@ -237,6 +249,8 @@ function createTerminalFlowNode({
         objectId: block.id
       }),
       approvalIntent,
+      workflowDragTerminalIds,
+      isIndependentCanvasTerminal,
       block,
       session: terminalStateStore.getState(block.id),
       terminalStateStore,
@@ -285,9 +299,7 @@ function createTerminalGroupFlowNode({
   const memberBlocks = (graph?.blocks ?? []).filter((block) =>
     group.memberBlockIds.includes(block.id)
   )
-  const size = group.isCollapsed
-    ? createCollapsedTerminalGroupSize(memberBlocks.length)
-    : group.size
+  const size = group.isCollapsed ? collapsedTerminalGroupSize : group.size
   const objectPresence = resolveWorkflowBuildObjectPresence(workflowBuildPresentation, group.id, {
     enteringIds: workflowBuildPresentation?.enteringTerminalGroupIds,
     pendingIds: workflowBuildPresentation?.pendingTerminalGroupIds
@@ -296,6 +308,7 @@ function createTerminalGroupFlowNode({
   return {
     id: group.id,
     type: 'terminalGroup',
+    dragHandle: '.terminal-group-node__header, .terminal-group-node__member-name',
     position: group.position,
     selectable: false,
     selected: selectedTerminalGroupId === group.id,
@@ -362,17 +375,3 @@ async function noopUpdateGroupMetadata(): Promise<void> {}
 async function noopToggleGroupCollapsed(): Promise<void> {}
 
 async function noopRemoveTerminalFromGroup(): Promise<void> {}
-
-function createCollapsedTerminalGroupSize(memberCount: number): {
-  readonly width: number
-  readonly height: number
-} {
-  const visibleMemberCount = Math.max(memberCount, 0)
-  const memberListHeight = visibleMemberCount * collapsedTerminalGroupMemberRowHeight
-
-  return {
-    width: collapsedTerminalGroupWidth,
-    height:
-      collapsedTerminalGroupIdentityHeight + collapsedTerminalGroupToolbarHeight + memberListHeight
-  }
-}

@@ -7,7 +7,6 @@
 }
 
 .terminal-group-node {
-  --terminal-group-drop-scale: 1;
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);
   --terminal-group-surface: var(--cc-terminal-shell);
@@ -28,12 +27,7 @@
   border: 0;
   border-radius: var(--cc-canvas-node-radius);
   background: transparent;
-  transform: scale(var(--terminal-group-drop-scale));
   transform-origin: center;
-}
-
-.terminal-group-drop-spring--active {
-  will-change: transform;
 }
 
 .terminal-group-node::after {
@@ -68,6 +62,11 @@
   border-radius: inherit;
   background: var(--terminal-group-surface);
   content: '';
+}
+
+.terminal-group-node > .terminal-node__handle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .terminal-group-node__empty-state {
@@ -139,6 +138,52 @@
 
 .terminal-group-node__header--editing {
   box-shadow: 0 -2px 0 var(--cc-primary-border) inset;
+}
+
+.terminal-group-node__identity-icon {
+  display: none;
+  color: var(--terminal-group-muted);
+}
+
+.terminal-group-node--collapsed .terminal-group-node__header {
+  height: 100%;
+  flex: 1 1 auto;
+  border-radius: inherit;
+  padding: 28px 10px 12px;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__title {
+  align-items: center;
+  gap: 10px;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__identity-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__toolbar--inline {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__disclosure {
+  background: transparent;
+  box-shadow: none;
 }
 
 .terminal-group-node__title {
@@ -373,4 +418,14 @@
     0 0 0 2px var(--cc-primary-ring),
     0 0 0 1px var(--cc-primary-border) inset,
     0 1px 2px var(--cc-shadow-color);
+}
+
+.terminal-group-node--drop-join > .terminal-group-node__material,
+.terminal-group-node--drop-leave > .terminal-group-node__material {
+  outline: 2px solid var(--cc-primary-border);
+  outline-offset: 3px;
+}
+
+.terminal-group-node--drop-leave > .terminal-group-node__material {
+  outline-style: dashed;
 }

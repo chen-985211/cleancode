@@ -75,6 +75,11 @@
   transition: none;
 }
 
+/* Disabled native buttons swallow the mouseup needed to finish a title drag. */
+.react-flow__node.dragging .terminal-node__action:disabled {
+  pointer-events: none;
+}
+
 .terminal-node__header {
   position: relative;
   z-index: 1;
@@ -541,4 +546,87 @@
 .terminal-node-anchor--selected > .terminal-node__handle {
   opacity: 1;
   background: var(--cc-workbench-selection);
+}
+
+.terminal-node__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.terminal-node--disclosure-transition {
+  overflow: clip;
+}
+
+.terminal-node--disclosure-transition .terminal-node__actions {
+  min-width: 29px;
+  flex-shrink: 1;
+  justify-content: flex-end;
+  overflow: clip;
+}
+
+.terminal-node--collapsed .terminal-node__body {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.terminal-node--collapsed .terminal-node__header {
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  border-bottom: 0;
+  border-radius: inherit;
+  padding-block: 5px;
+}
+
+.terminal-node--collapsed {
+  border-radius: 10px;
+}
+
+.terminal-node--collapsed .terminal-node__disclosure {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.terminal-node--collapsed .terminal-node__meta {
+  display: none;
+}
+
+.terminal-workflow-drag-handle {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  color: var(--cc-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: grab;
+}
+.terminal-workflow-drag-handle span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-workflow-drag-handle:hover {
+  color: var(--cc-foreground);
+  background: var(--cc-surface-hover);
+}
+.terminal-workflow-drag-handle:active {
+  cursor: grabbing;
+}
+.terminal-workflow-drag-handle:focus-visible {
+  outline: 2px solid var(--cc-primary-border);
+  outline-offset: 2px;
 }

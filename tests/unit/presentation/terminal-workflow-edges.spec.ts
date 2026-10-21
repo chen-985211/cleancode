@@ -3,7 +3,7 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import { projectTerminalWorkflowBuildOntoEdges } from '../../../src/presentation/app-shell/projections/terminalWorkflowBuildEdgePresentation'
 
 describe('terminal workflow edges', () => {
-  it('maps persistent connections and hides edges of collapsed group members', () => {
+  it('projects external dependencies onto the collapsed group and hides only internal edges', () => {
     const graph = {
       id: 'graph-1',
       projectId: 'project-1',
@@ -12,7 +12,8 @@ describe('terminal workflow edges', () => {
       blocks: [],
       connections: [
         { id: 'a-b', sourceBlockId: 'a', targetBlockId: 'b' },
-        { id: 'b-c', sourceBlockId: 'b', targetBlockId: 'c' }
+        { id: 'b-c', sourceBlockId: 'b', targetBlockId: 'c' },
+        { id: 'c-d', sourceBlockId: 'c', targetBlockId: 'd' }
       ],
       terminalGroups: [
         {
@@ -34,6 +35,12 @@ describe('terminal workflow edges', () => {
         target: 'b',
         className: 'terminal-workflow-edge terminal-workflow-edge--active',
         markerEnd: expect.objectContaining({ color: 'context-stroke' })
+      }),
+      expect.objectContaining({
+        id: 'b-c',
+        source: 'b',
+        target: 'group-1',
+        targetHandle: 'workflow-input'
       })
     ])
   })

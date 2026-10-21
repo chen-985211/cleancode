@@ -128,6 +128,41 @@ describe('Agent layout coordination', () => {
     expect(nodeStore.getNodes()[0]?.position).toEqual(agent.layout.position)
   })
 
+  it('keeps the latest group drag protected when an earlier release finishes', async () => {
+    const nodes = createGroupedNodes()
+    const group = nodes[0]!
+    const commit = createDeferred<void>()
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceId: 'main',
+        moveWorkbenchNode: () => commit.promise,
+        moveWorkspaceAgent: vi.fn(async () => undefined),
+        nodeStore: createWorkbenchNodeStore(nodes),
+        reactFlowInstanceRef: { current: null },
+        setCurrentGraph: vi.fn()
+      })
+    )
+    act(() => result.current.onNodeDragStart({} as MouseEvent, group))
+    let previousRelease!: Promise<void>
+    act(() => {
+      previousRelease = result.current.onNodeDragStop({} as MouseEvent, group)
+    })
+    act(() => result.current.onNodeDragStart({} as MouseEvent, group))
+    await act(async () => {
+      commit.resolve()
+      await previousRelease
+    })
+    expect([...result.current.protectedLayoutNodeIds].sort()).toEqual([
+      'group-1',
+      'terminal-1',
+      'terminal-2'
+    ])
+    act(() => result.current.cancelNodeDrag(group.id))
+    expect(result.current.protectedLayoutNodeIds.size).toBe(0)
+  })
+
   it('does not recenter after the user takes control of the viewport', async () => {
     const terminalNode = createNode('terminal-1', 'terminal')
     const agentNode = createNode('agent:agent-1', 'agentConsole')

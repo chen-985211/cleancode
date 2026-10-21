@@ -29,6 +29,7 @@ interface CanvasStackDragSession {
 
 export function useCanvasStackDragging<TNode extends CanvasStackDragNode>({
   arrangement,
+  canDragStack,
   items,
   nodes,
   onCancelNodeDrag,
@@ -38,6 +39,7 @@ export function useCanvasStackDragging<TNode extends CanvasStackDragNode>({
   setNodePositions
 }: {
   readonly arrangement: CanvasArrangementSnapshot
+  readonly canDragStack?: (node: TNode) => boolean
   readonly items: readonly CanvasArrangementSelectionItem[]
   readonly nodes: readonly TNode[]
   readonly onCancelNodeDrag?: (nodeId: string) => void
@@ -59,14 +61,15 @@ export function useCanvasStackDragging<TNode extends CanvasStackDragNode>({
   }, [arrangement.projectId, arrangement.workspaceId])
 
   function begin(event: globalThis.MouseEvent | TouchEvent, node: TNode): void {
-    const target = onMoveCanvasStack
-      ? resolveCanvasStackDragTarget({
-          arrangement,
-          items,
-          nodeId: node.id,
-          nodes: projectionNodes
-        })
-      : null
+    const target =
+      onMoveCanvasStack && (canDragStack?.(node) ?? true)
+        ? resolveCanvasStackDragTarget({
+            arrangement,
+            items,
+            nodeId: node.id,
+            nodes: projectionNodes
+          })
+        : null
     sessionRef.current = target
       ? {
           activeStartPosition: { ...node.position },

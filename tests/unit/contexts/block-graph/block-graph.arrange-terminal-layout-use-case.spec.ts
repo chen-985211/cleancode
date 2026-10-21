@@ -18,7 +18,7 @@ describe('arrange terminal layout use case', () => {
     })
 
     expect(result).toEqual({
-      arrangedBlockIds: ['group-companion', 'upstream-terminal', 'downstream-terminal'],
+      arrangedBlockIds: ['upstream-terminal', 'group-companion', 'downstream-terminal'],
       arrangedTerminalGroupIds: ['workflow-group'],
       graph: repository.graph?.toSnapshot(),
       graphChanged: true
@@ -27,7 +27,7 @@ describe('arrange terminal layout use case', () => {
       ['upstream-terminal', { x: 138, y: 640 }],
       ['downstream-terminal', { x: 622, y: 640 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 380, y: 944 }]
+      ['group-companion', { x: 138, y: 944 }]
     ])
     expect(repository.transactionCount).toBe(1)
   })
@@ -69,15 +69,15 @@ describe('arrange terminal layout use case', () => {
       ['upstream-terminal', { x: 1600, y: 900 }],
       ['downstream-terminal', { x: 820, y: 564 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 40, y: 40 }]
+      ['group-companion', { x: 40, y: 344 }]
     ])
   })
 
-  it('preserves a complete group when one member moves before layout commits', async () => {
+  it('preserves a complete group moved before layout commits', async () => {
     const repository = new TransactionalBlockGraphRepository(
       createWorkflowGraph(),
       (currentGraph) => {
-        currentGraph.moveBlock('upstream-terminal', { x: 1600, y: 900 })
+        currentGraph.moveTerminalGroup('workflow-group', { x: 1600, y: 900 })
       }
     )
     const arrangeTerminalLayout = new ArrangeTerminalLayoutUseCase(repository)
@@ -95,10 +95,10 @@ describe('arrange terminal layout use case', () => {
       graphChanged: false
     })
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
-      ['upstream-terminal', { x: 1600, y: 900 }],
-      ['downstream-terminal', { x: 800, y: 40 }],
+      ['upstream-terminal', { x: 1632, y: 976 }],
+      ['downstream-terminal', { x: 2116, y: 976 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 40, y: 40 }]
+      ['group-companion', { x: 1632, y: 1280 }]
     ])
   })
 

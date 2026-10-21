@@ -52,30 +52,38 @@ describe('block graph terminal resize IPC contract', () => {
     expect(ipcMain.hasHandler('cleancode:save-graph')).toBe(false)
   })
 
-  it('passes the complete final terminal rectangle through IPC', async () => {
-    const ipcMain = new FakeIpcMain()
-    const resizeTerminalBlock = vi.fn(async () => createGraphSnapshot())
-    registerBlockGraphIpcHandlers({
-      ipcMain,
-      logger: silentLogger,
-      resizeTerminalBlock
-    } as unknown as BlockGraphIpcHandlersInput)
+  it.each([undefined, false, true])(
+    'passes the expanded rectangle and independent disclosure=%s through IPC',
+    async (isCollapsed) => {
+      const ipcMain = new FakeIpcMain()
+      const resizeTerminalBlock = vi.fn(async () => createGraphSnapshot())
+      registerBlockGraphIpcHandlers({
+        ipcMain,
+        logger: silentLogger,
+        resizeTerminalBlock
+      } as unknown as BlockGraphIpcHandlersInput)
 
-    const command = {
-      projectDirectory: '/repo/app',
-      workspaceId: 'main',
-      blockId: 'terminal-1',
-      position: { x: 180, y: 140 },
-      size: { width: 760, height: 420 }
+      const command = {
+        projectDirectory: '/repo/app',
+        workspaceId: 'main',
+        blockId: 'terminal-1',
+        position: { x: 180, y: 140 },
+        size: { width: 760, height: 420 },
+        ...(isCollapsed === undefined ? {} : { isCollapsed })
+      }
+      const result = await ipcMain.invoke<BlockGraphSnapshot>(
+        'cleancode:resize-terminal-block',
+        command
+      )
+
+      expect(result).toEqual({ ok: true, value: createGraphSnapshot() })
+      expect(resizeTerminalBlock).toHaveBeenCalledWith(command)
+      await expect(
+        ipcMain.invoke('cleancode:resize-terminal-block', { ...command, isCollapsed: 'true' })
+      ).resolves.toMatchObject({ ok: false, error: { code: 'INVALID_IPC_COMMAND' } })
+      expect(resizeTerminalBlock).toHaveBeenCalledTimes(1)
     }
-    const result = await ipcMain.invoke<BlockGraphSnapshot>(
-      'cleancode:resize-terminal-block',
-      command
-    )
-
-    expect(result).toEqual({ ok: true, value: createGraphSnapshot() })
-    expect(resizeTerminalBlock).toHaveBeenCalledWith(command)
-  })
+  )
 
   it('passes one complete terminal definition through the atomic update channel', async () => {
     const ipcMain = new FakeIpcMain()

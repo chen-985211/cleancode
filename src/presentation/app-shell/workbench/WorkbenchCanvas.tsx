@@ -1,3 +1,4 @@
+import { useWorkbenchNodeDragSession } from './nodes/useWorkbenchNodeDragSession'
 import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
 import {
   Background,
@@ -61,6 +62,7 @@ import {
   toWorkbenchFlowPosition
 } from './workbenchCanvasInteractionTargets'
 import { useWorkbenchCanvasViewportRestoration } from './viewport/useWorkbenchCanvasViewportRestoration'
+import { useWorkflowCanvasDragging } from './useWorkflowCanvasDragging'
 import type { WorkbenchCanvasProps } from './workbenchCanvasProps'
 import { ignoreAppNotifications } from '../../shared/notifications/appNotifications'
 import {
@@ -252,7 +254,27 @@ export function WorkbenchCanvas({
     Edge
   > | null>(null)
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
-  const activeDraggedNodeRef = useRef<WorkbenchFlowNode | null>(null)
+  const nodeDragSession = useWorkbenchNodeDragSession({
+    instanceRef: reactFlowInstanceRef,
+    nodeStore,
+    surfaceRef: canvasSurfaceRef,
+    onCancel: onCancelNodeDrag
+  })
+  const activeDraggedNodeRef = nodeDragSession.activeRef
+  const cancelledDragIdRef = nodeDragSession.cancelledRef
+  const workflowDragging = useWorkflowCanvasDragging({
+    instanceRef: reactFlowInstanceRef,
+    nodeStore,
+    onStart: (event, node, ids) => {
+      cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
+      cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
+      onViewportInteractionStart?.()
+      onNodeDragStart(event, node, ids)
+    },
+    onPreview: onNodeDrag,
+    onCommit: onNodeDragStop,
+    onCancel: onCancelNodeDrag
+  })
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
   const onViewportChangeRef = useRef(onViewportChange)
@@ -362,11 +384,22 @@ export function WorkbenchCanvas({
           className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
             .filter(Boolean)
             .join(' ')}
-          onPointerDownCapture={templateInteraction.beginSelection}
-          onPointerMoveCapture={templateInteraction.continueInteraction}
-          onPointerUpCapture={templateInteraction.completeSelection}
+          onKeyDownCapture={workflowDragging.keyDown}
+          onPointerDownCapture={(event) => {
+            if (!workflowDragging.begin(event)) templateInteraction.beginSelection(event)
+          }}
+          onPointerMoveCapture={(event) => {
+            if (!workflowDragging.preview(event)) templateInteraction.continueInteraction(event)
+          }}
+          onPointerUpCapture={(event) => {
+            if (!workflowDragging.commit(event)) templateInteraction.completeSelection(event)
+          }}
           onPointerCancelCapture={templateInteraction.cancelSelection}
-          onClickCapture={templateInteraction.placeFromCanvasClick}
+          onClickCapture={(event) => {
+            if (!workflowDragging.suppressClick(event))
+              templateInteraction.placeFromCanvasClick(event)
+          }}
+          onDragStartCapture={workflowDragging.preventNativeDrag}
         >
           <WorkbenchToolbar
             agentProviders={agentProviders}
@@ -453,7 +486,10 @@ export function WorkbenchCanvas({
               }}
               onNodesChange={(changes) =>
                 onNodesChange(
-                  isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current)
+                  isolateWorkbenchNodeDragChanges(
+                    nodeDragSession.projectChanges(changes),
+                    activeDraggedNodeRef.current
+                  )
                 )
               }
               onNodeClick={onNodeClick}
@@ -475,6 +511,7 @@ export function WorkbenchCanvas({
                 onPaneClick()
               }}
               onNodeDragStart={(event, node) => {
+                cancelledDragIdRef.current = null
                 cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
                 cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
                 onViewportInteractionStart?.()
@@ -482,12 +519,13 @@ export function WorkbenchCanvas({
                 if (viewportMoveCompletionRef.current === 'node-drag') {
                   viewportMoveCompletionRef.current = null
                 }
-                activeDraggedNodeRef.current = node
+                const presentedNode = nodeDragSession.begin(node)
                 canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
-                canvasArrangement.dragging.begin(event, node)
+                canvasArrangement.dragging.begin(event, presentedNode)
               }}
               onNodeDrag={(event, node) => {
-                if (canvasArrangement.dragging.preview(node)) return
+                if (cancelledDragIdRef.current === node.id) return
+                if (canvasArrangement.dragging.preview(nodeDragSession.projectNode(node))) return
                 const target = resolveQuickExecutionNodeTarget(
                   currentWorkbench?.graph ?? null,
                   node
@@ -500,12 +538,13 @@ export function WorkbenchCanvas({
                   onQuickExecutionDragPreview?.()
                   return
                 }
-                onNodeDrag(event, node)
+                onNodeDrag(event, nodeDragSession.projectNode(node))
               }}
               onNodeDragStop={(event, node) => {
                 try {
+                  if (cancelledDragIdRef.current === node.id) return
                   canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
-                  if (canvasArrangement.dragging.commit(node)) {
+                  if (canvasArrangement.dragging.commit(nodeDragSession.projectNode(node))) {
                     setIsQuickExecutionDropTarget(false)
                     return
                   }
@@ -521,7 +560,7 @@ export function WorkbenchCanvas({
                     void onQuickExecutionNodeDrop(target, node)
                     return
                   }
-                  onNodeDragStop(event, node)
+                  onNodeDragStop(event, nodeDragSession.projectNode(node))
                 } finally {
                   activeDraggedNodeRef.current = null
                   if (viewportMoveCompletionRef.current === 'node-drag') {

@@ -35,6 +35,7 @@ import { reconcileWorkbenchNodeProjection } from '../projections/workbenchNodePr
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
 interface UseWorkbenchFlowNodesInput {
+  readonly setNodeTemplates?: (nodes: readonly WorkbenchFlowNode[]) => void
   readonly canvasArrangementMotion?: CanvasArrangementMotionChoreography | null
   readonly agentToolApprovals: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -75,6 +76,7 @@ interface UseWorkbenchFlowNodesInput {
 }
 
 export function useWorkbenchFlowNodes({
+  setNodeTemplates,
   canvasArrangementMotion = null,
   agentToolApprovals,
   currentWorkbench,
@@ -194,6 +196,7 @@ export function useWorkbenchFlowNodes({
         workflowBuildPresentation: terminalWorkflowBuildPresentation,
         workflowNodeStatuses
       })
+      setNodeTemplates?.(terminalNodeTemplates)
       const collapsedGraphMemberIds = new Set(
         (graph?.terminalGroups ?? [])
           .filter((group) => group.isCollapsed)
@@ -279,6 +282,14 @@ export function useWorkbenchFlowNodes({
         if (!collapsedMemberIds.has(nodeId)) parkedCollapsedMemberNodesRef.current.delete(nodeId)
       })
       motionProjection.exitingNodes.forEach((node) => {
+        if (
+          node.type === 'terminal' &&
+          collapsedMemberIds.has(node.id) &&
+          node.data.objectMotion?.kind !== 'group-collapse'
+        ) {
+          parkedCollapsedMemberNodesRef.current.set(node.id, parkCollapsedTerminalNode(node))
+          return
+        }
         exitingObjectNodesRef.current.set(node.id, {
           ...node,
           data: {
@@ -328,6 +339,7 @@ export function useWorkbenchFlowNodes({
       return reconcileWorkbenchNodeProjection(projectedNodes, currentNodes)
     })
   }, [
+    setNodeTemplates,
     canvasArrangementMotion,
     currentWorkbench,
     currentWorkspace,

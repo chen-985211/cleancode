@@ -6,7 +6,8 @@ import {
   BlockGraph,
   defaultCanvasViewport,
   defaultTerminalBlockSize,
-  defaultTerminalExecutionConfig
+  defaultTerminalExecutionConfig,
+  type BlockGraphSnapshot
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { getAppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
@@ -23,6 +24,76 @@ describe('block graph filesystem repository', () => {
   afterEach(async () => {
     await rm(projectDirectory, { recursive: true, force: true })
     await rm(appStateDirectory, { recursive: true, force: true })
+  })
+
+  it('restores collapsed terminals, partial workflow membership and boundary connections from disk', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
+    for (const id of ['a', 'b'])
+      graph.createTerminalBlock({ id, name: id, description: '', position: { x: 0, y: 0 } })
+    graph.connectTerminalBlocks({ id: 'edge', sourceBlockId: 'a', targetBlockId: 'b' })
+    graph.createTerminalGroup({ id: 'group', name: 'App', position: { x: 800, y: 100 } })
+    graph.moveTerminalWorkflowToGroup('a', 'group', undefined, 'terminal')
+    graph.resizeTerminalBlock('a', {
+      position: graph.blocks[0]!.position,
+      size: graph.blocks[0]!.size,
+      isCollapsed: true
+    })
+    graph.setTerminalGroupCollapsed('group', true)
+    await repository.initializeDefaultGraph(projectDirectory, graph)
+    const reopened = new FileSystemBlockGraphRepository(appStateDirectory)
+    expect(await reopened.findDefaultGraphSnapshot(projectDirectory, 'main')).toEqual(
+      graph.toSnapshot()
+    )
+  })
+
+  it('recovers scrambled persisted flow positions before the first disclosure interaction', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
+    for (const id of ['a', 'b', 'c']) {
+      graph.createTerminalBlock({ id, name: id, description: '', position: { x: 0, y: 0 } })
+      const block = graph.blocks.find((block) => block.id === id)!
+      graph.resizeTerminalBlock(id, {
+        position: block.position,
+        size: block.size,
+        isCollapsed: true
+      })
+    }
+    graph.connectTerminalBlocks({ sourceBlockId: 'a', targetBlockId: 'b' })
+    graph.connectTerminalBlocks({ sourceBlockId: 'b', targetBlockId: 'c' })
+    graph.createTerminalGroup({
+      id: 'app',
+      name: 'App',
+      position: { x: 800, y: 100 },
+      memberBlockIds: ['a', 'b', 'c']
+    })
+    const canonical = graph.toSnapshot()
+    await repository.initializeDefaultGraph(projectDirectory, graph)
+    const path = await findOnlyFileNamed(appStateDirectory, 'default-graph.json')
+    const store = JSON.parse(await readFile(path, 'utf8')) as {
+      version: number
+      graph: BlockGraphSnapshot
+    }
+    store.graph = {
+      ...store.graph,
+      blocks: store.graph.blocks.map((block, index) => ({
+        ...block,
+        position: { x: 1200 - index * 50, y: 400 + index * 20 }
+      }))
+    }
+    await writeFile(path, JSON.stringify(store))
+    const reopened = new FileSystemBlockGraphRepository(appStateDirectory)
+    expect(await reopened.findDefaultGraphSnapshot(projectDirectory, 'main')).toEqual(canonical)
+    await reopened.transactDefaultGraph(projectDirectory, 'main', () => undefined)
+    expect(
+      (JSON.parse(await readFile(path, 'utf8')) as { graph: BlockGraphSnapshot }).graph
+    ).toEqual(canonical)
+    expect(
+      await new FileSystemBlockGraphRepository(appStateDirectory).findDefaultGraphSnapshot(
+        projectDirectory,
+        'main'
+      )
+    ).toEqual(canonical)
   })
 
   it('keeps the main workspace default graph outside the opened project directory', async () => {
@@ -90,7 +161,7 @@ describe('block graph filesystem repository', () => {
           description: 'Local shell',
           launchCommand: '',
           executionConfig: defaultTerminalExecutionConfig,
-          position: { x: 760, y: 180 },
+          position: { x: 240, y: 704 },
           size: defaultTerminalBlockSize
         }
       ],
@@ -100,7 +171,7 @@ describe('block graph filesystem repository', () => {
           type: 'terminal-group',
           name: '启动项目',
           position: { x: 208, y: 104 },
-          size: { width: 1304, height: 612 },
+          size: { width: 784, height: 1136 },
           isCollapsed: false,
           memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
         }

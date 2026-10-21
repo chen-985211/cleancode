@@ -24,6 +24,8 @@ import type { WorkbenchObjectMotionNodeData } from './workbenchObjectMotion'
 interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {
   readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
+  readonly isIndependentCanvasTerminal?: boolean
+  readonly workflowDragTerminalIds?: readonly string[]
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
   readonly terminalStateStore?: TerminalStateStore

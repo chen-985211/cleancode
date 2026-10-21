@@ -17,7 +17,11 @@ export function applyWorkbenchNodeChanges(
   const shouldResizeExpandedTerminalGroups = options.shouldResizeExpandedTerminalGroups ?? true
   const groupDeltas = collectTerminalGroupDragDeltas(changes, nodes)
   const changedNodes = applyNodeChanges(changes, nodes)
-  const affectedGroupIds = collectAffectedTerminalGroupIds(changes, nodes)
+  const affectedGroupIds = collectAffectedTerminalGroupIds(
+    // Observer dimensions report presentation, not a new layout decision.
+    changes.filter((change) => change.type === 'dimensions' && change.resizing === true),
+    nodes
+  )
 
   if (groupDeltas.length === 0) {
     return shouldResizeExpandedTerminalGroups

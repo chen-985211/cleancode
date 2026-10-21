@@ -206,7 +206,7 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
-  it('moves a complete terminal workflow into the edited group in one operation', async () => {
+  it('moves a dragged terminal into the group in one operation', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const absorbedPosition = { x: 740, y: 228 }
     const arrangedGraph = {
@@ -261,6 +261,7 @@ describe('app shell terminal group edit mode', () => {
         workspaceId: 'main',
         blockId: 'worker-terminal',
         targetTerminalGroupId: 'development-group',
+        scope: 'terminal',
         position: { x: 420, y: 260 }
       })
     )
@@ -273,7 +274,7 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
-  it('creates an empty group at the context-menu coordinate and enters its edit space', async () => {
+  it('creates and selects an empty group at the context-menu coordinate without editing membership', async () => {
     const workbench = createWorkbenchWithTerminalBlocks()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
@@ -315,7 +316,7 @@ describe('app shell terminal group edit mode', () => {
     )
     await waitFor(() =>
       expect(reactFlowProps.latest?.nodes.find((node) => node.id === 'new-group')).toMatchObject({
-        data: { isEditing: true }
+        data: { isEditing: false, isSelected: true }
       })
     )
   })
@@ -444,7 +445,7 @@ describe('app shell terminal group edit mode', () => {
     })
   })
 
-  it('moves a complete terminal workflow out of the edited group in one operation', async () => {
+  it('moves a dragged terminal out of the group in one operation', async () => {
     const workbench = createWorkbenchWithTerminalGroup({
       memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
     })
@@ -495,6 +496,7 @@ describe('app shell terminal group edit mode', () => {
         workspaceId: 'main',
         blockId: 'backend-terminal',
         targetTerminalGroupId: null,
+        scope: 'terminal',
         position: { x: 1280, y: 260 }
       })
     )
@@ -528,10 +530,12 @@ describe('app shell terminal group edit mode', () => {
     expect(groupNode).toBeDefined()
 
     act(() => {
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, groupNode!)
       reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
         ...groupNode!,
         position: { x: 420, y: 180 }
       })
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, groupNode!)
       reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
         ...groupNode!,
         position: { x: 760, y: 220 }

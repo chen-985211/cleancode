@@ -7,7 +7,7 @@ import type { TerminalBlockSnapshot } from '../../../contexts/block-graph/applic
 import * as derived from './appShellDerived'
 import { useProjectWorkspaceLifecycle } from '../coordinators/useProjectWorkspaceLifecycle'
 import { useTerminalGroupActions } from '../coordinators/useTerminalGroupActions'
-import { useTerminalGroupDragActions } from '../coordinators/useTerminalGroupDragActions'
+import { useWorkbenchNodeDragging } from '../coordinators/useWorkbenchNodeDragging'
 import { useTerminalGroupSelectionMode } from '../../../contexts/block-graph/presentation/view-models/useTerminalGroupSelectionMode'
 import { useTerminalBlockResizeAction } from '../context-adapters/block-graph/useTerminalBlockResizeAction'
 import { useInitialWorkbenchLoad } from './lifecycle/useInitialWorkbenchLoad'
@@ -31,7 +31,6 @@ import { useI18n } from '../../i18n/useI18n'
 import { WorkbenchCanvas } from '../workbench/WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from '../workbench/nodes/workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from '../workbench/nodes/workbenchNodeTypes'
-import { useAgentLayoutCoordination } from '../coordinators/useAgentLayoutCoordination'
 import { ignoreAppNotifications } from '../../shared/notifications/appNotifications'
 import * as shortcuts from '../app-features/shortcuts/applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from '../app-features/shortcuts/applicationShortcutTooltips'
@@ -306,25 +305,18 @@ export function AppShell({
     terminateWorkbenchTerminalSessions
   })
   const blockActions = useAppShellBlockActions({
-    beginTerminalGroupSelection,
+    setSelectedTerminalGroupId: (id) => {
+      if (id) selectTerminalGroup(id)
+    },
     currentWorkbench,
     currentWorkspace,
     notifications,
     setCurrentGraph,
     terminateTerminalSession
   })
-  const { clearTerminalGroupDropPreview, moveWorkbenchNode, previewTerminalGroupDrop } =
-    useTerminalGroupDragActions({
-      currentWorkbench,
-      currentWorkspace,
-      editingTerminalGroupId,
-      getNodes: nodeStore.getNodes,
-      graph,
-      layoutCommitQueue,
-      setCurrentGraph,
-      setNodes: nodeStore.setNodes
-    })
   const {
+    clearTerminalGroupDropPreview,
+    previewTerminalGroupDrop,
     cancelNodeDrag,
     cancelLayoutFocus,
     onAgentGraphUpdated,
@@ -332,11 +324,11 @@ export function AppShell({
     onNodeDragStop,
     protectedLayoutNodeIds,
     terminalWorkflowBuildPresentation
-  } = useAgentLayoutCoordination({
-    clearTerminalGroupDropPreview,
-    currentProjectId: currentWorkbench?.project.id ?? null,
-    currentWorkspaceId: currentWorkspace?.workspaceId ?? null,
-    moveWorkbenchNode,
+  } = useWorkbenchNodeDragging({
+    currentWorkbench,
+    currentWorkspace,
+    graph,
+    layoutCommitQueue,
     moveWorkspaceAgent,
     nodeStore,
     onCancelLayoutFocus: cancelPendingWorkbenchInputFocus,
@@ -480,6 +472,7 @@ export function AppShell({
     ]
   )
   useWorkbenchFlowNodes({
+    setNodeTemplates: nodeStore.setNodeTemplates,
     agentToolApprovals,
     canvasArrangementMotion: canvasArrangement.motionChoreography,
     currentWorkbench,

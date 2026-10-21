@@ -14,7 +14,8 @@ describe('terminal group card', () => {
     const onUpdateGroupMetadata = vi.fn(async () => undefined)
     render(<TerminalGroupCard data={createData({ onUpdateGroupMetadata })} memberRows={null} />)
 
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 重命名组合' }))
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 更多组合操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '重命名组合' }))
     fireEvent.change(screen.getByRole('textbox', { name: '组合名称' }), {
       target: { value: '  新组合  ' }
     })
@@ -32,13 +33,13 @@ describe('terminal group card', () => {
     render(<TerminalGroupCard data={createData({ onEditGroup, onStartGroup })} memberRows={null} />)
 
     fireEvent.click(screen.getByRole('button', { name: '启动项目 启动组合命令' }))
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 管理组合内容' }))
+    expect(screen.queryByRole('button', { name: '启动项目 管理组合内容' })).not.toBeInTheDocument()
 
     expect(onStartGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development' }))
-    expect(onEditGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development' }))
+    expect(onEditGroup).not.toHaveBeenCalled()
   })
 
-  it('renders an injected runtime status while owning the membership removal intent', () => {
+  it('renders a member summary without a second membership removal control', () => {
     const onRemove = vi.fn()
     render(
       <TerminalGroupMemberRow
@@ -50,8 +51,8 @@ describe('terminal group card', () => {
     )
 
     expect(screen.getByText('运行中')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'API 移出组合' }))
-    expect(onRemove).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'API 移出组合' })).not.toBeInTheDocument()
+    expect(onRemove).not.toHaveBeenCalled()
   })
 })
 

@@ -2,6 +2,7 @@ import { AgentNode } from './agent/AgentNode'
 import { AgentApprovalIntentEdge } from './agent/AgentApprovalIntentEdge'
 import { TerminalGroupNode } from './terminal-group/TerminalGroupNode'
 import { TerminalNode } from './terminal/TerminalNode'
+import { TerminalDependencyEdge } from './terminal/TerminalDependencyEdge'
 
 export const workbenchNodeTypes = {
   agentConsole: AgentNode,
@@ -10,5 +11,6 @@ export const workbenchNodeTypes = {
 }
 
 export const workbenchEdgeTypes = {
+  terminalDependency: TerminalDependencyEdge,
   approvalIntent: AgentApprovalIntentEdge
 }

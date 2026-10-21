@@ -18,6 +18,31 @@ describe('Workbench node projection reconciler', () => {
     expect(reconciled.every((node, index) => node === current[index])).toBe(true)
   })
 
+  it('refreshes workflow handles and terminal drag scope when dependencies change without geometry changes', () => {
+    const store = createTerminalStateStore(terminalStates)
+    const graph = createGraph()
+    const current = createNodes(graph, store)
+    const connected = {
+      ...graph,
+      connections: [{ id: 'link', sourceBlockId: 'terminal-2', targetBlockId: 'terminal-3' }]
+    }
+    const nodes = reconcileWorkbenchNodeProjection(createNodes(connected, store), current)
+    expect(nodes.find((node) => node.id === 'terminal-2')?.data.workflowDragTerminalIds).toEqual([
+      'terminal-2',
+      'terminal-3'
+    ])
+    expect(nodes.find((node) => node.id === 'terminal-3')?.data.isIndependentCanvasTerminal).toBe(
+      false
+    )
+    const disconnected = reconcileWorkbenchNodeProjection(createNodes(graph, store), nodes)
+    expect(
+      disconnected.find((node) => node.id === 'terminal-2')?.data.workflowDragTerminalIds
+    ).toBeUndefined()
+    expect(
+      disconnected.find((node) => node.id === 'terminal-3')?.data.isIndependentCanvasTerminal
+    ).toBe(true)
+  })
+
   it('replaces only the node whose graph fact changed', () => {
     const store = createTerminalStateStore(terminalStates)
     const current = createNodes(createGraph(), store)

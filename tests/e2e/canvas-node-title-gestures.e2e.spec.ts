@@ -65,7 +65,6 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
       await waitForAgentTerminalReady(page)
     } else {
       await selectBlankCanvasAction(page, nodeType === 'terminal' ? '新建终端积木' : '组合终端')
-      if (nodeType === 'terminalGroup') await page.getByRole('button', { name: '完成' }).click()
     }
     node = page.locator(`.react-flow__node-${nodeType}`).first()
     await node.locator(scenario.title).waitFor({ state: 'visible' })

@@ -76,6 +76,18 @@ function areTerminalNodeDataEqual(
 ): boolean {
   return (
     areCanvasObjectIdentitiesEqual(left.identity, right.identity) &&
+    left.isObjectMotionFrozen === right.isObjectMotionFrozen &&
+    left.isObjectDragPreview === right.isObjectDragPreview &&
+    left.isIndependentCanvasTerminal === right.isIndependentCanvasTerminal &&
+    (left.workflowDragTerminalIds === right.workflowDragTerminalIds ||
+      Boolean(
+        left.workflowDragTerminalIds &&
+        right.workflowDragTerminalIds &&
+        left.workflowDragTerminalIds.length === right.workflowDragTerminalIds.length &&
+        left.workflowDragTerminalIds.every(
+          (id, index) => id === right.workflowDragTerminalIds![index]
+        )
+      )) &&
     areTerminalBlocksEqual(left.block, right.block) &&
     areTerminalRuntimeSourcesEqual(left, right) &&
     areObjectMotionsEqual(left.objectMotion, right.objectMotion) &&
@@ -91,6 +103,7 @@ function areTerminalGroupNodeDataEqual(
   return (
     areCanvasObjectIdentitiesEqual(left.identity, right.identity) &&
     areTerminalGroupsEqual(left.group, right.group) &&
+    left.isObjectMotionFrozen === right.isObjectMotionFrozen &&
     areTerminalBlockListsEqual(left.memberBlocks, right.memberBlocks) &&
     areTerminalGroupRuntimeSourcesEqual(left, right) &&
     areObjectMotionsEqual(left.objectMotion, right.objectMotion) &&
@@ -246,6 +259,7 @@ function areTerminalBlocksEqual(
     left.name === right.name &&
     left.description === right.description &&
     left.launchCommand === right.launchCommand &&
+    left.isCollapsed === right.isCollapsed &&
     left.position.x === right.position.x &&
     left.position.y === right.position.y &&
     left.size.width === right.size.width &&

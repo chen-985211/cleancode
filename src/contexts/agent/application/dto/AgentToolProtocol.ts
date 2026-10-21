@@ -199,7 +199,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. Omit position for automatic empty-group placement around existing canvas objects. A group is a connection scope, not a workflow node; dependencies cannot cross its boundary. memberBlockIds remains compatible, but use move_terminal_workflow_to_group for existing workflow membership.',
+      'Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. Omit position for automatic empty-group placement around existing canvas objects. A group is a visual container; dependencies may cross its boundary. memberBlockIds remains compatible, but use move_terminal_workflow_to_group for existing workflow membership.',
     graphChanged: true,
     inputSchema: objectSchema(
       {

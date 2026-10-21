@@ -204,7 +204,7 @@ describe('terminal group use cases', () => {
           description: '',
           id: 'external-terminal',
           name: 'External terminal',
-          position: { x: 900, y: 100 }
+          position: { x: 700, y: 100 }
         })
       },
       obstacle: 'top-level terminal'
@@ -214,7 +214,7 @@ describe('terminal group use cases', () => {
         graph.createTerminalGroup({
           id: 'external-group',
           name: 'External group',
-          position: { x: 900, y: 100 }
+          position: { x: 700, y: 100 }
         })
       },
       obstacle: 'external group'

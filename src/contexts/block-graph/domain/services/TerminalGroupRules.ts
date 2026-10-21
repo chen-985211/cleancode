@@ -1,3 +1,4 @@
+import { terminalBlockVisibleSize } from '../aggregates/BlockGraphTypes'
 import type {
   BlockPositionSnapshot,
   TerminalBlockSnapshot,
@@ -9,6 +10,8 @@ import {
   analyzeCanvasExecutionSelection,
   type CanvasExecutionSelectionAnalysis
 } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
+
+export const minimumTerminalGroupSize: TerminalGroupSizeSnapshot = { width: 320, height: 160 }
 
 export const defaultTerminalGroupSize: TerminalGroupSizeSnapshot = {
   width: 520,
@@ -40,20 +43,17 @@ export function normalizeTerminalGroups(
       assignedBlockIds.add(memberBlockId)
     }
 
-    validGroups.push(
-      normalizeTerminalGroupBounds(
-        {
-          id: group.id ?? createTerminalGroupId(),
-          type: 'terminal-group',
-          name: normalizeRestoredTerminalGroupName(group.name),
-          position: normalizeBlockPosition(group.position),
-          size: normalizeTerminalGroupSize(group.size),
-          isCollapsed: group.isCollapsed === true,
-          memberBlockIds
-        },
-        blocks
-      )
-    )
+    validGroups.push({
+      id: group.id ?? createTerminalGroupId(),
+      type: 'terminal-group',
+      name: normalizeRestoredTerminalGroupName(group.name),
+      position: group.position
+        ? normalizeBlockPosition(group.position)
+        : createTerminalGroupBounds(memberBlockIds, blocks).position,
+      size: normalizeTerminalGroupSize(group.size),
+      isCollapsed: group.isCollapsed === true,
+      memberBlockIds
+    })
   }
 
   return validGroups
@@ -109,6 +109,7 @@ export function createTerminalGroupBounds(
   }
 
   const bounds = getTerminalGroupMemberBounds(memberBlocks)
+  const hasCompactMembers = memberBlocks.some((block) => block.isCollapsed)
   return {
     position: {
       x: bounds.left - terminalGroupPadding.x,
@@ -116,12 +117,15 @@ export function createTerminalGroupBounds(
     },
     size: {
       width: Math.max(
-        defaultTerminalGroupSize.width,
+        hasCompactMembers ? minimumTerminalGroupSize.width : defaultTerminalGroupSize.width,
         bounds.right - bounds.left + terminalGroupPadding.x * 2
       ),
       height: Math.max(
-        defaultTerminalGroupSize.height,
-        bounds.bottom - bounds.top + terminalGroupPadding.y * 2
+        hasCompactMembers ? minimumTerminalGroupSize.height : defaultTerminalGroupSize.height,
+        bounds.bottom -
+          bounds.top +
+          terminalGroupPadding.y +
+          (hasCompactMembers ? terminalGroupPadding.x : terminalGroupPadding.y)
       )
     }
   }
@@ -160,8 +164,8 @@ function getTerminalGroupMemberBounds(blocks: readonly TerminalBlockSnapshot[]) 
     (bounds, block) => ({
       left: Math.min(bounds.left, block.position.x),
       top: Math.min(bounds.top, block.position.y),
-      right: Math.max(bounds.right, block.position.x + block.size.width),
-      bottom: Math.max(bounds.bottom, block.position.y + block.size.height)
+      right: Math.max(bounds.right, block.position.x + terminalBlockVisibleSize(block).width),
+      bottom: Math.max(bounds.bottom, block.position.y + terminalBlockVisibleSize(block).height)
     }),
     {
       left: Number.POSITIVE_INFINITY,
@@ -193,12 +197,12 @@ function normalizeTerminalGroupSize(
   return {
     width: normalizeSizeValue(
       size?.width,
-      defaultTerminalGroupSize.width,
+      minimumTerminalGroupSize.width,
       defaultTerminalGroupSize.width
     ),
     height: normalizeSizeValue(
       size?.height,
-      defaultTerminalGroupSize.height,
+      minimumTerminalGroupSize.height,
       defaultTerminalGroupSize.height
     )
   }

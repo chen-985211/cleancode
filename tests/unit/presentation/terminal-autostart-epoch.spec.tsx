@@ -29,6 +29,45 @@ vi.mock('../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalVi
 }))
 
 describe('terminal autostart runtime epoch', () => {
+  it('parks the same terminal view during disclosure without starting or resizing a session', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const running = {
+      ...data,
+      session: { ...data.session, sessionId: 'live', status: 'running' as const }
+    }
+    const { rerender, container } = renderTerminal(running)
+    const view = screen.getByTestId('terminal-input-disabled')
+    rerenderTerminal(rerender, { ...running, block: { ...running.block, isCollapsed: true } })
+    expect(screen.getByTestId('terminal-input-disabled')).toBe(view)
+    expect(container.querySelector('.terminal-node__body')).toHaveAttribute('inert')
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 展开终端' }))
+    expect(data.onResizeBlock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'terminal-1' }),
+      expect.objectContaining({ isCollapsed: false, size: data.block.size })
+    )
+    expect(data.onStart).not.toHaveBeenCalled()
+    expect(data.onResize).not.toHaveBeenCalled()
+    rerenderTerminal(rerender, running)
+    expect(screen.getByTestId('terminal-input-disabled')).toBe(view)
+  })
+
+  it('does not mount or auto-start an initially collapsed terminal', () => {
+    const data = createTerminalNodeData(vi.fn())
+    renderTerminal({ ...data, block: { ...data.block, isCollapsed: true } })
+    expect(screen.queryByTestId('terminal-input-disabled')).not.toBeInTheDocument()
+    expect(data.onStart).not.toHaveBeenCalled()
+  })
+
+  it('does not auto-start a previously hidden terminal while its workflow is only a drag preview', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal({ ...data, isObjectDragPreview: true })
+    fireEvent.click(screen.getByText('measure terminal'))
+    expect(data.onStart).not.toHaveBeenCalled()
+    rerenderTerminal(rerender, data)
+    expect(data.onStart).toHaveBeenCalledOnce()
+  })
+
   it('starts at most once per reconciled runtime epoch and retries after a new epoch', async () => {
     const onStart = vi.fn()
     const baseData = createTerminalNodeData(onStart)

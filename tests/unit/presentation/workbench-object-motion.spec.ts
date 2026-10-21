@@ -6,6 +6,34 @@ import {
 } from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object motion', () => {
+  it('morphs terminal disclosure and moves its neighbors in the same spatial transition', () => {
+    const before = createTerminalNode('terminal-1', { x: 100, y: 100 })
+    const neighbor = createTerminalNode('terminal-2', { x: 900, y: 100 })
+    if (before.type !== 'terminal' || neighbor.type !== 'terminal')
+      throw new Error('Expected terminals')
+    const after = {
+      ...before,
+      style: { width: 300, height: 42 },
+      data: { ...before.data, block: { ...before.data.block, isCollapsed: true } }
+    } as typeof before
+    const moved = { ...neighbor, position: { x: 464, y: 100 } }
+    const result = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [before, neighbor],
+      nextNodes: [after, moved],
+      isContinuingGraph: true,
+      reducedMotion: false
+    })
+    expect(result.nodes[0]!.data.objectMotion).toMatchObject({
+      kind: 'group-reflow',
+      shellRect: { to: { width: 300, height: 42 } }
+    })
+    expect(result.nodes[1]!.data.objectMotion).toMatchObject({
+      kind: 'group-reflow',
+      offset: { x: 0, y: 0 },
+      shellRect: { from: { x: 900, y: 100 }, to: { x: 464, y: 100 } }
+    })
+  })
   it.each([1, 0.779, 0.519])('defaults zoom %s to full visual detail', (zoom) => {
     expect(resolveWorkbenchCanvasDetailLevel(zoom)).toBe('full')
   })
@@ -237,14 +265,12 @@ describe('workbench object motion', () => {
 
     expect(projection.exitingNodes).toEqual([])
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
-      contentDelayMs: 220,
       contentOpacity: { from: 0, to: 1 },
       delayMs: 0,
       id: 'group-expand:terminal-1',
       kind: 'group-expand',
       offset: { x: -320, y: -170 },
       opacity: { from: 0, to: 1 },
-      opacityDelayMs: 160,
       scale: { from: 0.88, to: 1 }
     })
   })
@@ -378,14 +404,15 @@ describe('workbench object motion', () => {
             id: 'group-collapse:terminal-1',
             kind: 'group-collapse',
             offset: { x: -320, y: -170 },
-            opacity: { from: 0, to: 0 }
+            opacity: { from: 1, to: 0 },
+            scale: { from: 1, to: 0.88 }
           }
         })
       })
     ])
   })
 
-  it('starts every expanding member with the shell while collapse hides them immediately', () => {
+  it('starts members with the shell and fades them continuously on collapse', () => {
     const memberIds = Array.from({ length: 8 }, (_, index) => `terminal-${index + 1}`)
     const collapsedGroup = createGroupNode('group-1', true, memberIds, {
       height: 180,
@@ -427,7 +454,7 @@ describe('workbench object motion', () => {
     expect(
       collapse.exitingNodes.every(
         (node) =>
-          node.data.objectMotion?.opacity?.from === 0 && node.data.objectMotion.opacity.to === 0
+          node.data.objectMotion?.opacity?.from === 1 && node.data.objectMotion.opacity.to === 0
       )
     ).toBe(true)
     expect(expandDelays.every((delay) => delay !== undefined && delay <= 60)).toBe(true)
@@ -460,7 +487,10 @@ describe('workbench object motion', () => {
     })
 
     expect(projection.exitingNodes).toEqual([])
-    expect(projection.nodes[0]?.data.objectMotion).toBeUndefined()
+    expect(projection.nodes[0]?.data.objectMotion).toMatchObject({
+      kind: 'group-reflow',
+      shellRect: { from: { width: 760 }, to: { width: 820 } }
+    })
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
       id: 'group-join:terminal-1',
       kind: 'group-join',

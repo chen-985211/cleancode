@@ -49,7 +49,13 @@ export function useSelectedWorkbenchNodeInput(
       cancelSelectedNodeInput()
       const instance = instanceRef.current
       const node = instance?.getNode(nodeId)
-      if (!node || node.type === 'terminalGroup' || !node.data.identity) return
+      if (
+        !node ||
+        node.type === 'terminalGroup' ||
+        (node.type === 'terminal' && node.data.block?.isCollapsed) ||
+        !node.data.identity
+      )
+        return
       const identityKey = createCanvasObjectIdentityKey(node.data.identity)
       const readiness = createWorkbenchNodeInputSurfaceReadiness(node)
       const isCurrentSelection = (): boolean => {
@@ -58,6 +64,7 @@ export function useSelectedWorkbenchNodeInput(
           instanceRef.current === instance &&
           current?.selected &&
           !current.dragging &&
+          !(current.type === 'terminal' && current.data.block?.isCollapsed) &&
           !isWorkbenchNodePresentationHidden(current) &&
           current.data.identity &&
           createCanvasObjectIdentityKey(current.data.identity) === identityKey &&

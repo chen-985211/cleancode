@@ -1,13 +1,10 @@
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
-import { ArrowsInSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsInSimple'
-import { ArrowsOutSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsOutSimple'
+import { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus'
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
-import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen'
-import { LinkBreakIcon } from '@phosphor-icons/react/dist/csr/LinkBreak'
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple'
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play'
-import { StackPlusIcon } from '@phosphor-icons/react/dist/csr/StackPlus'
 import { StopIcon } from '@phosphor-icons/react/dist/csr/Stop'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
@@ -81,19 +78,6 @@ export function GroupRestartIcon(props: TerminalGroupIconProps) {
   )
 }
 
-export function GroupContentsIcon(props: TerminalGroupIconProps) {
-  return (
-    <GroupIcon
-      {...props}
-      IconComponent={FolderOpenIcon}
-      dataIcon="group-contents"
-      glyph="folder-open"
-      role="open-project"
-      weight="bold"
-    />
-  )
-}
-
 export function GroupRenameIcon(props: TerminalGroupIconProps) {
   return (
     <GroupIcon
@@ -107,26 +91,13 @@ export function GroupRenameIcon(props: TerminalGroupIconProps) {
   )
 }
 
-export function GroupMemberUnlinkIcon(props: TerminalGroupIconProps) {
-  return (
-    <GroupIcon
-      {...props}
-      IconComponent={LinkBreakIcon}
-      dataIcon="group-member-unlink"
-      glyph="link-break"
-      role="disconnect"
-      weight="bold"
-    />
-  )
-}
-
 export function GroupExpandIcon(props: TerminalGroupIconProps) {
   return (
     <GroupIcon
       {...props}
-      IconComponent={ArrowsOutSimpleIcon}
+      IconComponent={PlusIcon}
       dataIcon="group-expand"
-      glyph="arrows-out-simple"
+      glyph="plus"
       role="expand-object"
       weight="bold"
     />
@@ -137,22 +108,10 @@ export function GroupCollapseIcon(props: TerminalGroupIconProps) {
   return (
     <GroupIcon
       {...props}
-      IconComponent={ArrowsInSimpleIcon}
+      IconComponent={MinusIcon}
       dataIcon="group-collapse"
-      glyph="arrows-in-simple"
+      glyph="minus"
       role="collapse-object"
-      weight="bold"
-    />
-  )
-}
-
-export function GroupAddIcon(props: TerminalGroupIconProps) {
-  return (
-    <GroupIcon
-      {...props}
-      IconComponent={StackPlusIcon}
-      glyph="stack-plus"
-      role="group-add"
       weight="bold"
     />
   )
