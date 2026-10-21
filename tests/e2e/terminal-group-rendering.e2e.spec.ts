@@ -54,9 +54,11 @@ describe('terminal group rendering', () => {
     resources.electronApp = app
     page = await app.firstWindow()
     resources.page = page
+    await page.waitForLoadState('domcontentloaded')
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0]!.setContentSize(3000, 1800)
     )
+    await page.waitForFunction(() => innerWidth >= 3000 && innerHeight >= 1800)
     await page.evaluate(async (executable) => {
       await window.cleancode!.updateAgentProviderPreferences({
         providerOverrides: { codex: { executable, argumentsText: '', environment: {} } }
