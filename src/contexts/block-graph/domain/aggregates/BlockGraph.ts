@@ -34,7 +34,7 @@ import {
   createTerminalGroupLayout,
   layoutTerminalGroups
 } from '../services/TerminalGroupMemberLayout'
-import { resizedTerminalBlock } from '../services/TerminalExpansionSize'
+import { resizedTerminalBlock, terminalExpansionSize } from '../services/TerminalExpansionSize'
 import {
   expandTerminalGroupLayout,
   reflowTerminalDisclosure
@@ -125,8 +125,9 @@ export class BlockGraph {
   }
 
   static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
-    const blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
+    let blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
     const connections = normalizeRestoredTerminalConnections(snapshot.connections, blocks)
+    blocks = blocks.map((block) => ({ ...block, size: terminalExpansionSize(block, connections) }))
     const groups = normalizeTerminalGroups(
       snapshot.terminalGroups,
       blocks,
@@ -336,8 +337,9 @@ export class BlockGraph {
     )
 
     if (
-      input.isCollapsed !== undefined &&
-      Boolean(previousBlock.isCollapsed) !== input.isCollapsed
+      (input.isCollapsed !== undefined &&
+        Boolean(previousBlock.isCollapsed) !== input.isCollapsed) ||
+      this.terminalGroupSnapshots.some((group) => group.memberBlockIds.includes(blockId))
     ) {
       const layout = reflowTerminalDisclosure(
         blockId,
@@ -386,6 +388,10 @@ export class BlockGraph {
       createTerminalConnectionId
     )
     this.terminalConnectionSnapshots = [...result.connections]
+    this.blockSnapshots = this.blockSnapshots.map((block) => ({
+      ...block,
+      size: terminalExpansionSize(block, this.terminalConnectionSnapshots)
+    }))
     this.reflowTerminalGroups()
 
     return result.connection
@@ -500,6 +506,7 @@ export class BlockGraph {
   }
 
   setTerminalGroupCollapsed(terminalGroupId: string, isCollapsed: boolean): void {
+    if (Boolean(this.requireTerminalGroup(terminalGroupId).isCollapsed) === isCollapsed) return
     const group = { ...this.requireTerminalGroup(terminalGroupId), isCollapsed }
     const layout = isCollapsed
       ? { blocks: this.blockSnapshots, group }

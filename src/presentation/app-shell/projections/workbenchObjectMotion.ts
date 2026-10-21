@@ -160,6 +160,9 @@ export function projectWorkbenchObjectMotion({
     )
   })
   const nodes = nextNodes.map((node) => {
+    // Direct manipulation owns presentation until its commit completes. A data
+    // refresh must not queue a spring back to the persisted drag-start snapshot.
+    if (currentNodesById.get(node.id)?.data.isObjectMotionFrozen) return node
     if (node.type === 'terminalGroup') {
       const currentNode = currentNodesById.get(node.id)
       if (

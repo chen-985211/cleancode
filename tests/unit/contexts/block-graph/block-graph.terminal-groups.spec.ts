@@ -279,8 +279,8 @@ describe('terminal groups in the default block graph', () => {
         id: 'workflow-wrapper',
         position: { x: -1_000, y: -1_000 },
         size: {
-          width: 2 * defaultTerminalBlockSize.width + 128,
-          height: defaultTerminalBlockSize.height + 152
+          width: 2 * 420 + 128,
+          height: 280 + 152
         },
         memberBlockIds: ['backend-terminal', 'frontend-terminal']
       })

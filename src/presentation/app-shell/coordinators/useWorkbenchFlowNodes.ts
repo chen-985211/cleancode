@@ -299,6 +299,10 @@ export function useWorkbenchFlowNodes({
         } as WorkbenchFlowNode)
       })
       const nodesWithEntrances = motionProjection.nodes.map((node): WorkbenchFlowNode => {
+        if (protectedLayoutNodeIds.has(node.id)) {
+          activeObjectEntrancesRef.current.delete(node.id)
+          return node
+        }
         const objectMotion = activeObjectEntrancesRef.current.get(node.id)
         if (!objectMotion) return node
 

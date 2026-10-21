@@ -10,13 +10,14 @@ export const defaultWorkflowTerminalSize = { width: 420, height: 280 }
 
 export function terminalExpansionSize(
   block: TerminalBlockSnapshot,
-  connections: readonly TerminalConnectionSnapshot[]
+  connections: readonly TerminalConnectionSnapshot[],
+  mode: 'normalize' | 'expand' = 'normalize'
 ) {
   const usesDefaultSize =
     (block.size.width === defaultTerminalBlockSize.width &&
       block.size.height === defaultTerminalBlockSize.height) ||
     (block.size.width === 560 && block.size.height === 340)
-  return usesDefaultSize &&
+  return (mode === 'expand' || usesDefaultSize) &&
     connections.some((edge) => edge.sourceBlockId === block.id || edge.targetBlockId === block.id)
     ? defaultWorkflowTerminalSize
     : block.size
@@ -28,15 +29,11 @@ export function resizedTerminalBlock(
   connections: readonly TerminalConnectionSnapshot[]
 ): TerminalBlockSnapshot {
   const size = normalizeTerminalBlockSize(input.size)
-  const expandDefault =
-    block.isCollapsed &&
-    input.isCollapsed === false &&
-    size.width === block.size.width &&
-    size.height === block.size.height
+  const expanding = block.isCollapsed && input.isCollapsed === false
   return {
     ...block,
     position: input.position,
-    size: expandDefault ? terminalExpansionSize(block, connections) : size,
+    size: expanding ? terminalExpansionSize({ ...block, size }, connections, 'expand') : size,
     ...(input.isCollapsed === undefined ? {} : { isCollapsed: input.isCollapsed })
   }
 }

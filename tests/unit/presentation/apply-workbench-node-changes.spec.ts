@@ -10,6 +10,43 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('workbench node changes', () => {
+  it.each([false, true])(
+    'keeps the group origin fixed during member resize, single=%s',
+    (single) => {
+      const graph = createGraph()
+      const nodes = createTerminalFlowNodes({
+        graph: single
+          ? {
+              ...graph,
+              blocks: graph.blocks.slice(0, 1),
+              terminalGroups: graph.terminalGroups.map((group) => ({
+                ...group,
+                memberBlockIds: ['backend-terminal']
+              }))
+            }
+          : graph,
+        hoveredTerminalBlockId: null,
+        handlers: createHandlers()
+      })
+      const before = nodes[0]!
+      const changed = applyWorkbenchNodeChanges(
+        [
+          { id: 'backend-terminal', type: 'position', position: { x: 180, y: 120 } },
+          {
+            id: 'backend-terminal',
+            type: 'dimensions',
+            dimensions: { width: 1200, height: 600 },
+            resizing: true,
+            setAttributes: true
+          }
+        ],
+        nodes
+      )
+      const group = changed[0]!
+      expect(group.position).toEqual(before.position)
+      expect(group.style!.width).toBeGreaterThan(1200 - (before.position.x - 180))
+    }
+  )
   it('moves terminal group members while the group node is being dragged', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph(),

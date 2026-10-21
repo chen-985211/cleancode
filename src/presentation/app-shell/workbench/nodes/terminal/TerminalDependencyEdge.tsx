@@ -1,18 +1,14 @@
-import {
-  BaseEdge,
-  getBezierPath,
-  useReactFlow,
-  type EdgeProps,
-  type InternalNode
-} from '@xyflow/react'
-import { useLayoutEffect, useRef } from 'react'
+import { BaseEdge, useReactFlow, type EdgeProps, type InternalNode } from '@xyflow/react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { WorkbenchFlowNode } from '../../../types/workbenchFlowNode'
 import { readTerminalEdgeMotionGeometry } from './terminalEdgeMotionGeometry'
+import { terminalDependencyPath, terminalDependencyPortRadius } from './terminalDependencyPath'
 
 export function TerminalDependencyEdge(props: EdgeProps) {
+  const markerId = useId()
   const flow = useReactFlow<WorkbenchFlowNode>()
   const surfaceRef = useRef<SVGGElement>(null)
-  const [path] = dependencyPath(
+  const path = dependencyPath(
     props,
     nodeRect(flow.getInternalNode(props.source)),
     nodeRect(flow.getInternalNode(props.target))
@@ -48,7 +44,7 @@ export function TerminalDependencyEdge(props: EdgeProps) {
       if (disposed || !surfaceRef.current) return
       const sourceRect = readGeometry(props.source, source)
       const targetRect = readGeometry(props.target, target)
-      const [nextPath] = dependencyPath(props, sourceRect, targetRect)
+      const nextPath = dependencyPath(props, sourceRect, targetRect)
       surfaceRef.current
         .querySelectorAll('path')
         .forEach((element) => element.setAttribute('d', nextPath))
@@ -76,10 +72,24 @@ export function TerminalDependencyEdge(props: EdgeProps) {
   }, [flow, followsMotion, props])
   return (
     <g ref={surfaceRef}>
+      <defs>
+        <marker
+          id={markerId}
+          viewBox="0 0 10 10"
+          markerWidth="10"
+          markerHeight="10"
+          refX="10"
+          refY="5"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <polygon points="0,0 10,5 0,10" fill="context-stroke" />
+        </marker>
+      </defs>
       <BaseEdge
         id={props.id}
         path={path}
-        markerEnd={props.markerEnd}
+        markerEnd={props.markerEnd ? `url(#${markerId})` : undefined}
         style={props.style}
         interactionWidth={props.interactionWidth}
       />
@@ -91,23 +101,33 @@ function nodeRect(node: InternalNode<WorkbenchFlowNode> | undefined) {
   if (!node) return null
   return {
     ...node.internals.positionAbsolute,
-    width: typeof node.style?.width === 'number' ? node.style.width : (node.measured.width ?? 0),
-    height: typeof node.style?.height === 'number' ? node.style.height : (node.measured.height ?? 0)
+    // Resize controls update explicit dimensions immediately; persisted styles
+    // follow only after the layout command completes.
+    width:
+      node.width ??
+      (typeof node.style?.width === 'number' ? node.style.width : (node.measured.width ?? 0)),
+    height:
+      node.height ??
+      (typeof node.style?.height === 'number' ? node.style.height : (node.measured.height ?? 0))
   }
 }
 
 // Static layout, direct dragging and spring presentation use the same attachment
-// points. React Flow's handle bounds include the handle's radius outside the node.
+// points. End at the input circle's outer edge so the marker tip touches the port.
+// The marker stays at the actual path end and rotates with its tangent.
 function dependencyPath(
   props: EdgeProps,
   source: ReturnType<typeof nodeRect>,
   target: ReturnType<typeof nodeRect>
 ) {
-  return getBezierPath({
-    ...props,
-    sourceX: source ? source.x + source.width : props.sourceX,
-    sourceY: source ? source.y + source.height / 2 : props.sourceY,
-    targetX: target ? target.x : props.targetX,
-    targetY: target ? target.y + target.height / 2 : props.targetY
-  })
+  return terminalDependencyPath(
+    {
+      x: source ? source.x + source.width : props.sourceX,
+      y: source ? source.y + source.height / 2 : props.sourceY
+    },
+    {
+      x: target ? target.x : props.targetX + terminalDependencyPortRadius,
+      y: target ? target.y + target.height / 2 : props.targetY
+    }
+  )
 }

@@ -58,11 +58,11 @@ describe('terminal combination container scopes', () => {
 
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'install', position: { x: 432, y: 776 } }),
-      expect.objectContaining({ id: 'build', position: { x: 1_056, y: 776 } })
+      expect.objectContaining({ id: 'build', position: { x: 916, y: 776 } })
     ])
     expect(graph.toSnapshot().terminalGroups[0]).toMatchObject({
       position: { x: 400, y: 700 },
-      size: { width: 1_248, height: 492 },
+      size: { width: 968, height: 432 },
       memberBlockIds: ['install', 'build']
     })
 
@@ -70,7 +70,7 @@ describe('terminal combination container scopes', () => {
 
     expect(graph.toSnapshot().blocks).toEqual([
       expect.objectContaining({ id: 'install', position: { x: 2_000, y: 300 } }),
-      expect.objectContaining({ id: 'build', position: { x: 2_624, y: 300 } })
+      expect.objectContaining({ id: 'build', position: { x: 2_484, y: 300 } })
     ])
     expect(graph.toSnapshot().terminalGroups[0]).toMatchObject({
       position: { x: 400, y: 700 },

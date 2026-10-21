@@ -7,6 +7,27 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { reconcileWorkbenchNodeProjection } from '../../../src/presentation/app-shell/projections/workbenchNodeProjectionReconciler'
 
 describe('Workbench node projection reconciler', () => {
+  it('retains measured geometry across graph updates so existing edge handles stay initialized', () => {
+    const store = createTerminalStateStore(terminalStates)
+    const current = createNodes(createGraph(), store).map((node) => ({
+      ...node,
+      measured: { width: 640, height: 380 }
+    }))
+    const next = createNodes(createGraph(), store).map((node) => ({
+      ...node,
+      style: { ...node.style, width: 420, height: 280 }
+    }))
+    const reconciled = reconcileWorkbenchNodeProjection(next, current)
+    for (const node of reconciled) {
+      expect(node.measured).toEqual({ width: 640, height: 380 })
+      expect(node.style).toMatchObject({ width: 420, height: 280 })
+    }
+    const measured = next.map((node) => ({ ...node, measured: { width: 420, height: 280 } }))
+    expect(
+      reconcileWorkbenchNodeProjection(measured, reconciled).map((node) => node.measured)
+    ).toEqual(measured.map((node) => node.measured))
+  })
+
   it('returns the current array when every node projection is equivalent', () => {
     const store = createTerminalStateStore(terminalStates)
     const current = createNodes(createGraph(), store)

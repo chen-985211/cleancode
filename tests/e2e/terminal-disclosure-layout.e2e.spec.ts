@@ -11,6 +11,7 @@ import {
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment } from '../support/e2eTerminal'
+import { recordEdgeFrames } from '../support/e2eTerminalGeometry'
 
 describe('terminal disclosure flow rows', () => {
   let app: ElectronApplication
@@ -119,13 +120,13 @@ describe('terminal disclosure flow rows', () => {
         )
       const initial = await boxes()
       expect(initial[0]!.x).toBeCloseTo(initial[3]!.x, 1)
+      const edgeFrames = await recordEdgeFrames(page, setup.connections)
       const recorder = await page.evaluateHandle(
         ({ ids, connections }) => {
           const overlaps: unknown[] = []
           let frame = 0,
             frames = 0,
-            curvedFrames = 0,
-            maxAttachmentGap = 0
+            curvedFrames = 0
           const tick = () => {
             const rects = ids.map((id) =>
               document
@@ -143,8 +144,6 @@ describe('terminal disclosure flow rows', () => {
                   overlaps.push({ i, j, width, height })
               }
             for (const connection of connections) {
-              const source = ids.indexOf(connection.sourceBlockId),
-                target = ids.indexOf(connection.targetBlockId)
               const actual = document.querySelector<SVGPathElement>(
                 `.react-flow__edge[data-id="${connection.id}"] .react-flow__edge-path`
               )
@@ -154,13 +153,6 @@ describe('terminal disclosure flow rows', () => {
                 end = actual.getPointAtLength(actual.getTotalLength())
               const from = new DOMPoint(start.x, start.y).matrixTransform(matrix),
                 to = new DOMPoint(end.x, end.y).matrixTransform(matrix)
-              const a = rects[source!]!,
-                b = rects[target!]!
-              maxAttachmentGap = Math.max(
-                maxAttachmentGap,
-                Math.hypot(from.x - a.right, from.y - a.y - a.height / 2),
-                Math.hypot(to.x - b.left, to.y - b.y - b.height / 2)
-              )
               if (Math.abs(from.y - to.y) > 10 && actual.getAttribute('d')?.includes('C'))
                 curvedFrames++
             }
@@ -170,7 +162,7 @@ describe('terminal disclosure flow rows', () => {
           return {
             stop() {
               cancelAnimationFrame(frame)
-              return { overlaps, frames, curvedFrames, maxAttachmentGap }
+              return { overlaps, frames, curvedFrames }
             }
           }
         },
@@ -225,7 +217,8 @@ describe('terminal disclosure flow rows', () => {
         expect(samples.frames).toBeGreaterThan(10)
         expect(samples.overlaps).toEqual([])
         expect(samples.curvedFrames).toBeGreaterThan(0)
-        expect(samples.maxAttachmentGap).toBeLessThan(5)
+        const edges = await edgeFrames.evaluate((recorder) => recorder.stop())
+        expect(edges.maxGap, JSON.stringify(edges.worst)).toBeLessThan(3)
         const final = await boxes()
         for (let i = 0; i < 6; i++)
           for (const key of ['x', 'y', 'width', 'height'] as const)
@@ -235,6 +228,8 @@ describe('terminal disclosure flow rows', () => {
         await settle()
         expect(await boxes()).toEqual(final)
       } finally {
+        await edgeFrames.evaluate((recorder) => recorder.stop()).catch(() => undefined)
+        await edgeFrames.dispose()
         await recorder.evaluate((recorder) => recorder.stop()).catch(() => undefined)
         await recorder.dispose()
       }

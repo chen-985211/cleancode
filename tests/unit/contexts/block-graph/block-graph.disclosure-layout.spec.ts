@@ -2,6 +2,28 @@ import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregat
 import { terminalBlockVisibleSize } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraphTypes'
 
 describe('terminal disclosure layout', () => {
+  it('keeps the group anchor fixed when resizing a member from its top-left corner', () => {
+    const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
+    for (const id of ['a', 'b'])
+      graph.createTerminalBlock({ id, name: id, description: '', position: { x: 100, y: 100 } })
+    graph.connectTerminalBlocks({ sourceBlockId: 'a', targetBlockId: 'b' })
+    graph.createTerminalGroup({
+      id: 'group',
+      name: 'App',
+      position: { x: 200, y: 300 },
+      memberBlockIds: ['a', 'b']
+    })
+    const before = graph.toSnapshot()
+    const member = graph.blocks[0]!
+    graph.resizeTerminalBlock(member.id, {
+      position: { x: member.position.x - 100, y: member.position.y - 80 },
+      size: { width: 520, height: 360 }
+    })
+    expect(graph.terminalGroups[0]!.position).toEqual(before.terminalGroups[0]!.position)
+    expect(graph.blocks[0]!.position).toEqual(member.position)
+    expect(graph.blocks[1]!.position.x).toBe(graph.blocks[0]!.position.x + 520 + 64)
+    expect(BlockGraph.fromSnapshot(graph.toSnapshot()).toSnapshot()).toEqual(graph.toSnapshot())
+  })
   it.each([false, true])('reflows the visible workflow footprint, grouped=%s', (grouped) => {
     const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
     const blocks = ['Install', 'Build', 'Serve'].map((name, index) =>
@@ -23,6 +45,7 @@ describe('terminal disclosure layout', () => {
     })
     if (group)
       graph.connectTerminalBlocks({ sourceBlockId: blocks[2]!.id, targetBlockId: external.id })
+    const externalBeforeDisclosure = graph.blocks.find((block) => block.id === external.id)
     const connections = graph.toSnapshot().connections
     const anchor = group?.position ?? { x: 100, y: 100 }
     for (const original of blocks) {
@@ -42,7 +65,7 @@ describe('terminal disclosure layout', () => {
       )
       expect(next.position.y).toBe(previous.position.y)
     }
-    expect(graph.blocks.find((block) => block.id === external.id)).toEqual(external)
+    expect(graph.blocks.find((block) => block.id === external.id)).toEqual(externalBeforeDisclosure)
     expect(graph.toSnapshot().connections).toEqual(connections)
     if (group) {
       expect(graph.terminalGroups[0]!.position).toEqual(anchor)

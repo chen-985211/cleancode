@@ -60,7 +60,7 @@ export function expandTerminalGroupLayout(
   const members = new Set(group.memberBlockIds)
   const next = blocks.map((block) =>
     members.has(block.id) && !block.isCollapsed
-      ? { ...block, size: terminalExpansionSize(block, connections) }
+      ? { ...block, size: terminalExpansionSize(block, connections, 'expand') }
       : block
   )
   return layoutTerminalGroupMembers(group, next, connections)

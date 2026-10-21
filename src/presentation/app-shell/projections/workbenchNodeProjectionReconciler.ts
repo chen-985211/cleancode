@@ -20,6 +20,10 @@ export function reconcileWorkbenchNodeProjection(
   let didChange = nextNodes.length !== currentNodes.length
   const reconciledNodes = nextNodes.map((nextNode, index): WorkbenchFlowNode => {
     const currentNode = currentNodesById.get(nextNode.id)
+    // Graph projections do not own DOM measurements. Dropping them makes React
+    // Flow discard the handles and hide existing edges until its next observer pass.
+    if (currentNode?.type === nextNode.type && !nextNode.measured && currentNode.measured)
+      nextNode = { ...nextNode, measured: currentNode.measured }
     if (currentNode && areWorkbenchNodeProjectionsEqual(currentNode, nextNode)) {
       if (currentNodes[index] !== currentNode) didChange = true
       return currentNode

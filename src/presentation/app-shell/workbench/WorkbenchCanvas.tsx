@@ -45,6 +45,7 @@ import {
 } from '../../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
 import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
+import { workbenchDragAutoPanSpeed } from './viewport/workbenchDragAutoPan'
 import { isApplyingWorkbenchViewport } from './viewport/workbenchViewportAdapter'
 import { useWorkbenchDirectZoom } from './viewport/useWorkbenchDirectZoom'
 import { useCanvasOrganization } from './viewport/useCanvasOrganization'
@@ -264,6 +265,7 @@ export function WorkbenchCanvas({
   const cancelledDragIdRef = nodeDragSession.cancelledRef
   const workflowDragging = useWorkflowCanvasDragging({
     instanceRef: reactFlowInstanceRef,
+    surfaceRef: canvasSurfaceRef,
     nodeStore,
     onStart: (event, node, ids) => {
       cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
@@ -273,6 +275,7 @@ export function WorkbenchCanvas({
     },
     onPreview: onNodeDrag,
     onCommit: onNodeDragStop,
+    onViewportChange,
     onCancel: onCancelNodeDrag
   })
   const restoredGraphIdRef = useRef<string | null>(null)
@@ -452,6 +455,7 @@ export function WorkbenchCanvas({
               nodesDraggable={!isCanvasArrangementPending}
               nodeClickDistance={nodeGestureThresholdPixels}
               nodeDragThreshold={nodeGestureThresholdPixels}
+              autoPanSpeed={workbenchDragAutoPanSpeed}
               onInit={(instance) => {
                 reactFlowInstanceRef.current = instance
                 setViewportMotionInstance((currentInstance) => currentInstance ?? instance)

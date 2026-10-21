@@ -7,9 +7,10 @@ import {
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchNodeStore } from './nodes/workbenchNodeStore'
+import { workbenchDragAutoPanDelta } from './viewport/workbenchDragAutoPan'
 
 type Point = { readonly x: number; readonly y: number }
 interface WorkflowDragSession {
@@ -24,31 +25,48 @@ interface WorkflowDragSession {
   started: boolean
   last: WorkbenchFlowNode
   isOverCanvas: boolean
+  didPan: boolean
 }
 
 // The existing workflow label moves the real graph with pointer capture. Native
 // HTML drag remains available for arranging quick slots; it does not own canvas moves.
 export function useWorkflowCanvasDragging({
   instanceRef,
+  surfaceRef,
   nodeStore,
   onStart,
   onPreview,
   onCommit,
+  onViewportChange,
   onCancel
 }: {
   readonly instanceRef: React.RefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
+  readonly surfaceRef: React.RefObject<HTMLElement | null>
   readonly nodeStore: WorkbenchNodeStore
   readonly onStart: (event: MouseEvent, node: WorkbenchFlowNode, ids?: readonly string[]) => void
   readonly onPreview: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onCommit: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onViewportChange?: (viewport: Viewport) => void
   readonly onCancel?: (nodeId: string) => void
 }) {
   const session = useRef<WorkflowDragSession | null>(null)
   const suppressedHandle = useRef<HTMLElement | null>(null)
+  const panFrame = useRef<number | null>(null)
+  const lastInput = useRef<InputEvent | null>(null)
+  const stopPanning = () => {
+    if (panFrame.current !== null) cancelAnimationFrame(panFrame.current)
+    panFrame.current = null
+    lastInput.current = null
+  }
+  const finishViewport = (current: WorkflowDragSession) => {
+    if (current.didPan && instanceRef.current) onViewportChange?.(instanceRef.current.getViewport())
+  }
   const cancel = () => {
+    stopPanning()
     const current = session.current
     session.current = null
     if (!current?.started) return
+    finishViewport(current)
     suppressedHandle.current = current.handle
     current.handle.removeAttribute('aria-pressed')
     onCancel?.(current.node.id)
@@ -73,6 +91,23 @@ export function useWorkflowCanvasDragging({
     )
   }
   const cancelFromWindow = useEffectEvent(cancel)
+  const panAtEdge = useEffectEvent(async () => {
+    const current = session.current
+    const event = lastInput.current
+    const instance = instanceRef.current
+    const bounds = surfaceRef.current?.getBoundingClientRect()
+    if (!current?.started || current.pointerId < 0 || !event || !instance || !bounds) return
+    const delta = workbenchDragAutoPanDelta({ x: event.clientX, y: event.clientY }, bounds)
+    if ((delta.x || delta.y) && current.isOverCanvas) {
+      const viewport = instance.getViewport()
+      await instance.setViewport({ ...viewport, x: viewport.x + delta.x, y: viewport.y + delta.y })
+      if (session.current !== current) return
+      current.didPan = true
+      // Reproject even without a pointermove: the viewport moved beneath the grab.
+      preview(event)
+    }
+    if (session.current === current) panFrame.current = requestAnimationFrame(panAtEdge)
+  })
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') cancelFromWindow()
@@ -83,6 +118,8 @@ export function useWorkflowCanvasDragging({
     window.addEventListener('pointercancel', cancelEvent, true)
     window.addEventListener('lostpointercapture', cancelEvent, true)
     return () => {
+      session.current = null
+      stopPanning()
       window.removeEventListener('keydown', keydown, true)
       window.removeEventListener('blur', cancelEvent)
       window.removeEventListener('pointercancel', cancelEvent, true)
@@ -123,7 +160,8 @@ export function useWorkflowCanvasDragging({
       ids: target.terminalBlockIds,
       started: false,
       last: node,
-      isOverCanvas: false
+      isOverCanvas: false,
+      didPan: false
     }
     if (event.pointerId >= 0) handle.setPointerCapture?.(event.pointerId)
     event.preventDefault()
@@ -178,6 +216,9 @@ export function useWorkflowCanvasDragging({
       })
     )
     onPreview(event.nativeEvent, current.last)
+    lastInput.current = event
+    if (current.pointerId >= 0 && panFrame.current === null)
+      panFrame.current = requestAnimationFrame(panAtEdge)
     return true
   }
   const commit = (event: InputEvent): boolean => {
@@ -193,11 +234,13 @@ export function useWorkflowCanvasDragging({
       return true
     }
     session.current = null
+    stopPanning()
     current.handle.removeAttribute('aria-pressed')
     suppressedHandle.current = current.handle
     event.preventDefault()
     event.stopPropagation()
     onCommit(event.nativeEvent, current.last)
+    finishViewport(current)
     return true
   }
   const suppressClick = (event: ReactMouseEvent<HTMLElement>): boolean => {

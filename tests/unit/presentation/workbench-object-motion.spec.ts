@@ -6,6 +6,26 @@ import {
 } from '../../../src/presentation/app-shell/projections/workbenchObjectMotion'
 
 describe('workbench object motion', () => {
+  it('does not queue a return spring to stale persisted coordinates during direct manipulation', () => {
+    const saved = createTerminalNode('terminal-1', { x: 100, y: 100 })
+    const held = {
+      ...saved,
+      position: { x: 400, y: 300 },
+      data: {
+        ...saved.data,
+        isObjectMotionFrozen: true,
+        isObjectDragPreview: true
+      }
+    } as WorkbenchFlowNode
+    const result = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [held],
+      nextNodes: [saved],
+      isContinuingGraph: true,
+      reducedMotion: false
+    })
+    expect(result.nodes[0]!.data.objectMotion).toBeUndefined()
+  })
   it('morphs terminal disclosure and moves its neighbors in the same spatial transition', () => {
     const before = createTerminalNode('terminal-1', { x: 100, y: 100 })
     const neighbor = createTerminalNode('terminal-2', { x: 900, y: 100 })

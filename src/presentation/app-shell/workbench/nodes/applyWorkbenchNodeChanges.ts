@@ -177,7 +177,7 @@ function resizeExpandedTerminalGroupShells(
       return node
     }
 
-    if (memberNodes.length < 2) {
+    if (memberNodes.length === 0) {
       return node
     }
 
@@ -196,20 +196,10 @@ function resizeTerminalGroupShell(
   const bounds = getTerminalNodeBounds(memberNodes)
   const currentWidth = resolveNodeDimension(groupNode, 'width')
   const currentHeight = resolveNodeDimension(groupNode, 'height')
-  const currentRight = groupNode.position.x + currentWidth
-  const currentBottom = groupNode.position.y + currentHeight
-  const nextLeft = Math.min(groupNode.position.x, bounds.left - terminalGroupShellPadding.x)
-  const nextTop = Math.min(groupNode.position.y, bounds.top - terminalGroupShellPadding.y)
-  const nextWidth = Math.max(
-    currentWidth,
-    currentRight - nextLeft,
-    bounds.right - nextLeft + terminalGroupShellPadding.x
-  )
-  const nextHeight = Math.max(
-    currentHeight,
-    currentBottom - nextTop,
-    bounds.bottom - nextTop + terminalGroupShellPadding.y
-  )
+  const nextLeft = groupNode.position.x
+  const nextTop = groupNode.position.y
+  const nextWidth = Math.max(currentWidth, bounds.right - nextLeft + terminalGroupShellPadding.x)
+  const nextHeight = Math.max(currentHeight, bounds.bottom - nextTop + terminalGroupShellPadding.y)
 
   if (
     nextLeft === groupNode.position.x &&
@@ -257,17 +247,14 @@ function resolveNodeDimension(
   node: TerminalFlowNode | TerminalGroupFlowNode,
   dimension: 'width' | 'height'
 ): number {
-  const styleValue = node.style?.[dimension]
-
-  if (typeof styleValue === 'number' && Number.isFinite(styleValue)) {
-    return styleValue
-  }
-
   const nodeValue = node[dimension]
 
   if (typeof nodeValue === 'number' && Number.isFinite(nodeValue)) {
     return nodeValue
   }
+
+  const styleValue = node.style?.[dimension]
+  if (typeof styleValue === 'number' && Number.isFinite(styleValue)) return styleValue
 
   const measuredValue = node.measured?.[dimension]
 
