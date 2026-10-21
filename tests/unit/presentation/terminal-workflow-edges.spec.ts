@@ -33,8 +33,7 @@ describe('terminal workflow edges', () => {
         source: 'a',
         target: 'b',
         className: 'terminal-workflow-edge terminal-workflow-edge--active',
-        style: { stroke: 'var(--cc-primary)' },
-        markerEnd: expect.objectContaining({ color: 'var(--cc-primary)' })
+        markerEnd: expect.objectContaining({ color: 'context-stroke' })
       })
     ])
   })

@@ -183,7 +183,7 @@
   position: absolute;
   z-index: 0;
   inset: 0;
-  background: var(--cc-primary-wash);
+  background: var(--cc-neutral-overlay);
   content: '';
   opacity: var(--cc-selection-motion-progress, 0);
   pointer-events: none;

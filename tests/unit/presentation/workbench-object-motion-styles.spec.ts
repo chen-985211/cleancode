@@ -96,9 +96,6 @@ describe('workbench object motion styles', () => {
     const groupRule = readTerminalGroupRule('.terminal-group-node')
     const materialRule = readTerminalGroupRule('.terminal-group-node__material')
     const materialFillRule = readTerminalGroupRule('.terminal-group-node__material::before')
-    const collapsedMaterialFillRule = readTerminalGroupRule(
-      '.terminal-group-node--collapsed > .terminal-group-node__material::before'
-    )
 
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
     expect(spatialMotionRule).not.toContain('scaleX(')
@@ -106,11 +103,11 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('var(--workbench-object-motion-content-opacity)')
     expect(objectMotionStyles).not.toContain('transform-origin: top left;')
     expect(groupRule).toContain('background: transparent;')
+    expect(groupRule).toContain('--terminal-group-surface: var(--cc-terminal-shell);')
     expect(materialRule).toContain('background: transparent;')
     expect(materialRule).not.toContain('opacity: var(--workbench-object-motion-content-opacity);')
     expect(materialRule).not.toContain('transform:')
-    expect(materialFillRule).toContain('background: var(--cc-surface-translucent);')
-    expect(collapsedMaterialFillRule).toContain('background: var(--terminal-group-surface);')
+    expect(materialFillRule).toContain('background: var(--terminal-group-surface);')
     expect(objectMotionStyles).toContain('width: var(--workbench-object-motion-shell-width);')
     expect(objectMotionStyles).toContain('height: var(--workbench-object-motion-shell-height);')
     expect(objectMotionStyles).toMatch(

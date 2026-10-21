@@ -1,6 +1,5 @@
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { FlowArrowIcon } from '@phosphor-icons/react/dist/csr/FlowArrow'
-import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play'
 import { PushPinIcon } from '@phosphor-icons/react/dist/csr/PushPin'
 import { StopIcon } from '@phosphor-icons/react/dist/csr/Stop'
 import type { Icon, IconWeight } from '@phosphor-icons/react'
@@ -12,6 +11,7 @@ import type {
 import type { WorkflowRunNodeStatus } from '../../application/dto/WorkflowRunSnapshot'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { WorkbenchIcon } from '../../../../presentation/shared/components/WorkbenchIcons'
 
 export interface TerminalRuntimeActionsProps {
   readonly terminalName: string
@@ -112,19 +112,16 @@ export function TerminalRuntimeActions({
           type="button"
           aria-label={t('terminal.namedAction', {
             blockName: terminalName,
-            action: t('terminal.action.launch')
+            action: launchCommandTooltip
           })}
           data-launch-command-state={launchCommandState}
           disabled={isRecoveryPending && canQuickLaunch}
           onClick={onQuickLaunch}
         >
-          <TerminalRuntimeActionIcon
-            IconComponent={PlayIcon}
-            dataIcon="terminal-launch"
-            glyph="play"
-            role="launch"
+          <WorkbenchIcon
+            data-icon="terminal-launch"
+            role={canQuickLaunch ? 'launch' : 'settings'}
             size={15}
-            weight="fill"
           />
         </button>
       </TooltipLabel>

@@ -33,7 +33,7 @@
   align-items: center;
   gap: 9px;
   border-radius: 9px;
-  background: var(--cc-primary-wash);
+  background: transparent;
   padding: 10px 12px;
   color: var(--cc-muted-strong);
   font-size: 12px;
@@ -103,9 +103,9 @@
 }
 
 .application-diagnostics-action__control:hover:not(:disabled) {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-wash);
-  color: var(--cc-primary);
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
   transform: translateY(-1px);
 }
 

@@ -25,12 +25,12 @@
 }
 
 .agent-mcp-capability__switch:hover:not(:disabled) {
-  background: var(--cc-surface-subtle);
+  background: var(--cc-terminal-control-hover);
   color: var(--cc-foreground);
 }
 
 .agent-mcp-capability__switch:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--cc-primary) 62%, transparent);
+  outline: 2px solid var(--cc-terminal-control-foreground);
   outline-offset: 1px;
 }
 
@@ -106,10 +106,11 @@
   display: grid;
   max-width: 320px;
   gap: 4px;
+  text-align: start;
 }
 
 .agent-mcp-capability__tooltip strong {
-  color: var(--cc-foreground);
+  color: inherit;
   font-size: 11px;
 }
 
@@ -122,9 +123,9 @@
   width: 25px;
   height: 14px;
   flex: 0 0 auto;
-  border: 1px solid var(--cc-border-strong);
+  border: 1px solid var(--cc-terminal-control-border);
   border-radius: 999px;
-  background: var(--cc-surface-subtle);
+  background: var(--cc-terminal-control);
   transition:
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
@@ -144,8 +145,7 @@
 }
 
 .agent-mcp-capability__switch[aria-checked='true'] .agent-mcp-capability__track {
-  border-color: var(--cc-primary);
-  background: color-mix(in srgb, var(--cc-primary) 24%, var(--cc-surface));
+  background: var(--cc-terminal-control-active);
 }
 
 .agent-mcp-capability__switch[aria-checked='true'] .agent-mcp-capability__thumb {

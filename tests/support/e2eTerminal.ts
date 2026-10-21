@@ -226,7 +226,7 @@ export async function configureAndStartTerminalLaunchCommand(
   const launchButtonName = `${terminalName} 启动命令`
   const previousSessionId = await readTerminalSessionId(page, terminalName)
 
-  await page.getByRole('button', { name: launchButtonName }).click()
+  await page.getByRole('button', { name: `${terminalName} 配置启动命令`, exact: true }).click()
   const metadataForm = page.getByRole('form', { name: '编辑终端信息' })
   const launchCommandInput = metadataForm.getByRole('textbox', { name: '启动命令' })
 

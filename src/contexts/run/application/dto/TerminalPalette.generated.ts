@@ -4,7 +4,7 @@
  */
 export const canonicalTerminalPalettes = {
   light: {
-    background: '#ffffff',
+    background: '#f2f4f5',
     foreground: '#172033',
     cursor: '#172033',
     selectionBackground: '#cbdcf8',
@@ -26,7 +26,7 @@ export const canonicalTerminalPalettes = {
     brightWhite: '#172033'
   },
   dark: {
-    background: '#000000',
+    background: '#202326',
     foreground: '#d6dee8',
     cursor: '#f8fafc',
     selectionBackground: '#2d415c',

@@ -212,7 +212,8 @@ describe('project sidebar navigation semantics', () => {
 
     const collapseProject = screen.getByRole('button', { name: 'alpha-project' })
     expect(collapseProject).toHaveAttribute('aria-expanded', 'true')
-    expect(collapseProject.querySelector('svg')).toBeNull()
+    expect(collapseProject.querySelector('svg:not(.project-dot)')).toBeNull()
+    expect(collapseProject.querySelector('.project-dot')).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByRole('button', { name: 'Git 未初始化 默认工作区' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '新建分支工作区' }))
     expect(screen.getByLabelText('分支名称')).toBeVisible()

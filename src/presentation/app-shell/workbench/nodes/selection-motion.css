@@ -1,7 +1,7 @@
 .application-settings-navigation__selection {
   z-index: 0;
   border-radius: 9px;
-  background: var(--cc-primary-wash);
+  background: var(--cc-settings-navigation-selection);
 }
 
 .application-settings-navigation__selection::before {
@@ -11,13 +11,13 @@
   left: 4px;
   width: 2px;
   border-radius: 999px;
-  background: var(--cc-primary);
+  background: var(--cc-settings-navigation-accent);
   content: '';
 }
 
 .application-settings-navigation:not([data-selection-motion-ready='true'])
   button[aria-current='page'] {
-  background: var(--cc-primary-wash);
+  background: var(--cc-settings-navigation-selection);
 }
 
 .application-settings-navigation:not([data-selection-motion-ready='true'])
@@ -28,22 +28,30 @@
   left: 4px;
   width: 2px;
   border-radius: 999px;
-  background: var(--cc-primary);
+  background: var(--cc-settings-navigation-accent);
   content: '';
 }
 
 .terminal-settings-options__selection {
   z-index: 0;
-  border: 1px solid var(--cc-primary-border);
-  border-radius: 8px;
-  background: var(--cc-primary-wash);
-  box-shadow: var(--cc-shadow-xs);
+  border: 1px solid var(--cc-settings-selection-border);
+  border-radius: 0;
+  background: var(--cc-settings-selection-surface);
+}
+
+.terminal-settings-options:has(label:first-of-type input:checked)
+  .terminal-settings-options__selection {
+  border-radius: 10px 0 0 10px;
+}
+
+.terminal-settings-options:has(label:last-of-type input:checked)
+  .terminal-settings-options__selection {
+  border-radius: 0 10px 10px 0;
 }
 
 .terminal-settings-options:not([data-selection-motion-ready='true']) label:has(input:checked) {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-wash);
-  box-shadow: var(--cc-shadow-xs);
+  border-color: var(--cc-settings-selection-border);
+  background: var(--cc-settings-selection-surface);
 }
 
 .shortcut-recorder::before {

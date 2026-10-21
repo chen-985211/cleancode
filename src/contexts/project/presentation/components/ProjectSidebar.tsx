@@ -9,6 +9,7 @@ import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
 import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspaceForm'
 import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
+import { ProjectCurrentMarker } from './ProjectCurrentMarker'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
@@ -335,9 +336,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             onClick={toggleProjectExpanded}
             onPointerDown={(event) => onProjectPointerDown(event, workbench)}
           >
-            <span
-              className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'}
-            />
+            <ProjectCurrentMarker current={isCurrentProject} />
             <span className="project-card__name truncate">{workbench.project.name}</span>
           </button>
         </TooltipLabel>

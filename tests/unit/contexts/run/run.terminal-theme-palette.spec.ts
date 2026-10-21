@@ -1,7 +1,22 @@
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
-import { readCanonicalTerminalTheme } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
+import {
+  readCanonicalTerminalTheme,
+  readTerminalThemeProjectionMatrix
+} from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
 describe('terminal theme palette', () => {
+  it.each(['light', 'dark'] as const)(
+    'maps the %s source background to the opposite theme background',
+    (theme) => {
+      const source = canonicalTerminalPalettes[theme]
+      const target = canonicalTerminalPalettes[theme === 'light' ? 'dark' : 'light']
+
+      expect(projectColor(source.background, readTerminalThemeProjectionMatrix(theme))).toBe(
+        target.background
+      )
+    }
+  )
+
   it.each(['light', 'dark'] as const)(
     'gives renderer xterm the canonical %s terminal palette',
     (theme) => {
@@ -14,12 +29,14 @@ describe('terminal theme palette', () => {
     (theme) => {
       const palette = readCanonicalTerminalTheme(theme)
       const background = requireColor(palette.background)
+      const matrix = readTerminalThemeProjectionMatrix(theme)
+      const projectedBackground = projectColor(background, matrix)
 
       for (const foreground of [palette.white, palette.brightWhite]) {
         const requiredForeground = requireColor(foreground)
         expect(colorContrastRatio(requiredForeground, background)).toBeGreaterThanOrEqual(4.5)
         expect(
-          colorContrastRatio(invertRgb(requiredForeground), invertRgb(background))
+          colorContrastRatio(projectColor(requiredForeground, matrix), projectedBackground)
         ).toBeGreaterThanOrEqual(4.5)
       }
     }
@@ -49,9 +66,17 @@ function relativeLuminance(color: string): number {
   return 0.2126 * linearChannels[0]! + 0.7152 * linearChannels[1]! + 0.0722 * linearChannels[2]!
 }
 
-function invertRgb(color: string): string {
-  const channels = [0, 2, 4].map(
-    (offset) => 255 - Number.parseInt(color.slice(1 + offset, 3 + offset), 16)
+function projectColor(color: string, matrix: readonly number[]): string {
+  const input = [0, 2, 4].map(
+    (offset) => Number.parseInt(color.slice(1 + offset, 3 + offset), 16) / 255
   )
+  const channels = [0, 1, 2].map((row) => {
+    const offset = row * 5
+    const value = input.reduce(
+      (sum, channel, column) => sum + channel * matrix[offset + column]!,
+      matrix[offset + 4]!
+    )
+    return Math.round(Math.max(0, Math.min(1, value)) * 255)
+  })
   return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
 }

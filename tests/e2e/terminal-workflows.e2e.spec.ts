@@ -126,7 +126,7 @@ async function configureLaunchCommand(
   terminalName: string,
   command: string
 ): Promise<void> {
-  await page.getByRole('button', { name: `${terminalName} 启动命令` }).click()
+  await page.getByRole('button', { name: `${terminalName} 配置启动命令` }).click()
   const input = page.getByRole('textbox', { name: '启动命令' })
   await input.fill(command)
   await submitTerminalMetadataForm(page.getByRole('form', { name: '编辑终端信息' }), terminalName)

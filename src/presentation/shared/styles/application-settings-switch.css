@@ -17,7 +17,7 @@
   z-index: 0;
   inset: 0;
   border-radius: inherit;
-  background: var(--cc-primary);
+  background: var(--cc-settings-switch-on);
   content: '';
   opacity: var(--cc-selection-motion-progress, 0);
   pointer-events: none;
@@ -30,12 +30,12 @@
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: var(--cc-primary-contrast);
+  background: var(--cc-settings-switch-thumb);
   box-shadow: var(--cc-shadow-sm);
   transform: translate3d(calc(var(--cc-selection-motion-progress, 0) * 15px), 0, 0);
 }
 
 .application-settings-switch:focus-visible {
-  outline: 2px solid var(--cc-ring);
+  outline: 2px solid var(--cc-settings-switch-on);
   outline-offset: 3px;
 }

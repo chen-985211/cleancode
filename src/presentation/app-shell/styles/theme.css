@@ -6,12 +6,45 @@
   --cc-chrome: #f3f5f8;
   --cc-chrome-raised: #f8f9fb;
   --cc-chrome-translucent: rgb(243 245 248 / 78%);
+  --cc-sidebar-hover: #eef0f3;
+  --cc-sidebar-selection: #e9ebee;
+  --cc-sidebar-selection-hover: #e3e6ea;
+  --cc-sidebar-foreground: var(--cc-muted-strong);
+  --cc-sidebar-selection-foreground: #43474c;
+  --cc-sidebar-focus-ring: #7a7a7a;
+  --cc-sidebar-current-marker: #737373;
+  --cc-sidebar-drag-surface: #e6e7e8;
+  --cc-sidebar-drag-border: #9b9b9b;
+  --cc-sidebar-drag-indicator: #737373;
+  --cc-settings-selection-surface: #d1d5d9;
+  --cc-settings-selection-foreground: #43474c;
+  --cc-settings-selection-accent: #777777;
+  --cc-settings-selection-border: #9b9b9b;
+  --cc-settings-switch-on: #6b87aa;
+  --cc-settings-switch-thumb: var(--cc-primary-contrast);
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
+  --cc-branch-selector-selection: color-mix(
+    in srgb,
+    var(--cc-foreground) 6%,
+    var(--cc-surface-raised)
+  );
+  --cc-branch-selector-selection-hover: color-mix(
+    in srgb,
+    var(--cc-foreground) 8%,
+    var(--cc-surface-raised)
+  );
   --cc-surface: #ffffff;
   --cc-surface-subtle: #f0f2f5;
   --cc-surface-raised: #ffffff;
   --cc-surface-hover: rgb(255 255 255 / 64%);
   --cc-surface-translucent: rgb(255 255 255 / 90%);
   --cc-surface-overlay: rgb(255 255 255 / 98%);
+  --cc-terminal-shell: var(--cc-terminal-light-background);
+  --cc-terminal-border: #d9dee2;
+  --cc-terminal-control-border: #b8bec5;
+  --cc-terminal-control-foreground: #50565f;
   --cc-canvas-node-menu-surface: #f2f4f5;
   --cc-canvas-node-menu-hover: #e9ebec;
   --cc-canvas-node-menu-foreground: #16181a;
@@ -22,6 +55,7 @@
   --cc-disabled: #9aa2af;
   --cc-border: #dfe3ea;
   --cc-border-strong: #c9cfd9;
+  --cc-workbench-selection: #9fb3c8;
   --cc-divider: rgb(198 205 216 / 78%);
   --cc-primary: #2f67d8;
   --cc-primary-hover: #2458bd;
@@ -79,12 +113,45 @@
   --cc-chrome: #171b22;
   --cc-chrome-raised: #1b2028;
   --cc-chrome-translucent: rgb(23 27 34 / 82%);
+  --cc-sidebar-hover: #1d2128;
+  --cc-sidebar-selection: #22262d;
+  --cc-sidebar-selection-hover: #272b32;
+  --cc-sidebar-foreground: #d0d5dc;
+  --cc-sidebar-selection-foreground: #eceff3;
+  --cc-sidebar-focus-ring: #8c8c8c;
+  --cc-sidebar-current-marker: #a3a3a3;
+  --cc-sidebar-drag-surface: #2a2c2f;
+  --cc-sidebar-drag-border: #696969;
+  --cc-sidebar-drag-indicator: #b0b0b0;
+  --cc-settings-selection-surface: #292d32;
+  --cc-settings-selection-foreground: #e4e7eb;
+  --cc-settings-selection-accent: #b0b0b0;
+  --cc-settings-selection-border: #696969;
+  --cc-settings-switch-on: #566f8a;
+  --cc-settings-switch-thumb: #e2e8f0;
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
+  --cc-branch-selector-selection: color-mix(
+    in srgb,
+    var(--cc-background) 22%,
+    var(--cc-surface-raised)
+  );
+  --cc-branch-selector-selection-hover: color-mix(
+    in srgb,
+    var(--cc-background) 30%,
+    var(--cc-surface-raised)
+  );
   --cc-surface: #1b2028;
   --cc-surface-subtle: #222831;
   --cc-surface-raised: #252c36;
   --cc-surface-hover: rgb(255 255 255 / 7%);
   --cc-surface-translucent: rgb(27 32 40 / 92%);
   --cc-surface-overlay: rgb(27 32 40 / 98%);
+  --cc-terminal-shell: var(--cc-terminal-dark-background);
+  --cc-terminal-border: var(--cc-border);
+  --cc-terminal-control-border: #50565c;
+  --cc-terminal-control-foreground: #c1c6cb;
   --cc-canvas-node-menu-surface: #212426;
   --cc-canvas-node-menu-hover: #373a3c;
   --cc-canvas-node-menu-foreground: #e9ebec;
@@ -95,6 +162,7 @@
   --cc-disabled: #687384;
   --cc-border: #303844;
   --cc-border-strong: #46505e;
+  --cc-workbench-selection: #9fb3c8;
   --cc-divider: rgb(70 80 94 / 82%);
   --cc-primary: #75a0f5;
   --cc-primary-hover: #91b3f8;
@@ -140,6 +208,19 @@
 }
 
 :root {
+  --cc-branch-selector-hover: color-mix(in srgb, var(--cc-foreground) 2%, var(--cc-surface-raised));
+  --cc-terminal-control: var(--cc-terminal-shell);
+  --cc-terminal-control-hover: color-mix(
+    in srgb,
+    var(--cc-foreground) 5%,
+    var(--cc-terminal-shell)
+  );
+  --cc-terminal-control-pressed: color-mix(
+    in srgb,
+    var(--cc-foreground) 8%,
+    var(--cc-terminal-shell)
+  );
+  --cc-terminal-control-active: var(--cc-terminal-control-hover);
   --cc-motion-duration-press: 100ms;
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;
@@ -155,7 +236,7 @@
   --cc-easing-brand-sweep: cubic-bezier(0.65, 0, 0.35, 1);
   --cc-easing-loading-shimmer-wave: ease-in-out;
   --cc-canvas-node-radius: 20px;
-  --cc-terminal-light-background: #ffffff;
+  --cc-terminal-light-background: #f2f4f5;
   --cc-terminal-light-foreground: #172033;
   --cc-terminal-light-cursor: #172033;
   --cc-terminal-light-selection: #cbdcf8;
@@ -177,7 +258,7 @@
   --cc-terminal-light-bright-magenta: #a565cb;
   --cc-terminal-light-bright-cyan: #188fa8;
   --cc-terminal-light-bright-white: #172033;
-  --cc-terminal-dark-background: #000000;
+  --cc-terminal-dark-background: #202326;
   --cc-terminal-dark-foreground: #d6dee8;
   --cc-terminal-dark-cursor: #f8fafc;
   --cc-terminal-dark-selection: #2d415c;
@@ -199,7 +280,6 @@
   --cc-terminal-dark-bright-magenta: #d7a8ff;
   --cc-terminal-dark-bright-cyan: #83e7f3;
   --cc-terminal-dark-bright-white: #ffffff;
-  --cc-terminal-theme-mismatch-filter: invert(1) hue-rotate(180deg);
 }
 
 :root,

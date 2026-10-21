@@ -10,13 +10,12 @@
   --terminal-group-drop-scale: 1;
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);
-  --terminal-group-surface: var(--cc-surface-raised);
-  --terminal-group-toolbar: var(--cc-chrome-raised);
-  --terminal-group-control: var(--cc-surface-raised);
-  --terminal-group-control-hover: var(--cc-surface-subtle);
+  --terminal-group-surface: var(--cc-terminal-shell);
+  --terminal-group-toolbar: var(--terminal-group-surface);
+  --terminal-group-control: var(--cc-terminal-control);
+  --terminal-group-control-hover: var(--cc-terminal-control-hover);
   --terminal-group-foreground: var(--cc-foreground);
   --terminal-group-muted: var(--cc-muted);
-  --terminal-group-azure: var(--cc-primary);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -67,12 +66,8 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--cc-surface-translucent);
-  content: '';
-}
-
-.terminal-group-node--collapsed > .terminal-group-node__material::before {
   background: var(--terminal-group-surface);
+  content: '';
 }
 
 .terminal-group-node__empty-state {
@@ -138,7 +133,7 @@
   box-sizing: border-box;
   border-radius: var(--cc-canvas-node-radius) var(--cc-canvas-node-radius) 0 0;
   padding: 6px 12px 6px 15px;
-  background: var(--cc-surface-overlay);
+  background: var(--terminal-group-surface);
   overflow: visible;
 }
 
@@ -179,15 +174,12 @@
   border: 0;
   border-radius: 7px;
   padding: 0 8px;
-  background: var(--cc-canvas);
-  color: var(--cc-muted-strong);
+  background: var(--terminal-group-control);
+  color: var(--cc-terminal-control-foreground);
   font: inherit;
   font-size: 11px;
   font-weight: 560;
-  box-shadow:
-    0 0 0 1px var(--cc-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 2px 5px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
   transition:
     transform var(--cc-motion-duration-press) var(--cc-easing-standard),
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
@@ -201,12 +193,9 @@
 }
 
 .terminal-group-node__disclosure:hover:not(:disabled) {
-  background: var(--cc-surface-subtle);
+  background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
-  box-shadow:
-    0 0 0 1px var(--terminal-group-border-strong) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset,
-    0 3px 7px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__members {
@@ -334,8 +323,8 @@
 }
 
 .terminal-group-node__member-remove:hover {
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
+  background: var(--terminal-group-control-hover);
+  color: var(--terminal-group-foreground);
 }
 
 .terminal-group-node__member-remove:active {

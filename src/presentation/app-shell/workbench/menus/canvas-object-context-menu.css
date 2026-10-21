@@ -155,14 +155,10 @@
   opacity: 0.42;
 }
 
-.terminal-workflow-edge--context-selected .react-flow__edge-path {
-  stroke: var(--cc-primary);
+.react-flow__edge.terminal-workflow-edge--context-selected path.react-flow__edge-path {
+  stroke: var(--cc-workbench-selection);
   stroke-width: 3;
   stroke-dasharray: none;
-}
-
-.terminal-workflow-edge--context-selected .react-flow__arrowhead polyline {
-  stroke: var(--cc-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

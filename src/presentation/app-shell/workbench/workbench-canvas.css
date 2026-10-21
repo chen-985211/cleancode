@@ -212,33 +212,22 @@
   stroke-linecap: round;
 }
 
-.terminal-workflow-edge .react-flow__arrowhead polyline {
-  stroke: var(--cc-muted);
-}
-
-.terminal-workflow-edge--active .react-flow__edge-path,
-.terminal-workflow-edge--active .react-flow__arrowhead polyline {
+.terminal-workflow-edge--active .react-flow__edge-path {
   stroke: var(--cc-primary);
 }
 
-.terminal-workflow-edge--succeeded .react-flow__edge-path,
-.terminal-workflow-edge--succeeded .react-flow__arrowhead polyline {
+.terminal-workflow-edge--succeeded .react-flow__edge-path {
   stroke: var(--cc-success);
 }
 
-.terminal-workflow-edge--failed .react-flow__edge-path,
-.terminal-workflow-edge--failed .react-flow__arrowhead polyline {
+.terminal-workflow-edge--failed .react-flow__edge-path {
   stroke: var(--cc-danger);
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--cc-primary);
+.react-flow__edge.selected path.react-flow__edge-path {
+  stroke: var(--cc-workbench-selection);
   stroke-width: 3;
   stroke-dasharray: none;
-}
-
-.react-flow__edge.selected .react-flow__arrowhead polyline {
-  stroke: var(--cc-primary);
 }
 
 .canvas-empty {
@@ -361,9 +350,10 @@
 }
 
 .canvas-empty[data-tone='danger'] .canvas-empty__icon {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
+  border-color: transparent;
+  background: transparent;
   color: var(--cc-danger-strong);
+  box-shadow: none;
 }
 
 .canvas-empty[data-tone='danger'] .canvas-empty__panel {

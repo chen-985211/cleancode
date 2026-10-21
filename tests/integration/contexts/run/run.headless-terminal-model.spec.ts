@@ -135,12 +135,12 @@ describe('headless terminal model', () => {
 
   it.each([
     {
-      background: '\u001b]11;rgb:0000/0000/0000\u001b\\',
+      background: '\u001b]11;rgb:2020/2323/2626\u001b\\',
       foreground: '\u001b]10;rgb:d6d6/dede/e8e8\u001b\\',
       theme: 'dark' as const
     },
     {
-      background: '\u001b]11;rgb:ffff/ffff/ffff\u001b\\',
+      background: '\u001b]11;rgb:f2f2/f4f4/f5f5\u001b\\',
       foreground: '\u001b]10;rgb:1717/2020/3333\u001b\\',
       theme: 'light' as const
     }

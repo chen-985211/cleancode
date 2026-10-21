@@ -34,8 +34,8 @@ img.agent-provider-icon {
 
 .agent-provider-status-control__trigger:hover,
 .agent-provider-status-control__trigger[aria-expanded='true'] {
-  border-color: var(--cc-warning-border);
-  background: var(--cc-warning-soft);
+  border-color: var(--cc-border);
+  background: var(--cc-surface-subtle);
 }
 
 .agent-provider-status-control__trigger[data-tone='neutral']:hover,
@@ -215,7 +215,7 @@ img.agent-provider-icon {
 }
 
 .agent-provider-empty-state[data-tone='warning'] .agent-provider-empty-state__icon {
-  background: var(--cc-warning-soft);
+  background: transparent;
   color: var(--cc-warning-strong);
 }
 

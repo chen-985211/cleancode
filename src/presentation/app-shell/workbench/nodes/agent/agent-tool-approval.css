@@ -33,19 +33,14 @@
   height: 36px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cc-warning-border);
+  border: 1px solid transparent;
   border-radius: 10px;
-  background: var(--cc-warning-soft);
-  box-shadow:
-    0 1px 0 var(--cc-highlight-inset) inset,
-    0 2px 5px var(--cc-shadow-color);
+  background: transparent;
   color: var(--cc-warning-strong);
 }
 
 .agent-tool-approval-card--failed .agent-tool-approval-card__status-icon,
 .agent-tool-approval-card--missing .agent-tool-approval-card__status-icon {
-  border-color: var(--cc-danger-border);
-  background: var(--cc-danger-soft);
   color: var(--cc-danger-strong);
 }
 
@@ -264,7 +259,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 7px;
-  background: var(--cc-warning-soft);
+  background: transparent;
   color: var(--cc-warning-strong);
 }
 
@@ -275,10 +270,10 @@
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: start;
   gap: 8px;
-  border: 1px solid var(--cc-danger-border);
+  border: 1px solid var(--cc-border);
   border-radius: 10px;
   padding: 10px;
-  background: var(--cc-danger-soft);
+  background: transparent;
   color: var(--cc-danger-strong);
   font-size: 11px;
   line-height: 1.45;

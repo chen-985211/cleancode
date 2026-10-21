@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
+import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
 import {
   TerminalRuntimeActions,
   TerminalWorkflowStatusBadge,
@@ -7,6 +8,46 @@ import {
 } from '../../../../src/contexts/run/presentation/components/TerminalRuntimeHeader'
 
 describe('terminal runtime header presentation', () => {
+  it.each([
+    { locale: 'zh-CN', canQuickLaunch: false, label: 'Terminal 配置启动命令' },
+    { locale: 'zh-CN', canQuickLaunch: true, label: 'Terminal 启动命令' },
+    { locale: 'en', canQuickLaunch: false, label: 'Terminal — Configure launch command' },
+    { locale: 'en', canQuickLaunch: true, label: 'Terminal — Launch command' }
+  ] as const)(
+    'identifies the launch action by shape and name ($locale, configured: $canQuickLaunch)',
+    ({ locale, canQuickLaunch, label }) => {
+      const callbacks = createCallbacks()
+      const props = { ...createProps(callbacks), canQuickLaunch }
+      const { rerender } = render(
+        <I18nProvider initialLocale={locale}>
+          <TerminalRuntimeActions {...props} />
+        </I18nProvider>
+      )
+      const button = screen.getByRole('button', { name: label })
+      expect(button).toHaveAttribute(
+        'data-launch-command-state',
+        canQuickLaunch ? 'configured' : 'unconfigured'
+      )
+      expect(button.querySelector('[data-icon="terminal-launch"]')).toMatchObject({
+        dataset: expect.objectContaining({
+          iconGlyph: canQuickLaunch ? 'play' : 'gear-six',
+          iconRole: canQuickLaunch ? 'launch' : 'settings',
+          iconWeight: canQuickLaunch ? 'fill' : 'bold'
+        })
+      })
+      fireEvent.click(button)
+      expect(callbacks.onQuickLaunch).toHaveBeenCalledOnce()
+
+      rerender(
+        <I18nProvider initialLocale={locale}>
+          <TerminalRuntimeActions {...props} isRecoveryPending />
+        </I18nProvider>
+      )
+      if (canQuickLaunch) expect(button).toBeDisabled()
+      else expect(button).toBeEnabled()
+    }
+  )
+
   it('projects the workflow node status without terminal definition state', () => {
     const { rerender } = render(<TerminalWorkflowStatusBadge status="running" />)
 
