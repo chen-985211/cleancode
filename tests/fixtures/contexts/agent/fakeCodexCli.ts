@@ -330,13 +330,12 @@ function draw() {
   if (!sourceTheme) return
   const columns = Math.max(2, process.stdout.columns || 80)
   const rows = Math.max(2, process.stdout.rows || 24)
-  const background = sourceTheme === 'light' ? '255;255;255' : '0;0;0'
   const foreground = sourceTheme === 'light' ? '0;0;0' : '255;255;255'
   const blankRow = ' '.repeat(columns - 1)
   let output = CSI + '?25l'
 
   for (let row = 1; row <= rows; row += 1) {
-    output += CSI + row + ';1H' + CSI + '48;2;' + background + 'm' + blankRow
+    output += CSI + row + ';1H' + CSI + '49m' + blankRow
   }
 
   output +=
@@ -485,7 +484,8 @@ async function publishSessionEnd(sessionId) {
       windowsHide: true
     })
     let settled = false
-    const timeout = setTimeout(() => finish(false), 1_000)
+    // Match the configured SessionEnd timeout, including cold Windows shell startup.
+    const timeout = setTimeout(() => finish(false), 3_000)
     const finish = (published) => {
       if (settled) return
       settled = true

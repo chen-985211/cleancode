@@ -200,6 +200,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await agentProjection
         .locator('.agent-terminal-viewport .xterm-helper-textarea')
         .waitFor({ state: 'attached' })
+      await waitForAgentTerminal(page, 'main', 'light')
 
       await selectTheme(page, 'dark')
       await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
