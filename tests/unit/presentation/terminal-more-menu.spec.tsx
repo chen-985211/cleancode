@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { TerminalMoreMenu } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalMoreMenu'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/workbench/menus/CanvasMenuMotionProvider'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
 
 function createProps() {
@@ -18,6 +19,31 @@ function createProps() {
 }
 
 describe('terminal more menu', () => {
+  it('dismisses with Escape after the focused stop action becomes disabled', async () => {
+    const props = createProps()
+    const view = (isRunning: boolean) => (
+      <CanvasMenuMotionProvider reducedMotion>
+        <TerminalMoreMenu {...props} isRunning={isRunning} />
+      </CanvasMenuMotionProvider>
+    )
+    const { rerender } = render(view(true))
+    const trigger = screen.getByRole('button', { name: 'Terminal 更多终端操作' })
+    fireEvent.click(trigger)
+    const stop = screen.getByRole('menuitem', { name: 'Terminal 停止当前命令' })
+    await waitFor(() => expect(stop).toHaveFocus())
+
+    rerender(view(false))
+    expect(stop).toBeDisabled()
+    // Chromium can move focus to body when its focused button becomes disabled.
+    stop.blur()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveFocus()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByTestId('canvas-menu-dismiss-layer')).toHaveStyle({ pointerEvents: 'none' })
+  })
+
   it.each([
     ['menuitem', '停止当前命令', 'onStop'],
     ['menuitemcheckbox', '应用退出后继续运行此会话', 'onToggleRetention'],

@@ -36,6 +36,18 @@ describe('native Electron window sizing', () => {
     expect(evaluate.mock.calls.filter((call) => call.length === 2)).toHaveLength(1)
   })
 
+  it('accepts the extra native frame extent reported by Windows', async () => {
+    vi.useFakeTimers()
+    const evaluate = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue([2216, 1439])
+    const result = setElectronContentSize({ evaluate } as unknown as ElectronApplication, {
+      width: 2200,
+      height: 1400
+    })
+
+    await Promise.all([expect(result).resolves.toBeUndefined(), vi.advanceTimersByTimeAsync(5000)])
+    expect(evaluate).toHaveBeenCalledTimes(2)
+  })
+
   it('propagates other mutation errors without retrying or observing', async () => {
     const error = new Error('BrowserWindow is destroyed')
     const evaluate = vi.fn().mockRejectedValue(error)

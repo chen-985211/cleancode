@@ -61,6 +61,19 @@ export function CanvasNodeMoreMenu({
     onDismiss: close,
     pointerPolicy: 'consume'
   })
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      // A live action can become disabled and lose focus to body while open.
+      // Keep dismissal owned by the menu even when its key handler cannot run.
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }
+    document.addEventListener('keydown', closeOnEscape, true)
+    return () => document.removeEventListener('keydown', closeOnEscape, true)
+  }, [close, open])
   useLayoutEffect(() => {
     const anchor = triggerRef.current
     const menu = menuRef.current

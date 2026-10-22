@@ -17,10 +17,12 @@ export async function setElectronContentSize(
     }
   }
   await pollUntilState({
-    description: `Electron content size ${size.width}x${size.height}`,
+    description: `Electron content size ${size.width}x${size.height} or larger`,
     observe: () =>
       app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getContentSize()),
-    accept: ([width, height]) => width === size.width && height === size.height,
+    // Windows may include extra native frame extent. These geometry scenarios
+    // need this much real canvas space, and measure the resulting viewport.
+    accept: ([width, height]) => width >= size.width && height >= size.height,
     retryObservationErrors: true,
     timeoutMs: 5000
   })

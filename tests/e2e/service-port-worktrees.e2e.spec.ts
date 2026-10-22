@@ -183,6 +183,7 @@ describe('service port management across worktrees e2e', () => {
       await branchTerminal.getByRole('button', { name: 'Terminal 1 更多终端操作' }).click()
       await waitForLocatorDisabled(stopAction, 'branch service stop action to settle')
       await page.keyboard.press('Escape')
+      await page.getByRole('menu', { name: 'Terminal 1 更多终端操作' }).waitFor({ state: 'hidden' })
       await branchTerminal
         .getByLabel('实际服务地址', { exact: true })
         .waitFor({ state: 'detached' })
