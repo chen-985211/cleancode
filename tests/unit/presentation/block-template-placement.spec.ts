@@ -1,3 +1,4 @@
+import { BlockGraph } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import type { BlockTemplateSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import { projectBlockTemplateRects } from '../../../src/contexts/block-graph/presentation/view-models/blockTemplateGeometry'
 import { resolveBlockTemplatePlacement } from '../../../src/presentation/app-shell/workbench/creation/blockTemplatePlacement'
@@ -48,6 +49,43 @@ describe('block template placement', () => {
           })
       )
     ).toBe(true)
+  })
+
+  it('instantiates the same combination footprint used to avoid a lower obstacle', () => {
+    const template: BlockTemplateSnapshot = {
+      ...createWorkflowTemplate(),
+      type: 'combination',
+      connections: [],
+      nodes: createWorkflowTemplate().nodes.map((node, index) => ({
+        ...node,
+        position: { x: index * 760, y: 0 },
+        size: { width: 640, height: 360 }
+      }))
+    }
+    const obstacle = {
+      id: 'below',
+      position: { x: 368, y: 900 },
+      size: { width: 800, height: 300 }
+    }
+    const origin = resolveBlockTemplatePlacement({
+      desiredCenter: { x: 1100, y: 480 },
+      occupiedRects: [obstacle],
+      template
+    })
+    const preview = projectBlockTemplateRects(template, origin)[0]!
+    const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
+    graph.instantiateBlockTemplate(template, origin)
+    for (const snapshot of [
+      graph.toSnapshot(),
+      BlockGraph.fromSnapshot(graph.toSnapshot()).toSnapshot()
+    ]) {
+      const actual = snapshot.terminalGroups[0]!
+      expect({ position: actual.position, size: actual.size }).toEqual({
+        position: preview.position,
+        size: preview.size
+      })
+      expect(overlaps(actual, obstacle)).toBe(false)
+    }
   })
 
   it('uses the complete combination boundary as one unchanged collision footprint', () => {

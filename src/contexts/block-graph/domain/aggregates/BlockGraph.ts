@@ -70,7 +70,7 @@ import {
   createTerminalGroupId
 } from '../services/BlockGraphIdentifiers'
 import type { BlockTemplateSnapshot, InstantiatedBlockTemplateSnapshot } from './BlockTemplateTypes'
-import { normalizeBlockTemplate } from '../services/BlockTemplateProjection'
+import { instantiateBlockTemplate } from '../services/BlockTemplateInstantiation'
 import {
   createEmptyQuickExecutionSlots,
   normalizeQuickExecutionTarget,
@@ -135,7 +135,7 @@ export class BlockGraph {
       createTerminalGroupId
     )
 
-    const layout = layoutTerminalGroups(groups, blocks, connections)
+    const layout = layoutTerminalGroups(groups, blocks, connections, 'preserve-valid')
 
     return new BlockGraph(
       snapshot.id,
@@ -255,52 +255,7 @@ export class BlockGraph {
       return this.templateApplications.apply(operationId, sourceTemplate, () =>
         this.instantiateBlockTemplate(sourceTemplate, origin)
       )
-    const template = normalizeBlockTemplate(sourceTemplate)
-    const blockIdByTemplateNodeId = new Map<string, string>()
-
-    for (const node of template.nodes) {
-      const block = this.createTerminalBlock({
-        name: node.name,
-        description: node.description,
-        launchCommand: node.launchCommand,
-        position: {
-          x: origin.x + node.position.x,
-          y: origin.y + node.position.y
-        },
-        size: node.size
-      })
-      this.updateTerminalDefinition(block.id, {
-        name: node.name,
-        description: node.description,
-        launchCommand: node.launchCommand,
-        executionConfig: node.executionConfig
-      })
-      blockIdByTemplateNodeId.set(node.templateNodeId, block.id)
-    }
-
-    for (const connection of template.connections) {
-      this.connectTerminalBlocks({
-        sourceBlockId: blockIdByTemplateNodeId.get(connection.sourceTemplateNodeId)!,
-        targetBlockId: blockIdByTemplateNodeId.get(connection.targetTemplateNodeId)!
-      })
-    }
-
-    const blockIds = template.nodes.map((node) => blockIdByTemplateNodeId.get(node.templateNodeId)!)
-    const terminalGroup =
-      template.type === 'combination'
-        ? this.createTerminalGroup({ name: template.name, memberBlockIds: blockIds })
-        : null
-
-    return Object.freeze({
-      blockIds: Object.freeze(blockIds),
-      terminalGroupId: terminalGroup?.id ?? null,
-      executionScope: terminalGroup
-        ? Object.freeze({
-            terminalGroupId: terminalGroup.id,
-            type: 'terminal-group' as const
-          })
-        : Object.freeze({ blockIds: Object.freeze([...blockIds]), type: 'block-set' as const })
-    })
+    return instantiateBlockTemplate(this, sourceTemplate, origin)
   }
 
   moveBlock(blockId: string, position: BlockPositionSnapshot): void {
@@ -392,16 +347,19 @@ export class BlockGraph {
       ...block,
       size: terminalExpansionSize(block, this.terminalConnectionSnapshots)
     }))
-    this.reflowTerminalGroups()
+    this.reflowTerminalGroups([input.sourceBlockId, input.targetBlockId])
 
     return result.connection
   }
 
   disconnectTerminalBlocks(connectionId: string): void {
+    const connection = this.terminalConnectionSnapshots.find((edge) => edge.id === connectionId)
     this.terminalConnectionSnapshots = [
       ...removeTerminalConnection(this.terminalConnectionSnapshots, connectionId)
     ]
-    this.reflowTerminalGroups()
+    this.reflowTerminalGroups(
+      connection ? [connection.sourceBlockId, connection.targetBlockId] : []
+    )
   }
 
   deleteBlock(blockId: string): void {
@@ -420,6 +378,9 @@ export class BlockGraph {
   deleteBlocks(blockIds: readonly string[]): void {
     const deletedBlockIds = new Set(blockIds)
     for (const blockId of deletedBlockIds) this.requireTerminalBlock(blockId)
+    const affectedMembers = this.terminalGroupSnapshots
+      .filter((group) => group.memberBlockIds.some((id) => deletedBlockIds.has(id)))
+      .flatMap((group) => group.memberBlockIds)
     this.blockSnapshots = this.blockSnapshots.filter((block) => !deletedBlockIds.has(block.id))
     this.terminalConnectionSnapshots = this.terminalConnectionSnapshots.filter(
       (connection) =>
@@ -436,14 +397,17 @@ export class BlockGraph {
           : {})
       }
     })
-    this.reflowTerminalGroups()
+    this.reflowTerminalGroups(affectedMembers)
   }
 
   ensureTerminalBlockExists(blockId: string): void {
     this.requireTerminalBlock(blockId)
   }
 
-  createTerminalGroup(input: CreateTerminalGroupInput): TerminalGroupSnapshot {
+  createTerminalGroup(
+    input: CreateTerminalGroupInput,
+    memberLayout: 'flow-rows' | 'preserve' = 'flow-rows'
+  ): TerminalGroupSnapshot {
     const name = input.name.trim()
 
     if (!name) {
@@ -468,7 +432,8 @@ export class BlockGraph {
     const layout = createTerminalGroupLayout(
       { ...input, id: input.id ?? createTerminalGroupId(), name, memberBlockIds },
       this.blockSnapshots,
-      this.terminalConnectionSnapshots
+      this.terminalConnectionSnapshots,
+      memberLayout
     )
     this.blockSnapshots = layout.blocks
     this.terminalGroupSnapshots = [...this.terminalGroupSnapshots, layout.group]
@@ -654,14 +619,19 @@ export class BlockGraph {
     }
   }
 
-  private reflowTerminalGroups(): void {
+  private reflowTerminalGroups(affectedBlockIds: readonly string[]): void {
+    const groups = this.terminalGroupSnapshots.filter((group) =>
+      group.memberBlockIds.some((id) => affectedBlockIds.includes(id))
+    )
     const layout = layoutTerminalGroups(
-      this.terminalGroupSnapshots,
+      groups,
       this.blockSnapshots,
       this.terminalConnectionSnapshots
     )
     this.blockSnapshots = layout.blocks
-    this.terminalGroupSnapshots = layout.groups
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map(
+      (group) => layout.groups.find((updated) => updated.id === group.id) ?? group
+    )
   }
 
   private requireTerminalBlock(blockId: string): TerminalBlockSnapshot {

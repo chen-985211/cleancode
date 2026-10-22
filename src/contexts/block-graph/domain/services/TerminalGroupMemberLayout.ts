@@ -1,3 +1,4 @@
+import { terminalBlockVisibleSize } from '../aggregates/BlockGraphTypes'
 import type {
   BlockPositionSnapshot,
   CreateTerminalGroupInput,
@@ -41,7 +42,8 @@ export function createTerminalGroupLayout(
     readonly memberBlockIds: readonly string[]
   },
   blocks: readonly TerminalBlockSnapshot[],
-  connections: readonly TerminalConnectionSnapshot[]
+  connections: readonly TerminalConnectionSnapshot[],
+  memberLayout: 'flow-rows' | 'preserve' = 'flow-rows'
 ): TerminalGroupMemberLayoutResult {
   const bounds = createTerminalGroupBounds(input.memberBlockIds, blocks)
   const group: TerminalGroupSnapshot = {
@@ -53,7 +55,7 @@ export function createTerminalGroupLayout(
     isCollapsed: false,
     memberBlockIds: input.memberBlockIds
   }
-  return group.memberBlockIds.length === 0
+  return memberLayout === 'preserve' || group.memberBlockIds.length === 0
     ? { blocks: [...blocks], group }
     : layoutTerminalGroupMembers(group, blocks, connections)
 }
@@ -61,11 +63,16 @@ export function createTerminalGroupLayout(
 export function layoutTerminalGroups(
   groups: readonly TerminalGroupSnapshot[],
   blocks: readonly TerminalBlockSnapshot[],
-  connections: readonly TerminalConnectionSnapshot[]
+  connections: readonly TerminalConnectionSnapshot[],
+  mode: 'flow-rows' | 'preserve-valid' = 'flow-rows'
 ): { readonly blocks: TerminalBlockSnapshot[]; readonly groups: TerminalGroupSnapshot[] } {
   let nextBlocks = [...blocks]
   const nextGroups = groups.map((group) => {
-    if (group.memberBlockIds.length === 0) return group
+    if (
+      group.memberBlockIds.length === 0 ||
+      (mode === 'preserve-valid' && hasValidMemberLayout(group, nextBlocks))
+    )
+      return group
     const layout = layoutTerminalGroupMembers(group, nextBlocks, connections)
     nextBlocks = layout.blocks
     return layout.group
@@ -216,5 +223,36 @@ function normalizeGroupsContainingAnyBlock(
     group.memberBlockIds.some((memberId) => blockIds.has(memberId))
       ? normalizeTerminalGroupBounds(group, blocks)
       : group
+  )
+}
+
+// Reading a saved graph must not arrange an already valid template instance.
+// Legacy overlapping/out-of-bounds members still recover at the stored group anchor.
+function hasValidMemberLayout(
+  group: TerminalGroupSnapshot,
+  blocks: readonly TerminalBlockSnapshot[]
+): boolean {
+  const members = blocks.filter((block) => group.memberBlockIds.includes(block.id))
+  const rects = members.map((block) => ({ ...block.position, ...terminalBlockVisibleSize(block) }))
+  if (
+    Math.min(...rects.map((rect) => rect.x)) !== group.position.x + terminalGroupPadding.x ||
+    Math.min(...rects.map((rect) => rect.y)) !== group.position.y + terminalGroupPadding.y
+  )
+    return false
+  return rects.every(
+    (rect, index) =>
+      rect.x >= group.position.x + terminalGroupPadding.x &&
+      rect.y >= group.position.y + terminalGroupPadding.y &&
+      rect.x + rect.width <= group.position.x + group.size.width - terminalGroupPadding.x &&
+      rect.y + rect.height <= group.position.y + group.size.height - terminalGroupPadding.x &&
+      rects
+        .slice(index + 1)
+        .every(
+          (other) =>
+            rect.x + rect.width <= other.x ||
+            other.x + other.width <= rect.x ||
+            rect.y + rect.height <= other.y ||
+            other.y + other.height <= rect.y
+        )
   )
 }

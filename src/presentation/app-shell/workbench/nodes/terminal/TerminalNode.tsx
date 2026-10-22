@@ -21,6 +21,7 @@ import { TerminalMoreMenu } from './TerminalMoreMenu'
 import { TerminalServiceRuntimeBar } from '../../../../../contexts/run/presentation/components/TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
 import { useTerminalBodyMount } from './useTerminalBodyMount'
+import { useTerminalLaunchCommandEditing } from './useTerminalLaunchCommandEditing'
 import { TooltipLabel } from '../../../../shared/components/Tooltip'
 import { WorkbenchNodeResizer } from '../WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from '../WorkbenchNodeSelectionVeil'
@@ -94,7 +95,6 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
   const metadataFormId = `terminal-metadata-form-${block.id}`
   const hasRequestedAutoStartRef = useRef(false)
-  const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
   const {
     className: objectMotionClassName,
@@ -216,13 +216,12 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     setIsEditingMetadata(true)
   }, [])
 
-  useEffect(() => {
-    const requestId = data.launchCommandEditRequestId
-    if (requestId === undefined || requestId === lastLaunchCommandEditRequestIdRef.current) return
-
-    lastLaunchCommandEditRequestIdRef.current = requestId
-    startEditingLaunchCommand()
-  }, [data.launchCommandEditRequestId, startEditingLaunchCommand])
+  useTerminalLaunchCommandEditing({
+    data,
+    ready: !isCollapsed && hasExpanded && !isInteractionSuppressed,
+    surfaceRef: terminalShellRef,
+    onEdit: startEditingLaunchCommand
+  })
 
   const requestTerminalFocus = useCallback(() => {
     setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)

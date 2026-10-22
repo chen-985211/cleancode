@@ -199,6 +199,106 @@ describe('terminal metadata editing', () => {
     expect(onUpdateDefinition).toHaveBeenCalledTimes(1)
   })
 
+  it.each([false, true])(
+    'expands before focusing a quick-execution edit request, previously mounted=%s',
+    async (warm) => {
+      const geometry = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          const collapsed = this.classList.contains('terminal-node--collapsed')
+          return {
+            x: 0,
+            y: 0,
+            left: 0,
+            top: 0,
+            right: collapsed ? 220 : 720,
+            bottom: collapsed ? 44 : 460,
+            width: collapsed ? 220 : 720,
+            height: collapsed ? 44 : 460,
+            toJSON: () => ({})
+          } as DOMRect
+        })
+      try {
+        const data = createTerminalNodeData()
+        const onResizeBlock = vi.fn(async () => undefined)
+        const node = (collapsed: boolean, requestId?: number) => (
+          <TerminalNode
+            id="terminal-1"
+            type="terminal"
+            data={{
+              ...data,
+              onResizeBlock,
+              block: { ...data.block, isCollapsed: collapsed },
+              launchCommandEditRequestId: requestId
+            }}
+            dragging={false}
+            zIndex={0}
+            selectable
+            deletable
+            selected={false}
+            draggable
+            isConnectable={false}
+            positionAbsoluteX={240}
+            positionAbsoluteY={180}
+          />
+        )
+        const { rerender } = render(node(!warm))
+        if (warm) rerender(node(true))
+        rerender(node(true, 1))
+        await waitFor(() =>
+          expect(onResizeBlock).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ id: 'terminal-1', isCollapsed: true }),
+            { position: data.block.position, size: data.block.size, isCollapsed: false }
+          )
+        )
+        // A pending disclosure must not consume focus while the body is hidden/inert.
+        expect(screen.queryByRole('form')).not.toBeInTheDocument()
+        rerender(node(false, 1))
+        await waitFor(() => expect(screen.getByLabelText('启动命令')).toHaveFocus())
+        expect(screen.getByRole('form').closest('[inert]')).toBeNull()
+        fireEvent.keyDown(screen.getByLabelText('启动命令'), { key: 'Escape' })
+        expect(screen.getByRole('button', { name: 'Terminal 编辑终端信息' })).toHaveFocus()
+        rerender(node(false, 1))
+        expect(screen.queryByRole('form')).not.toBeInTheDocument()
+        expect(onResizeBlock).toHaveBeenCalledTimes(1)
+        // A request redirected to another terminal must not steal focus after disclosure.
+        rerender(node(true, 2))
+        await waitFor(() => expect(onResizeBlock).toHaveBeenCalledTimes(2))
+        rerender(node(false))
+        expect(screen.queryByRole('form')).not.toBeInTheDocument()
+      } finally {
+        geometry.mockRestore()
+      }
+    }
+  )
+
+  it('waits for the measured node to become visible before opening the requested editor', async () => {
+    const data = { ...createTerminalNodeData(), launchCommandEditRequestId: 1 }
+    const node = (visible: boolean) => (
+      <div style={{ visibility: visible ? 'visible' : 'hidden' }}>
+        <TerminalNode
+          id="terminal-1"
+          type="terminal"
+          data={data}
+          dragging={false}
+          zIndex={0}
+          selectable
+          deletable
+          selected={false}
+          draggable
+          isConnectable={false}
+          positionAbsoluteX={240}
+          positionAbsoluteY={180}
+        />
+      </div>
+    )
+    const { container, rerender } = render(node(false))
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+    expect(container.querySelector('form')).toBeNull()
+    rerender(node(true))
+    await waitFor(() => expect(screen.getByLabelText('启动命令')).toHaveFocus())
+  })
+
   it('opens the existing launch-command editor for an external quick-execution request', async () => {
     const data = createTerminalNodeData()
     const { rerender } = render(

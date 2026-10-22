@@ -1,3 +1,4 @@
+import { createBlockTemplate } from '../../../../src/contexts/block-graph/domain/services/BlockTemplateProjection'
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -24,6 +25,52 @@ describe('block graph filesystem repository', () => {
   afterEach(async () => {
     await rm(projectDirectory, { recursive: true, force: true })
     await rm(appStateDirectory, { recursive: true, force: true })
+  })
+
+  it('preserves a template layout across disk reads and unrelated transactions', async () => {
+    const source = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'source' })
+    for (const id of ['a', 'b'])
+      source.createTerminalBlock({
+        id,
+        name: id,
+        description: '',
+        position: { x: 0, y: 0 },
+        size: { width: 640, height: 360 }
+      })
+    source.createTerminalGroup({ id: 'group', name: 'Template', memberBlockIds: ['a', 'b'] })
+    source.moveBlock('a', { x: 100, y: 100 })
+    source.moveBlock('b', { x: 860, y: 100 })
+    const template = createBlockTemplate({
+      id: 'template',
+      name: 'Template',
+      description: '',
+      scope: { type: 'global' },
+      createdAt: '2026-10-22T00:00:00Z',
+      graph: source.toSnapshot(),
+      selectedBlockIds: ['a', 'b']
+    })
+    const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    await repository.initializeDefaultGraph(projectDirectory, graph)
+    const created = await repository.transactDefaultGraph(projectDirectory, 'main', (current) =>
+      current.instantiateBlockTemplate(template, { x: 400, y: 300 })
+    )
+    expect(created!.graph.blocks.map((block) => block.position)).toEqual([
+      { x: 400, y: 300 },
+      { x: 1160, y: 300 }
+    ])
+    const reopened = new FileSystemBlockGraphRepository(appStateDirectory)
+    expect(await reopened.findDefaultGraphSnapshot(projectDirectory, 'main')).toEqual(
+      created!.graph
+    )
+    const saved = await reopened.transactDefaultGraph(projectDirectory, 'main', (current) =>
+      current.updateTerminalGroupMetadata(created!.result.terminalGroupId!, { name: 'Renamed' })
+    )
+    expect(saved!.graph.blocks).toEqual(created!.graph.blocks)
+    expect(saved!.graph.terminalGroups[0]).toEqual({
+      ...created!.graph.terminalGroups[0],
+      name: 'Renamed'
+    })
   })
 
   it('restores collapsed terminals, partial workflow membership and boundary connections from disk', async () => {
