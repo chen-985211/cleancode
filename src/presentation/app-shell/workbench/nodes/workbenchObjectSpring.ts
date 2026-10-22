@@ -156,7 +156,6 @@ export function createWorkbenchObjectSpringController({
 
   const scheduleFrame = (): void => {
     if (animationFrameId !== null) return
-    lastFrameTimestamp = scheduler.now()
     animationFrameId = scheduler.requestFrame(advanceFrame)
   }
 
@@ -468,6 +467,9 @@ export function createWorkbenchObjectSpringController({
       }
 
       present()
+      // Seed only a new animation. Successive frames share RAF's timestamp;
+      // resetting to now() would subtract callback work differently per shell.
+      if (animationFrameId === null) lastFrameTimestamp = scheduler.now()
       scheduleFrame()
     }
   }

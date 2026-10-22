@@ -6,6 +6,55 @@ import {
 import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types/workbenchObjectMotion'
 
 describe('workbench object spring', () => {
+  it('keeps collapsing rows separated when shell callbacks finish at different times', () => {
+    const topClock = createFrameScheduler()
+    const bottomClock = createFrameScheduler()
+    let callbackCost = 0
+    const top = createSurface()
+    const bottom = createSurface()
+    const topController = createWorkbenchObjectSpringController({
+      scheduler: { ...topClock, now: () => topClock.now() + callbackCost }
+    })
+    const bottomController = createWorkbenchObjectSpringController({ scheduler: bottomClock })
+    topController.motionChanged(
+      top,
+      {
+        ...createMotion('group-reflow', { x: 0, y: 0 }),
+        shellRect: {
+          from: { x: 0, y: 0, width: 420, height: 280 },
+          to: { x: 0, y: 0, width: 220, height: 44 }
+        }
+      },
+      false,
+      vi.fn()
+    )
+    bottomController.motionChanged(
+      bottom,
+      {
+        ...createMotion('group-reflow', { x: 0, y: 0 }),
+        shellRect: {
+          from: { x: 0, y: 352, width: 220, height: 44 },
+          to: { x: 0, y: 116, width: 220, height: 44 }
+        }
+      },
+      false,
+      vi.fn()
+    )
+
+    // RAF timestamps identify a shared frame even when expensive callbacks
+    // ahead of one shell make performance.now() much later than that timestamp.
+    callbackCost = 70
+    for (let frame = 0; frame < 8; frame++) {
+      topClock.advanceNextFrame(80)
+      bottomClock.advanceNextFrame(80)
+      const topBottom = readProperty(top, '--workbench-object-motion-shell-height')
+      const bottomTop = 116 + readProperty(bottom, '--workbench-object-motion-shell-y')
+      expect(bottomTop - topBottom).toBeCloseTo(72, 3)
+    }
+    topController.dispose()
+    bottomController.dispose()
+  })
+
   it('materializes a created object from the center without changing layout geometry', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()

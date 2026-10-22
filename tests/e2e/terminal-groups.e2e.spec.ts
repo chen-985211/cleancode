@@ -378,6 +378,7 @@ describe('terminal group direct manipulation', () => {
       )
       await waitForTerminalOutput(page, 'Prepare', 'DISCLOSURE_SESSION_中文')
       const sessionId = await readTerminalSessionId(page, 'Prepare')
+      const buildSessionId = await readTerminalSessionId(page, 'Build')
       const xterm = await terminal(page, ids.a).locator('.xterm').elementHandle()
       await page.getByRole('button', { name: 'Prepare 折叠终端' }).click()
       await terminal(page, ids.a).locator('.terminal-node--collapsed').waitFor()
@@ -542,7 +543,7 @@ describe('terminal group direct manipulation', () => {
       expect(foldedGraph.terminalGroups[0]?.isCollapsed).toBe(true)
       expect(foldedGraph.connections).toEqual(ids.edges)
       await page.reload()
-      await waitForTerminalShellReady(page, 'Build')
+      expect(await readTerminalSessionId(page, 'Build')).toBe(buildSessionId)
       await waitForMotion(page)
       const beforeWorkflowMove = await readE2eBlockGraph(workbench)
       // Quick slots drag only their binding; the visible workflow label owns canvas movement.
@@ -569,7 +570,7 @@ describe('terminal group direct manipulation', () => {
       }
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)
       await page.reload()
-      await waitForTerminalShellReady(page, 'Prepare')
+      await waitForTerminalOutput(page, 'Prepare', 'DISCLOSURE_SESSION_中文')
       expect((await readE2eBlockGraph(workbench)).connections).toEqual(ids.edges)
       expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([])
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)

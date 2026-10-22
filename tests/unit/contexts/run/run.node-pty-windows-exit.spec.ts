@@ -124,6 +124,19 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(agent.listenForDrainData).toHaveBeenCalledOnce()
   })
 
+  it('consumes pending input write errors only after ConPTY shutdown begins', () => {
+    const agent = createBundledConptyAgentHarness()
+    const error = Object.assign(new Error('write EAGAIN'), { code: 'EAGAIN' })
+    expect(() => agent.inputSocket.emit('error', error)).toThrow(error)
+
+    agent.kill()
+
+    expect(() => agent.inputSocket.emit('error', error)).not.toThrow()
+    expect(agent.destroyInput).toHaveBeenCalledOnce()
+    expect(agent.nativeKill).toHaveBeenCalledOnce()
+    expect(agent.disposeWorker).toHaveBeenCalledOnce()
+  })
+
   it('absorbs delayed pipe errors while disposing a failed ConPTY spawn', () => {
     const agent = createFailedConptySpawnHarness()
 
@@ -216,12 +229,13 @@ function createPreReadyWindowsTerminalHarness() {
 
 function createBundledConptyAgentHarness() {
   const destroyInput = vi.fn()
+  const inputSocket = Object.assign(new EventEmitter(), { destroy: destroyInput })
   const disposeWorker = vi.fn()
   const listenForDrainData = vi.fn()
   const nativeKill = vi.fn()
   const agent = Object.create(WindowsPtyAgent.prototype) as {
     _conoutSocketWorker: { dispose: () => void }
-    _inSocket: { destroy: () => void }
+    _inSocket: EventEmitter & { destroy: () => void }
     _killRequested: boolean
     _outSocket: { on: (event: string, listener: () => void) => void }
     _pty: number
@@ -231,7 +245,7 @@ function createBundledConptyAgentHarness() {
     kill(): void
   }
   agent._conoutSocketWorker = { dispose: disposeWorker }
-  agent._inSocket = { destroy: destroyInput }
+  agent._inSocket = inputSocket
   agent._killRequested = false
   agent._outSocket = { on: listenForDrainData }
   agent._pty = 42
@@ -243,6 +257,7 @@ function createBundledConptyAgentHarness() {
     destroyInput,
     disposeWorker,
     kill: () => agent.kill(),
+    inputSocket,
     listenForDrainData,
     nativeKill
   }

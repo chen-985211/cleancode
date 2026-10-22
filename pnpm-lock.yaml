@@ -12,7 +12,7 @@ patchedDependencies:
     hash: 9f9d05ea1df8c5ed387f0bd9e80f84cc97a31e2d4b60d5c182f1e7c13c7a9f06
     path: patches/@xterm__xterm@6.0.0.patch
   node-pty@1.1.0:
-    hash: 47c225fe7eb39ce7ff34c66e466b12fecf60c4562bdc1eeffee8531bb7ef7b33
+    hash: c0aacf2a04058f0eeb172ca2ac3eb11b5ebaa9acad421ac5ced070224b76c630
     path: patches/node-pty@1.1.0.patch
 
 importers:
@@ -54,7 +54,7 @@ importers:
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       node-pty:
         specifier: 1.1.0
-        version: 1.1.0(patch_hash=47c225fe7eb39ce7ff34c66e466b12fecf60c4562bdc1eeffee8531bb7ef7b33)
+        version: 1.1.0(patch_hash=c0aacf2a04058f0eeb172ca2ac3eb11b5ebaa9acad421ac5ced070224b76c630)
       react:
         specifier: 19.2.7
         version: 19.2.7
@@ -7369,7 +7369,7 @@ snapshots:
 
   node-int64@0.4.0: {}
 
-  node-pty@1.1.0(patch_hash=47c225fe7eb39ce7ff34c66e466b12fecf60c4562bdc1eeffee8531bb7ef7b33):
+  node-pty@1.1.0(patch_hash=c0aacf2a04058f0eeb172ca2ac3eb11b5ebaa9acad421ac5ced070224b76c630):
     dependencies:
       node-addon-api: 7.1.1
 
