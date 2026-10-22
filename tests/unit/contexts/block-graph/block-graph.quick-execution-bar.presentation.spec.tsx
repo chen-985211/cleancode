@@ -198,39 +198,56 @@ describe('quick execution bar', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it.each([
-    { type: 'terminal' as const, terminalBlockId: 'worker' },
-    { type: 'workflow' as const, terminalBlockIds: ['api', 'web'] },
-    { type: 'combination' as const, terminalGroupId: 'development' }
-  ])('reorders a $type shortcut assignment without focusing its canvas target', (target) => {
-    const onReorder = vi.fn()
-    const onFocus = vi.fn()
-    const graph = createGraph()
-    render(
-      <QuickExecutionBar
-        graph={{
-          ...graph,
-          quickExecutionSlots: graph.quickExecutionSlots!.map((slot) =>
-            slot.number === 2 ? { ...slot, target } : slot
-          )
-        }}
-        onAdd={vi.fn()}
-        onClear={vi.fn()}
-        onFocus={onFocus}
-        onReorder={onReorder}
-      />
+  it.each(
+    [
+      { type: 'terminal' as const, terminalBlockId: 'worker' },
+      { type: 'workflow' as const, terminalBlockIds: ['api', 'web'] },
+      { type: 'combination' as const, terminalGroupId: 'development' }
+    ].flatMap((target) =>
+      (['outside', 'expanded', 'collapsed'] as const).map((group) => ({ target, group }))
     )
+  )(
+    'reorders a $target.type shortcut without moving or focusing its $group target',
+    ({ target, group }) => {
+      const onReorder = vi.fn()
+      const onFocus = vi.fn()
+      const baseGraph = createGraph()
+      const graph = {
+        ...baseGraph,
+        terminalGroups: baseGraph.terminalGroups!.map((entry) => ({
+          ...entry,
+          isCollapsed: group === 'collapsed',
+          memberBlockIds: group === 'outside' ? [] : entry.memberBlockIds
+        }))
+      }
+      const originalGraph = structuredClone(graph)
+      render(
+        <QuickExecutionBar
+          graph={{
+            ...graph,
+            quickExecutionSlots: graph.quickExecutionSlots!.map((slot) =>
+              slot.number === 2 ? { ...slot, target } : slot
+            )
+          }}
+          onAdd={vi.fn()}
+          onClear={vi.fn()}
+          onFocus={onFocus}
+          onReorder={onReorder}
+        />
+      )
 
-    const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-    fireEvent.dragStart(source)
-    const destination = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
-    fireEvent.dragOver(destination)
-    fireEvent.drop(destination)
+      const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+      fireEvent.dragStart(source)
+      const destination = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
+      fireEvent.dragOver(destination)
+      fireEvent.drop(destination)
 
-    expect(onReorder).toHaveBeenCalledWith(2, 1)
-    expect(onFocus).not.toHaveBeenCalled()
-    expectBlackHoleMediaAbsent()
-  })
+      expect(onReorder).toHaveBeenCalledWith(2, 1)
+      expect(onFocus).not.toHaveBeenCalled()
+      expect(graph).toEqual(originalGraph)
+      expectBlackHoleMediaAbsent()
+    }
+  )
 
   it('keeps the popover DOM inert while closing and reuses it when opening reverses', () => {
     render(

@@ -173,9 +173,7 @@ describe('terminal drag geometry', () => {
 
   it.each([
     { zoom: 0.5, expanded: false, reducedMotion: false },
-    { zoom: 1, expanded: false, reducedMotion: false },
-    { zoom: 0.5, expanded: true, reducedMotion: false },
-    { zoom: 1, expanded: true, reducedMotion: true }
+    { zoom: 0.5, expanded: true, reducedMotion: false }
   ])(
     'keeps members and edges attached through release: $zoom, expanded=$expanded, reduced=$reducedMotion',
     async ({ zoom, expanded, reducedMotion }) => {

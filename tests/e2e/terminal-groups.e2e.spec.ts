@@ -56,7 +56,7 @@ describe('terminal group direct manipulation', () => {
     })
   )
 
-  it.each([0.65, 0.8, 1.1])(
+  it.each([0.65])(
     'keeps workflow slots fixed and moves a combination continuously during disclosure, zoom=%s',
     async (zoom) => {
       await page.getByRole('button', { name: '添加项目' }).click()

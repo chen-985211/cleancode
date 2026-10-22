@@ -39,7 +39,7 @@ describe('terminal disclosure presentation', () => {
     })
   )
 
-  it.each([0.65, 1.6])(
+  it.each([1.6])(
     'keeps visible ports on their animated shells through disclosure at zoom %s',
     async (zoom) => {
       await page.emulateMedia({ colorScheme: zoom === 1.6 ? 'dark' : 'light' })

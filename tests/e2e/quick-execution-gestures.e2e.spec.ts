@@ -20,6 +20,9 @@ import {
   waitForQuickExecutionVisualToSettle
 } from '../support/quickExecutionVisualE2e'
 
+// Representative native gestures only. Target/state/zoom matrices live in
+// quick-execution-focus.spec.ts, quick-execution-actions.spec.tsx and
+// block-graph.quick-execution-bar.presentation.spec.tsx.
 // Real pointer capture/native drag ordering and screen geometry require Electron.
 // Each case owns its process/profile/project. Graph IDs survive reload; visible
 // target bounds and persisted graph facts are the oracles, not animation timing.
@@ -138,35 +141,23 @@ describe('quick execution gesture ownership', () => {
     return graph
   }
 
-  it.each(['slot', 'directional shortcut', 'slots during flight'] as const)(
-    'preserves readable zoom while smoothly focusing the same compact target: %s',
-    async (method) => {
+  it(
+    'preserves readable zoom while retargeting compact slots during flight',
+    async () => {
       const graph = await prepare(cases[2], true)
-      const samples = await recordViewportMotion(
-        page,
-        method === 'directional shortcut' ? 'keydown' : 'click',
-        async () => {
-          if (method === 'directional shortcut') {
-            await page.keyboard.press(
-              process.platform === 'darwin' ? 'Meta+ArrowRight' : 'Alt+ArrowRight'
-            )
-            return
-          }
-          const initialTransform = await page.locator('.react-flow__viewport').getAttribute('style')
-          await page.locator('[data-quick-execution-slot="1"] button').click()
-          if (method === 'slots during flight') {
-            await page.waitForFunction(
-              (initial) =>
-                document.querySelector('.react-flow__viewport')!.getAttribute('style') !== initial,
-              initialTransform
-            )
-            await page.locator('[data-quick-execution-slot="2"] button').click()
-            await page.locator('[data-quick-execution-slot="3"] button').click()
-          }
-        }
-      )
+      const samples = await recordViewportMotion(page, 'click', async () => {
+        const initialTransform = await page.locator('.react-flow__viewport').getAttribute('style')
+        await page.locator('[data-quick-execution-slot="1"] button').click()
+        await page.waitForFunction(
+          (initial) =>
+            document.querySelector('.react-flow__viewport')!.getAttribute('style') !== initial,
+          initialTransform
+        )
+        await page.locator('[data-quick-execution-slot="2"] button').click()
+        await page.locator('[data-quick-execution-slot="3"] button').click()
+      })
       await writeFile(
-        `test-results/quick-execution-gestures/motion-${method}.json`,
+        `test-results/quick-execution-gestures/motion-in-flight.json`,
         JSON.stringify(samples, null, 2)
       )
       expect(samples.length).toBeGreaterThan(5)
@@ -176,36 +167,23 @@ describe('quick execution gesture ownership', () => {
       expect(final.zoom).toBeCloseTo(initial.zoom, 3)
       const target = page.locator(`.react-flow__node[data-id="${graph.terminalGroups[0]!.id}"]`)
       expect(await target.isVisible()).toBe(true)
-      if (method === 'directional shortcut') {
-        const canvas = (await page.locator('.react-flow').boundingBox())!
-        const targetBox = (await target.boundingBox())!
-        expect(
-          Math.abs(targetBox.x + targetBox.width / 2 - canvas.x - canvas.width / 2)
-        ).toBeLessThan(2)
-        expect(
-          Math.abs(targetBox.y + targetBox.height / 2 - canvas.y - canvas.height / 2)
-        ).toBeLessThan(2)
-      } else {
-        const geometry = await readFocusGeometry(page, [graph.terminalGroups[0]!.id])
-        expect(geometry.centerError).toBeLessThan(2)
-        expect(geometry.overflow).toBeLessThan(1)
-      }
+      const geometry = await readFocusGeometry(page, [graph.terminalGroups[0]!.id])
+      expect(geometry.centerError).toBeLessThan(2)
+      expect(geometry.overflow).toBeLessThan(1)
       const focused = await readE2eBlockGraph(workbench)
       expect(focused.blocks).toEqual(graph.blocks)
       expect(focused.terminalGroups).toEqual(graph.terminalGroups)
-      await page.screenshot({ path: `test-results/quick-execution-gestures/motion-${method}.png` })
+      await page.screenshot({ path: `test-results/quick-execution-gestures/motion-in-flight.png` })
     },
     electronScenarioTimeoutMs
   )
 
-  it.each(cases)(
+  it.each([cases[1]])(
     'focuses complete targets in the visible safe viewport: $group',
     async (scenario) => {
       const graph = await prepare(scenario)
       const ids = [
-        scenario.group === 'collapsed'
-          ? [graph.terminalGroups[0]!.id]
-          : graph.blocks.slice(0, 2).map((block) => block.id),
+        graph.blocks.slice(0, 2).map((block) => block.id),
         [graph.terminalGroups[0]!.id],
         [graph.blocks[2]!.id]
       ]
@@ -228,7 +206,7 @@ describe('quick execution gesture ownership', () => {
     electronScenarioTimeoutMs
   )
 
-  it.each(cases)(
+  it.each([cases[0]])(
     'drags only bindings and preserves all canvas objects: $group',
     async (scenario) => {
       const graph = await prepare(scenario)

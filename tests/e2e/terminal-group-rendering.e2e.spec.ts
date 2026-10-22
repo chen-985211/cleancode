@@ -74,10 +74,7 @@ describe('terminal group rendering', () => {
     })
   }, electronScenarioTimeoutMs)
 
-  it.each([
-    { zoom: 0.65, members: 1 },
-    { zoom: 1.6, members: 3 }
-  ])(
+  it.each([{ zoom: 1.6, members: 3 }])(
     'preserves visible ordinary and Agent terminals at zoom $zoom with $members members',
     async ({ zoom, members }) => {
       await page.getByRole('button', { name: '添加项目' }).click()

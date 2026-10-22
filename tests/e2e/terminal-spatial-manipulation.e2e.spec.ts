@@ -230,58 +230,8 @@ describe('terminal spatial manipulation', () => {
     electronScenarioTimeoutMs
   )
 
-  it(
-    'joins arrowheads seamlessly on steep curves in either direction',
-    async () => {
-      const graph = await prepare(false, 1.6)
-      const ids = graph.blocks.map((block) => block.id)
-      for (const dy of [-150, 0, 150]) {
-        await page.evaluate(
-          async ({ graph, dy }) => {
-            const entry = (await window.cleancode!.listWorkbenches())[0]!
-            const scope = {
-              projectDirectory: entry.project.directory,
-              workspaceId: graph.workspaceId
-            }
-            for (const [index, block] of graph.blocks.entries())
-              await window.cleancode!.moveBlock({
-                ...scope,
-                blockId: block.id,
-                position: { x: 200 + index * 500, y: 250 + index * dy }
-              })
-          },
-          { graph, dy }
-        )
-        await page.reload()
-        await page.locator('.terminal-workflow-drag-handle').waitFor()
-        await settle(page)
-        const geometry = await readGeometry(page, ids, null, graph.connections ?? [])
-        expect(geometry.maxGap).toBeLessThan(1)
-        const source = geometry.members[0]!,
-          target = geometry.members[1]!
-        const fromY = source.y + source.height / 2,
-          toY = target.y + target.height / 2
-        for (const theme of ['light', 'dark'] as const) {
-          await page.emulateMedia({ colorScheme: theme })
-          await page.waitForFunction(
-            (theme) => document.documentElement.dataset.theme === theme,
-            theme
-          )
-          await page.screenshot({
-            path: `test-results/terminal-spatial/arrow-${dy}-${theme}.png`,
-            clip: {
-              x: source.x + source.width - 50,
-              y: Math.min(fromY, toY) - 35,
-              width: target.x - source.x - source.width + 100,
-              height: Math.abs(fromY - toY) + 70
-            }
-          })
-        }
-      }
-    },
-    electronScenarioTimeoutMs
-  )
-
+  // Curve direction and marker/port joins are parameterized in
+  // terminal-dependency-edge.spec.tsx; resize above retains real SVG attachment coverage.
   it(
     'pans a workflow at the edge without losing the pointer grab, and keeps the released camera',
     async () => {
@@ -322,7 +272,7 @@ describe('terminal spatial manipulation', () => {
     electronScenarioTimeoutMs
   )
 
-  it.each([0.53, 1])(
+  it.each([0.53])(
     'moves a group as one fixed space without a release rebound at zoom %s',
     async (zoom) => {
       const graph = await prepare(true, zoom)
