@@ -49,8 +49,10 @@ describe('terminal rendering workload coordinator', () => {
     coordinator.requestRasterAlignment()
     coordinator.setSidebarMotionActive(true)
     coordinator.setSidebarMotionActive(false)
+    coordinator.setObjectMotionActive(true)
+    coordinator.setObjectMotionActive(false)
 
-    expect(raster.beginInteraction).toHaveBeenCalledOnce()
+    expect(raster.beginInteraction).toHaveBeenCalledTimes(2)
     expect(raster.updateCanvasZoom).toHaveBeenCalledWith(1.5)
     expect(raster.endInteraction).toHaveBeenCalledWith(1.5)
     expect(raster.requestRasterAlignment).toHaveBeenCalledOnce()
@@ -58,5 +60,33 @@ describe('terminal rendering workload coordinator', () => {
     expect(workload.beginInteraction).toHaveBeenNthCalledWith(2, 'sidebar')
     expect(workload.endInteraction).toHaveBeenNthCalledWith(1, 'canvas')
     expect(workload.endInteraction).toHaveBeenNthCalledWith(2, 'sidebar')
+    expect(workload.beginInteraction).toHaveBeenNthCalledWith(3, 'object-motion')
+    expect(workload.endInteraction).toHaveBeenNthCalledWith(3, 'object-motion')
+  })
+
+  it('keeps raster work suspended until both disclosure and canvas interaction finish', () => {
+    const raster = {
+      beginInteraction: vi.fn(),
+      endInteraction: vi.fn(),
+      requestRasterAlignment: vi.fn(),
+      updateCanvasZoom: vi.fn()
+    }
+    const workload = { beginInteraction: vi.fn(), endInteraction: vi.fn() }
+    const coordinator = createTerminalRenderingWorkloadCoordinator(raster, workload)
+    coordinator.setObjectMotionActive(true)
+    coordinator.beginInteraction()
+    coordinator.setObjectMotionActive(false)
+    expect(raster.beginInteraction).toHaveBeenCalledOnce()
+    expect(raster.endInteraction).not.toHaveBeenCalled()
+    coordinator.endInteraction(1.6)
+    expect(raster.endInteraction).toHaveBeenCalledWith(1.6)
+
+    coordinator.beginInteraction()
+    coordinator.setObjectMotionActive(true)
+    coordinator.endInteraction(0.8)
+    expect(raster.endInteraction).toHaveBeenCalledTimes(1)
+    expect(raster.updateCanvasZoom).toHaveBeenLastCalledWith(0.8)
+    coordinator.setObjectMotionActive(false)
+    expect(raster.endInteraction).toHaveBeenCalledTimes(2)
   })
 })

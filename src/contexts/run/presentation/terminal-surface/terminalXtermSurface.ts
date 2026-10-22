@@ -170,6 +170,9 @@ class XtermTerminalSurface implements TerminalSurface {
       )
       this.isOpened = true
       this.notifyNonCriticalWorkChange()
+    } else if (this.terminal.element?.parentElement !== attachment.element) {
+      // The idle measurement surface is adopted by its first run without reopening xterm.
+      if (this.terminal.element) attachment.element.append(this.terminal.element)
     }
 
     this.fitAndReportDimensions()

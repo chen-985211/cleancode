@@ -207,6 +207,8 @@ xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model �
 3. 降级不得 reset xterm、重新 attach view、替换 session、重放 snapshot 或清空搜索和粘贴状态。
 4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，并在异步 addon 激活完成后把 `data-terminal-renderer-ready` 置为 `true`；registry 诊断同时统计两类 surface，便于测试和故障定位。
 
+终端和组合的展开、折叠、重排也属于渲染交互窗口。App Shell 将对象动效的开始和完成交给现有 Run workload/raster 调度器；多个成员、反向动效及画布手势重叠时，最后一个活动来源结束后才能恢复 idle 初始化和位图调整。动画期间继续使用已有 DOM/WebGL 视图，不重新挂载已展开过的终端；网格 fit 暂停中间尺寸更新，结束后合并同步最终尺寸，不改变权威会话或输出序列。首次 WebGL context 创建不能插进展开动画的逐帧工作。首次展开先让外壳与折叠控件绘制，确认外壳已有可见尺寸变化后，再在下一次绘制后的任务中挂载其余工具栏和终端正文，不以固定等待猜测反馈已发生；在挂载前反向收起或卸载会取消该任务。空闲测量 surface 在同一源主题下交给首次运行继续使用，不因拿到 session ID 再创建一个 xterm；无运行身份的测量阶段不恢复临时输出或伪造 `80×24` 空 snapshot，保持首次有效网格，首次正式 attach 才恢复权威 snapshot，后续输出仍只进入精确 viewId。真正替换会话、改变源主题或卸载仍释放旧 surface，重开会话继续重置搜索、粘贴和焦点状态。性能回归应分别记录首次展开、再次展开、折叠和整组操作，同时检查点击到外壳反馈的延迟、首次创建次数和逐帧间隔，不能用动画帧间隔代替点击响应时间，也不能只观察结束截图。
+
 React Flow 缩放节点时，不能长期把分辨率不足的 WebGL backing store 交给 compositor 放大，也不能在每个缩放手势帧里重新分配 canvas。surface 使用两阶段策略：手势期间只更新外层 transform；视口停稳后，Run 的 raster policy 在浏览器 idle slice 中逐个调整绘制分辨率，普通终端与 Agent terminal 共用这份策略。可见终端保留至少 `1x` 的基础位图；低于 100% 的画布允许缩小显示基础位图，给再次放大留下分辨率余量。高倍率按 `1`、`1.15`、`1.3`、`1.45`、`1.6` 五档向上选择覆盖当前 zoom 的分辨率，以每档 `0.15` 的间距均衡中间倍率的采样差距。App Shell 从 BlockGraph 的公开 DTO 传入画布上限并截断最高档；当前最高档 `1.6x` 与 160% 上限直接匹配，预算允许时仍与最终显示的物理像素尺寸一致。中间倍率允许插值，稳定同一档内的字形并减少重建；降档只有在 zoom 比下一档边界低至少 `0.05` 时才发生，避免边界附近反复切换。
 
 组合展开或折叠时，已挂载节点保留 DOM 顺序，避免移动组合成员时连带移除、插回其他 WebGL surface；遮挡层级仍由既有 z-index 投影决定。可见集合变化也可能重新分配全局 raster 预算，因此 xterm 与 WebGL addon 的精确版本补丁共同回移 [xterm.js #5529](https://github.com/xtermjs/xterm.js/pull/5529)：画布 resize 清空位图后通过 `sync` redraw 同步恢复文字，不能等下一次 RAF。源码与 ESM/CJS 发布入口必须一致。真实 Electron raster 集成测试在升降档调用返回后立即读取字形像素；组合 E2E 同时检查普通终端、Agent 的逐帧文字、挂载连续性和会话身份。

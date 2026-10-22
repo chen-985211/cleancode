@@ -8,6 +8,7 @@ import { supportedLocales, type Locale } from '../../../src/presentation/i18n/lo
 import { translate } from '../../../src/presentation/i18n/messages'
 
 vi.mock('@xyflow/react', () => ({
+  useUpdateNodeInternals: () => () => undefined,
   Handle: () => null,
   NodeResizeControl: () => null,
   Position: { Left: 'left', Right: 'right' }

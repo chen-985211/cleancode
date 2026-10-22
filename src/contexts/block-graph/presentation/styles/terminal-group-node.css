@@ -65,6 +65,7 @@
 }
 
 .terminal-group-node > .terminal-node__handle {
+  visibility: hidden;
   opacity: 0;
   pointer-events: none;
 }

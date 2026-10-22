@@ -144,7 +144,7 @@
   transform-origin: center;
 }
 
-.terminal-node.workbench-object-motion--group-expand > * {
+.terminal-node.workbench-object-motion--group-expand > .terminal-node__content {
   opacity: var(--workbench-object-motion-content-opacity);
 }
 

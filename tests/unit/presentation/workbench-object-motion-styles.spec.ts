@@ -75,7 +75,7 @@ describe('workbench object motion styles', () => {
       /\.terminal-node:is\(\s*\.workbench-object-motion--group-expand,\s*\.workbench-object-motion--group-collapse\s*\)/
     )
     expect(objectMotionStyles).toMatch(
-      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
+      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\.terminal-node__content/
     )
     expect(collapsingMemberRule).not.toContain('visibility: hidden;')
     expect(collapsingMemberRule).not.toContain('opacity: 0;')

@@ -4,12 +4,13 @@ import { useEffect, type MutableRefObject } from 'react'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../types/workbenchSnapshot'
 import { restoreCanvasViewport } from './workbenchCanvasViewport'
-import type { TerminalZoomRasterCoordinator } from '../../../../contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
+import type { TerminalRenderingWorkloadCoordinator } from '../../context-adapters/run/terminalRenderingWorkloadCoordinator'
 
 export type TerminalZoomRasterCanvasCoordinator = Pick<
-  TerminalZoomRasterCoordinator,
+  TerminalRenderingWorkloadCoordinator,
   'beginInteraction' | 'endInteraction' | 'updateCanvasZoom' | 'requestRasterAlignment'
->
+> &
+  Partial<Pick<TerminalRenderingWorkloadCoordinator, 'setObjectMotionActive'>>
 
 export function useWorkbenchCanvasViewportRestoration({
   currentWorkbench,

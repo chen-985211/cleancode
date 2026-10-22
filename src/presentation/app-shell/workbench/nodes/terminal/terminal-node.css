@@ -542,8 +542,16 @@
   background: var(--cc-muted);
 }
 
-.terminal-node-anchor:hover > .terminal-node__handle,
-.terminal-node-anchor--selected > .terminal-node__handle {
+.terminal-node > .terminal-node__handle--input {
+  left: -1px;
+}
+
+.terminal-node > .terminal-node__handle--output {
+  right: -1px;
+}
+
+.terminal-node-anchor:hover .terminal-node__handle,
+.terminal-node-anchor--selected .terminal-node__handle {
   opacity: 1;
   background: var(--cc-workbench-selection);
 }
@@ -555,7 +563,15 @@
   flex-direction: column;
 }
 
-.terminal-node--disclosure-transition {
+.terminal-node__content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  border-radius: inherit;
+}
+
+.terminal-node--disclosure-transition > .terminal-node__content {
   overflow: clip;
 }
 

@@ -1,4 +1,5 @@
 import { useWorkbenchNodeDragSession } from './nodes/useWorkbenchNodeDragSession'
+import { useTerminalObjectMotionWorkload } from '../context-adapters/run/useTerminalObjectMotionWorkload'
 import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
 import {
   Background,
@@ -152,6 +153,7 @@ export function WorkbenchCanvas({
   const motionEdgeProjector = (motionEdgeProjectorRef.current ??=
     createWorkbenchObjectMotionEdgeProjector())
   const nodes = useWorkbenchNodes(nodeStore)
+  useTerminalObjectMotionWorkload(nodes, terminalZoomRasterCoordinator)
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const approvalEdges = useMemo(

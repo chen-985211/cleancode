@@ -4,7 +4,9 @@ import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/doma
 import { TerminalNode } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
+const flowGeometry = vi.hoisted(() => ({ update: vi.fn() }))
 vi.mock('@xyflow/react', () => ({
+  useUpdateNodeInternals: () => flowGeometry.update,
   Handle: () => null,
   NodeResizeControl: () => null,
   NodeResizer: () => null,
@@ -14,13 +16,16 @@ vi.mock('@xyflow/react', () => ({
 vi.mock('../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalViewport', () => ({
   TerminalViewport: ({
     isInputDisabled,
+    isResizeSuspended,
     onDimensionsChange
   }: {
     isInputDisabled: boolean
+    isResizeSuspended: boolean
     onDimensionsChange: (value: unknown) => void
   }) => (
     <>
       <span data-testid="terminal-input-disabled">{String(isInputDisabled)}</span>
+      <span data-testid="terminal-resize-suspended">{String(isResizeSuspended)}</span>
       <button type="button" onClick={() => onDimensionsChange({ columns: 100, rows: 30 })}>
         measure terminal
       </button>
@@ -29,6 +34,38 @@ vi.mock('../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalVi
 }))
 
 describe('terminal autostart runtime epoch', () => {
+  afterEach(() => vi.restoreAllMocks())
+  it('refreshes handle geometry after motion without duplicating the initial React Flow measurement', () => {
+    flowGeometry.update.mockClear()
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal(data)
+    expect(flowGeometry.update).not.toHaveBeenCalled()
+    rerenderTerminal(rerender, {
+      ...data,
+      objectMotion: {
+        id: 'expand',
+        kind: 'group-reflow',
+        offset: { x: 0, y: 0 }
+      }
+    })
+    expect(flowGeometry.update).not.toHaveBeenCalled()
+    rerenderTerminal(rerender, data)
+    expect(flowGeometry.update).toHaveBeenCalledExactlyOnceWith(data.block.id)
+  })
+  it('suspends intermediate terminal grid fitting until disclosure finishes', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal({
+      ...data,
+      objectMotion: {
+        id: 'expand',
+        kind: 'group-reflow',
+        offset: { x: 0, y: 0 }
+      }
+    })
+    expect(screen.getByTestId('terminal-resize-suspended')).toHaveTextContent('true')
+    rerenderTerminal(rerender, { ...data, objectMotion: undefined })
+    expect(screen.getByTestId('terminal-resize-suspended')).toHaveTextContent('false')
+  })
   it('parks the same terminal view during disclosure without starting or resizing a session', () => {
     const data = createTerminalNodeData(vi.fn())
     const running = {
@@ -50,6 +87,65 @@ describe('terminal autostart runtime epoch', () => {
     expect(data.onResize).not.toHaveBeenCalled()
     rerenderTerminal(rerender, running)
     expect(screen.getByTestId('terminal-input-disabled')).toBe(view)
+  })
+
+  it('keeps the same viewport when an idle terminal receives its first session identity', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal(data)
+    const view = screen.getByTestId('terminal-input-disabled')
+    rerenderTerminal(rerender, {
+      ...data,
+      session: { ...data.session, sessionId: 'first', status: 'running' }
+    })
+    expect(screen.getByTestId('terminal-input-disabled')).toBe(view)
+  })
+
+  it('resets the viewport on genuine session replacement while adopting the next idle measurement', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal({
+      ...data,
+      session: { ...data.session, sessionId: 'old', status: 'running' }
+    })
+    const oldView = screen.getByTestId('terminal-input-disabled')
+    rerenderTerminal(rerender, data)
+    const measurement = screen.getByTestId('terminal-input-disabled')
+    expect(measurement).not.toBe(oldView)
+    rerenderTerminal(rerender, {
+      ...data,
+      session: { ...data.session, sessionId: 'new', status: 'running' }
+    })
+    expect(screen.getByTestId('terminal-input-disabled')).toBe(measurement)
+    rerenderTerminal(rerender, {
+      ...data,
+      session: { ...data.session, sessionId: 'replacement', status: 'running' }
+    })
+    expect(screen.getByTestId('terminal-input-disabled')).not.toBe(measurement)
+  })
+
+  it('lets the collapsed shell open before mounting its first terminal body', async () => {
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        return {
+          width: 220,
+          height: this.classList.contains('terminal-node--collapsed') ? 44 : 280
+        } as DOMRect
+      })
+    const data = createTerminalNodeData(vi.fn())
+    const { rerender } = renderTerminal({ ...data, block: { ...data.block, isCollapsed: true } })
+    rerenderTerminal(rerender, data)
+    expect(screen.queryByTestId('terminal-input-disabled')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Terminal 折叠终端' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+    expect(screen.queryByRole('button', { name: 'Terminal 删除终端' })).not.toBeInTheDocument()
+    await screen.findByTestId('terminal-input-disabled')
+    expect(screen.getByRole('button', { name: 'Terminal 删除终端' })).toBeInTheDocument()
+    bounds.mockRestore()
+    expect(data.onStart).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('measure terminal'))
+    expect(data.onStart).toHaveBeenCalledOnce()
   })
 
   it('does not mount or auto-start an initially collapsed terminal', () => {

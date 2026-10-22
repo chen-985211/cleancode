@@ -6,6 +6,7 @@ import { TerminalNode } from '../../../src/presentation/app-shell/workbench/node
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 vi.mock('@xyflow/react', () => ({
+  useUpdateNodeInternals: () => () => undefined,
   Handle: () => <span data-testid="terminal-flow-handle" />,
   NodeResizeControl: ({ autoScale, onResizeEnd, position, style }: ResizeControlProps) => (
     <span
@@ -48,7 +49,7 @@ interface NodeResizerProps {
 }
 
 describe('terminal tooltips', () => {
-  it('keeps React Flow handles outside the animated terminal surface', () => {
+  it('keeps connection ports on the animated shell and resize controls on the layout anchor', () => {
     const { container } = render(
       <TerminalNode
         id="terminal-1"
@@ -78,7 +79,9 @@ describe('terminal tooltips', () => {
 
     expect(anchor).not.toBe(animatedSurface)
     expect(anchor).toContainElement(screen.getAllByTestId('terminal-flow-handle')[0])
-    expect(animatedSurface).not.toContainElement(screen.getAllByTestId('terminal-flow-handle')[0])
+    for (const handle of screen.getAllByTestId('terminal-flow-handle')) {
+      expect(animatedSurface).toContainElement(handle)
+    }
     expect(animatedSurface).not.toContainElement(
       screen.getAllByTestId('terminal-resize-control')[0]
     )
