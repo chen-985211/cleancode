@@ -529,6 +529,8 @@
 }
 
 .terminal-node__handle {
+  /* Keep both ports above the body and the collapsed header for hit testing. */
+  z-index: 2;
   width: 9px;
   height: 9px;
   border: 2px solid var(--cc-surface);
