@@ -545,19 +545,26 @@ async function crashElectronMainProcess(electronApp: ElectronApplication): Promi
 }
 
 async function waitForTerminalStopActionDisabled(page: Page): Promise<void> {
-  const stopAction = page.getByRole('button', { name: 'Terminal 1 停止当前命令' })
+  await page.getByRole('button', { name: 'Terminal 1 更多终端操作' }).click()
+  const stopAction = page.getByRole('menuitem', { name: 'Terminal 1 停止当前命令' })
   await pollUntilState({
     description: 'terminal stop action to become disabled',
     observe: () => stopAction.isDisabled(),
     accept: Boolean,
     timeoutMs: 5_000
   })
+  await page.keyboard.press('Escape')
 }
 
 async function retainTerminal(page: Page): Promise<string> {
   const sessionId = await readTerminalSessionId(page, 'Terminal 1')
-  await page.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' }).click()
-  await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
+  await page.getByRole('button', { name: 'Terminal 1 更多终端操作' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Terminal 1 应用退出后继续运行此会话' }).click()
+  await page.getByRole('button', { name: 'Terminal 1 更多终端操作' }).click()
+  await page
+    .getByRole('menuitemcheckbox', { name: 'Terminal 1 应用退出后不再保留此会话' })
+    .waitFor()
+  await page.keyboard.press('Escape')
   return sessionId
 }
 

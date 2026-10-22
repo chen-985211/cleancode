@@ -70,6 +70,7 @@ export const enTerminalMessages = {
   'terminalValidation.environmentVariable': 'Enter a valid environment variable name.',
   'terminalValidation.argumentTemplate':
     'The argument suffix must contain only safe arguments and exactly one {port} placeholder.',
+  'terminal.action.more': 'More terminal actions',
   'terminal.action.launch': 'Launch command',
   'terminal.action.configureLaunch': 'Configure launch command',
   'terminal.action.selected': 'Terminal selected',

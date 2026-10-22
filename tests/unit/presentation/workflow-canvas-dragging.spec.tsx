@@ -102,6 +102,44 @@ describe('workflow canvas dragging', () => {
     ])
   })
 
+  it('continues a pointer drag when projection replaces the workflow label', () => {
+    const { result, calls, event, canvas, label } = setup()
+    document.body.append(canvas)
+    canvas.append(label)
+    let capture: Element | null = null
+    canvas.setPointerCapture = () => {
+      capture = canvas
+    }
+    label.setPointerCapture = () => {
+      capture = label
+    }
+    act(() => result.current.begin(event(100, 80)))
+    act(() => result.current.preview(event(160, 120, canvas)))
+    // Chromium drops capture when its target is removed or reparented by projection.
+    act(() => {
+      label.remove()
+      if (capture === label) window.dispatchEvent(new Event('lostpointercapture'))
+    })
+    act(() => result.current.preview(event(200, 160, canvas)))
+    act(() => result.current.commit(event(200, 160, canvas)))
+    expect(calls.cancel).not.toHaveBeenCalled()
+    expect(calls.commit).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      expect.objectContaining({
+        id: 'a',
+        position: { x: 110, y: 100 }
+      })
+    )
+    expect(
+      result.current.suppressClick({
+        target: canvas,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn()
+      } as never)
+    ).toBe(true)
+    canvas.remove()
+  })
+
   it('supports keyboard grabbing, moving and placing the same complete workflow', () => {
     const { result, store, calls, canvas, label } = setup()
     label.dataset.canvasDragOrigin = 'canvas'

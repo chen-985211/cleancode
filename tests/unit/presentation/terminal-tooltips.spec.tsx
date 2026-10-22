@@ -223,7 +223,8 @@ describe('terminal tooltips', () => {
     expect(onSelect).toHaveBeenCalledOnce()
     expect(onSelect).toHaveBeenCalledWith(data.block)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 重开空终端会话' }), {
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal 重开空终端会话' }), {
       shiftKey
     })
     expect(onSelect).toHaveBeenCalledOnce()
@@ -280,16 +281,19 @@ describe('terminal tooltips', () => {
 
     await expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
     await expectTooltip('Terminal 配置启动命令', '配置启动命令')
-    await expectTooltip('Terminal 停止当前命令', '停止当前命令')
-    await expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
-    await expectTooltip('Terminal 删除终端', '删除终端')
+    await expectTooltip('Terminal 更多终端操作', '更多终端操作')
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    await expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令', 'menuitem')
 
-    const restartButton = screen.getByRole('button', { name: 'Terminal 重开空终端会话' })
+    const restartButton = screen.getByRole('menuitem', { name: 'Terminal 重开空终端会话' })
     expect(restartButton.querySelector('[data-icon-role="restart"]')).toHaveAttribute(
       'data-icon-glyph',
       'arrow-clockwise'
     )
-    expect(screen.queryByRole('button', { name: 'Terminal 更多终端操作' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Terminal 更多终端操作' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
 
     expect(document.querySelector('[data-icon="terminal-node"]')).toHaveAttribute(
       'data-icon-glyph',
@@ -304,7 +308,7 @@ describe('terminal tooltips', () => {
     })
     expect(
       screen
-        .getByRole('button', { name: 'Terminal 停止当前命令' })
+        .getByRole('menuitem', { name: 'Terminal 停止当前命令' })
         .querySelector('[data-icon="terminal-stop-command"]')
     ).toMatchObject({
       dataset: expect.objectContaining({ iconGlyph: 'stop', iconWeight: 'fill' })
@@ -315,7 +319,7 @@ describe('terminal tooltips', () => {
         .querySelector('[data-icon="terminal-edit"]')
     ).toHaveAttribute('data-icon-glyph', 'pencil-simple')
 
-    const deleteButton = screen.getByRole('button', { name: 'Terminal 删除终端' })
+    const deleteButton = screen.getByRole('menuitem', { name: 'Terminal 删除终端' })
     expect(deleteButton.querySelector('[data-icon="terminal-delete"]')).toHaveAttribute(
       'data-icon-glyph',
       'trash'
@@ -357,7 +361,8 @@ describe('terminal tooltips', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('停止本次运行')
     fireEvent.click(stopWorkflow)
     expect(onStopWorkflow).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Terminal 停止当前命令' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    expect(screen.getByRole('menuitem', { name: 'Terminal 停止当前命令' })).toBeInTheDocument()
   })
 
   it('explains the workflow retention restriction to pointer and keyboard users', async () => {
@@ -390,7 +395,8 @@ describe('terminal tooltips', () => {
     )
 
     const explanation = '工作流会话会随应用退出停止，不能跨应用保留'
-    const retentionButton = screen.getByRole('button', {
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    const retentionButton = screen.getByRole('menuitemcheckbox', {
       name: `Terminal ${explanation}`
     })
     expect(retentionButton).toHaveAttribute('aria-disabled', 'true')
@@ -409,8 +415,8 @@ describe('terminal tooltips', () => {
     expect(onToggleRetention).not.toHaveBeenCalled()
   })
 
-  it('orders terminal actions like the shared terminal group actions', () => {
-    render(
+  it('keeps primary actions ordered and separates only the disclosure button', () => {
+    const { container } = render(
       <TerminalNode
         id="terminal-1"
         type="terminal"
@@ -434,12 +440,27 @@ describe('terminal tooltips', () => {
     expect(actionNames).toEqual([
       'Terminal 从此处运行终端流程',
       'Terminal 配置启动命令',
+      'Terminal 编辑终端信息',
+      'Terminal 更多终端操作',
+      'Terminal 折叠终端'
+    ])
+    const divider = container.querySelector('.terminal-node__action-divider')!
+    expect(divider.previousElementSibling).toContainElement(
+      screen.getByRole('button', { name: 'Terminal 更多终端操作' })
+    )
+    expect(divider.nextElementSibling).toContainElement(
+      screen.getByRole('button', { name: 'Terminal 折叠终端' })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    expect(
+      Array.from(screen.getByRole('menu').querySelectorAll('[role^=menuitem]')).map((item) =>
+        item.getAttribute('aria-label')
+      )
+    ).toEqual([
       'Terminal 停止当前命令',
       'Terminal 应用退出后继续运行此会话',
       'Terminal 重开空终端会话',
-      'Terminal 编辑终端信息',
-      'Terminal 删除终端',
-      'Terminal 折叠终端'
+      'Terminal 删除终端'
     ])
   })
 
@@ -538,8 +559,12 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
   }
 }
 
-async function expectTooltip(accessibleName: string, tooltip: string): Promise<void> {
-  const button = screen.getByRole('button', { name: accessibleName })
+async function expectTooltip(
+  accessibleName: string,
+  tooltip: string,
+  role = 'button'
+): Promise<void> {
+  const button = screen.getByRole(role, { name: accessibleName })
   expect(button).not.toHaveAttribute('title')
   expect(button).not.toHaveAttribute('data-cc-tooltip')
 

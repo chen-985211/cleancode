@@ -541,12 +541,13 @@ describe('terminal group direct manipulation', () => {
       await waitForTerminalShellReady(page, 'Build')
       await waitForMotion(page)
       const beforeWorkflowMove = await readE2eBlockGraph(workbench)
-      const label = page.locator('[data-quick-execution-slot="1"]')
+      // Quick slots drag only their binding; the visible workflow label owns canvas movement.
+      const label = terminal(page, ids.b).locator('.terminal-workflow-drag-handle')
       const labelBox = await requiredBox(label)
       const paneBox = await requiredBox(page.locator('.react-flow__pane'))
       await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2)
       await page.mouse.down()
-      await page.mouse.move(paneBox.x + 1200, paneBox.y + 1100, { steps: 18 })
+      await page.mouse.move(paneBox.x + 900, paneBox.y + 700, { steps: 18 })
       await page.mouse.up()
       const moved = await waitForGraph(
         workbench,

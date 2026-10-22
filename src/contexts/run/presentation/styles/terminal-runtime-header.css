@@ -1,15 +1,3 @@
-.terminal-node__action--retention-active {
-  border-color: var(--cc-terminal-control-foreground);
-  background: var(--cc-terminal-control-active);
-  color: var(--cc-terminal-control-foreground);
-}
-
-.terminal-node__action--retention-active:hover:not(:disabled) {
-  border-color: var(--cc-terminal-control-foreground);
-  background: var(--cc-terminal-control-active);
-  color: var(--cc-terminal-control-foreground);
-}
-
 .workflow-state {
   display: inline-flex;
   height: 16px;

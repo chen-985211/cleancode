@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Fragment, memo } from 'react'
 
 import { TerminalGroupCard } from '../../../../../contexts/block-graph/presentation/components/TerminalGroupCard'
+import { TerminalGroupMoreMenu } from './TerminalGroupMoreMenu'
 import { useI18n } from '../../../../i18n/useI18n'
 import {
   agentApprovalConnectionSourceHandleId,
@@ -33,6 +34,13 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   return (
     <TerminalGroupCard
       data={data}
+      renderMoreMenu={(onRename) => (
+        <TerminalGroupMoreMenu
+          name={data.group.name}
+          onRename={onRename}
+          onDissolve={() => void data.onDissolveGroup(data.group)}
+        />
+      )}
       isContextSelected={data.isContextSelected}
       isPending={isPending}
       leadingContent={

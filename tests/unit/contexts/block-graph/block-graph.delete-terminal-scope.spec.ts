@@ -7,6 +7,28 @@ import { DeleteTerminalScopeUseCase } from '../../../../src/contexts/block-graph
 import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 
 describe('delete terminal scope', () => {
+  it.each([false, true])(
+    'removes an empty combination (collapsed: %s) without altering other objects',
+    async (isCollapsed) => {
+      const fixture = createFixture()
+      await fixture.repository.transactDefaultGraph('/project', 'main', (graph) => {
+        graph.createTerminalGroup({ id: 'empty', name: 'Empty', memberBlockIds: [] })
+        graph.setTerminalGroupCollapsed('empty', isCollapsed)
+      })
+      const before = fixture.repository.snapshot()
+      const snapshot = await fixture.deleteTerminalScope.execute({
+        projectDirectory: '/project',
+        workspaceId: 'main',
+        target: { type: 'combination', terminalGroupId: 'empty', terminalBlockIds: [] }
+      })
+      expect(snapshot.blocks).toEqual(before.blocks)
+      expect(snapshot.connections).toEqual(before.connections)
+      expect(snapshot.terminalGroups).toEqual(
+        before.terminalGroups.filter((group) => group.id !== 'empty')
+      )
+    }
+  )
+
   it('deletes one complete workflow in one graph transaction and preserves unrelated objects', async () => {
     const fixture = createFixture()
 
@@ -81,6 +103,10 @@ describe('delete terminal scope', () => {
   })
 
   it.each([
+    { target: { type: 'combination' as const, terminalGroupId: 'missing', terminalBlockIds: [] } },
+    {
+      target: { type: 'combination' as const, terminalGroupId: 'combination', terminalBlockIds: [] }
+    },
     {
       target: { type: 'workflow' as const, terminalBlockIds: ['workflow-a'] }
     },

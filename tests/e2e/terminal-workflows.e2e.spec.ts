@@ -44,7 +44,7 @@ describe('terminal workflows e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
-    // Compact CI geometry lets closing editors overlap neighboring connection handles.
+    // Compact CI geometry keeps fixed canvas controls close to terminal title actions.
     await page.setViewportSize({ width: 1024, height: 681 })
   }, electronLaunchTimeoutMs)
 
@@ -72,6 +72,9 @@ describe('terminal workflows e2e', () => {
         'Terminal 2',
         createE2ePrintCommand('workflow-build-complete')
       )
+      await page.getByRole('button', { name: '适应画布' }).click()
+      await waitForTerminalViewportGeometry(page, initialSessions.first)
+      await waitForTerminalViewportGeometry(page, initialSessions.second)
       await connectTerminalNodes(page)
 
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()
@@ -126,6 +129,10 @@ async function configureLaunchCommand(
   terminalName: string,
   command: string
 ): Promise<void> {
+  // Overview may place compact title actions beneath the fixed workbench toolbar.
+  // Minimap navigation also reaches terminals outside the current viewport.
+  await page.getByRole('button', { name: `聚焦终端 ${terminalName}`, exact: true }).click()
+  await waitForTerminalViewportGeometry(page, await readTerminalSessionId(page, terminalName))
   await page.getByRole('button', { name: `${terminalName} 配置启动命令` }).click()
   const input = page.getByRole('textbox', { name: '启动命令' })
   await input.fill(command)

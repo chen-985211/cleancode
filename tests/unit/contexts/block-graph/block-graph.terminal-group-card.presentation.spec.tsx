@@ -12,10 +12,15 @@ import {
 describe('terminal group card', () => {
   it('owns group metadata editing and publishes the trimmed name', async () => {
     const onUpdateGroupMetadata = vi.fn(async () => undefined)
-    render(<TerminalGroupCard data={createData({ onUpdateGroupMetadata })} memberRows={null} />)
+    render(
+      <TerminalGroupCard
+        data={createData({ onUpdateGroupMetadata })}
+        memberRows={null}
+        renderMoreMenu={(onRename) => <button onClick={onRename}>重命名组合</button>}
+      />
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 更多组合操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '重命名组合' }))
+    fireEvent.click(screen.getByRole('button', { name: '重命名组合' }))
     fireEvent.change(screen.getByRole('textbox', { name: '组合名称' }), {
       target: { value: '  新组合  ' }
     })
@@ -30,7 +35,13 @@ describe('terminal group card', () => {
   it('publishes runtime and structure intents without owning their execution', () => {
     const onStartGroup = vi.fn()
     const onEditGroup = vi.fn()
-    render(<TerminalGroupCard data={createData({ onEditGroup, onStartGroup })} memberRows={null} />)
+    render(
+      <TerminalGroupCard
+        data={createData({ onEditGroup, onStartGroup })}
+        memberRows={null}
+        renderMoreMenu={(onRename) => <button onClick={onRename}>重命名组合</button>}
+      />
+    )
 
     fireEvent.click(screen.getByRole('button', { name: '启动项目 启动组合命令' }))
     expect(screen.queryByRole('button', { name: '启动项目 管理组合内容' })).not.toBeInTheDocument()

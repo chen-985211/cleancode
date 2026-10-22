@@ -14,9 +14,10 @@ import type { TerminalBlockMetadataInput } from '../../../../../contexts/block-g
 import { agentApprovalTargetHandleId } from '../agent/agentApprovalHandles'
 import {
   TerminalRuntimeActions,
-  TerminalWorkflowStatusBadge,
-  type TerminalRuntimeActionsProps
+  TerminalWorkflowStatusBadge
 } from '../../../../../contexts/run/presentation/components/TerminalRuntimeHeader'
+import type { TerminalSessionMenuItemsProps } from '../../../../../contexts/run/presentation/components/TerminalSessionMenuItems'
+import { TerminalMoreMenu } from './TerminalMoreMenu'
 import { TerminalServiceRuntimeBar } from '../../../../../contexts/run/presentation/components/TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
 import { useTerminalBodyMount } from './useTerminalBodyMount'
@@ -485,8 +486,8 @@ interface TerminalHeaderProps {
   readonly isTerminalGroupSelectionMode: boolean
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
-  readonly sessionKind: TerminalRuntimeActionsProps['sessionKind']
-  readonly retentionPolicy: TerminalRuntimeActionsProps['retentionPolicy']
+  readonly sessionKind: TerminalSessionMenuItemsProps['sessionKind']
+  readonly retentionPolicy: TerminalSessionMenuItemsProps['retentionPolicy']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
@@ -592,20 +593,13 @@ function TerminalHeader({
             <TerminalRuntimeActions
               terminalName={blockName}
               canQuickLaunch={canQuickLaunch}
-              isRunning={isRunning}
               isRecoveryPending={isRecoveryPending}
-              sessionKind={sessionKind}
-              retentionPolicy={retentionPolicy}
               isActiveWorkflowRoot={isActiveWorkflowRoot}
               isStoppingWorkflow={isStoppingWorkflow}
               onRunFromHere={onRunFromHere}
               onStopWorkflow={onStopWorkflow}
               onQuickLaunch={onQuickLaunch}
-              onStop={onStop}
-              onToggleRetention={onToggleRetention}
-              onRestart={onRestart}
             />
-            <span className="terminal-node__action-divider" aria-hidden="true" />
             <TooltipLabel content={editActionLabel}>
               <button
                 className={[
@@ -630,19 +624,18 @@ function TerminalHeader({
                 <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />
               </button>
             </TooltipLabel>
-            <TooltipLabel content={t('terminal.action.delete')}>
-              <button
-                className="terminal-node__action terminal-node__action--danger"
-                type="button"
-                aria-label={t('terminal.namedAction', {
-                  blockName,
-                  action: t('terminal.action.delete')
-                })}
-                onClick={onDelete}
-              >
-                <WorkbenchIcon size={15} data-icon="terminal-delete" role="delete" />
-              </button>
-            </TooltipLabel>
+            <TerminalMoreMenu
+              terminalName={blockName}
+              isRunning={isRunning}
+              isRecoveryPending={isRecoveryPending}
+              sessionKind={sessionKind}
+              retentionPolicy={retentionPolicy}
+              onStop={onStop}
+              onToggleRetention={onToggleRetention}
+              onRestart={onRestart}
+              onDelete={onDelete}
+            />
+            <span className="terminal-node__action-divider" aria-hidden="true" />
           </>
         ) : null}
         <TooltipLabel

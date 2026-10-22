@@ -63,6 +63,7 @@ export const zhCNTerminalMessages = {
   'terminalValidation.noBindingFixedOnly': '不注入端口只适用于固定端口策略。',
   'terminalValidation.environmentVariable': '请填写有效的环境变量名称。',
   'terminalValidation.argumentTemplate': '参数后缀必须只包含安全参数，并且恰好包含一个 {port}。',
+  'terminal.action.more': '更多终端操作',
   'terminal.action.launch': '启动命令',
   'terminal.action.configureLaunch': '配置启动命令',
   'terminal.action.selected': '已选择终端',

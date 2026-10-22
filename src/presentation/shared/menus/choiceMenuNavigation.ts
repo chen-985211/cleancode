@@ -6,7 +6,9 @@ const choices = (menu: HTMLElement) =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>('button')).filter(
     (item) =>
       !item.disabled &&
-      (item.getAttribute('role') === 'menuitem' || item.getAttribute('role') === 'menuitemradio')
+      (item.getAttribute('role') === 'menuitem' ||
+        item.getAttribute('role') === 'menuitemradio' ||
+        item.getAttribute('role') === 'menuitemcheckbox')
   )
 
 export function focusChoiceMenu(

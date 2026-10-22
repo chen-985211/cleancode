@@ -15,6 +15,7 @@ import { workbenchDragAutoPanDelta } from './viewport/workbenchDragAutoPan'
 type Point = { readonly x: number; readonly y: number }
 interface WorkflowDragSession {
   readonly handle: HTMLElement
+  readonly captureElement: HTMLElement
   readonly pointerId: number
   readonly node: WorkbenchFlowNode
   readonly nodes: ReadonlyMap<string, WorkbenchFlowNode>
@@ -50,7 +51,7 @@ export function useWorkflowCanvasDragging({
   readonly onCancel?: (nodeId: string) => void
 }) {
   const session = useRef<WorkflowDragSession | null>(null)
-  const suppressedHandle = useRef<HTMLElement | null>(null)
+  const suppressedHandle = useRef<WorkflowDragSession | null>(null)
   const panFrame = useRef<number | null>(null)
   const lastInput = useRef<InputEvent | null>(null)
   const stopPanning = () => {
@@ -67,7 +68,7 @@ export function useWorkflowCanvasDragging({
     session.current = null
     if (!current?.started) return
     finishViewport(current)
-    suppressedHandle.current = current.handle
+    suppressedHandle.current = current
     current.handle.removeAttribute('aria-pressed')
     onCancel?.(current.node.id)
     nodeStore.setNodes((nodes) =>
@@ -146,8 +147,12 @@ export function useWorkflowCanvasDragging({
     const node = scopeNodes[0]
     if (!node || !instanceRef.current) return false
     suppressedHandle.current = null
+    // Projection can reparent a node when hidden workflow members become visible.
+    // The canvas survives that update and keeps the gesture captured until release.
+    const captureElement = surfaceRef.current ?? handle
     session.current = {
       handle,
+      captureElement,
       pointerId: event.pointerId,
       node,
       nodes: new Map(scopeNodes.map((candidate) => [candidate.id, candidate])),
@@ -160,7 +165,7 @@ export function useWorkflowCanvasDragging({
       isOverCanvas: false,
       didPan: false
     }
-    if (event.pointerId >= 0) handle.setPointerCapture?.(event.pointerId)
+    if (event.pointerId >= 0) captureElement.setPointerCapture?.(event.pointerId)
     event.preventDefault()
     return true
   }
@@ -233,7 +238,7 @@ export function useWorkflowCanvasDragging({
     session.current = null
     stopPanning()
     current.handle.removeAttribute('aria-pressed')
-    suppressedHandle.current = current.handle
+    suppressedHandle.current = current
     event.preventDefault()
     event.stopPropagation()
     onCommit(event.nativeEvent, current.last)
@@ -241,9 +246,14 @@ export function useWorkflowCanvasDragging({
     return true
   }
   const suppressClick = (event: ReactMouseEvent<HTMLElement>): boolean => {
-    const handle = suppressedHandle.current
+    const suppressed = suppressedHandle.current
     suppressedHandle.current = null
-    if (!handle || !(event.target instanceof Node) || !handle.contains(event.target)) return false
+    if (
+      !suppressed ||
+      !(event.target instanceof Node) ||
+      (!suppressed.handle.contains(event.target) && event.target !== suppressed.captureElement)
+    )
+      return false
     event.preventDefault()
     event.stopPropagation()
     return true

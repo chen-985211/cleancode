@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
+import { TerminalSessionMenuItems } from '../../../../src/contexts/run/presentation/components/TerminalSessionMenuItems'
 import { I18nProvider } from '../../../../src/presentation/i18n/I18nProvider'
 import {
   TerminalRuntimeActions,
@@ -57,35 +58,32 @@ describe('terminal runtime header presentation', () => {
     expect(screen.queryByText('执行中')).not.toBeInTheDocument()
   })
 
-  it('keeps the five runtime actions ordered and publishes their narrow callbacks', () => {
+  it('keeps primary actions separate from session menu items and publishes narrow callbacks', () => {
     const callbacks = createCallbacks()
-    render(<TerminalRuntimeActions {...createProps(callbacks)} />)
+    const { rerender } = render(<TerminalRuntimeActions {...createProps(callbacks)} />)
 
     expect(
       screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    ).toEqual([
-      'Terminal 从此处运行终端流程',
-      'Terminal 启动命令',
-      'Terminal 停止当前命令',
-      'Terminal 应用退出后继续运行此会话',
-      'Terminal 重开空终端会话'
-    ])
+    ).toEqual(['Terminal 从此处运行终端流程', 'Terminal 启动命令'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Terminal 从此处运行终端流程' }))
     fireEvent.click(screen.getByRole('button', { name: 'Terminal 启动命令' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 停止当前命令' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 应用退出后继续运行此会话' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 重开空终端会话' }))
+    expect(document.querySelector('[data-icon="terminal-workflow-run"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'flow-arrow'
+    )
+    rerender(<TerminalSessionMenuItems {...createSessionProps(callbacks)} />)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal 停止当前命令' }))
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: 'Terminal 应用退出后继续运行此会话' })
+    )
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal 重开空终端会话' }))
 
     expect(callbacks.onRunFromHere).toHaveBeenCalledOnce()
     expect(callbacks.onQuickLaunch).toHaveBeenCalledOnce()
     expect(callbacks.onStop).toHaveBeenCalledOnce()
     expect(callbacks.onToggleRetention).toHaveBeenCalledOnce()
     expect(callbacks.onRestart).toHaveBeenCalledOnce()
-    expect(document.querySelector('[data-icon="terminal-workflow-run"]')).toHaveAttribute(
-      'data-icon-glyph',
-      'flow-arrow'
-    )
     expect(document.querySelector('[data-icon="terminal-retention"]')).toHaveAttribute(
       'data-icon-weight',
       'bold'
@@ -116,14 +114,14 @@ describe('terminal runtime header presentation', () => {
   it('keeps workflow retention focusable for its explanation without publishing a toggle', () => {
     const callbacks = createCallbacks()
     render(
-      <TerminalRuntimeActions
-        {...createProps(callbacks)}
+      <TerminalSessionMenuItems
+        {...createSessionProps(callbacks)}
         sessionKind="workflow"
         retentionPolicy="terminate-on-application-exit"
       />
     )
 
-    const retention = screen.getByRole('button', {
+    const retention = screen.getByRole('menuitemcheckbox', {
       name: 'Terminal 工作流会话会随应用退出停止，不能跨应用保留'
     })
     expect(retention).toHaveAttribute('aria-disabled', 'true')
@@ -138,10 +136,7 @@ function createProps(callbacks: ReturnType<typeof createCallbacks>): TerminalRun
   return {
     terminalName: 'Terminal',
     canQuickLaunch: true,
-    isRunning: true,
     isRecoveryPending: false,
-    sessionKind: 'interactive',
-    retentionPolicy: 'terminate-on-application-exit',
     isActiveWorkflowRoot: false,
     isStoppingWorkflow: false,
     ...callbacks
@@ -156,5 +151,17 @@ function createCallbacks() {
     onStop: vi.fn(),
     onToggleRetention: vi.fn(),
     onRestart: vi.fn()
+  }
+}
+
+function createSessionProps(callbacks: ReturnType<typeof createCallbacks>) {
+  return {
+    terminalName: 'Terminal',
+    isRunning: true,
+    isRecoveryPending: false,
+    sessionKind: 'interactive' as const,
+    retentionPolicy: 'terminate-on-application-exit' as const,
+    ...callbacks,
+    onAction: vi.fn()
   }
 }

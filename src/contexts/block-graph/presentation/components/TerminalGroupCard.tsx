@@ -1,4 +1,3 @@
-import { TerminalGroupMoreMenu } from './TerminalGroupMoreMenu'
 import {
   useCallback,
   useLayoutEffect,
@@ -56,6 +55,7 @@ export interface TerminalGroupCardProps {
   readonly isExpanding?: boolean
   readonly isPending?: boolean
   readonly leadingContent?: ReactNode
+  readonly renderMoreMenu: (onRename: () => void) => ReactNode
   readonly memberRows?: ReactNode
   readonly selectionContent?: ReactNode
   readonly surfaceClassName?: string
@@ -69,6 +69,7 @@ export function TerminalGroupCard({
   isContextSelected = false,
   isPending = false,
   leadingContent,
+  renderMoreMenu,
   selectionContent,
   surfaceClassName,
   surfaceRef,
@@ -190,7 +191,7 @@ export function TerminalGroupCard({
             onCancel={cancelEditingName}
           />
         ) : (
-          <GroupActionToolbar data={data} isInline onRename={startEditingName} />
+          <GroupActionToolbar data={data} isInline moreMenu={renderMoreMenu(startEditingName)} />
         )}
       </div>
 
@@ -210,10 +211,10 @@ export function TerminalGroupCard({
 interface GroupActionToolbarProps {
   readonly data: TerminalGroupCardData
   readonly isInline?: boolean
-  readonly onRename: () => void
+  readonly moreMenu: ReactNode
 }
 
-function GroupActionToolbar({ data, isInline = false, onRename }: GroupActionToolbarProps) {
+function GroupActionToolbar({ data, isInline = false, moreMenu }: GroupActionToolbarProps) {
   const group = data.group
   const { t } = useI18n()
 
@@ -277,11 +278,7 @@ function GroupActionToolbar({ data, isInline = false, onRename }: GroupActionToo
         </IconButton>
       </div>
 
-      <TerminalGroupMoreMenu
-        name={group.name}
-        onRename={onRename}
-        onDissolve={() => void data.onDissolveGroup(group)}
-      />
+      {moreMenu}
       <DisclosureButton data={data} />
     </div>
   )

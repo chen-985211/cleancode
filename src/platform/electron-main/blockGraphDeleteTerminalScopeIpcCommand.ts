@@ -29,7 +29,7 @@ export function readDeleteTerminalScopeCommand(command: unknown): DeleteTerminal
 function isBatchTerminalRemovalTarget(value: unknown): value is BatchTerminalRemovalTargetSnapshot {
   if (!isRecord(value) || !hasUniqueTerminalBlockIds(value.terminalBlockIds)) return false
   if (value.type === 'workflow') {
-    return hasExactKeys(value, ['type', 'terminalBlockIds'])
+    return value.terminalBlockIds.length > 0 && hasExactKeys(value, ['type', 'terminalBlockIds'])
   }
   return (
     value.type === 'combination' &&
@@ -42,7 +42,6 @@ function isBatchTerminalRemovalTarget(value: unknown): value is BatchTerminalRem
 function hasUniqueTerminalBlockIds(value: unknown): value is readonly string[] {
   return (
     Array.isArray(value) &&
-    value.length > 0 &&
     value.every((id) => typeof id === 'string' && id.length > 0) &&
     new Set(value).size === value.length
   )

@@ -50,7 +50,6 @@
 }
 
 .terminal-group-node__action {
-  --terminal-group-icon-cutout: var(--terminal-group-control);
   position: relative;
   display: inline-flex;
   width: 39px;
@@ -93,14 +92,12 @@
 }
 
 .terminal-group-node__action:hover:not(:disabled) {
-  --terminal-group-icon-cutout: var(--terminal-group-control-hover);
   background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__action[aria-pressed='true'] {
-  --terminal-group-icon-cutout: var(--cc-terminal-control-active);
   background: var(--cc-terminal-control-active);
   color: var(--cc-terminal-control-foreground);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-foreground) inset;
@@ -108,7 +105,6 @@
 
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
-  --terminal-group-icon-cutout: var(--cc-terminal-control-pressed);
   transform: translateY(1px);
   background: var(--cc-terminal-control-pressed);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
@@ -261,45 +257,6 @@
   gap: 3px;
 }
 
-.terminal-group-node__more {
-  position: relative;
-  display: flex;
-}
-
-.terminal-group-node__more-menu {
-  position: fixed;
-  z-index: 1600;
-  display: flex;
-  box-sizing: border-box;
-  flex-direction: column;
-  gap: 2px;
-  border: 1px solid var(--cc-border);
-  border-radius: 10px;
-  padding: 5px;
-  background: var(--cc-surface-overlay);
-  box-shadow: var(--cc-shadow-floating);
-  transform-origin: top right;
-}
-
-.terminal-group-node__more-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: transparent;
-  color: var(--cc-foreground);
-  font: inherit;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.terminal-group-node__more-menu button:is(:hover, :focus-visible) {
-  outline: 0;
-  background: var(--cc-surface-subtle);
-}
-
 .terminal-group-node__drop-hint {
   position: absolute;
   z-index: 4;
@@ -315,16 +272,6 @@
   white-space: nowrap;
   transform: translateX(-50%);
   pointer-events: none;
-}
-
-.terminal-group-icon__cutout {
-  fill: var(--terminal-group-icon-cutout);
-  stroke: var(--terminal-group-icon-cutout);
-}
-
-.terminal-group-icon__disconnect-accent {
-  fill: var(--cc-danger);
-  stroke: var(--cc-danger);
 }
 
 @keyframes terminal-group-saving-spin {

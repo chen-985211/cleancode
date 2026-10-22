@@ -20,6 +20,13 @@ describe('block graph terminal scope deletion IPC contract', () => {
         terminalGroupId: 'development',
         terminalBlockIds: ['api', 'web']
       }
+    },
+    {
+      target: {
+        type: 'combination' as const,
+        terminalGroupId: 'empty',
+        terminalBlockIds: []
+      }
     }
   ])('passes one complete $target.type target through IPC', async ({ target }) => {
     const ipcMain = new FakeIpcMain()
@@ -44,7 +51,9 @@ describe('block graph terminal scope deletion IPC contract', () => {
   it.each([
     { type: 'terminal', terminalBlockId: 'api' },
     { type: 'workflow', terminalBlockIds: [] },
-    { type: 'combination', terminalGroupId: 'development', terminalBlockIds: [] },
+    { type: 'combination', terminalGroupId: '', terminalBlockIds: [] },
+    { type: 'combination', terminalGroupId: 'development', terminalBlockIds: ['api', 'api'] },
+    { type: 'combination', terminalGroupId: 'development', terminalBlockIds: [''] },
     { type: 'combination', terminalBlockIds: ['api', 'web'] }
   ])('rejects malformed or unsupported target $type', async (target) => {
     const ipcMain = new FakeIpcMain()
