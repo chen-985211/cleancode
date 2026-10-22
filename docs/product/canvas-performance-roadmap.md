@@ -250,6 +250,8 @@ flowchart LR
 
 第三轮代码与目标自动化验证于 2026-08-15 完成：
 
+以下成员行记录描述该轮实现。当前折叠组合已改为应用图标，不再显示成员列表或成员状态行；当前交互与停放态规则以 [UI 契约](ui-contract.md#终端组合)和 [UI Style Guide](ui-style-guide.md#动效)为准，不应依据旧实现记录重新增加成员行。
+
 - renderer 窗口内建立按 terminal ID 订阅的状态投影 store。普通 Terminal 节点和折叠组合成员行直接订阅自身 runtime 状态；单个 session、状态或输出引用变化只通知对应 selector，不再触发整组 React Flow 节点投影。外部 store 接入后，`useWorkbenchFlowNodes` 的结构投影依赖中不再包含 terminal runtime record。
 - 被折叠组合停放的 Terminal 节点暂停 runtime 订阅，组合成员行继续作为必要消费者显示状态；组合重新展开时直接读取 store 的最新值，不建立积压队列，也不改变 Run session、输出或缓冲区事实。
 - 节点投影在完成既有瞬时几何、CanvasArrangement 堆叠和对象 motion 投影后，按稳定节点身份协调引用。Terminal、terminal group 与 Agent 分别使用显式事实维度比较；图事实、选择、workflow 状态或 motion 变化只替换受影响节点，未变化节点和已稳定的动作回调继续复用。实现没有使用全局深比较，也不把缓存作为业务判断来源。

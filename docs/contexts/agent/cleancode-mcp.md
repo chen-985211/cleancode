@@ -183,6 +183,8 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 `create_block` 显式提供 `position` 时原样采用；省略时，应用层把同工作区全部 Agent 的持久化布局统一注入为 `canvasRegions`，不赋予发起 Agent 特殊方向或距离优先级，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
 
+`update_terminal_group.isCollapsed` 复用界面的同一个 BlockGraph 折叠用例：`true` 收起，`false` 展开，成员与依赖关系不变；展开后的成员尺寸和排列继续遵循[积木图模型](../block-graph/block-graph.md#终端组合规则)。图快照中的组合 `position` 是已提交的空间锚点，`size` 是保存的展开尺寸，不是折叠图标底板或动画中间帧的尺寸。折叠应用图标、整区点击和展开收起动效由 Presentation 统一投影，无需新增 MCP 参数或由 Agent 模拟点击。`delete_terminal_group` 始终只解散组合并保留成员，不对应界面的“移除组合及其全部成员”；当前 MCP 未暴露该批量移除动作。
+
 Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置和依赖，再执行后续变更。完整新建路径按结构选择 `create_terminal`、`create_terminal_workflow` 或 `create_terminal_set`，在一次提交中返回新对象 ID、排列结果和已验证计划，不需要再串联细粒度工具；只有用户明确要求把既有流程组成新组合时，才使用空 `create_terminal_group` 加 `move_terminal_workflow_to_group`，不要优先使用兼容的 `memberBlockIds`。既有对象编辑路径仍按实际需要使用细粒度工具并在需要时重新排列、检查计划。Agent 的最终说明应报告持久化的策略与注入方式，不能把请求端口误报为本次运行的实际端点。
 
 所有工具通过 MCP `annotations` 如实声明副作用：`inspect_graph` 和 `inspect_terminal_workflow_plan` 的 `readOnlyHint` 为 `true`；创建、更新、连接和完整流程成员移动属于非破坏性写入；删除积木、解散组合和断开依赖的 `destructiveHint` 为 `true`；所有当前工具的 `openWorldHint` 都为 `false`。即使 Provider launch 已允许当前 Server 的工具，这些注解仍必须真实描述风险，并且不能替代 cleancode UI 审批。
