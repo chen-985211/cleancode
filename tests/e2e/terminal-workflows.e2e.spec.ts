@@ -24,7 +24,6 @@ import {
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
 } from '../support/e2eTerminal'
-import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
 import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 describe('terminal workflows e2e', () => {
@@ -146,21 +145,9 @@ async function connectTerminalNodes(page: Page): Promise<void> {
   const targetHandle = terminalNodeByTitle(page, 'Terminal 2').locator(
     '.terminal-node__handle--input'
   )
-  const sourceBox = await readRequiredBoundingBox(sourceHandle)
-  const targetBox = await readRequiredBoundingBox(targetHandle)
-  const sourcePoint = {
-    x: sourceBox.x + sourceBox.width - 1,
-    y: sourceBox.y + sourceBox.height / 2
-  }
-  const targetPoint = {
-    x: targetBox.x + 1,
-    y: targetBox.y + targetBox.height / 2
-  }
-
-  await page.mouse.move(sourcePoint.x, sourcePoint.y)
-  await page.mouse.down()
-  await page.mouse.move(targetPoint.x, targetPoint.y, { steps: 20 })
-  await page.mouse.up()
+  // Fit-to-canvas can resume after two identical geometry samples on a busy
+  // runner. Let locator actionability check the live handles before dragging.
+  await sourceHandle.dragTo(targetHandle, { steps: 20 })
   await page.locator('.react-flow__edge').waitFor({ state: 'attached' })
 }
 
