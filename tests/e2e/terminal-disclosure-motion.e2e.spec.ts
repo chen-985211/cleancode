@@ -122,6 +122,15 @@ describe('terminal disclosure presentation', () => {
         const recorder = await recordPresentation(page, ids)
         await action()
         await settle(page)
+        // Renderer activation is asynchronous after the shell settles. Finish the
+        // cold expansion before measuring the next gesture, so its delayed ready
+        // signal is not attributed to that subsequent collapse.
+        if (name === 'cold-expand') {
+          await page.waitForFunction(
+            () =>
+              !document.querySelector('.terminal-viewport[data-terminal-renderer-ready="false"]')
+          )
+        }
         const metrics = await recorder.evaluate((recorder) => recorder.stop())
         await recorder.dispose()
         results.push({ name, ...metrics })

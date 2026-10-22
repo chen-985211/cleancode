@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { Position, type EdgeProps } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import { TerminalDependencyEdge } from '../../../src/presentation/app-shell/workbench/nodes/terminal/TerminalDependencyEdge'
@@ -11,6 +11,64 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
 }))
 
 describe('terminal dependency edge attachment', () => {
+  it('follows shell writes before paint even when a reversal starts after the edge frame', async () => {
+    // The edge may have already sampled this frame when a node starts a new spring.
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    graph.getInternalNode.mockImplementation((id: string) => ({
+      internals: { positionAbsolute: { x: id === 'source' ? 100 : 600, y: 300 } },
+      style: { width: 420, height: 280 },
+      measured: {},
+      data: {}
+    }))
+    const { container, unmount } = render(
+      <div>
+        {['source', 'target'].map((id) => (
+          <div key={id} data-terminal-block-id={id}>
+            <div className="terminal-node workbench-object-motion--spatial" />
+          </div>
+        ))}
+        <svg>
+          <TerminalDependencyEdge
+            {...({
+              id: 'reversal',
+              source: 'source',
+              target: 'target',
+              sourcePosition: Position.Right,
+              targetPosition: Position.Left,
+              sourceX: 520,
+              sourceY: 440,
+              targetX: 600,
+              targetY: 440,
+              data: { followsObjectMotion: true }
+            } as EdgeProps)}
+          />
+        </svg>
+      </div>
+    )
+    try {
+      await act(async () => {})
+      await act(async () => {
+        for (const shell of container.querySelectorAll<HTMLElement>('.terminal-node')) {
+          shell.style.setProperty('--workbench-object-motion-shell-width', '270px')
+          shell.style.setProperty('--workbench-object-motion-shell-height', '100px')
+        }
+      })
+      expect(container.querySelector('path')!.getAttribute('d')).toMatch(/^M370,350 C/)
+      expectPortJoin(container, { x: 600, y: 350 })
+      await act(async () => {
+        for (const shell of container.querySelectorAll<HTMLElement>('.terminal-node')) {
+          shell.classList.remove('workbench-object-motion--spatial')
+          shell.removeAttribute('style')
+        }
+      })
+      expect(container.querySelector('path')!.getAttribute('d')).toMatch(/^M520,440 C/)
+      expectPortJoin(container, { x: 600, y: 440 })
+    } finally {
+      unmount()
+      frame.mockRestore()
+    }
+  })
+
   it('follows live resize dimensions before the persisted style is updated', () => {
     graph.getInternalNode.mockReturnValue({
       internals: { positionAbsolute: { x: 100, y: 200 } },

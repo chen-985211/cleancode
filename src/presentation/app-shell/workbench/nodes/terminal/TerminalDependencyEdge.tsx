@@ -16,7 +16,6 @@ export function TerminalDependencyEdge(props: EdgeProps) {
   const followsMotion = Boolean(props.data?.followsObjectMotion)
   useLayoutEffect(() => {
     if (!followsMotion) return
-    let frame = 0
     let disposed = false
     const surface = surfaceRef.current
     const findSurface = (id: string): HTMLElement | null => {
@@ -60,13 +59,19 @@ export function TerminalDependencyEdge(props: EdgeProps) {
           visibleOpacity(target, targetRect?.opacity)
         )
       )
-      frame = requestAnimationFrame(present)
     }
-    // Subscribe after node layout effects so each frame follows the spring writes.
+    // A reversal can schedule a node's spring after an existing edge callback.
+    // Observe shell writes in the same frame's microtask checkpoint instead of
+    // relying on requestAnimationFrame registration order, without reading layout.
+    const observer = new MutationObserver(present)
+    for (const element of [source, target]) {
+      if (element)
+        observer.observe(element, { attributes: true, attributeFilter: ['style', 'class'] })
+    }
     queueMicrotask(present)
     return () => {
       disposed = true
-      cancelAnimationFrame(frame)
+      observer.disconnect()
       surface?.style.removeProperty('opacity')
     }
   }, [flow, followsMotion, props])

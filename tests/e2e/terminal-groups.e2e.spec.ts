@@ -458,7 +458,9 @@ describe('terminal group direct manipulation', () => {
         { ids, workbench: workbenches[0]! }
       )
       await page.reload()
-      await waitForTerminalShellReady(page, 'Prepare')
+      // Restored PowerShell prompts can wrap at the compact workflow width.
+      // The existing session's output proves restore; a new prompt is not required.
+      await waitForTerminalOutput(page, 'Prepare', 'DISCLOSURE_SESSION_中文')
       await waitForGraph(
         workbench,
         (graph) => graph.terminalGroups[0]?.memberBlockIds.join() === ids.a

@@ -150,16 +150,18 @@ describe('quick execution gesture ownership', () => {
         method === 'directional shortcut' ? 'keydown' : 'click',
         async () => {
           if (method === 'directional shortcut') {
-            await page.keyboard.press('ControlOrMeta+ArrowRight')
+            await page.keyboard.press(
+              process.platform === 'darwin' ? 'Meta+ArrowRight' : 'Alt+ArrowRight'
+            )
             return
           }
+          const initialTransform = await page.locator('.react-flow__viewport').getAttribute('style')
           await page.locator('[data-quick-execution-slot="1"] button').click()
           if (method === 'slots during flight') {
             await page.waitForFunction(
-              () =>
-                new DOMMatrix(
-                  document.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform
-                ).a < 1.45
+              (initial) =>
+                document.querySelector('.react-flow__viewport')!.getAttribute('style') !== initial,
+              initialTransform
             )
             await page.locator('[data-quick-execution-slot="2"] button').click()
             await page.locator('[data-quick-execution-slot="3"] button').click()

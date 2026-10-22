@@ -189,6 +189,22 @@ async function captureFailureArtifacts(input: {
     join(input.workbench.appStateDirectory, 'terminal-runtime-provider', 'provider.log'),
     'utf8'
   ).catch(() => '')
+  // Automatic recovery rotates the crashed provider's logs before teardown.
+  // Keep bounded process stderr and the preceding instance's diagnostics too.
+  const providerFailureLogs = Object.fromEntries(
+    await Promise.all(
+      ['provider.log.1', 'provider-process.log', 'provider-process.log.1'].map(async (name) => [
+        name,
+        await readFile(
+          join(input.workbench.appStateDirectory, 'terminal-runtime-provider', name),
+          'utf8'
+        ).then(
+          (contents) => contents.slice(-20_000),
+          () => ''
+        )
+      ])
+    )
+  )
 
   await writeFile(
     join(e2eArtifactDirectory, `${artifactStem}.json`),
@@ -197,6 +213,7 @@ async function captureFailureArtifacts(input: {
         electronProcess: electronProcessState,
         processOutput: input.diagnostics.processOutput,
         providerLog: providerLog.slice(-20_000),
+        providerFailureLogs,
         rendererOutput: input.diagnostics.rendererOutput,
         rendererState,
         screenshotError,
