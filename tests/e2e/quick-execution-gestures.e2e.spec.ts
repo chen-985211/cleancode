@@ -14,6 +14,7 @@ import {
 import { createE2eTerminalEnvironment } from '../support/e2eTerminal'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { pollUntilState } from '../support/e2ePolling'
+import { setElectronContentSize } from '../support/e2eWindow'
 import {
   selectTheme,
   waitForQuickExecutionVisualToSettle
@@ -51,11 +52,7 @@ describe('quick execution gesture ownership', () => {
   ] as const
 
   async function prepare(scenario: (typeof cases)[number], onlyGroupVisible = false) {
-    await resources.electronApp!.evaluate(
-      ({ BrowserWindow }, { width, height }) =>
-        BrowserWindow.getAllWindows()[0]!.setContentSize(width, height),
-      scenario
-    )
+    await setElectronContentSize(resources.electronApp!, scenario)
     await page.getByRole('button', { name: '添加项目' }).click()
     const entries = await pollUntilState({
       description: 'registered quick gesture project',

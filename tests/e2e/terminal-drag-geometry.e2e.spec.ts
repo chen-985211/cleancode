@@ -15,6 +15,7 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { pollUntilState } from '../support/e2ePolling'
+import { setElectronContentSize } from '../support/e2eWindow'
 import { createE2eTerminalEnvironment } from '../support/e2eTerminal'
 
 // Real React Flow/D3 input and SVG screen geometry are essential here: mocked
@@ -31,9 +32,7 @@ describe('terminal drag geometry', () => {
     resources.electronApp = app
     page = await app.firstWindow()
     resources.page = page
-    await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]!.setContentSize(2200, 1400)
-    )
+    await setElectronContentSize(app, { width: 2200, height: 1400 })
     await page.waitForFunction(() => innerWidth >= 2200 && innerHeight >= 1400)
   }, electronLaunchTimeoutMs)
   afterEach(async ({ task }) =>

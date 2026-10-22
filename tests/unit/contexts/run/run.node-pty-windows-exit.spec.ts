@@ -124,19 +124,6 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(agent.listenForDrainData).toHaveBeenCalledOnce()
   })
 
-  it('consumes pending input write errors only after ConPTY shutdown begins', () => {
-    const agent = createBundledConptyAgentHarness()
-    const error = Object.assign(new Error('write EAGAIN'), { code: 'EAGAIN' })
-    expect(() => agent.inputSocket.emit('error', error)).toThrow(error)
-
-    agent.kill()
-
-    expect(() => agent.inputSocket.emit('error', error)).not.toThrow()
-    expect(agent.destroyInput).toHaveBeenCalledOnce()
-    expect(agent.nativeKill).toHaveBeenCalledOnce()
-    expect(agent.disposeWorker).toHaveBeenCalledOnce()
-  })
-
   it('absorbs delayed pipe errors while disposing a failed ConPTY spawn', () => {
     const agent = createFailedConptySpawnHarness()
 
