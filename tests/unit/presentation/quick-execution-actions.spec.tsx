@@ -15,6 +15,9 @@ import { useQuickExecutionActions } from '../../../src/presentation/app-shell/co
 describe('quick execution actions', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    const canvas = document.createElement('div')
+    canvas.className = 'react-flow'
+    document.body.append(canvas)
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({
@@ -32,6 +35,7 @@ describe('quick execution actions', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    document.body.replaceChildren()
   })
 
   it.each([
@@ -81,6 +85,15 @@ describe('quick execution actions', () => {
 
     await act(async () => harness.result.current.executeSlot(1))
 
+    expect(harness.setViewport).not.toHaveBeenCalled()
+    expect(harness.quickLaunchTerminal).toHaveBeenCalledOnce()
+  })
+
+  it('executes even when the canvas has no measurable safe viewport', async () => {
+    document.body.replaceChildren()
+    const target = { type: 'terminal' as const, terminalBlockId: 'terminal-1' }
+    const harness = createHarness(target, true)
+    await act(async () => harness.result.current.executeSlot(1))
     expect(harness.setViewport).not.toHaveBeenCalled()
     expect(harness.quickLaunchTerminal).toHaveBeenCalledOnce()
   })

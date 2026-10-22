@@ -132,7 +132,7 @@ export function useMinimapNodeFocus({
   )
 
   const focusTerminalBlock = useCallback(
-    (blockId: string, motion: WorkbenchViewportMotionIntent = { type: 'spatial' }) =>
+    (blockId: string, motion?: WorkbenchViewportMotionIntent) =>
       revealTerminalBlock(blockId, {
         activateTerminalInput: true,
         motion

@@ -70,12 +70,6 @@ export function QuickExecutionSlots(props: QuickExecutionSlotsProps) {
               .filter(Boolean)
               .join(' ')}
             data-quick-execution-slot={slot.number}
-            data-canvas-drag-target={
-              projection?.isAvailable && projection.target.type === 'workflow'
-                ? JSON.stringify(projection.target)
-                : undefined
-            }
-            data-canvas-drag-scope={projection?.target.type === 'workflow' ? 'workflow' : undefined}
             draggable={Boolean(projection)}
             onDragStart={
               projection ? (event) => props.onDragStart(event, slot.number, projection) : undefined

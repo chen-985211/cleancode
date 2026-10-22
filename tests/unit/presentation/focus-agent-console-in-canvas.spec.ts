@@ -1,4 +1,4 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
 import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { focusAgentConsoleInCanvas } from '../../../src/presentation/app-shell/workbench/viewport/focusAgentConsoleInCanvas'
@@ -13,8 +13,8 @@ describe('focus Agent console in canvas', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the created Agent layout before its flow node exists and clears sibling selections', () => {
-    const setViewport = vi.fn(async () => true)
+  it('uses the Agent layout before its flow node exists and clears sibling selections', () => {
+    const setViewport = vi.fn<(viewport: Viewport) => Promise<boolean>>(async () => true)
     const setSelectedAgentId = vi.fn()
     const setSelectedTerminalBlockIds = vi.fn()
     const setSelectedTerminalGroupId = vi.fn()
@@ -33,7 +33,16 @@ describe('focus Agent console in canvas', () => {
     expect(setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
     expect(setHoveredTerminalBlockId).toHaveBeenCalledWith(null)
-    expect(setViewport).toHaveBeenCalledWith({ x: -780, y: -150, zoom: 1 }, { duration: 0 })
+    const viewport = setViewport.mock.calls[0]![0] as unknown as {
+      x: number
+      y: number
+      zoom: number
+    }
+    expect(viewport.x + 1260 * viewport.zoom).toBeCloseTo(480)
+    expect(viewport.y + 470 * viewport.zoom).toBeCloseTo(320)
+    expect(viewport.zoom).toBeGreaterThan(0.6)
+    expect(720 * viewport.zoom).toBeLessThan(960)
+    expect(460 * viewport.zoom).toBeLessThan(640)
   })
 })
 

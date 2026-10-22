@@ -4,6 +4,22 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('workflow canvas dragging', () => {
+  it.each(['shortcut', 'unmarked'])(
+    'does not claim a workflow gesture from a %s outside the canvas drag handle',
+    (origin) => {
+      const { result, store, calls, event, canvas, label } = setup()
+      delete label.dataset.canvasDragOrigin
+      if (origin === 'shortcut') label.dataset.quickExecutionSlot = '1'
+      const before = store.getNodes()
+      const down = event(100, 700)
+      expect(result.current.begin(down)).toBe(false)
+      act(() => result.current.preview(event(300, 500, canvas)))
+      act(() => result.current.commit(event(300, 500, canvas)))
+      expect(store.getNodes()).toEqual(before)
+      expect(calls.start).not.toHaveBeenCalled()
+      expect(calls.commit).not.toHaveBeenCalled()
+    }
+  )
   it.each([0.5, 1])(
     'pans at the canvas edge while holding the pointer and stops on cancel, zoom=%s',
     async (zoom) => {
@@ -106,13 +122,16 @@ describe('workflow canvas dragging', () => {
     act(() => result.current.begin(event(100, 700)))
     act(() => result.current.preview(event(300, 500, canvas)))
     expect(store.getNodes().map((node) => node.position)).toEqual([
-      { x: 268, y: 480 },
-      { x: 768, y: 530 }
+      { x: 210, y: -180 },
+      { x: 710, y: -130 }
     ])
     expect(calls.commit).not.toHaveBeenCalled()
     act(() => result.current.commit(event(320, 500, canvas)))
     expect(calls.commit).toHaveBeenCalledOnce()
-    expect(calls.commit.mock.calls[0]?.[1]).toMatchObject({ id: 'a', position: { x: 288, y: 480 } })
+    expect(calls.commit.mock.calls[0]?.[1]).toMatchObject({
+      id: 'a',
+      position: { x: 230, y: -180 }
+    })
     expect(calls.start.mock.calls[0]?.[2]).toEqual(['a', 'b'])
   })
 
@@ -193,6 +212,7 @@ function setup(zoom = 1) {
     terminalBlockIds: ['a', 'b']
   })
   label.dataset.canvasDragScope = 'workflow'
+  label.dataset.canvasDragOrigin = 'canvas'
   const event = (clientX: number, clientY: number, target: Element = label) =>
     ({
       button: 0,

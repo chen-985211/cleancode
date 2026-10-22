@@ -198,14 +198,25 @@ describe('quick execution bar', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('reorders filled slots by dragging one shortcut assignment onto another', () => {
+  it.each([
+    { type: 'terminal' as const, terminalBlockId: 'worker' },
+    { type: 'workflow' as const, terminalBlockIds: ['api', 'web'] },
+    { type: 'combination' as const, terminalGroupId: 'development' }
+  ])('reorders a $type shortcut assignment without focusing its canvas target', (target) => {
     const onReorder = vi.fn()
+    const onFocus = vi.fn()
+    const graph = createGraph()
     render(
       <QuickExecutionBar
-        graph={createGraph()}
+        graph={{
+          ...graph,
+          quickExecutionSlots: graph.quickExecutionSlots!.map((slot) =>
+            slot.number === 2 ? { ...slot, target } : slot
+          )
+        }}
         onAdd={vi.fn()}
         onClear={vi.fn()}
-        onFocus={vi.fn()}
+        onFocus={onFocus}
         onReorder={onReorder}
       />
     )
@@ -217,6 +228,7 @@ describe('quick execution bar', () => {
     fireEvent.drop(destination)
 
     expect(onReorder).toHaveBeenCalledWith(2, 1)
+    expect(onFocus).not.toHaveBeenCalled()
     expectBlackHoleMediaAbsent()
   })
 

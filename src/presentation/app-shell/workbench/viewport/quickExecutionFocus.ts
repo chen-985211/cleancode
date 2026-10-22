@@ -5,7 +5,7 @@ import type {
   TerminalGroupSnapshot
 } from '../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
-import { transitionWorkbenchViewport } from './workbenchViewportMotion'
+import { focusWorkbenchNodesInCanvas } from './workbenchNavigationFocus'
 
 export function focusQuickExecutionTargetInCanvas({
   instance,
@@ -22,15 +22,7 @@ export function focusQuickExecutionTargetInCanvas({
   const nodes = nodeIds.map((nodeId) => instance.getNode(nodeId))
 
   if (nodes.some((node) => !node)) return false
-
-  void transitionWorkbenchViewport(instance, {
-    intent: { type: 'spatial' },
-    maxZoom: 1,
-    nodes: nodes as WorkbenchFlowNode[],
-    padding: 0.24,
-    type: 'fit-view'
-  })
-  return true
+  return focusWorkbenchNodesInCanvas(instance, nodes as WorkbenchFlowNode[])
 }
 
 function resolveVisibleQuickExecutionNodeIds(

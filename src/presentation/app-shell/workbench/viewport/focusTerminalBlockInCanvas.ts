@@ -5,17 +5,12 @@ import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewpo
 import { revealCreatedWorkbenchNode } from '../creation/revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from '../creation/scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
-import { workbenchNodeReadableZoom } from './workbenchNodeFocusViewport'
+import { revealNavigatedWorkbenchNode } from './workbenchNavigationFocus'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness
 } from '../creation/workbenchNodeInputActivation'
-import {
-  transitionWorkbenchViewport,
-  readWorkbenchViewportTargetZoom,
-  type WorkbenchViewportCommand,
-  type WorkbenchViewportMotionIntent
-} from './workbenchViewportMotion'
+import type { WorkbenchViewportMotionIntent } from './workbenchViewportMotion'
 
 interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
@@ -32,7 +27,7 @@ export function focusTerminalBlockInCanvas({
   block,
   reactFlowInstance,
   activateTerminalInput = true,
-  motion = { type: 'spatial' },
+  motion,
   targetZoom,
   viewportIntent = 'navigation',
   setSelectedTerminalBlockId,
@@ -57,13 +52,11 @@ export function focusTerminalBlockInCanvas({
           nodeSize: { height: measuredHeight, width: measuredWidth },
           reactFlowInstance
         })
-      : revealNavigatedTerminalBlock({
-          height: measuredHeight,
+      : revealNavigatedWorkbenchNode({
+          bounds: { ...position, height: measuredHeight, width: measuredWidth },
           motion,
-          position,
-          reactFlowInstance,
-          targetZoom,
-          width: measuredWidth
+          instance: reactFlowInstance,
+          targetZoom
         })
 
   if (!activateTerminalInput) {
@@ -91,31 +84,4 @@ export function focusTerminalBlockInCanvas({
     ...readinessOptions,
     transitionCompletion
   })
-}
-
-function revealNavigatedTerminalBlock({
-  height,
-  motion,
-  position,
-  reactFlowInstance,
-  targetZoom,
-  width
-}: {
-  readonly height: number
-  readonly motion: WorkbenchViewportMotionIntent
-  readonly position: { readonly x: number; readonly y: number }
-  readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-  readonly targetZoom?: number
-  readonly width: number
-}): Promise<boolean> {
-  const nextZoom =
-    targetZoom ??
-    Math.max(readWorkbenchViewportTargetZoom(reactFlowInstance), workbenchNodeReadableZoom)
-  const command = {
-    center: { x: position.x + width / 2, y: position.y + height / 2 },
-    intent: motion,
-    type: 'center',
-    zoom: nextZoom
-  } satisfies WorkbenchViewportCommand
-  return transitionWorkbenchViewport(reactFlowInstance, command)
 }

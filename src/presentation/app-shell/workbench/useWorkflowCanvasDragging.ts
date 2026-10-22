@@ -19,7 +19,7 @@ interface WorkflowDragSession {
   readonly node: WorkbenchFlowNode
   readonly nodes: ReadonlyMap<string, WorkbenchFlowNode>
   readonly startClient: Point
-  readonly startFlow: Point | null
+  readonly startFlow: Point
   readonly ids: readonly string[]
   readonly originalIds: ReadonlySet<string>
   started: boolean
@@ -133,7 +133,7 @@ export function useWorkflowCanvasDragging({
   const begin = (event: InputEvent): boolean => {
     if (event.button !== 0 || !(event.target instanceof Element)) return false
     const handle = event.target.closest<HTMLElement>('[data-canvas-drag-target]')
-    if (!handle || handle.closest('[data-quick-execution-arranging="true"]')) return false
+    if (!handle || handle.dataset.canvasDragOrigin !== 'canvas') return false
     const target = JSON.parse(handle.dataset.canvasDragTarget!) as {
       type: string
       terminalBlockIds: string[]
@@ -153,10 +153,7 @@ export function useWorkflowCanvasDragging({
       nodes: new Map(scopeNodes.map((candidate) => [candidate.id, candidate])),
       originalIds: new Set(nodes.map((candidate) => candidate.id)),
       startClient: { x: event.clientX, y: event.clientY },
-      startFlow:
-        handle.dataset.canvasDragOrigin === 'canvas'
-          ? instanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-          : null,
+      startFlow: instanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
       ids: target.terminalBlockIds,
       started: false,
       last: node,
@@ -185,8 +182,8 @@ export function useWorkflowCanvasDragging({
     current.isOverCanvas = hit instanceof Element && Boolean(hit.closest('.react-flow'))
     const point = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY })
     const delta = {
-      x: point.x - (current.startFlow?.x ?? current.node.position.x + 32),
-      y: point.y - (current.startFlow?.y ?? current.node.position.y + 20)
+      x: point.x - current.startFlow.x,
+      y: point.y - current.startFlow.y
     }
     current.last = {
       ...current.node,

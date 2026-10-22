@@ -6,17 +6,12 @@ import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewpo
 import { revealCreatedWorkbenchNode } from '../creation/revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from '../creation/scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
-import { workbenchNodeReadableZoom } from './workbenchNodeFocusViewport'
+import { revealNavigatedWorkbenchNode } from './workbenchNavigationFocus'
 import {
   activateWorkbenchNodeInput,
   createWorkbenchNodeInputSurfaceReadiness
 } from '../creation/workbenchNodeInputActivation'
-import {
-  transitionWorkbenchViewport,
-  readWorkbenchViewportTargetZoom,
-  type WorkbenchViewportCommand,
-  type WorkbenchViewportMotionIntent
-} from './workbenchViewportMotion'
+import type { WorkbenchViewportMotionIntent } from './workbenchViewportMotion'
 
 interface FocusAgentConsoleInCanvasInput {
   readonly activateAgentInput?: boolean
@@ -35,7 +30,7 @@ export function focusAgentConsoleInCanvas({
   activateAgentInput = false,
   agent,
   reactFlowInstance,
-  motion = { type: 'spatial' },
+  motion,
   targetZoom,
   viewportIntent = 'navigation',
   setSelectedAgentId,
@@ -58,10 +53,6 @@ export function focusAgentConsoleInCanvas({
   const height =
     node?.measured?.height ?? resolveDimension(node?.style?.height) ?? agent.layout.size.height
   const position = node?.position ?? agent.layout.position
-  const targetCenter = {
-    x: position.x + width / 2,
-    y: position.y + height / 2
-  }
   const transitionCompletion =
     viewportIntent === 'creation'
       ? revealCreatedWorkbenchNode({
@@ -70,10 +61,10 @@ export function focusAgentConsoleInCanvas({
           nodeSize: { height, width },
           reactFlowInstance
         })
-      : revealNavigatedAgentConsole({
+      : revealNavigatedWorkbenchNode({
+          bounds: { ...position, width, height },
           motion,
-          reactFlowInstance,
-          targetCenter,
+          instance: reactFlowInstance,
           targetZoom
         })
 
@@ -102,29 +93,6 @@ export function focusAgentConsoleInCanvas({
     ...readinessOptions,
     transitionCompletion
   })
-}
-
-function revealNavigatedAgentConsole({
-  motion,
-  reactFlowInstance,
-  targetCenter,
-  targetZoom
-}: {
-  readonly motion: WorkbenchViewportMotionIntent
-  readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-  readonly targetCenter: { readonly x: number; readonly y: number }
-  readonly targetZoom?: number
-}): Promise<boolean> {
-  const nextZoom =
-    targetZoom ??
-    Math.max(readWorkbenchViewportTargetZoom(reactFlowInstance), workbenchNodeReadableZoom)
-  const command = {
-    center: targetCenter,
-    intent: motion,
-    type: 'center',
-    zoom: nextZoom
-  } satisfies WorkbenchViewportCommand
-  return transitionWorkbenchViewport(reactFlowInstance, command)
 }
 
 function resolveDimension(value: unknown): number | null {

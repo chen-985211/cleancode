@@ -49,8 +49,12 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       }, [onInit])
       return React.createElement(
         'div',
-        { className: 'react-flow__pane', 'data-testid': 'pane' },
-        props.children
+        { className: 'react-flow' },
+        React.createElement(
+          'div',
+          { className: 'react-flow__pane', 'data-testid': 'pane' },
+          props.children
+        )
       )
     }
   }
