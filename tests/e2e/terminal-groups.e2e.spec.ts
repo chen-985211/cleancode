@@ -14,7 +14,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
-import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
+import { waitForTerminalDomText } from '../support/terminalSelectionE2e'
 import { pollUntilState } from '../support/e2ePolling'
 import {
   asE2eTerminalInput,
@@ -459,9 +459,12 @@ describe('terminal group direct manipulation', () => {
         { ids, workbench: workbenches[0]! }
       )
       await page.reload()
-      // Restored PowerShell prompts can wrap at the compact workflow width.
-      // The existing session's output proves restore; a new prompt is not required.
-      await waitForTerminalOutput(page, 'Prepare', 'DISCLOSURE_SESSION_中文')
+      // Read the restored screen: the live output tail may contain only a fresh
+      // prompt, and PowerShell prompts can wrap at the compact workflow width.
+      await waitForTerminalDomText(
+        terminal(page, ids.a).locator('.terminal-viewport'),
+        'DISCLOSURE_SESSION_中文'
+      )
       await waitForGraph(
         workbench,
         (graph) => graph.terminalGroups[0]?.memberBlockIds.join() === ids.a
@@ -570,18 +573,13 @@ describe('terminal group direct manipulation', () => {
       }
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)
       await page.reload()
-      await waitForTerminalOutput(page, 'Prepare', 'DISCLOSURE_SESSION_中文')
+      await waitForTerminalDomText(
+        terminal(page, ids.a).locator('.terminal-viewport'),
+        'DISCLOSURE_SESSION_中文'
+      )
       expect((await readE2eBlockGraph(workbench)).connections).toEqual(ids.edges)
       expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([])
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)
-      await ensureTerminalDomRenderer(terminal(page, ids.a).locator('.terminal-viewport'))
-      await page.waitForFunction(
-        ({ id, marker }) =>
-          document
-            .querySelector(`[data-terminal-block-id="${id}"] .xterm-rows`)
-            ?.textContent?.includes(marker),
-        { id: ids.a, marker: 'DISCLOSURE_SESSION_中文' }
-      )
       await writeTerminalCommand(
         page,
         'Prepare',
