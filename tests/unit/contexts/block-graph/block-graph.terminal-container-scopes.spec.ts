@@ -1,6 +1,34 @@
 import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 
 describe('terminal combination container scopes', () => {
+  it.each([undefined, 'workflow'] as const)(
+    'moves split workflows with scope %s while rejecting genuinely stale membership',
+    (scope) => {
+      const graph = createGraph()
+      createTerminal(graph, 'left', 0, 0)
+      createTerminal(graph, 'right', 800, 0)
+      createTerminal(graph, 'later', 1600, 0)
+      graph.createTerminalGroup({ id: 'left-group', name: 'Left', memberBlockIds: ['left'] })
+      graph.createTerminalGroup({ id: 'right-group', name: 'Right', memberBlockIds: ['right'] })
+      graph.createTerminalGroup({ id: 'target', name: 'Target', position: { x: 3000, y: 3000 } })
+      graph.connectTerminalBlocks({ sourceBlockId: 'left', targetBlockId: 'right' })
+      graph.moveTerminalWorkflowToGroup('left', 'target', undefined, scope, ['left', 'right'])
+      expect(graph.terminalGroups.find((group) => group.id === 'target')?.memberBlockIds).toEqual([
+        'left',
+        'right'
+      ])
+      graph.connectTerminalBlocks({ sourceBlockId: 'right', targetBlockId: 'later' })
+      const before = graph.toSnapshot()
+      expect(() =>
+        graph.moveTerminalWorkflowToGroup('left', null, { x: 5000, y: 5000 }, scope, [
+          'left',
+          'right'
+        ])
+      ).toThrow(expect.objectContaining({ code: 'TERMINAL_SCOPE_MOVE_STALE' }))
+      expect(graph.toSnapshot()).toEqual(before)
+    }
+  )
+
   it('creates and preserves an empty combination at an explicit canvas position', () => {
     const graph = createGraph()
 

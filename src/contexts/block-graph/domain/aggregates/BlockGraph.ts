@@ -228,7 +228,8 @@ export class BlockGraph {
         successExitCodes: [...defaultTerminalExecutionConfig.successExitCodes]
       },
       position: input.position,
-      size: normalizeTerminalBlockSize(input.size)
+      size: normalizeTerminalBlockSize(input.size),
+      ...(input.isCollapsed === undefined ? {} : { isCollapsed: input.isCollapsed })
     }
 
     this.blockSnapshots = [...this.blockSnapshots, block]
@@ -550,16 +551,6 @@ export class BlockGraph {
         'TERMINAL_SCOPE_MOVE_STALE',
         'Terminal workflow scope changed before it could be moved.'
       )
-    }
-
-    for (const movedBlockId of scope ? [] : movedBlockIds) {
-      const currentGroup = this.findTerminalGroupByBlockId(movedBlockId)
-      if ((currentGroup?.id ?? null) !== (sourceGroup?.id ?? null)) {
-        throw createExpectedAppError(
-          'TERMINAL_SCOPE_MOVE_STALE',
-          'Terminal workflow scope changed before it could be moved.'
-        )
-      }
     }
 
     const result = applyTerminalGroupMembershipMove({

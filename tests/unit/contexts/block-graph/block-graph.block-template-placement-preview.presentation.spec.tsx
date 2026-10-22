@@ -4,6 +4,27 @@ import type { BlockTemplateSnapshot } from '../../../../src/contexts/block-graph
 import { BlockTemplatePlacementPreview } from '../../../../src/contexts/block-graph/presentation/components/BlockTemplatePlacementPreview'
 
 describe('block template placement preview', () => {
+  it('uses the collapsed visible size for both node surfaces and connection centers', () => {
+    const template = createTemplate('workflow')
+    const { container } = render(
+      <BlockTemplatePlacementPreview
+        origin={{ x: 100, y: 50 }}
+        template={{
+          ...template,
+          nodes: template.nodes.map((node) => ({
+            ...node,
+            isCollapsed: true,
+            size: { width: 420, height: 280 }
+          }))
+        }}
+        viewport={{ x: 10, y: 20, zoom: 2 }}
+      />
+    )
+    expect(screen.getByText('A').parentElement).toHaveStyle({ width: '440px', height: '88px' })
+    expect(container.querySelector('line')).toHaveAttribute('x1', '430')
+    expect(container.querySelector('line')).toHaveAttribute('y1', '164')
+  })
+
   it('projects nodes and connections through the supplied canvas viewport', () => {
     const { container } = render(
       <BlockTemplatePlacementPreview

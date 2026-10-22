@@ -38,7 +38,8 @@ export function instantiateBlockTemplate(
         x: origin.x + node.position.x,
         y: origin.y + node.position.y
       },
-      size: node.size
+      size: node.size,
+      ...(node.isCollapsed === undefined ? {} : { isCollapsed: node.isCollapsed })
     })
     graph.updateTerminalDefinition(block.id, {
       name: node.name,

@@ -4,6 +4,7 @@ import type {
 } from '../../application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../application/dto/BlockTemplateSnapshot'
 import { resolveBlockTemplateBounds } from '../view-models/blockTemplateGeometry'
+import { terminalBlockVisibleSize } from '../../application/dto/BlockGraphSnapshot'
 
 export function BlockTemplatePlacementPreview({
   origin,
@@ -29,12 +30,12 @@ export function BlockTemplatePlacementPreview({
           const target = nodeById.get(connection.targetTemplateNodeId)
           if (!source || !target) return null
           const sourceCenter = toScreen({
-            x: origin.x + source.position.x + source.size.width / 2,
-            y: origin.y + source.position.y + source.size.height / 2
+            x: origin.x + source.position.x + terminalBlockVisibleSize(source).width / 2,
+            y: origin.y + source.position.y + terminalBlockVisibleSize(source).height / 2
           })
           const targetCenter = toScreen({
-            x: origin.x + target.position.x + target.size.width / 2,
-            y: origin.y + target.position.y + target.size.height / 2
+            x: origin.x + target.position.x + terminalBlockVisibleSize(target).width / 2,
+            y: origin.y + target.position.y + terminalBlockVisibleSize(target).height / 2
           })
           return (
             <line
@@ -65,8 +66,8 @@ export function BlockTemplatePlacementPreview({
           style={{
             left: (origin.x + node.position.x) * viewport.zoom + viewport.x,
             top: (origin.y + node.position.y) * viewport.zoom + viewport.y,
-            width: node.size.width * viewport.zoom,
-            height: node.size.height * viewport.zoom
+            width: terminalBlockVisibleSize(node).width * viewport.zoom,
+            height: terminalBlockVisibleSize(node).height * viewport.zoom
           }}
         >
           <span>{node.name}</span>

@@ -181,6 +181,8 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点；终端、流程和组合分类由共享画布语义契约定义。
 
+完整流程移动允许来源成员跨越多个组合及根画布。`move_terminal_workflow_to_group` 先通过共享画布语义取得完整成员，再交给 BlockGraph 在事务内校验该集合；来源组合不同不表示请求陈旧。只有全部成员都已处于目标作用域时才返回无变化，不能只检查代表节点。成员集合在读取与提交之间变化时仍整体拒绝。
+
 `create_block` 显式提供 `position` 时原样采用；省略时，应用层把同工作区全部 Agent 的持久化布局统一注入为 `canvasRegions`，不赋予发起 Agent 特殊方向或距离优先级，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
 
 `update_terminal_group.isCollapsed` 复用界面的同一个 BlockGraph 折叠用例：`true` 收起，`false` 展开，成员与依赖关系不变；展开后的成员尺寸和排列继续遵循[积木图模型](../block-graph/block-graph.md#终端组合规则)。图快照中的组合 `position` 是已提交的空间锚点，`size` 是保存的展开尺寸，不是折叠图标底板或动画中间帧的尺寸。折叠应用图标、整区点击和展开收起动效由 Presentation 统一投影，无需新增 MCP 参数或由 Agent 模拟点击。`delete_terminal_group` 始终只解散组合并保留成员，不对应界面的“移除组合及其全部成员”；当前 MCP 未暴露该批量移除动作。

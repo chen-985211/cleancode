@@ -53,7 +53,8 @@ export function createBlockTemplate(input: CreateBlockTemplateInput): BlockTempl
         x: block.position.x - minimumX,
         y: block.position.y - minimumY
       },
-      size: { ...block.size }
+      size: { ...block.size },
+      ...(block.isCollapsed === undefined ? {} : { isCollapsed: block.isCollapsed })
     }
   })
   const connections = (input.graph.connections ?? []).flatMap((connection) => {
@@ -114,6 +115,9 @@ export function normalizeBlockTemplate(template: BlockTemplateSnapshot): BlockTe
       invalidTemplate('Template node ids must be unique.')
     }
     templateNodeIds.add(templateNodeId)
+    if (node.isCollapsed !== undefined && typeof node.isCollapsed !== 'boolean') {
+      invalidTemplate('Template node collapsed state must be boolean.')
+    }
     const definition = normalizeTerminalDefinition({
       name: node.name,
       description: node.description,
@@ -126,7 +130,8 @@ export function normalizeBlockTemplate(template: BlockTemplateSnapshot): BlockTe
       ...definition,
       executionConfig: freezeExecutionConfig(definition.executionConfig),
       position: Object.freeze(normalizePosition(node.position)),
-      size: Object.freeze(normalizeSize(node.size))
+      size: Object.freeze(normalizeSize(node.size)),
+      ...(node.isCollapsed === undefined ? {} : { isCollapsed: node.isCollapsed })
     })
   })
   const connectionKeys = new Set<string>()

@@ -332,6 +332,69 @@ describe('agent block graph workflow tool adapter', () => {
     })
   })
 
+  it.each(['third group', 'representative group', 'root representative'] as const)(
+    'moves every member of a split workflow to the %s through the Agent port',
+    async (target) => {
+      const first = await adapter.createTerminalGroup(context, {
+        name: 'First',
+        memberBlockIds: [terminalIds.install],
+        position: { x: 2400, y: 0 }
+      })
+      const firstId = first.terminalGroups.find((group) => group.name === 'First')!.id
+      if (target !== 'root representative')
+        await adapter.createTerminalGroup(context, {
+          name: 'Second',
+          memberBlockIds: [terminalIds.build],
+          position: { x: 2400, y: 2000 }
+        })
+      const third = await adapter.createTerminalGroup(context, {
+        name: 'Target',
+        position: { x: 4800, y: 0 }
+      })
+      await adapter.connectTerminalBlocks(context, {
+        sourceBlockId: terminalIds.install,
+        targetBlockId: terminalIds.build
+      })
+      const before = await adapter.inspectGraph(context)
+      const targetId =
+        target === 'third group'
+          ? third.terminalGroups.find((group) => group.name === 'Target')!.id
+          : target === 'representative group'
+            ? firstId
+            : null
+      const result = await adapter.moveTerminalWorkflowToGroup(context, {
+        blockId: target === 'root representative' ? terminalIds.build : terminalIds.install,
+        canvasRegions: [],
+        ...(targetId
+          ? { targetTerminalGroupId: targetId }
+          : { targetTerminalGroupId: null, position: { x: 6000, y: 6000 } })
+      })
+      expect(result.graphChanged).toBe(true)
+      expect(result.graph.connections).toEqual(before.connections)
+      for (const id of [terminalIds.install, terminalIds.build]) {
+        expect(
+          result.graph.terminalGroups.find((group) => group.memberBlockIds.includes(id))?.id ?? null
+        ).toBe(targetId)
+      }
+      expect(result.graph.blocks.find((block) => block.id === terminalIds.test)).toEqual(
+        before.blocks.find((block) => block.id === terminalIds.test)
+      )
+      expect(await adapter.inspectGraph(context)).toEqual(result.graph)
+      const repeated = await adapter.moveTerminalWorkflowToGroup(context, {
+        blockId: terminalIds.install,
+        canvasRegions: [],
+        ...(targetId
+          ? { targetTerminalGroupId: targetId }
+          : { targetTerminalGroupId: null, position: { x: 9000, y: 9000 } })
+      })
+      expect(repeated).toMatchObject({
+        graphChanged: false,
+        movedBlockIds: [],
+        graph: result.graph
+      })
+    }
+  )
+
   it('treats moving an already root workflow to the root canvas as a true no-op', async () => {
     await adapter.connectTerminalBlocks(context, {
       sourceBlockId: terminalIds.install,

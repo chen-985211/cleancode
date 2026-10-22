@@ -3,9 +3,8 @@ import type {
   TerminalBlockSizeSnapshot
 } from '../../application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../application/dto/BlockTemplateSnapshot'
-
-const terminalGroupPadding = { x: 32, y: 76 }
-const minimumTerminalGroupSize = { width: 520, height: 320 }
+import { terminalBlockVisibleSize } from '../../application/dto/BlockGraphSnapshot'
+import { createTerminalGroupBounds } from '../../domain/services/TerminalGroupRules'
 
 export interface BlockTemplateRect {
   readonly id: string
@@ -25,31 +24,19 @@ export function projectBlockTemplateRects(
   origin: BlockPositionSnapshot
 ): BlockTemplateRect[] {
   if (template.type === 'combination') {
-    const nodeBounds = boundsOf(
-      template.nodes.map((node) => ({
-        id: node.templateNodeId,
-        position: node.position,
-        size: node.size
-      }))
+    const bounds = createTerminalGroupBounds(
+      template.nodes.map((node) => node.templateNodeId),
+      template.nodes.map((node) => ({ ...node, id: node.templateNodeId }))
     )
 
     return [
       {
         id: template.id,
         position: {
-          x: origin.x + nodeBounds.left - terminalGroupPadding.x,
-          y: origin.y + nodeBounds.top - terminalGroupPadding.y
+          x: origin.x + bounds.position.x,
+          y: origin.y + bounds.position.y
         },
-        size: {
-          width: Math.max(
-            minimumTerminalGroupSize.width,
-            nodeBounds.right - nodeBounds.left + terminalGroupPadding.x * 2
-          ),
-          height: Math.max(
-            minimumTerminalGroupSize.height,
-            nodeBounds.bottom - nodeBounds.top + terminalGroupPadding.y * 2
-          )
-        }
+        size: bounds.size
       }
     ]
   }
@@ -60,7 +47,7 @@ export function projectBlockTemplateRects(
       x: origin.x + node.position.x,
       y: origin.y + node.position.y
     },
-    size: node.size
+    size: terminalBlockVisibleSize(node)
   }))
 }
 

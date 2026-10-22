@@ -11,6 +11,11 @@ import {
   type CanvasExecutionSelectionAnalysis
 } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 
+type TerminalMemberGeometry = Pick<
+  TerminalBlockSnapshot,
+  'id' | 'position' | 'size' | 'isCollapsed'
+>
+
 export const minimumTerminalGroupSize: TerminalGroupSizeSnapshot = { width: 320, height: 160 }
 
 export const defaultTerminalGroupSize: TerminalGroupSizeSnapshot = {
@@ -101,7 +106,7 @@ export function normalizeTerminalGroupBounds(
 
 export function createTerminalGroupBounds(
   memberBlockIds: readonly string[],
-  blocks: readonly TerminalBlockSnapshot[]
+  blocks: readonly TerminalMemberGeometry[]
 ): Pick<TerminalGroupSnapshot, 'position' | 'size'> {
   const memberBlocks = blocks.filter((block) => memberBlockIds.includes(block.id))
   if (memberBlocks.length === 0) {
@@ -159,7 +164,7 @@ function normalizeRestoredTerminalGroupName(name: string | undefined): string {
   return trimmedName ? trimmedName : '终端组合'
 }
 
-function getTerminalGroupMemberBounds(blocks: readonly TerminalBlockSnapshot[]) {
+function getTerminalGroupMemberBounds(blocks: readonly TerminalMemberGeometry[]) {
   return blocks.reduce(
     (bounds, block) => ({
       left: Math.min(bounds.left, block.position.x),

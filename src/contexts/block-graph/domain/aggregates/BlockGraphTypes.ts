@@ -177,6 +177,7 @@ export interface CreateDefaultGraphInput {
 
 export interface CreateTerminalBlockInput {
   readonly id?: string
+  readonly isCollapsed?: boolean
   readonly name: string
   readonly description: string
   readonly launchCommand?: string
@@ -235,7 +236,9 @@ export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
   height: 460
 }
 
-export function terminalBlockVisibleSize(block: TerminalBlockSnapshot): TerminalBlockSizeSnapshot {
+export function terminalBlockVisibleSize(
+  block: Pick<TerminalBlockSnapshot, 'size' | 'isCollapsed'>
+): TerminalBlockSizeSnapshot {
   return block.isCollapsed ? { width: Math.min(220, block.size.width), height: 44 } : block.size
 }
 

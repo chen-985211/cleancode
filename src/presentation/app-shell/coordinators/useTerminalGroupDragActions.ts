@@ -11,6 +11,7 @@ import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import type { WorkbenchNodeLayoutCommitQueue } from '../workbench/nodes/workbenchNodeLayoutCommitQueue'
 import { restoreWorkbenchNodeLayout } from '../workbench/nodes/restoreWorkbenchNodeLayout'
 import { restoreTerminalDragSlots } from '../projections/restoreTerminalDragSlots'
+import { restoreFrozenTerminalGroups } from '../projections/restoreFrozenTerminalGroups'
 
 type Point = { readonly x: number; readonly y: number }
 type DragEvent = globalThis.MouseEvent | TouchEvent
@@ -48,6 +49,21 @@ export function useTerminalGroupDragActions({
   const sessionRef = useRef<DragSession | null>(null)
   const dragGenerationRef = useRef(0)
   const restoreSequence = useRef(0)
+  const completeDragReturn = useCallback(
+    (nodeId: string, motionId: string) => {
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === nodeId && node.data.objectMotion?.id === motionId
+            ? ({
+                ...node,
+                data: { ...node.data, objectMotion: undefined, onObjectMotionComplete: undefined }
+              } as WorkbenchFlowNode)
+            : node
+        )
+      )
+    },
+    [setNodes]
+  )
   const cancelledIdRef = useRef<string | null>(null)
   const actionRef = useRef<TerminalGroupDropAction>({ type: 'none' })
   const updateAction = useCallback(
@@ -149,7 +165,7 @@ export function useTerminalGroupDragActions({
       setNodes((nodes) =>
         nodes.map((node) => {
           const original = baseline.get(node.id)
-          if (!original) return node
+          if (!original || node.type === 'terminalGroup') return node
           return {
             ...node,
             position: original.position,
@@ -159,9 +175,19 @@ export function useTerminalGroupDragActions({
           } as WorkbenchFlowNode
         })
       )
+      if (graph)
+        setNodes((nodes) =>
+          restoreFrozenTerminalGroups(
+            nodes,
+            session.nodes,
+            graph,
+            `drag-cancel:${++restoreSequence.current}`,
+            completeDragReturn
+          )
+        )
     }
     updateAction({ type: 'none' })
-  }, [setNodes, updateAction])
+  }, [completeDragReturn, graph, setNodes, updateAction])
   useEffect(() => {
     dragGenerationRef.current += 1
     cancelledIdRef.current = sessionRef.current?.nodeId ?? null
@@ -204,22 +230,6 @@ export function useTerminalGroupDragActions({
     [beginTerminalGroupDrag, resolveDrop, updateAction]
   )
 
-  const completeDragReturn = useCallback(
-    (nodeId: string, motionId: string) => {
-      setNodes((nodes) =>
-        nodes.map((node) =>
-          node.id === nodeId && node.data.objectMotion?.id === motionId
-            ? ({
-                ...node,
-                data: { ...node.data, objectMotion: undefined, onObjectMotionComplete: undefined }
-              } as WorkbenchFlowNode)
-            : node
-        )
-      )
-    },
-    [setNodes]
-  )
-
   const moveWorkbenchNode = useCallback(
     async (event: DragEvent, node: WorkbenchFlowNode) => {
       if (cancelledIdRef.current === node.id || !currentWorkbench || !currentWorkspace) return
@@ -227,6 +237,7 @@ export function useTerminalGroupDragActions({
       cancelledIdRef.current = node.id
       const session = sessionRef.current
       sessionRef.current = null
+      let committedGraph = currentWorkbench.graph
       if (node.type === 'agentConsole') {
         clearTerminalGroupDropPreview()
         return
@@ -310,7 +321,10 @@ export function useTerminalGroupDragActions({
             )
           },
           (snapshot) => {
-            if (snapshot) setCurrentGraph(snapshot)
+            if (snapshot) {
+              committedGraph = snapshot
+              setCurrentGraph(snapshot)
+            }
           }
         )
       } catch (error) {
@@ -329,6 +343,16 @@ export function useTerminalGroupDragActions({
         throw error
       } finally {
         if (dragGenerationRef.current === generation) {
+          if (session)
+            setNodes((nodes) =>
+              restoreFrozenTerminalGroups(
+                nodes,
+                session.nodes,
+                committedGraph,
+                `drag-resume:${++restoreSequence.current}`,
+                completeDragReturn
+              )
+            )
           setNodes((nodes) =>
             nodes.map(
               (candidate) =>

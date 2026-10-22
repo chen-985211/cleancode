@@ -17,6 +17,7 @@ export interface BlockTemplateNodeSnapshot {
   readonly executionConfig: TerminalExecutionConfigSnapshot
   readonly position: BlockPositionSnapshot
   readonly size: TerminalBlockSizeSnapshot
+  readonly isCollapsed?: boolean
 }
 
 export interface BlockTemplateConnectionSnapshot {

@@ -10,8 +10,64 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useTerminalGroupDragActions } from '../../../src/presentation/app-shell/coordinators/useTerminalGroupDragActions'
 import { createWorkbenchNodeLayoutCommitQueue } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeLayoutCommitQueue'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
+import { preserveWorkbenchNodeTransientLayout } from '../../../src/presentation/app-shell/projections/preserveWorkbenchNodeTransientLayout'
 
 describe('terminal group drag actions', () => {
+  it.each(['success', 'failure', 'cancel'] as const)(
+    'restores an interrupted group disclosure after unrelated terminal drag %s',
+    async (outcome) => {
+      const { api, result, terminal, nodeStore } = setupDrag(false, false, false, true)
+      const baseline = nodeStore.getNodes()
+      const group = baseline.find((node) => node.type === 'terminalGroup')!
+      const surface = document.createElement('section')
+      surface.dataset.terminalGroupId = group.id
+      surface.getBoundingClientRect = () => ({
+        x: 300,
+        y: 180,
+        left: 300,
+        top: 180,
+        right: 600,
+        bottom: 380,
+        width: 300,
+        height: 200,
+        toJSON: () => ({})
+      })
+      document.body.append(surface)
+      try {
+        act(() => result.current.beginTerminalGroupDrag({} as MouseEvent, terminal))
+        expect(nodeStore.getNodes().find((node) => node.id === group.id)?.style).toMatchObject({
+          width: 300,
+          height: 200
+        })
+        if (outcome === 'cancel') act(() => result.current.cancelTerminalGroupDrag())
+        else {
+          if (outcome === 'failure') api.moveBlock.mockRejectedValueOnce(new Error('save failed'))
+          await act(async () => {
+            await result.current
+              .moveWorkbenchNode({} as MouseEvent, { ...terminal, position: { x: 1600, y: 1000 } })
+              .catch((error) => {
+                if (outcome !== 'failure') throw error
+              })
+          })
+        }
+        const restored = nodeStore.getNodes().find((node) => node.id === group.id)!
+        expect(restored.style).toEqual(group.style)
+        expect(restored.position).toEqual(group.position)
+        expect(restored.data.objectMotion).toMatchObject({
+          shellRect: {
+            from: { x: 300, y: 180, width: 300, height: 200 },
+            to: { x: 300, y: 180, width: 600, height: 400 }
+          }
+        })
+        act(() => restored.data.onObjectMotionComplete?.(restored.data.objectMotion!.id))
+        const projected = preserveWorkbenchNodeTransientLayout(baseline, nodeStore.getNodes())
+        expect(projected.find((node) => node.id === group.id)?.style).toEqual(group.style)
+        expect(projected.find((node) => node.id === group.id)?.data.objectMotion).toBeUndefined()
+      } finally {
+        surface.remove()
+      }
+    }
+  )
   it.each([false, true])(
     'keeps a terminal title drag scoped to that terminal when it crosses a workflow label, grouped=%s',
     async (grouped) => {
@@ -282,7 +338,12 @@ describe('terminal group drag actions', () => {
   })
 })
 
-function setupDrag(isCollapsed: boolean, isMember = false, workflow = false) {
+function setupDrag(
+  isCollapsed: boolean,
+  isMember = false,
+  workflow = false,
+  captureGeometry = false
+) {
   const base = createWorkbenchSnapshot('/repo/app', 'app')
   const block = {
     description: '',
@@ -329,6 +390,7 @@ function setupDrag(isCollapsed: boolean, isMember = false, workflow = false) {
       getNodes: nodeStore.getNodes,
       graph: workbench.graph,
       layoutCommitQueue: createWorkbenchNodeLayoutCommitQueue(),
+      toFlowPosition: captureGeometry ? (point) => point : undefined,
       setCurrentGraph: vi.fn(),
       setNodes: nodeStore.setNodes
     })

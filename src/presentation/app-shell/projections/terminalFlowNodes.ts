@@ -27,7 +27,7 @@ import type { TerminalViewState } from '../../../contexts/run/presentation/view-
 
 import { terminalWorkflowDragHandles } from './terminalWorkflowDragHandles'
 
-const collapsedTerminalGroupSize = { width: 112, height: 112 }
+export const collapsedTerminalGroupSize = { width: 112, height: 112 }
 
 interface TerminalFlowNodeHandlers {
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
