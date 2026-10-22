@@ -54,6 +54,11 @@ describe('terminal runtime recovery e2e', () => {
     ;({ electronApp, page } = await launchWorkbench(workbench))
     resources.electronApp = electronApp
     resources.page = page
+  }, electronLaunchTimeoutMs)
+
+  // A cold native launch can consume its entire budget. Project registration
+  // and the first PTY have their own readiness conditions and bounded setup.
+  beforeEach(async () => {
     await createRunningTerminal(page)
   }, electronLaunchTimeoutMs)
 
