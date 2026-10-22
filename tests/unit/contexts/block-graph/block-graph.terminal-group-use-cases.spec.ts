@@ -329,7 +329,120 @@ describe('terminal group use cases', () => {
     ])
     expect(repository.savedGraph?.toSnapshot()).toEqual(updatedGraph)
   })
+
+  it.each(
+    ([undefined, 'workflow'] as const).flatMap((scope) =>
+      (['root', 'grouped'] as const).flatMap((blockId) =>
+        (['Agent', 'terminal', 'group'] as const).map((obstacle) => ({
+          scope,
+          blockId,
+          obstacle
+        }))
+      )
+    )
+  )(
+    'rolls back the complete split workflow on $obstacle conflict, scope=$scope, representative=$blockId',
+    async ({ scope, blockId, obstacle }) => {
+      const graph = createSplitWorkflow()
+      const destination = { x: 5000, y: 5000 }
+      if (obstacle === 'terminal')
+        graph.createTerminalBlock({
+          id: 'obstacle',
+          name: 'Obstacle',
+          description: '',
+          position: destination
+        })
+      if (obstacle === 'group')
+        graph.createTerminalGroup({ id: 'obstacle', name: 'Obstacle', position: destination })
+      const repository = new InMemoryBlockGraphRepository(graph)
+      const before = graph.toSnapshot()
+      const representative = before.blocks.find((block) => block.id === blockId)!
+
+      await expect(
+        new MoveTerminalWorkflowToGroupUseCase(repository).execute({
+          projectDirectory: '/tmp/project',
+          workspaceId: 'main',
+          blockId,
+          scope,
+          targetTerminalGroupId: null,
+          position: {
+            x: destination.x + representative.position.x,
+            y: destination.y + representative.position.y
+          },
+          canvasRegions: obstacle === 'Agent' ? [region(5000, 5000, 420, 280)] : []
+        })
+      ).rejects.toSatisfy(
+        (error: unknown) => getAppErrorCode(error) === 'TERMINAL_GROUP_LAYOUT_CONFLICT'
+      )
+      expect(repository.savedGraph?.toSnapshot()).toEqual(before)
+    }
+  )
+
+  it('does not treat other members of the moved workflow as external obstacles', async () => {
+    // The user can place root members closer than the external-object safety gap.
+    const graph = createSplitWorkflow({ x: 450, y: 0 })
+    const repository = new InMemoryBlockGraphRepository(graph)
+    const before = graph.toSnapshot()
+    const updated = await new MoveTerminalWorkflowToGroupUseCase(repository).execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      blockId: 'root',
+      targetTerminalGroupId: null,
+      position: { x: 5000, y: 5000 },
+      canvasRegions: []
+    })
+
+    expect(updated.blocks.map(({ id, position }) => ({ id, position }))).toEqual([
+      { id: 'root', position: { x: 5000, y: 5000 } },
+      { id: 'grouped', position: { x: 5450, y: 5000 } }
+    ])
+    expect(updated.connections).toEqual(before.connections)
+    expect(updated.terminalGroups[0]?.memberBlockIds).toEqual([])
+    expect(repository.savedGraph?.toSnapshot()).toEqual(updated)
+  })
+
+  it('keeps the explicit terminal scope precise during collision checking', async () => {
+    const graph = createSplitWorkflow()
+    const repository = new InMemoryBlockGraphRepository(graph)
+    const root = graph.blocks.find((block) => block.id === 'root')!
+    const updated = await new MoveTerminalWorkflowToGroupUseCase(repository).execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      blockId: 'grouped',
+      scope: 'terminal',
+      targetTerminalGroupId: null,
+      position: { x: 5000, y: 5000 },
+      canvasRegions: [region(0, 0, 420, 280)]
+    })
+
+    expect(updated.blocks.find((block) => block.id === 'root')).toEqual(root)
+    expect(updated.blocks.find((block) => block.id === 'grouped')?.position).toEqual({
+      x: 5000,
+      y: 5000
+    })
+    expect(repository.savedGraph?.toSnapshot()).toEqual(updated)
+  })
 })
+
+function createSplitWorkflow(groupedPosition = { x: 1032, y: 576 }): BlockGraph {
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
+  for (const id of ['root', 'grouped'])
+    graph.createTerminalBlock({
+      id,
+      name: id,
+      description: '',
+      position: { x: 0, y: 0 },
+      size: { width: 420, height: 280 }
+    })
+  graph.createTerminalGroup({
+    id: 'source',
+    name: 'Source',
+    memberBlockIds: ['grouped'],
+    position: { x: groupedPosition.x - 32, y: groupedPosition.y - 76 }
+  })
+  graph.connectTerminalBlocks({ sourceBlockId: 'root', targetBlockId: 'grouped' })
+  return graph
+}
 
 function createGraphWithGroupedTerminals(): BlockGraph {
   const graph = createGraphWithThreeTerminals()

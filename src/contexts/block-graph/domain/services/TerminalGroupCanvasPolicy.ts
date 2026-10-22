@@ -15,7 +15,7 @@ import type { TerminalLayoutRegion } from './TerminalLayoutPolicy'
 
 interface AssertTerminalGroupMembershipMoveFitsCanvasInput {
   readonly after: BlockGraphSnapshot
-  readonly before: BlockGraphSnapshot
+  readonly movedBlockIds: readonly string[]
   readonly canvasRegions: readonly TerminalLayoutRegion[]
   readonly targetTerminalGroupId: string | null
 }
@@ -39,31 +39,23 @@ export function resolveEmptyTerminalGroupCanvasPosition(
 
 export function assertTerminalGroupMembershipMoveFitsCanvas({
   after,
-  before,
+  movedBlockIds,
   canvasRegions,
   targetTerminalGroupId
 }: AssertTerminalGroupMembershipMoveFitsCanvasInput): void {
-  const membershipBefore = indexTerminalGroupMembership(before.terminalGroups)
-  const membershipAfter = indexTerminalGroupMembership(after.terminalGroups)
-  const movedBlockIds = new Set(
-    after.blocks
-      .filter(
-        (block) =>
-          (membershipBefore.get(block.id) ?? null) !== (membershipAfter.get(block.id) ?? null)
-      )
-      .map((block) => block.id)
-  )
-  if (movedBlockIds.size === 0) return
+  // Workflow members can move without changing membership, including root nodes.
+  const movedIds = new Set(movedBlockIds)
+  if (movedIds.size === 0) return
 
   const movingRegions = targetTerminalGroupId
     ? after.terminalGroups
         .filter((group) => group.id === targetTerminalGroupId)
         .map(toPositionedRegion)
-    : after.blocks.filter((block) => movedBlockIds.has(block.id)).map(toPositionedRegion)
+    : after.blocks.filter((block) => movedIds.has(block.id)).map(toPositionedRegion)
   const obstacleRegions = createMembershipMoveObstacleRegions(
     after,
     canvasRegions,
-    movedBlockIds,
+    movedIds,
     targetTerminalGroupId
   )
   const hasConflict = movingRegions.some((movingRegion) =>
@@ -122,14 +114,6 @@ function createTopLevelObstacleRegions(
     ...graph.blocks.filter((block) => !groupedBlockIds.has(block.id)).map(toPositionedRegion),
     ...graph.terminalGroups.map(toPositionedRegion)
   ]
-}
-
-function indexTerminalGroupMembership(
-  groups: readonly TerminalGroupSnapshot[]
-): ReadonlyMap<string, string> {
-  return new Map(
-    groups.flatMap((group) => group.memberBlockIds.map((blockId) => [blockId, group.id] as const))
-  )
 }
 
 function toPositionedRegion(

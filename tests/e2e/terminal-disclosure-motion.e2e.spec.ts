@@ -107,9 +107,7 @@ describe('terminal disclosure presentation', () => {
       const ids = graph.blocks.map((block) => block.id)
       const terminalToggle = (id: string) =>
         page.locator(`[data-terminal-block-id="${id}"] .terminal-node__disclosure`)
-      const groupToggle = page.locator(
-        `[data-terminal-group-id="${graph.terminalGroups[0]!.id}"] .terminal-group-node__disclosure`
-      )
+      const group = page.locator(`[data-terminal-group-id="${graph.terminalGroups[0]!.id}"]`)
       await terminalToggle(ids[0]!).waitFor()
       await settle(page)
       const cdp = await page.context().newCDPSession(page)
@@ -152,14 +150,20 @@ describe('terminal disclosure presentation', () => {
         )
       }
       const toggleGroup = async (expanded: boolean) => {
-        await groupToggle.press('Space')
-        await page.waitForFunction(
-          ({ id, expanded }) =>
-            document
-              .querySelector(`[data-terminal-group-id="${id}"] .terminal-group-node__disclosure`)
-              ?.getAttribute('aria-expanded') === String(expanded),
-          { id: graph.terminalGroups[0]!.id, expanded }
-        )
+        await group
+          .getByRole('button', {
+            name: expanded ? 'Application 展开组合' : 'Application 折叠组合',
+            exact: true,
+            expanded: !expanded
+          })
+          .press('Space')
+        await group
+          .getByRole('button', {
+            name: expanded ? 'Application 折叠组合' : 'Application 展开组合',
+            exact: true,
+            expanded
+          })
+          .waitFor()
       }
       try {
         await measure('cold-expand', () => toggleTerminal(ids[0]!, true, true))

@@ -23,8 +23,7 @@ export class MoveTerminalWorkflowToGroupUseCase {
       this.graphRepository,
       command,
       (graph) => {
-        const before = graph.toSnapshot()
-        graph.moveTerminalWorkflowToGroup(
+        const movedBlockIds = graph.moveTerminalWorkflowToGroup(
           command.blockId,
           command.targetTerminalGroupId,
           command.position,
@@ -34,7 +33,7 @@ export class MoveTerminalWorkflowToGroupUseCase {
         if (command.canvasRegions) {
           assertTerminalGroupMembershipMoveFitsCanvas({
             after: graph.toSnapshot(),
-            before,
+            movedBlockIds,
             canvasRegions: command.canvasRegions,
             targetTerminalGroupId: command.targetTerminalGroupId
           })

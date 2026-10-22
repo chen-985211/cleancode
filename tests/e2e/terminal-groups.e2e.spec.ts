@@ -249,8 +249,8 @@ describe('terminal group direct manipulation', () => {
       await group.locator('.terminal-group-node__drop-hint').waitFor()
       expect(
         await group.locator('.terminal-group-node__material').evaluate((element) => ({
-          style: getComputedStyle(element).outlineStyle,
-          color: getComputedStyle(element).outlineColor,
+          style: getComputedStyle(element, '::before').outlineStyle,
+          color: getComputedStyle(element, '::before').outlineColor,
           expected: getComputedStyle(element).getPropertyValue('--cc-primary-border').trim()
         }))
       ).toMatchObject({ style: 'dashed' })
@@ -484,7 +484,9 @@ describe('terminal group direct manipulation', () => {
       await page.keyboard.press('Escape')
       expect(await more.evaluate((button) => document.activeElement === button)).toBe(true)
       await page.getByRole('button', { name: 'Application 折叠组合' }).click()
-      await group.locator('.terminal-group-node__disclosure[aria-expanded="false"]').waitFor()
+      await group
+        .getByRole('button', { name: 'Application 展开组合', exact: true, expanded: false })
+        .waitFor()
       const attachment = await page.evaluate(
         async ({ groupId, edgeId }) => {
           await new Promise<void>((resolve) =>

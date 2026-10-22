@@ -528,7 +528,7 @@ export class BlockGraph {
     position?: BlockPositionSnapshot,
     scope?: 'terminal' | 'workflow',
     expectedBlockIds?: readonly string[]
-  ): void {
+  ): readonly string[] {
     this.requireTerminalBlock(blockId)
     if (terminalGroupId) this.requireTerminalGroup(terminalGroupId)
 
@@ -565,6 +565,7 @@ export class BlockGraph {
     })
     this.blockSnapshots = result.blocks
     this.terminalGroupSnapshots = result.groups
+    return Object.freeze([...movedBlockIds])
   }
 
   dissolveTerminalGroup(terminalGroupId: string): void {

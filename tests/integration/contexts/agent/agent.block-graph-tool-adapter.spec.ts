@@ -417,6 +417,54 @@ describe('agent block graph workflow tool adapter', () => {
     })
     expect(await adapter.inspectGraph(context)).toEqual(before)
   })
+
+  it('rejects a split workflow collision through MCP without persisting any of the move', async () => {
+    await adapter.createTerminalGroup(context, {
+      name: 'Source',
+      memberBlockIds: [terminalIds.build],
+      position: { x: 2400, y: 900 }
+    })
+    await adapter.connectTerminalBlocks(context, {
+      sourceBlockId: terminalIds.install,
+      targetBlockId: terminalIds.build
+    })
+    const before = await repository.findDefaultGraphSnapshot(
+      context.projectDirectory,
+      context.workspaceId
+    )
+    const destination = { x: 6000, y: 6000 }
+    const move = {
+      blockId: terminalIds.install,
+      targetTerminalGroupId: null,
+      position: destination
+    } as const
+
+    await expect(
+      adapter.moveTerminalWorkflowToGroup(context, {
+        ...move,
+        canvasRegions: [{ position: destination, size: { width: 720, height: 460 } }]
+      })
+    ).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'TERMINAL_GROUP_LAYOUT_CONFLICT'
+    )
+    // Read with a fresh repository so a cached projection cannot hide a partial save.
+    const freshRepository = new FileSystemBlockGraphRepository(appStateDirectory)
+    expect(
+      await freshRepository.findDefaultGraphSnapshot(context.projectDirectory, context.workspaceId)
+    ).toEqual(before)
+
+    const result = await adapter.moveTerminalWorkflowToGroup(context, {
+      ...move,
+      canvasRegions: []
+    })
+    expect(result.graphChanged).toBe(true)
+    expect(findBlock(result.graph, terminalIds.install).position).toEqual(destination)
+    expect(result.graph.terminalGroups.every((group) => group.memberBlockIds.length === 0)).toBe(
+      true
+    )
+    expect(result.graph.connections).toEqual(before?.connections)
+    expect(await createAdapter(freshRepository).inspectGraph(context)).toEqual(result.graph)
+  })
 })
 
 function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAgentToolAdapter {
