@@ -107,16 +107,22 @@ describe('workbench object motion styles', () => {
     expect(materialRule).toContain('background: transparent;')
     expect(materialRule).not.toContain('opacity: var(--workbench-object-motion-content-opacity);')
     expect(materialRule).not.toContain('transform:')
+    expect(materialFillRule).toContain('var(--terminal-group-material-x)')
+    expect(materialFillRule).toContain('var(--terminal-group-material-y)')
+    expect(materialFillRule).toContain('width: var(--terminal-group-material-width);')
+    expect(materialFillRule).toContain('height: var(--terminal-group-material-height);')
     expect(materialFillRule).toContain('background: var(--terminal-group-surface);')
     expect(objectMotionStyles).toContain('width: var(--workbench-object-motion-shell-width);')
-    expect(objectMotionStyles).toContain('height: var(--workbench-object-motion-shell-height);')
+    expect(objectMotionStyles).toContain('var(--workbench-object-motion-shell-height) -')
+    expect(objectMotionStyles).toContain('var(--terminal-group-app-icon-inset) * 2 *')
+    expect(objectMotionStyles).toContain('var(--terminal-group-collapsed-progress)')
     expect(objectMotionStyles).toMatch(
       /translate3d\(\s*var\(--workbench-object-motion-shell-x\),\s*var\(--workbench-object-motion-shell-y\),\s*0\s*\)/
     )
     expect(objectMotionStyles).toContain('will-change: transform, width, height;')
-    expect(expandingHeaderRule).toContain('width: var(--workbench-object-motion-shell-width);')
-    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-x)')
-    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-y)')
+    expect(expandingHeaderRule).toContain('width: var(--terminal-group-material-width);')
+    expect(expandingHeaderRule).toContain('var(--terminal-group-material-x)')
+    expect(expandingHeaderRule).toContain('var(--terminal-group-material-y)')
     expect(expandingHeaderRule).toContain('will-change: transform, width;')
     expect(expandingHeaderRule).toContain('overflow: hidden;')
     expect(expandingHeaderRule).toContain('transition: none;')
@@ -127,9 +133,8 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain(
       'opacity: calc(1 - var(--workbench-object-motion-content-opacity));'
     )
-    expect(objectMotionStyles).toMatch(
-      /workbench-object-motion--group-expand[\s\S]*> \.terminal-group-node__header[\s\S]*> :not\(\.terminal-group-node__title\)/
-    )
+    expect(objectMotionStyles).toContain('.terminal-group-node__launcher-exit')
+    expect(objectMotionStyles).not.toContain('> :not(.terminal-group-node__title)')
     expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')

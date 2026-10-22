@@ -33,7 +33,9 @@ interface WorkbenchObjectFrameScheduler {
 
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
-const groupMemberCollapsedScale = 0.88
+// Position and scale share the same spring so adjacent cards retain their
+// relative spacing instead of converging as almost full-size translucent layers.
+const groupMemberCollapsedScale = 0
 
 export function resolveWorkbenchCanvasDetailLevel(
   zoom: number,

@@ -41,6 +41,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           onDissolve={() => void data.onDissolveGroup(data.group)}
         />
       )}
+      isExpanding={objectMotion.kind === 'group-expand'}
       isContextSelected={data.isContextSelected}
       isPending={isPending}
       leadingContent={

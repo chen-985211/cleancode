@@ -291,7 +291,7 @@ describe('workbench object motion', () => {
       kind: 'group-expand',
       offset: { x: -320, y: -170 },
       opacity: { from: 0, to: 1 },
-      scale: { from: 0.88, to: 1 }
+      scale: { from: 0, to: 1 }
     })
   })
 
@@ -425,7 +425,7 @@ describe('workbench object motion', () => {
             kind: 'group-collapse',
             offset: { x: -320, y: -170 },
             opacity: { from: 1, to: 0 },
-            scale: { from: 1, to: 0.88 }
+            scale: { from: 1, to: 0 }
           }
         })
       })

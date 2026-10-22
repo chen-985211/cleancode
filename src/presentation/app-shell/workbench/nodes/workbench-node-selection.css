@@ -9,3 +9,12 @@
   box-shadow: var(--cc-shadow-node);
   pointer-events: none;
 }
+
+.terminal-group-node > .workbench-node-selection-veil {
+  inset: -2px auto auto -2px;
+  width: calc(var(--terminal-group-material-width) + 4px);
+  height: calc(var(--terminal-group-material-height) + 4px);
+  transform: translate3d(var(--terminal-group-material-x), var(--terminal-group-material-y), 0);
+  border-radius: calc(var(--terminal-group-material-radius) + 2px);
+  box-shadow: none;
+}

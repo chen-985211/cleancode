@@ -10,6 +10,23 @@ import {
 } from '../../../../src/contexts/block-graph/presentation/components/TerminalGroupCard'
 
 describe('terminal group card', () => {
+  it('retains a passive launcher identity only while expansion is being presented', () => {
+    const data = createData()
+    const { container, rerender } = render(
+      <TerminalGroupCard data={data} isExpanding renderMoreMenu={() => null} />
+    )
+    const identity = container.querySelector('.terminal-group-node__launcher-exit')
+    expect(identity).toHaveAttribute('aria-hidden', 'true')
+    expect(identity).toHaveTextContent(data.group.name)
+    expect(identity!.querySelector('[data-icon-role="terminal-group"]')).not.toBeNull()
+    expect(identity!.querySelector('button, [tabindex]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /展开组合/ })).not.toBeInTheDocument()
+    fireEvent.click(identity!)
+    expect(data.onToggleGroupCollapsed).not.toHaveBeenCalled()
+    rerender(<TerminalGroupCard data={data} renderMoreMenu={() => null} />)
+    expect(container.querySelector('.terminal-group-node__launcher-exit')).toBeNull()
+  })
+
   it('owns group metadata editing and publishes the trimmed name', async () => {
     const onUpdateGroupMetadata = vi.fn(async () => undefined)
     render(

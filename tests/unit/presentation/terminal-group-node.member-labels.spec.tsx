@@ -1,4 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import type { TerminalViewState } from '../../../src/contexts/run/presentation/view-models/TerminalPresentationTypes'
@@ -7,12 +9,82 @@ import type { TerminalGroupFlowNode } from '../../../src/presentation/app-shell/
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ className, id }: { readonly className?: string; readonly id?: string }) => (
-    <span className={className} data-handleid={id} />
+    <span className={`react-flow__handle ${className ?? ''}`} data-handleid={id} />
   ),
   Position: { Left: 'left' }
 }))
 
 describe('terminal group member labels', () => {
+  it.each(['idle', 'group-collapse', 'group-expand'])(
+    'keeps one opaque material instead of cross-fading a second icon surface during %s',
+    (phase) => {
+      const stylesheet = document.createElement('style')
+      stylesheet.textContent = [
+        'src/contexts/block-graph/presentation/styles/terminal-group-node.css',
+        'src/presentation/app-shell/workbench/nodes/workbench-object-motion.css'
+      ]
+        .map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'))
+        .join('\n')
+      document.head.append(stylesheet)
+      try {
+        const { container } = render(
+          <TerminalGroupNode
+            {...createTerminalGroupNodeProps({ isCollapsed: phase !== 'group-expand' })}
+          />
+        )
+        const group = container.querySelector<HTMLElement>('.terminal-group-node')!
+        if (phase !== 'idle') group.classList.add(`workbench-object-motion--${phase}`)
+        group.style.setProperty('--workbench-object-motion-content-opacity', '0.45')
+        const material = group.querySelector('.terminal-group-node__material')!
+        expect(getComputedStyle(material).opacity || '1').toBe('1')
+        const icon = group.querySelector('.terminal-group-node__expand-icon')
+        if (icon) {
+          expect(getComputedStyle(icon).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+          expect(getComputedStyle(icon).boxShadow || 'none').toBe('none')
+        }
+      } finally {
+        stylesheet.remove()
+      }
+    }
+  )
+
+  it.each(['idle', 'create', 'group-collapse', 'group-expand', 'group-reflow'])(
+    'keeps every connection anchor hidden without removing its layout box during %s',
+    (phase) => {
+      const stylesheet = document.createElement('style')
+      stylesheet.textContent = [
+        'src/contexts/block-graph/presentation/styles/terminal-group-node.css',
+        'src/presentation/app-shell/workbench/nodes/terminal/terminal-node.css',
+        'src/presentation/app-shell/workbench/nodes/agent/agent-tool-approval.css',
+        'src/presentation/app-shell/workbench/nodes/workbench-object-motion.css'
+      ]
+        .map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'))
+        .join('\n')
+      document.head.append(stylesheet)
+      try {
+        const { container } = render(
+          <TerminalGroupNode
+            {...createTerminalGroupNodeProps({ isCollapsed: phase !== 'group-expand' })}
+          />
+        )
+        const group = container.querySelector<HTMLElement>('.terminal-group-node')!
+        if (phase !== 'idle') group.classList.add(`workbench-object-motion--${phase}`)
+        group.style.setProperty('--workbench-object-motion-content-opacity', '0.45')
+        const anchors = group.querySelectorAll('.react-flow__handle')
+        expect(anchors.length).toBeGreaterThan(0)
+        for (const anchor of anchors) {
+          const style = getComputedStyle(anchor)
+          expect(style.visibility, anchor.getAttribute('data-handleid')!).toBe('hidden')
+          expect(style.opacity).toBe('0')
+          expect(style.pointerEvents).toBe('none')
+          expect(style.display).not.toBe('none')
+        }
+      } finally {
+        stylesheet.remove()
+      }
+    }
+  )
+
   it.each([false, true])(
     'keeps the five group controls in the same order, collapsed=%s',
     (isCollapsed) => {
@@ -39,18 +111,56 @@ describe('terminal group member labels', () => {
     }
   )
 
-  it('keeps disclosure icons and accessible expanded state synchronized', () => {
+  it('uses the group identity as the collapsed expand control and keeps the expanded collapse control', () => {
     const { rerender } = render(
       <TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />
     )
     const expand = screen.getByRole('button', { name: '启动项目 展开组合' })
     expect(expand).toHaveAttribute('aria-expanded', 'false')
-    expect(expand.querySelector('[data-icon-glyph]')).toHaveAttribute('data-icon-glyph', 'plus')
+    expect(expand.querySelector('[data-icon-role="terminal-group"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'stack'
+    )
+    expect(document.querySelector('[data-icon-glyph="plus"]')).not.toBeInTheDocument()
     rerender(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
     const collapse = screen.getByRole('button', { name: '启动项目 折叠组合' })
     expect(collapse).toHaveAttribute('aria-expanded', 'true')
     expect(collapse.querySelector('[data-icon-glyph]')).toHaveAttribute('data-icon-glyph', 'minus')
   })
+
+  it.each([0, 1, 2])(
+    'expands from the whole application area and leaves pointer events available for dragging, member count=%s',
+    (count) => {
+      const members = Array.from({ length: count }, (_, index) => ({
+        id: `terminal-${index}`,
+        name: `Terminal ${index}`,
+        status: 'idle' as const
+      }))
+      const props = createTerminalGroupNodeProps({ isCollapsed: true, members })
+      const onPointerDown = vi.fn()
+      render(
+        <div onPointerDown={onPointerDown}>
+          <TerminalGroupNode {...props} />
+        </div>
+      )
+      const expand = screen.getByRole('button', { name: '启动项目 展开组合' })
+      const icon = expand.querySelector('[data-icon-role="terminal-group"]')!
+      expect(icon).not.toBeNull()
+      fireEvent.pointerDown(icon)
+      expect(onPointerDown).toHaveBeenCalledOnce()
+      fireEvent.click(icon)
+      expect(props.data.onToggleGroupCollapsed).toHaveBeenCalledExactlyOnceWith(
+        props.data.group,
+        false
+      )
+      fireEvent.pointerDown(screen.getByText('启动项目'))
+      expect(onPointerDown).toHaveBeenCalledTimes(2)
+      fireEvent.click(screen.getByText('启动项目'))
+      fireEvent.click(expand)
+      expect(expand).toContainElement(screen.getByText('启动项目'))
+      expect(props.data.onToggleGroupCollapsed).toHaveBeenCalledTimes(3)
+    }
+  )
 
   it('routes runtime and disclosure actions through the existing callbacks', () => {
     const props = createTerminalGroupNodeProps({ isCollapsed: false })

@@ -1,6 +1,5 @@
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus'
-import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play'
@@ -72,19 +71,6 @@ export function GroupRestartIcon(props: TerminalGroupIconProps) {
       dataIcon="group-restart"
       glyph="arrow-clockwise"
       role="restart"
-      weight="bold"
-    />
-  )
-}
-
-export function GroupExpandIcon(props: TerminalGroupIconProps) {
-  return (
-    <GroupIcon
-      {...props}
-      IconComponent={PlusIcon}
-      dataIcon="group-expand"
-      glyph="plus"
-      role="expand-object"
       weight="bold"
     />
   )

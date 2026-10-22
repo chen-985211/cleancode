@@ -15,6 +15,7 @@ import { createWorkbenchObjectSpringController } from './workbenchObjectSpring'
 import { usePrefersReducedMotion } from '../../../shared/hooks/usePrefersReducedMotion'
 
 interface WorkbenchObjectMotionPresentation {
+  readonly kind: WorkbenchObjectMotion['kind'] | undefined
   readonly className: string
   readonly onAnimationEnd: (event: AnimationEvent<HTMLElement>) => void
   readonly surfaceRef: RefCallback<HTMLElement>
@@ -91,6 +92,7 @@ export function useWorkbenchObjectMotionPresentation(
   )
 
   return {
+    kind: presentation?.kind,
     className: presentation
       ? [
           `workbench-object-motion--${presentation.kind}`,
