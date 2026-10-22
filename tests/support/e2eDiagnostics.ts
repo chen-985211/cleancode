@@ -97,14 +97,6 @@ export async function startE2eTracing(electronApp: ElectronApplication): Promise
   diagnostics.tracingActive = true
 }
 
-export async function stopE2eTracing(electronApp: ElectronApplication): Promise<void> {
-  const diagnostics = applicationDiagnostics.get(electronApp)
-
-  if (diagnostics) {
-    await stopTracing(electronApp, diagnostics)
-  }
-}
-
 export async function captureE2eFailureDiagnostics(input: {
   readonly electronApp: ElectronApplication
   readonly page?: Page

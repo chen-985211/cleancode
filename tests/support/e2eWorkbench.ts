@@ -13,8 +13,7 @@ import {
   captureE2eShutdownFailure,
   initializeE2eDiagnostics,
   observeE2eShutdown,
-  startE2eTracing,
-  stopE2eTracing
+  startE2eTracing
 } from './e2eDiagnostics'
 import { runE2eTeardown, withE2eDeadline } from './e2eLifecycle'
 import { pollUntilState } from './e2ePolling'
@@ -493,20 +492,12 @@ export async function closeElectronApp(
     return
   }
 
-  let tracingError: unknown
-
-  try {
-    await stopE2eTracing(electronApp)
-  } catch (error) {
-    tracingError = error
-  }
-
+  // Failure traces are exported before this step. For passing scenarios, closing
+  // Playwright's Electron context aborts tracing and removes its temporary files;
+  // a separate stop/discard round trip must not block verified process shutdown.
   const electronProcess = electronApp.process()
 
   if (electronProcess.exitCode !== null || electronProcess.signalCode !== null) {
-    if (tracingError) {
-      throw tracingError
-    }
     return
   }
 
@@ -523,10 +514,6 @@ export async function closeElectronApp(
     electronProcess.kill('SIGKILL')
     await waitForProcessExit(electronProcess, electronCloseTimeoutMs).catch(() => undefined)
     throw error
-  }
-
-  if (tracingError) {
-    throw tracingError
   }
 }
 

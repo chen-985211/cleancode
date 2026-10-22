@@ -63,7 +63,13 @@ const browserFrameScheduler: WorkbenchObjectSpringFrameScheduler = {
     if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(frameId)
     else window.clearTimeout(frameId)
   },
-  now: () => window.performance.now(),
+  // All shells committed within a frame must share RAF's clock. Mounting a
+  // terminal between sibling layout effects can make performance.now() diverge
+  // enough for a growing shell to catch its still-stationary neighbor.
+  now: () => {
+    const frameTime = document.timeline?.currentTime
+    return typeof frameTime === 'number' ? frameTime : window.performance.now()
+  },
   requestFrame: (callback) => {
     if (typeof window.requestAnimationFrame === 'function') {
       return window.requestAnimationFrame(callback)
