@@ -286,7 +286,7 @@ describe('project workspaces e2e', () => {
       await expectEmptyProjectStateWithoutPreviewData(page)
 
       await page.getByRole('button', { name: '打开项目' }).click()
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
       await page.getByText('Terminal 1').waitFor()
 
       const projectMetadata = JSON.parse(

@@ -671,7 +671,7 @@ async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
 async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
   const terminalInput = page.getByLabel('Terminal input')

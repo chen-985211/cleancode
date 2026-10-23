@@ -122,7 +122,7 @@ describe('terminal runtime recovery e2e', () => {
     async () => {
       const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
       for (const terminalName of terminalNames.slice(1)) {
-        await selectBlankCanvasAction(page, '新建终端积木')
+        await selectBlankCanvasAction(page, '新建终端')
         await ensureTerminalShellStarted(page, terminalName)
       }
       const sessionIds = await Promise.all(
@@ -471,7 +471,7 @@ async function waitForTerminalSessionId(
 
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   await ensureTerminalShellStarted(page, 'Terminal 1')
 }
 

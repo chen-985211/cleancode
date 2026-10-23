@@ -1,11 +1,11 @@
 export const zhCNCanvasMessages = {
   'toolbar.label': '工作台工具栏',
   'toolbar.terminalTools': '终端工具',
-  'toolbar.newTerminal': '新建终端积木',
+  'toolbar.newTerminal': '新建终端',
   'toolbar.groupEditing': '组合编辑',
   'toolbar.createGroup': '创建组合',
   'toolbar.finish': '完成',
-  'toolbar.groupTerminals': '组合终端',
+  'toolbar.groupTerminals': '新建组合',
   'toolbar.agentTools': 'Agent 工具',
   'toolbar.newAgent': '新建 Agent',
   'toolbar.creatingAgent': '正在创建…',

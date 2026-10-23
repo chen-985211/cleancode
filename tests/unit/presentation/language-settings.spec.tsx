@@ -144,8 +144,8 @@ describe('language settings', () => {
 
     const toolbar = screen.getByRole('toolbar', { name: 'Workbench toolbar' })
     expect(toolbar).toHaveTextContent('New Agent')
-    expect(toolbar).not.toHaveTextContent('New terminal block')
-    expect(toolbar).not.toHaveTextContent('Group terminals')
+    expect(toolbar).not.toHaveTextContent('New terminal')
+    expect(toolbar).not.toHaveTextContent('New group')
   })
 })
 

@@ -53,7 +53,7 @@ describe('canvas cursor e2e', () => {
       const draggingPaneCursor = await readCursor(pane)
       await pane.evaluate((element) => element.classList.remove('dragging'))
 
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
       const node = page.locator('.react-flow__node').filter({ hasText: 'Terminal 1' })
       const header = node.locator('.terminal-node__header')
       await header.waitFor()

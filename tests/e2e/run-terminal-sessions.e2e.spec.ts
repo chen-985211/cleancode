@@ -324,7 +324,7 @@ describe('run terminal sessions e2e', () => {
     'allows another terminal to receive keyboard input while a fullscreen agent is running',
     async () => {
       await createRunningTerminal(page)
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
       await readTerminalSessionId(page, 'Terminal 2')
       await waitForTerminalShellReady(page, 'Terminal 2')
 
@@ -411,7 +411,7 @@ async function waitForFakeAgentReport(
 async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
   const terminalBlock = page.locator('[data-terminal-block-id]').first()

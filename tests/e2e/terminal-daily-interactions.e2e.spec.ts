@@ -305,7 +305,7 @@ describe('terminal daily interactions e2e', () => {
 async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   await readTerminalSessionId(page, 'Terminal 1')
   if (process.platform === 'darwin') {
     // zsh can emit bracketed-paste control bytes after its prompt marker.

@@ -234,7 +234,7 @@ async function createHttpServiceTerminal(
   policy: 'fixed' | 'preferred',
   shouldStart: boolean
 ): Promise<Locator> {
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   const currentTerminal = terminalBlock(page)
   await currentTerminal.waitFor()
   const terminalBlockId = await currentTerminal.getAttribute('data-terminal-block-id')

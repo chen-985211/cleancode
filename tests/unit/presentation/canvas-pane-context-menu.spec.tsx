@@ -11,7 +11,7 @@ describe('canvas pane context menu', () => {
     const menu = screen.getByRole('menu', { name: '画布操作' })
     const organize = within(menu).getByRole('menuitem', { name: '整理画布' })
     await waitFor(() =>
-      expect(within(menu).getByRole('menuitem', { name: '新建终端积木' })).toHaveFocus()
+      expect(within(menu).getByRole('menuitem', { name: '新建终端' })).toHaveFocus()
     )
     fireEvent.keyDown(menu, { key: 'End' })
     expect(organize).toHaveFocus()
@@ -42,8 +42,8 @@ describe('canvas pane context menu', () => {
     expect(event.defaultPrevented).toBe(true)
     expect(actions.onBeforeOpen).toHaveBeenCalledOnce()
     const menu = screen.getByRole('menu', { name: '画布操作' })
-    const createTerminal = within(menu).getByRole('menuitem', { name: '新建终端积木' })
-    const groupTerminals = within(menu).getByRole('menuitem', { name: '组合终端' })
+    const createTerminal = within(menu).getByRole('menuitem', { name: '新建终端' })
+    const groupTerminals = within(menu).getByRole('menuitem', { name: '新建组合' })
     expect(createTerminal.querySelector('[data-icon-role="terminal"]')).toHaveAttribute(
       'data-icon-glyph',
       'terminal-window'
@@ -67,7 +67,7 @@ describe('canvas pane context menu', () => {
     )
 
     fireEvent.contextMenu(pane, { clientX: 410, clientY: 300 })
-    fireEvent.click(screen.getByRole('menuitem', { name: '新建终端积木' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '新建终端' }))
     expect(actions.onCreateTerminal).toHaveBeenCalledOnce()
   })
 
@@ -94,9 +94,7 @@ describe('canvas pane context menu', () => {
     const pane = screen.getByTestId('pane')
     pane.focus()
     fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
-    await waitFor(() =>
-      expect(screen.getByRole('menuitem', { name: '新建终端积木' })).toHaveFocus()
-    )
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: '新建终端' })).toHaveFocus())
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
@@ -147,8 +145,8 @@ function Harness({ actions, graphId, isBlocked = false, canOrganizeCanvas = true
     graphId,
     isBlocked,
     shortcutTooltips: {
-      createTerminal: '新建终端积木 (⌘T)',
-      groupTerminals: '组合终端 (⌘G)'
+      createTerminal: '新建终端 (⌘T)',
+      groupTerminals: '新建组合 (⌘G)'
     },
     ...actions
   })

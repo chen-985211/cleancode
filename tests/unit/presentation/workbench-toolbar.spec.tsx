@@ -22,8 +22,8 @@ describe('workbench toolbar', () => {
     const agentTools = within(toolbar).getByRole('group', { name: 'Agent 工具' })
 
     expect(within(toolbar).queryByRole('group', { name: '终端工具' })).not.toBeInTheDocument()
-    expect(within(toolbar).queryByRole('button', { name: '新建终端积木' })).not.toBeInTheDocument()
-    expect(within(toolbar).queryByRole('button', { name: '组合终端' })).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: '新建终端' })).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: '新建组合' })).not.toBeInTheDocument()
     expect(within(agentTools).getByRole('button', { name: '新建 Agent' })).toBeInTheDocument()
     expect(toolbar.lastElementChild).toBe(agentTools)
 
@@ -59,7 +59,7 @@ describe('workbench toolbar', () => {
     ).not.toBeInTheDocument()
     expect(within(terminalTools).getByRole('button', { name: '完成' })).toBeEnabled()
     expect(
-      within(terminalTools).queryByRole('button', { name: '新建终端积木' })
+      within(terminalTools).queryByRole('button', { name: '新建终端' })
     ).not.toBeInTheDocument()
   })
 
@@ -129,8 +129,8 @@ describe('workbench toolbar', () => {
 
 const shortcutTooltips = {
   createAgent: '新建 Agent (⌘⇧A)',
-  createTerminal: '新建终端积木 (⌘T)',
-  groupTerminals: '组合终端 (⌘G)'
+  createTerminal: '新建终端 (⌘T)',
+  groupTerminals: '新建组合 (⌘G)'
 } as const
 
 async function expectPointerTooltip(buttonName: string, tooltip: string): Promise<void> {
