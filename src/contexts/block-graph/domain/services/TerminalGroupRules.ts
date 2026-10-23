@@ -31,7 +31,6 @@ export const terminalGroupPadding = {
 export function normalizeTerminalGroups(
   groups: readonly Partial<TerminalGroupSnapshot>[] | undefined,
   blocks: readonly TerminalBlockSnapshot[],
-  _connections: readonly TerminalConnectionSnapshot[],
   createTerminalGroupId: () => string
 ): TerminalGroupSnapshot[] {
   const assignedBlockIds = new Set<string>()

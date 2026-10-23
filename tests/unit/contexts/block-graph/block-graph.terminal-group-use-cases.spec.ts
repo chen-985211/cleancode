@@ -341,9 +341,9 @@ describe('terminal group use cases', () => {
       )
     )
   )(
-    'rolls back the complete split workflow on $obstacle conflict, scope=$scope, representative=$blockId',
+    'rolls back the complete grouped workflow on $obstacle conflict, scope=$scope, representative=$blockId',
     async ({ scope, blockId, obstacle }) => {
-      const graph = createSplitWorkflow()
+      const graph = createGroupedWorkflow()
       const destination = { x: 5000, y: 5000 }
       if (obstacle === 'terminal')
         graph.createTerminalBlock({
@@ -379,8 +379,7 @@ describe('terminal group use cases', () => {
   )
 
   it('does not treat other members of the moved workflow as external obstacles', async () => {
-    // The user can place root members closer than the external-object safety gap.
-    const graph = createSplitWorkflow({ x: 450, y: 0 })
+    const graph = createGroupedWorkflow()
     const repository = new InMemoryBlockGraphRepository(graph)
     const before = graph.toSnapshot()
     const updated = await new MoveTerminalWorkflowToGroupUseCase(repository).execute({
@@ -394,7 +393,7 @@ describe('terminal group use cases', () => {
 
     expect(updated.blocks.map(({ id, position }) => ({ id, position }))).toEqual([
       { id: 'root', position: { x: 5000, y: 5000 } },
-      { id: 'grouped', position: { x: 5450, y: 5000 } }
+      { id: 'grouped', position: { x: 5484, y: 5000 } }
     ])
     expect(updated.connections).toEqual(before.connections)
     expect(updated.terminalGroups[0]?.memberBlockIds).toEqual([])
@@ -402,7 +401,8 @@ describe('terminal group use cases', () => {
   })
 
   it('keeps the explicit terminal scope precise during collision checking', async () => {
-    const graph = createSplitWorkflow()
+    const graph = createGroupedWorkflow()
+    graph.disconnectTerminalBlocks(graph.connections[0]!.id)
     const repository = new InMemoryBlockGraphRepository(graph)
     const root = graph.blocks.find((block) => block.id === 'root')!
     const updated = await new MoveTerminalWorkflowToGroupUseCase(repository).execute({
@@ -424,7 +424,7 @@ describe('terminal group use cases', () => {
   })
 })
 
-function createSplitWorkflow(groupedPosition = { x: 1032, y: 576 }): BlockGraph {
+function createGroupedWorkflow(): BlockGraph {
   const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   for (const id of ['root', 'grouped'])
     graph.createTerminalBlock({
@@ -434,13 +434,13 @@ function createSplitWorkflow(groupedPosition = { x: 1032, y: 576 }): BlockGraph 
       position: { x: 0, y: 0 },
       size: { width: 420, height: 280 }
     })
+  graph.connectTerminalBlocks({ sourceBlockId: 'root', targetBlockId: 'grouped' })
   graph.createTerminalGroup({
     id: 'source',
     name: 'Source',
-    memberBlockIds: ['grouped'],
-    position: { x: groupedPosition.x - 32, y: groupedPosition.y - 76 }
+    memberBlockIds: ['root', 'grouped'],
+    position: { x: -32, y: -76 }
   })
-  graph.connectTerminalBlocks({ sourceBlockId: 'root', targetBlockId: 'grouped' })
   return graph
 }
 

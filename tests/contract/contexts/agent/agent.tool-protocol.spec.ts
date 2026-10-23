@@ -397,13 +397,13 @@ describe('agent tool protocol', () => {
       expect(instructions).toContain(canvasExecutionSemanticInstructions)
       expect(instructions).toContain('persistent visual container')
       expect(instructions).toContain('may remain empty')
-      expect(instructions).toContain('may cross combination boundaries')
+      expect(instructions).toContain('must not cross combination boundaries')
     }
 
     const createGroup = requireTool('create_terminal_group')
     const moveWorkflowToGroup = requireTool('move_terminal_workflow_to_group')
     expect(createGroup.description).toContain('may start empty')
-    expect(createGroup.description).toContain('dependencies may cross its boundary')
+    expect(createGroup.description).toContain('must not cross combination boundaries')
     expect(createGroup.inputSchema.required).toEqual(['name'])
     expect(readSchemaProperty(createGroup.inputSchema, 'memberBlockIds')).toMatchObject({
       type: 'array',

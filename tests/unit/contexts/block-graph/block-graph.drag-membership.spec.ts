@@ -14,18 +14,23 @@ describe('terminal drag membership', () => {
     expect(graph.toSnapshot()).toEqual(before)
   })
 
-  it('moves only the dragged terminal and preserves external dependencies through restore', () => {
+  it('rejects a partial membership move and restores a complete workflow move', () => {
     const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
     for (const id of ['a', 'b'])
       graph.createTerminalBlock({ id, name: id, description: '', position: { x: 0, y: 0 } })
     graph.connectTerminalBlocks({ id: 'a-b', sourceBlockId: 'a', targetBlockId: 'b' })
     graph.createTerminalGroup({ id: 'group', name: 'App', position: { x: 800, y: 100 } })
-    graph.moveTerminalWorkflowToGroup('a', 'group', undefined, 'terminal')
+    const before = graph.toSnapshot()
+    expect(() => graph.moveTerminalWorkflowToGroup('a', 'group', undefined, 'terminal')).toThrow(
+      expect.objectContaining({ code: 'TERMINAL_CONNECTION_SCOPE_MISMATCH' })
+    )
+    expect(graph.toSnapshot()).toEqual(before)
+    graph.moveTerminalWorkflowToGroup('a', 'group')
     const snapshot = graph.toSnapshot()
-    expect(snapshot.terminalGroups[0]?.memberBlockIds).toEqual(['a'])
+    expect(snapshot.terminalGroups[0]?.memberBlockIds).toEqual(['a', 'b'])
     expect(snapshot.connections).toEqual([{ id: 'a-b', sourceBlockId: 'a', targetBlockId: 'b' }])
     expect(BlockGraph.fromSnapshot(snapshot).toSnapshot()).toEqual(snapshot)
-    graph.moveTerminalWorkflowToGroup('a', null, { x: -500, y: 0 }, 'terminal')
+    graph.moveTerminalWorkflowToGroup('a', null, { x: -500, y: 0 }, 'workflow')
     expect(graph.toSnapshot().terminalGroups[0]?.memberBlockIds).toEqual([])
     expect(graph.toSnapshot().blocks).toHaveLength(2)
     expect(graph.toSnapshot().connections).toEqual(snapshot.connections)

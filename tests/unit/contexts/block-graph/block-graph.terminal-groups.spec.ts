@@ -100,19 +100,21 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
-  it('preserves a dependency that crosses a group boundary', () => {
+  it('rejects a dependency that crosses a group boundary without changing the graph', () => {
     const graph = createGraphWithWorkflowComponents(false)
     graph.createTerminalGroup({
       id: 'release-group',
       name: 'Release',
       memberBlockIds: ['test-terminal', 'package-terminal']
     })
+    const before = graph.toSnapshot()
     expect(() =>
       graph.connectTerminalBlocks({
         sourceBlockId: 'build-terminal',
         targetBlockId: 'test-terminal'
       })
-    ).not.toThrow()
+    ).toThrow(expect.objectContaining({ code: 'TERMINAL_CONNECTION_SCOPE_MISMATCH' }))
+    expect(graph.toSnapshot()).toEqual(before)
   })
 
   it('moves grouped terminals together when the group moves', () => {

@@ -144,6 +144,8 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 进程级 `developer_instructions` 与 `initialize.instructions` 共同承担开启 CleanCode MCP 时的画布语义消歧：二者先投影共享画布语义契约生成的同一规范说明，再追加各自的路由和能力边界。用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”“终端工作流”“启动项目的终端组合”或同义请求时，Agent 必须先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布事实。Agent 可以在查看画布后读取仓库以确认真实启动单元；新建结构必须按规范分类一次调用：一个已配置终端使用 `create_terminal`，一条至少包含两个依赖连通终端的完整流程使用 `create_terminal_workflow`，多个独立顶层执行单元使用 `create_terminal_set`。用户明确要求流程时不得静默降级到另外两个工具；启动项目流程可以把仓库真实支持的依赖安装或初始化作为上游任务、开发服务作为下游服务，若仍无法识别两个真实阶段则先询问用户，不能只创建终端，也不能虚构等待或转发步骤。`terminalGroup` 默认省略，只有用户明确要求终端组合、容器或分组时才提供；多个相关终端或依赖关系本身不构成组合意图。要把既有完整流程纳入新组合时，也只有在用户明确要求组合时才先用 `create_terminal_group` 创建空组合，再用 `move_terminal_workflow_to_group` 移动流程；不要通过兼容字段 `memberBlockIds` 重新拼装既有流程。`create_block`、`update_terminal_execution_config`、`connect_terminal_blocks`、`create_terminal_group`、`move_terminal_workflow_to_group`、`arrange_terminal_layout` 和 `inspect_terminal_workflow_plan` 继续服务空白视觉终端或既有画布对象的增量编辑。不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成替代品。当前工具目录只能创作和检查工作流，没有启动工具，因此 Agent 只能声明已经搭建，不能声称终端或工作流已经运行。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
 
+组合连接限制同样由共享画布语义契约投影到 MCP 与 Provider 指引：依赖两端必须同属一个组合，或都位于组合之外。`connect_terminal_blocks` 不得跨组合边界，成员调整必须携带完整相连流程；BlockGraph 在所有入口统一校验，失败不提交图事实。工具描述引用结构化契约，不另行维护语义。
+
 ## 当前工具目录
 
 以下 16 个终端画布工具与下节 5 个 Agent 协作工具构成当前完整的 21 个工具。独立设置页完整显示名称、用途和每类数量；每类开关共同控制该类全部工具，不提供单工具开关。这里列出完整目录，具体 launch 仅暴露启用分类中的工具：

@@ -72,7 +72,7 @@ export const zhCNErrorsMessages = {
   'error.SERVICE_PORT_MANAGEMENT_UNSUPPORTED': '当前环境不支持托管端口，请改用受支持的运行环境。',
   'error.TERMINAL_CONNECTION_DUPLICATE': '这条终端依赖已经存在。',
   'error.TERMINAL_CONNECTION_INVALID': '终端不能连接到自身。',
-  'error.TERMINAL_CONNECTION_SCOPE_MISMATCH': '连线两端必须位于同一个组合空间。',
+  'error.TERMINAL_CONNECTION_SCOPE_MISMATCH': '连线不能跨组合边界，请整体移动相连的流程。',
   'error.TERMINAL_SCOPE_MOVE_STALE': '流程所属空间已经变化，请重试。',
   'error.TERMINAL_EXECUTION_CONFIG_INVALID': '终端执行配置无效，请检查退出码、超时和就绪条件。',
   'error.TERMINAL_SHELL_UNSUPPORTED':

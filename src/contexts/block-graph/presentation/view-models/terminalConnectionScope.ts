@@ -1,4 +1,8 @@
 import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
+import {
+  isTerminalConnectionWithinGroupBoundary,
+  resolveTerminalGroupId
+} from '../../domain/services/TerminalConnectionBoundary'
 
 export function isTerminalConnectionAllowedInCanvasScope(
   graph: BlockGraphSnapshot | null,
@@ -14,13 +18,10 @@ export function isTerminalConnectionAllowedInCanvasScope(
     return false
   }
 
-  const sourceScope = resolveTerminalScope(graph, sourceBlockId)
-  const targetScope = resolveTerminalScope(graph, targetBlockId)
-
   return (
-    editingTerminalGroupId === null ||
-    sourceScope === editingTerminalGroupId ||
-    targetScope === editingTerminalGroupId
+    isTerminalConnectionWithinGroupBoundary(graph.terminalGroups, sourceBlockId, targetBlockId) &&
+    (editingTerminalGroupId === null ||
+      resolveTerminalGroupId(graph.terminalGroups, sourceBlockId) === editingTerminalGroupId)
   )
 }
 
@@ -32,11 +33,8 @@ export function isTerminalConnectionEditableInCanvasScope(
 ): boolean {
   if (!editingTerminalGroupId) return true
   return (
-    resolveTerminalScope(graph, sourceBlockId) === editingTerminalGroupId &&
-    resolveTerminalScope(graph, targetBlockId) === editingTerminalGroupId
+    graph !== null &&
+    resolveTerminalGroupId(graph.terminalGroups, sourceBlockId) === editingTerminalGroupId &&
+    resolveTerminalGroupId(graph.terminalGroups, targetBlockId) === editingTerminalGroupId
   )
-}
-
-function resolveTerminalScope(graph: BlockGraphSnapshot | null, blockId: string): string | null {
-  return graph?.terminalGroups.find((group) => group.memberBlockIds.includes(blockId))?.id ?? null
 }

@@ -16,7 +16,10 @@ import type {
   AgentTerminalWorkflowPlanScope,
   AgentTerminalWorkflowPlanSnapshot
 } from './AgentTerminalWorkflowProtocol'
-import { canvasExecutionSemanticInstructions } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
+import {
+  canvasExecutionSemanticContract,
+  canvasExecutionSemanticInstructions
+} from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import {
   objectSchema,
   type AgentToolJsonSchema,
@@ -198,8 +201,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   }),
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
-    description:
-      'Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. Omit position for automatic empty-group placement around existing canvas objects. A group is a visual container; dependencies may cross its boundary. memberBlockIds remains compatible, but use move_terminal_workflow_to_group for existing workflow membership.',
+    description: `Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. Omit position for automatic empty-group placement around existing canvas objects. ${canvasExecutionSemanticContract.rules.crossBoundaryDependencies.english} memberBlockIds remains compatible, but use move_terminal_workflow_to_group for existing workflow membership.`,
     graphChanged: true,
     inputSchema: objectSchema(
       {
@@ -302,8 +304,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   }),
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
-    description:
-      'Connect an upstream source terminal to a downstream target terminal in the CleanCode dependency workflow.',
+    description: `Connect an upstream source terminal to a downstream target terminal in the CleanCode dependency workflow. ${canvasExecutionSemanticContract.rules.crossBoundaryDependencies.english}`,
     graphChanged: true,
     inputSchema: objectSchema(
       {
