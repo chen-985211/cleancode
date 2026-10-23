@@ -186,6 +186,71 @@ describe('file-system mutation lock', () => {
     expect(await readdir(rootDirectory)).toEqual([])
   })
 
+  it.each(
+    ['EPERM', 'EACCES', 'EBUSY'].flatMap((code) =>
+      [false, true].map((removed) => ({ code, removed }))
+    )
+  )(
+    'rechecks a retiring barrier after a transient $code read failure (removed: $removed)',
+    async ({ code, removed }) => {
+      const barrier = `${lockDirectory}.reclaimed-retiring`
+      await createLockArtifact(barrier, 'dead-owner', 987_654_321)
+      let failedRead = false
+      const retiringFileSystem: FileSystemMutationLockFileSystem = {
+        ...faultingFileSystem,
+        readFile: async (path, encoding) => {
+          if (path === join(barrier, 'owner.json') && !failedRead) {
+            failedRead = true
+            // Windows can deny an open while another owner finishes removing it.
+            if (removed) await rm(barrier, { force: true, recursive: true })
+            throw Object.assign(new Error('barrier is retiring'), { code })
+          }
+          return readFile(path, encoding)
+        }
+      }
+
+      const lease = await acquireFileSystemMutationLock({
+        directory: lockDirectory,
+        fileSystem: retiringFileSystem,
+        isProcessAlive: (processId) => processId === process.pid
+      })
+
+      expect(failedRead).toBe(true)
+      await lease.assertOwned()
+      await lease.close()
+      expect(await readdir(rootDirectory)).toEqual([])
+    }
+  )
+
+  it.each(['EPERM', 'EACCES', 'EBUSY'])(
+    'does not bypass a reclaim barrier that remains unreadable with %s',
+    async (code) => {
+      const barrier = `${lockDirectory}.reclaimed-unreadable`
+      await createLockArtifact(barrier, 'live-owner', process.pid)
+      const unreadableFileSystem: FileSystemMutationLockFileSystem = {
+        ...faultingFileSystem,
+        readFile: async (path, encoding) => {
+          if (path === join(barrier, 'owner.json')) {
+            throw Object.assign(new Error('barrier is unreadable'), { code })
+          }
+          return readFile(path, encoding)
+        }
+      }
+
+      await expect(
+        acquireFileSystemMutationLock({
+          directory: lockDirectory,
+          fileSystem: unreadableFileSystem,
+          isProcessAlive: (processId) => processId === process.pid,
+          timeoutMs: 50
+        })
+      ).rejects.toThrow('Timed out waiting for file-system mutation lock')
+
+      expect(await readFile(join(barrier, 'owner.json'), 'utf8')).toContain('live-owner')
+      expect(await readdir(rootDirectory)).toEqual(['mutation.lock.reclaimed-unreadable'])
+    }
+  )
+
   it.each([
     ['canonical', () => lockDirectory],
     ['unique reclaim barrier', () => `${lockDirectory}.reclaimed-interrupted`]
