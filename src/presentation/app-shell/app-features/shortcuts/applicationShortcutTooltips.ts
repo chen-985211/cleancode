@@ -26,6 +26,7 @@ export const applicationShortcutCommandMessageKeys: Readonly<
   zoomCanvasIn: 'settings.shortcuts.command.zoomCanvasIn',
   zoomCanvasOut: 'settings.shortcuts.command.zoomCanvasOut',
   fitCanvas: 'settings.shortcuts.command.fitCanvas',
+  organizeCanvas: 'settings.shortcuts.command.organizeCanvas',
   toggleMinimap: 'settings.shortcuts.command.toggleMinimap',
   quickExecution1: 'settings.shortcuts.command.quickExecution1',
   quickExecution2: 'settings.shortcuts.command.quickExecution2',

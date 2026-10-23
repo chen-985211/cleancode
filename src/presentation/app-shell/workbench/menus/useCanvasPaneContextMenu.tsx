@@ -18,7 +18,8 @@ interface UseCanvasPaneContextMenuOptions {
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
     'createTerminal' | 'groupTerminals'
-  >
+  > &
+    Partial<Pick<ApplicationShortcutTooltipLabels, 'organizeCanvas'>>
   readonly onBeforeOpen: () => void
   readonly onBeginTerminalGroupSelection?: () => void
   readonly onCreateTerminal: (position: { readonly x: number; readonly y: number }) => void

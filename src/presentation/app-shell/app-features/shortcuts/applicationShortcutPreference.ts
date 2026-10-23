@@ -81,9 +81,18 @@ const v6ApplicationShortcutCommands = [
 
 type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding | null>>
 
+const v8ApplicationShortcutCommands = [
+  ...v6ApplicationShortcutCommands,
+  'quickExecution1',
+  'quickExecution2',
+  'quickExecution3',
+  'quickExecution4',
+  'quickExecution5'
+] as const
+
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 8
+  readonly version: 9
 }
 
 const v6FitCanvasDefaultBinding = {
@@ -241,10 +250,16 @@ export function readApplicationShortcutBindings(
       readonly version?: unknown
       readonly bindings?: unknown
     }
-    if (preference.version === 8) {
+    if (preference.version === 9) {
       return hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
         !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
         ? cloneBindings(preference.bindings)
+        : defaults
+    }
+    if (preference.version === 8) {
+      return hasCompleteBindingCatalog(preference.bindings, v8ApplicationShortcutCommands) &&
+        !hasShortcutConflict(preference.bindings, v8ApplicationShortcutCommands)
+        ? extendLegacyBindings(preference.bindings, v8ApplicationShortcutCommands, defaults)
         : defaults
     }
   } catch {
@@ -287,10 +302,10 @@ function readLegacyApplicationShortcutBindings(
     }
     if (
       preference.version === 7 &&
-      hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
-      !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
+      hasCompleteBindingCatalog(preference.bindings, v8ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v8ApplicationShortcutCommands)
     ) {
-      return cloneBindings(preference.bindings)
+      return extendLegacyBindings(preference.bindings, v8ApplicationShortcutCommands, defaults)
     }
 
     if (
@@ -378,7 +393,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 8
+    version: 9
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

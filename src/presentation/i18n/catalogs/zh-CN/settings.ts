@@ -43,6 +43,7 @@ export const zhCNSettingsMessages = {
   'settings.shortcuts.command.zoomCanvasIn': '放大画布',
   'settings.shortcuts.command.zoomCanvasOut': '缩小画布',
   'settings.shortcuts.command.fitCanvas': '适应画布',
+  'settings.shortcuts.command.organizeCanvas': '整理画布',
   'settings.shortcuts.command.toggleMinimap': '收起或展开小地图',
   'settings.shortcuts.command.quickExecution1': '执行快捷位 1',
   'settings.shortcuts.command.quickExecution2': '执行快捷位 2',

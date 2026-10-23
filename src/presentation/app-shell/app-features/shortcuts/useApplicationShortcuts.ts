@@ -18,7 +18,7 @@ export type ApplicationShortcutActions = Readonly<
 >
 
 interface UseApplicationShortcutsInput {
-  readonly actions: ApplicationShortcutActions
+  readonly actions: Partial<ApplicationShortcutActions>
   readonly bindings: ApplicationShortcutBindings
   readonly platform: ShortcutPlatform
 }
@@ -68,7 +68,7 @@ export function useApplicationShortcuts({
       }
 
       const action = actionsRef.current[command]
-      if (!action.enabled) {
+      if (!action?.enabled) {
         return
       }
 

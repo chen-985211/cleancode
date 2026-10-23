@@ -31,6 +31,7 @@ describe('application shortcut tooltips', () => {
       zoomCanvasIn: '放大画布 (⌘])',
       zoomCanvasOut: '缩小画布 (⌘[)',
       fitCanvas: '适应画布 (⌘\\)',
+      organizeCanvas: '整理画布 (⌘⇧F)',
       selectCanvasNodeLeft: '选择左侧节点 (⌘←)',
       selectCanvasNodeRight: '选择右侧节点 (⌘→)',
       selectCanvasNodeUp: '选择上方节点 (⌘↑)',
@@ -44,6 +45,7 @@ describe('application shortcut tooltips', () => {
     })
     expect(otherLabels.createAgent).toBe('New Agent (Ctrl+Shift+A)')
     expect(otherLabels.createTerminal).toBe('New terminal (Ctrl+T)')
+    expect(otherLabels.organizeCanvas).toBe('Organize canvas (Ctrl+Shift+F)')
   })
 
   it('tracks custom bindings and omits empty shortcut parentheses', () => {

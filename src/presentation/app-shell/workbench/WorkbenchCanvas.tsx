@@ -47,7 +47,7 @@ import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
 import { workbenchDragAutoPanSpeed } from './viewport/workbenchDragAutoPan'
 import { isApplyingWorkbenchViewport } from './viewport/workbenchViewportAdapter'
 import { useWorkbenchDirectZoom } from './viewport/useWorkbenchDirectZoom'
-import { useCanvasOrganization } from './viewport/useCanvasOrganization'
+import { useWorkbenchCanvasOrganization } from './viewport/useWorkbenchCanvasOrganization'
 import {
   centerCanvasViewportOnMinimapPoint,
   persistCanvasViewportFromMoveEnd,
@@ -99,6 +99,7 @@ export function WorkbenchCanvas({
   terminalWorkflowBuildPresentation = null,
   shortcutTooltips,
   shortcutPlatform = 'mac',
+  shortcutBindings,
   placementTemplate,
   onPlaceBlockTemplate,
   onCancelBlockTemplatePlacement,
@@ -195,13 +196,17 @@ export function WorkbenchCanvas({
       ? (target) => void onAddQuickExecutionTarget(toQuickExecutionTarget(target))
       : undefined
   })
-  const canvasOrganization = useCanvasOrganization({
+  const canvasOrganization = useWorkbenchCanvasOrganization({
     items: canvasArrangement.items,
-    scopeKey: JSON.stringify([
-      currentWorkbench?.project.id,
-      currentWorkspace?.workspaceId,
-      currentWorkbench?.graph.id
-    ]),
+    currentWorkbench,
+    currentWorkspace,
+    editingTerminalGroupId,
+    isDesktopRuntime,
+    isCanvasArrangementPending,
+    isTerminalGroupSelectionMode,
+    placementTemplate,
+    shortcutBindings,
+    shortcutPlatform,
     onOrganizeCanvas,
     onUserAction: onViewportInteractionStart,
     onFailure: () =>
@@ -215,14 +220,7 @@ export function WorkbenchCanvas({
   const paneContextMenu = useCanvasPaneContextMenu({
     canCreateTerminal: isDesktopRuntime && Boolean(currentWorkbench),
     canGroupTerminals: isDesktopRuntime && Boolean(currentWorkbench) && !editingTerminalGroupId,
-    canOrganizeCanvas:
-      isDesktopRuntime &&
-      Boolean(currentWorkbench) &&
-      Boolean(onOrganizeCanvas) &&
-      canvasArrangement.items.length > 0 &&
-      !isCanvasArrangementPending &&
-      !isTerminalGroupSelectionMode &&
-      !editingTerminalGroupId,
+    canOrganizeCanvas: canvasOrganization.canOrganizeCanvas,
     onOrganizeCanvas: () => {
       void canvasOrganization.organize()
     },

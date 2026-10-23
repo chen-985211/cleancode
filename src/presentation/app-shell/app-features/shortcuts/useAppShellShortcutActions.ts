@@ -50,7 +50,7 @@ export function useAppShellShortcutActions({
   toggleSidebar,
   zoomCanvasIn,
   zoomCanvasOut
-}: UseAppShellShortcutActionsInput): ApplicationShortcutActions {
+}: UseAppShellShortcutActionsInput): Omit<ApplicationShortcutActions, 'organizeCanvas'> {
   return useMemo(
     () => ({
       openSettings: { enabled: !isSettingsOpen, run: openSettings },

@@ -10,6 +10,8 @@ describe('canvas pane context menu', () => {
     fireEvent.contextMenu(screen.getByTestId('pane'), { clientX: 320, clientY: 240 })
     const menu = screen.getByRole('menu', { name: '画布操作' })
     const organize = within(menu).getByRole('menuitem', { name: '整理画布' })
+    expect(within(organize).getByText('⌘⇧F')).toBeInTheDocument()
+    expect(organize).toHaveAttribute('title', '整理画布')
     await waitFor(() =>
       expect(within(menu).getByRole('menuitem', { name: '新建终端' })).toHaveFocus()
     )
@@ -145,6 +147,7 @@ function Harness({ actions, graphId, isBlocked = false, canOrganizeCanvas = true
     graphId,
     isBlocked,
     shortcutTooltips: {
+      organizeCanvas: '整理画布 (⌘⇧F)',
       createTerminal: '新建终端 (⌘T)',
       groupTerminals: '新建组合 (⌘G)'
     },
