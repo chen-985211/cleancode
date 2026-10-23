@@ -2,14 +2,12 @@ import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregat
 
 describe('terminal combination container scopes', () => {
   it.each([undefined, 'workflow'] as const)(
-    'moves split workflows with scope %s while rejecting genuinely stale membership',
+    'moves complete workflows with scope %s while rejecting stale membership',
     (scope) => {
       const graph = createGraph()
       createTerminal(graph, 'left', 0, 0)
       createTerminal(graph, 'right', 800, 0)
       createTerminal(graph, 'later', 1600, 0)
-      graph.createTerminalGroup({ id: 'left-group', name: 'Left', memberBlockIds: ['left'] })
-      graph.createTerminalGroup({ id: 'right-group', name: 'Right', memberBlockIds: ['right'] })
       graph.createTerminalGroup({ id: 'target', name: 'Target', position: { x: 3000, y: 3000 } })
       graph.connectTerminalBlocks({ sourceBlockId: 'left', targetBlockId: 'right' })
       graph.moveTerminalWorkflowToGroup('left', 'target', undefined, scope, ['left', 'right'])
@@ -17,6 +15,7 @@ describe('terminal combination container scopes', () => {
         'left',
         'right'
       ])
+      graph.moveTerminalWorkflowToGroup('later', 'target')
       graph.connectTerminalBlocks({ sourceBlockId: 'right', targetBlockId: 'later' })
       const before = graph.toSnapshot()
       expect(() =>
@@ -137,7 +136,7 @@ describe('terminal combination container scopes', () => {
     ])
   })
 
-  it('preserves valid dependencies across container boundaries and still rejects cycles', () => {
+  it('rejects connections across container boundaries and preserves the graph through restore', () => {
     const graph = createGraph()
     for (const [id, x] of [
       ['root', 0],
@@ -147,14 +146,18 @@ describe('terminal combination container scopes', () => {
       createTerminal(graph, id, x, 100)
     graph.createTerminalGroup({ id: 'group', name: 'Inside', memberBlockIds: ['inside'] })
     graph.createTerminalGroup({ id: 'other-group', name: 'Other', memberBlockIds: ['other'] })
-    graph.connectTerminalBlocks({ sourceBlockId: 'root', targetBlockId: 'inside' })
-    graph.connectTerminalBlocks({ sourceBlockId: 'inside', targetBlockId: 'other' })
     const before = graph.toSnapshot()
-    expect(() =>
-      graph.connectTerminalBlocks({ sourceBlockId: 'other', targetBlockId: 'root' })
-    ).toThrow()
+    for (const [sourceBlockId, targetBlockId] of [
+      ['root', 'inside'],
+      ['inside', 'other'],
+      ['other', 'root']
+    ]) {
+      expect(() => graph.connectTerminalBlocks({ sourceBlockId, targetBlockId })).toThrow(
+        expect.objectContaining({ code: 'TERMINAL_CONNECTION_SCOPE_MISMATCH' })
+      )
+      expect(graph.toSnapshot()).toEqual(before)
+    }
     expect(BlockGraph.fromSnapshot(before).toSnapshot()).toEqual(before)
-    expect(before.connections).toHaveLength(2)
   })
 
   it('moves a complete connected workflow into and out of a combination atomically', () => {

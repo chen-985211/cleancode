@@ -73,14 +73,14 @@ describe('block graph filesystem repository', () => {
     })
   })
 
-  it('restores collapsed terminals, partial workflow membership and boundary connections from disk', async () => {
+  it('restores collapsed terminals and complete workflow membership from disk', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({ projectId: 'project', workspaceId: 'main' })
     for (const id of ['a', 'b'])
       graph.createTerminalBlock({ id, name: id, description: '', position: { x: 0, y: 0 } })
     graph.connectTerminalBlocks({ id: 'edge', sourceBlockId: 'a', targetBlockId: 'b' })
     graph.createTerminalGroup({ id: 'group', name: 'App', position: { x: 800, y: 100 } })
-    graph.moveTerminalWorkflowToGroup('a', 'group', undefined, 'terminal')
+    graph.moveTerminalWorkflowToGroup('a', 'group', undefined, 'workflow')
     graph.resizeTerminalBlock('a', {
       position: graph.blocks[0]!.position,
       size: graph.blocks[0]!.size,

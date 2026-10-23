@@ -23,7 +23,7 @@ const dependencies = [
 describe('canvas execution semantic contract', () => {
   it('publishes the versioned container and scope invariants', () => {
     expect(canvasExecutionSemanticContract).toMatchObject({
-      version: 3,
+      version: 4,
       rules: {
         completeWorkflowMembership: expect.any(Object),
         crossBoundaryDependencies: expect.any(Object),
@@ -94,7 +94,7 @@ describe('canvas execution semantic contract', () => {
   it('publishes the canonical bilingual instructions from the structured rules', () => {
     expect(canvasExecutionSemanticInstructions).toContain('may remain empty')
     expect(canvasExecutionSemanticInstructions).toContain('可以保持为空')
-    expect(canvasExecutionSemanticInstructions).toContain('may cross combination boundaries')
+    expect(canvasExecutionSemanticInstructions).toContain('must not cross combination boundaries')
     expect(canvasExecutionSemanticInstructions).toContain('returns it to its fixed slot')
     expect(canvasExecutionSemanticInstructions).toContain('回到固定槽位')
     expect(canvasExecutionSemanticInstructions).toContain(

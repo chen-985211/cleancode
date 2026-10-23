@@ -43,8 +43,6 @@ describe('terminal disclosure layout', () => {
       description: '',
       position: { x: -800, y: -600 }
     })
-    if (group)
-      graph.connectTerminalBlocks({ sourceBlockId: blocks[2]!.id, targetBlockId: external.id })
     const externalBeforeDisclosure = graph.blocks.find((block) => block.id === external.id)
     const connections = graph.toSnapshot().connections
     const anchor = group?.position ?? { x: 100, y: 100 }

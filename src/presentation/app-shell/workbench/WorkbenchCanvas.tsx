@@ -40,10 +40,8 @@ import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasS
 import { CanvasMenuMotionProvider } from './menus/CanvasMenuMotionProvider'
 import { useCanvasPaneContextMenu } from './menus/useCanvasPaneContextMenu'
 import { projectTerminalWorkflowBuildOntoEdges } from '../projections/terminalWorkflowBuildEdgePresentation'
-import {
-  isTerminalConnectionAllowedInCanvasScope,
-  isTerminalConnectionEditableInCanvasScope
-} from '../../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
+import { isTerminalConnectionAllowedInCanvasScope } from '../../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
+import { useCanvasConnectionInteraction } from './useCanvasConnectionInteraction'
 import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
 import { workbenchDragAutoPanSpeed } from './viewport/workbenchDragAutoPan'
@@ -247,6 +245,18 @@ export function WorkbenchCanvas({
       onCreateTerminalGroup(toWorkbenchFlowPosition(reactFlowInstanceRef.current, screenPosition))
     }
   })
+  const connectionInteraction = useCanvasConnectionInteraction({
+    edges: objectContextMenu.edges,
+    graph: currentWorkbench?.graph ?? null,
+    editingTerminalGroupId,
+    isBlocked: Boolean(placementTemplate) || isTerminalGroupSelectionMode,
+    onBeforeOpen: () => {
+      objectContextMenu.close()
+      paneContextMenu.close()
+    },
+    onDeleteEdges: workflow.deleteEdges,
+    onNodeClick
+  })
   const [viewportStore] = useState(() =>
     createWorkbenchCanvasViewportStore(currentWorkbench?.graph.viewport ?? defaultCanvasViewport)
   )
@@ -389,7 +399,10 @@ export function WorkbenchCanvas({
           className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
             .filter(Boolean)
             .join(' ')}
-          onKeyDownCapture={workflowDragging.keyDown}
+          onKeyDownCapture={(event) => {
+            workflowDragging.keyDown(event)
+            connectionInteraction.onKeyDown(event)
+          }}
           onPointerDownCapture={(event) => {
             if (!workflowDragging.begin(event)) templateInteraction.beginSelection(event)
           }}
@@ -428,7 +441,7 @@ export function WorkbenchCanvas({
                 templateInteraction.canvasSelection?.items ?? [],
                 canvasArrangement.arrangement
               )}
-              edges={objectContextMenu.edges}
+              {...connectionInteraction.flowProps}
               edgeTypes={workbenchEdgeTypes}
               isValidConnection={(connection: Connection | Edge) =>
                 isTerminalConnectionAllowedInCanvasScope(
@@ -439,20 +452,6 @@ export function WorkbenchCanvas({
                 )
               }
               onConnect={(connection) => void workflow.connect(connection)}
-              onEdgesDelete={(edges) =>
-                void workflow.deleteEdges(
-                  edges.filter(
-                    (edge) =>
-                      !edge.id.startsWith('approval:') &&
-                      isTerminalConnectionEditableInCanvasScope(
-                        currentWorkbench?.graph ?? null,
-                        edge.source,
-                        edge.target,
-                        editingTerminalGroupId
-                      )
-                  )
-                )
-              }
               nodeTypes={nodeTypes}
               nodesDraggable={!isCanvasArrangementPending}
               nodeClickDistance={nodeGestureThresholdPixels}
@@ -498,7 +497,6 @@ export function WorkbenchCanvas({
                   )
                 )
               }
-              onNodeClick={onNodeClick}
               onNodeContextMenu={(event, node) => {
                 if (node.type === 'terminalGroup' && node.id === editingTerminalGroupId) {
                   objectContextMenu.close()
@@ -510,6 +508,7 @@ export function WorkbenchCanvas({
               }}
               onPaneContextMenu={paneContextMenu.open}
               onPaneClick={() => {
+                connectionInteraction.clearSelection()
                 objectContextMenu.close()
                 paneContextMenu.close()
                 if (placementTemplate) return
@@ -682,6 +681,7 @@ export function WorkbenchCanvas({
           </div>
           {objectContextMenu.menu}
           {paneContextMenu.menu}
+          {connectionInteraction.menu}
         </div>
         <CanvasStatusbar
           motionRef={statusbarMotionRef}

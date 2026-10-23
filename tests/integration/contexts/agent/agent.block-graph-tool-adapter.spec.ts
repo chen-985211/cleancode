@@ -332,28 +332,59 @@ describe('agent block graph workflow tool adapter', () => {
     })
   })
 
+  it.each([
+    ['install', 'build'],
+    ['build', 'install'],
+    ['install', 'test'],
+    ['test', 'install']
+  ] as const)(
+    'rejects a boundary connection %s → %s through the Agent port without saving',
+    async (source, target) => {
+      await adapter.createTerminalGroup(context, {
+        name: 'First',
+        memberBlockIds: [terminalIds.install],
+        position: { x: 2400, y: 0 }
+      })
+      await adapter.createTerminalGroup(context, {
+        name: 'Second',
+        memberBlockIds: [terminalIds.test],
+        position: { x: 4800, y: 0 }
+      })
+      const before = await repository.findDefaultGraphSnapshot(
+        context.projectDirectory,
+        context.workspaceId
+      )
+      await expect(
+        adapter.connectTerminalBlocks(context, {
+          sourceBlockId: terminalIds[source],
+          targetBlockId: terminalIds[target]
+        })
+      ).rejects.toSatisfy(
+        (error: unknown) => getAppErrorCode(error) === 'TERMINAL_CONNECTION_SCOPE_MISMATCH'
+      )
+      const reopened = new FileSystemBlockGraphRepository(appStateDirectory)
+      expect(
+        await reopened.findDefaultGraphSnapshot(context.projectDirectory, context.workspaceId)
+      ).toEqual(before)
+    }
+  )
+
   it.each(['third group', 'representative group', 'root representative'] as const)(
-    'moves every member of a split workflow to the %s through the Agent port',
+    'moves or retains a complete workflow at the %s through the Agent port',
     async (target) => {
+      await adapter.connectTerminalBlocks(context, {
+        sourceBlockId: terminalIds.install,
+        targetBlockId: terminalIds.build
+      })
       const first = await adapter.createTerminalGroup(context, {
         name: 'First',
         memberBlockIds: [terminalIds.install],
         position: { x: 2400, y: 0 }
       })
       const firstId = first.terminalGroups.find((group) => group.name === 'First')!.id
-      if (target !== 'root representative')
-        await adapter.createTerminalGroup(context, {
-          name: 'Second',
-          memberBlockIds: [terminalIds.build],
-          position: { x: 2400, y: 2000 }
-        })
       const third = await adapter.createTerminalGroup(context, {
         name: 'Target',
         position: { x: 4800, y: 0 }
-      })
-      await adapter.connectTerminalBlocks(context, {
-        sourceBlockId: terminalIds.install,
-        targetBlockId: terminalIds.build
       })
       const before = await adapter.inspectGraph(context)
       const targetId =
@@ -369,7 +400,7 @@ describe('agent block graph workflow tool adapter', () => {
           ? { targetTerminalGroupId: targetId }
           : { targetTerminalGroupId: null, position: { x: 6000, y: 6000 } })
       })
-      expect(result.graphChanged).toBe(true)
+      expect(result.graphChanged).toBe(target !== 'representative group')
       expect(result.graph.connections).toEqual(before.connections)
       for (const id of [terminalIds.install, terminalIds.build]) {
         expect(
@@ -418,15 +449,15 @@ describe('agent block graph workflow tool adapter', () => {
     expect(await adapter.inspectGraph(context)).toEqual(before)
   })
 
-  it('rejects a split workflow collision through MCP without persisting any of the move', async () => {
+  it('rejects a complete workflow collision through MCP without persisting any of the move', async () => {
+    await adapter.connectTerminalBlocks(context, {
+      sourceBlockId: terminalIds.install,
+      targetBlockId: terminalIds.build
+    })
     await adapter.createTerminalGroup(context, {
       name: 'Source',
       memberBlockIds: [terminalIds.build],
       position: { x: 2400, y: 900 }
-    })
-    await adapter.connectTerminalBlocks(context, {
-      sourceBlockId: terminalIds.install,
-      targetBlockId: terminalIds.build
     })
     const before = await repository.findDefaultGraphSnapshot(
       context.projectDirectory,

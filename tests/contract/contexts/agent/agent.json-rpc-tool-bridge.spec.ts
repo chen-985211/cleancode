@@ -332,6 +332,20 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       }
     })
   })
+
+  it('publishes closed combination boundaries during initialization', async () => {
+    const bridge = new CleancodeAgentJsonRpcToolBridge({
+      executeMcpTool: vi.fn(),
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      workspaceId: 'main'
+    })
+    await expect(
+      bridge.handle({ id: 1, jsonrpc: '2.0', method: 'initialize' })
+    ).resolves.toMatchObject({
+      result: { instructions: expect.stringContaining('must not cross combination boundaries') }
+    })
+  })
 })
 
 function readStructuredToolCallId(

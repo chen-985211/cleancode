@@ -90,79 +90,80 @@ describe('block graph versioned store', () => {
     })
   })
 
-  it('preserves legacy cross-space dependencies and membership while upgrading only on a write', async () => {
-    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
-    const graphPath = await initializeAndFindGraphPath(
-      repository,
-      appStateDirectory,
-      projectDirectory
-    )
-    const legacyGraph = BlockGraph.createDefault({
-      id: 'graph-1',
-      projectId: 'project-1',
-      workspaceId: 'main'
-    })
-    const source = legacyGraph.createTerminalBlock({
-      id: 'source',
-      name: 'Source',
-      description: '',
-      position: { x: 100, y: 100 }
-    })
-    const target = legacyGraph.createTerminalBlock({
-      id: 'target',
-      name: 'Target',
-      description: '',
-      position: { x: 700, y: 100 }
-    })
-    legacyGraph.connectTerminalBlocks({ sourceBlockId: source.id, targetBlockId: target.id })
-    const legacySnapshot = legacyGraph.toSnapshot()
-    const versionThreeStore = `${JSON.stringify(
-      {
+  it.each([2, 3, 4, 5])(
+    'cleans legacy boundary connections in version %s without writing until a successful transaction',
+    async (version) => {
+      const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+      const graphPath = await initializeAndFindGraphPath(
+        repository,
+        appStateDirectory,
+        projectDirectory
+      )
+      const graph = BlockGraph.createDefault({
+        id: 'graph-1',
+        projectId: 'project-1',
+        workspaceId: 'main'
+      })
+      for (const [index, id] of ['root-a', 'root-b', 'a-1', 'a-2', 'b-1', 'b-2'].entries()) {
+        graph.createTerminalBlock({
+          id,
+          name: id,
+          description: id,
+          launchCommand: `echo ${id}`,
+          position: { x: index * 800, y: 100 }
+        })
+      }
+      for (const [sourceBlockId, targetBlockId] of [
+        ['root-a', 'root-b'],
+        ['a-1', 'a-2'],
+        ['b-1', 'b-2']
+      ]) {
+        graph.connectTerminalBlocks({
+          id: `${sourceBlockId}-${targetBlockId}`,
+          sourceBlockId,
+          targetBlockId
+        })
+      }
+      graph.createTerminalGroup({ id: 'group-a', name: 'A', memberBlockIds: ['a-1'] })
+      graph.createTerminalGroup({ id: 'group-b', name: 'B', memberBlockIds: ['b-1'] })
+      graph.setTerminalGroupCollapsed('group-a', true)
+      const canonical = graph.toSnapshot()
+      const legacyStore = JSON.stringify({
+        version,
         graph: {
-          ...legacySnapshot,
-          terminalGroups: [
-            {
-              id: 'legacy-group',
-              type: 'terminal-group',
-              name: 'Legacy',
-              position: { x: 64, y: 24 },
-              size: { width: 520, height: 460 },
-              isCollapsed: false,
-              memberBlockIds: [source.id]
-            }
+          ...canonical,
+          connections: [
+            ...canonical.connections!,
+            { id: 'root-group', sourceBlockId: 'root-a', targetBlockId: 'a-1' },
+            { id: 'group-root', sourceBlockId: 'a-2', targetBlockId: 'root-b' },
+            { id: 'group-group', sourceBlockId: 'a-1', targetBlockId: 'b-1' }
           ]
-        },
-        version: 3
-      },
-      null,
-      2
-    )}\n`
-    await writeFile(graphPath, versionThreeStore)
+        }
+      })
+      await writeFile(graphPath, legacyStore)
 
-    const restored = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
+      expect(await repository.findDefaultGraphSnapshot(projectDirectory, 'main')).toEqual(canonical)
+      await expect(readFile(graphPath, 'utf8')).resolves.toBe(legacyStore)
+      await expect(
+        repository.transactDefaultGraph(projectDirectory, 'main', (current) => {
+          current.connectTerminalBlocks({ sourceBlockId: 'root-a', targetBlockId: 'a-1' })
+        })
+      ).rejects.toSatisfy(
+        (error) => getAppErrorCode(error) === 'TERMINAL_CONNECTION_SCOPE_MISMATCH'
+      )
+      await expect(readFile(graphPath, 'utf8')).resolves.toBe(legacyStore)
 
-    expect(restored?.connections).toHaveLength(1)
-    expect(restored?.terminalGroups).toEqual([
-      expect.objectContaining({ id: 'legacy-group', memberBlockIds: [source.id] })
-    ])
-    await expect(readFile(graphPath, 'utf8')).resolves.toBe(versionThreeStore)
-
-    await repository.transactDefaultGraph(projectDirectory, 'main', (graph) => {
-      graph.updateViewport({ x: 48 })
-    })
-
-    await expect(readStore(appStateDirectory)).resolves.toMatchObject({
-      graph: {
-        connections: [
-          expect.objectContaining({ sourceBlockId: source.id, targetBlockId: target.id })
-        ],
-        terminalGroups: [
-          expect.objectContaining({ id: 'legacy-group', memberBlockIds: [source.id] })
-        ]
-      },
-      version: 5
-    })
-  })
+      await repository.transactDefaultGraph(projectDirectory, 'main', (current) =>
+        current.updateViewport({ x: 48 })
+      )
+      const expected = { ...canonical, viewport: { ...canonical.viewport, x: 48 } }
+      await expect(readStore(appStateDirectory)).resolves.toEqual({ version: 5, graph: expected })
+      const reopened = new FileSystemBlockGraphRepository(appStateDirectory)
+      await expect(reopened.findDefaultGraphSnapshot(projectDirectory, 'main')).resolves.toEqual(
+        expected
+      )
+    }
+  )
 
   it('rejects a raw legacy graph without migrating or rewriting it', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)

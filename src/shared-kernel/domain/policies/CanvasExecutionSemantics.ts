@@ -33,8 +33,8 @@ export interface CanvasExecutionSelectionAnalysis {
 export const canvasExecutionSemanticContract = Object.freeze({
   definitions: Object.freeze({
     combination: bilingual(
-      'A persistent visual container for zero or more terminals and workflows, allowing dependencies across its boundary.',
-      '组合是可持久存在的独立视觉容器，可容纳零个或多个终端与流程，允许跨边界依赖。'
+      'A persistent visual container for zero or more independent terminals and complete workflows, with closed dependency boundaries.',
+      '组合是可持久存在的独立视觉容器，可容纳零个或多个独立终端与完整流程，依赖边界封闭。'
     ),
     terminal: bilingual('A terminal is the smallest execution unit.', '终端是最小执行单位。'),
     topLevelExecutionUnit: bilingual(
@@ -48,23 +48,23 @@ export const canvasExecutionSemanticContract = Object.freeze({
   }),
   rules: Object.freeze({
     completeWorkflowMembership: bilingual(
-      'Creating a combination or moving workflow membership must include the complete workflow. Explicit terminal-scoped membership commands preserve external dependencies. Dragging a workflow terminal title inside a combination returns it to its fixed slot. Outside a combination, each terminal can move independently and keeps its released position, membership and dependencies; the workflow handle moves the complete workflow.',
-      '创建组合或调整流程成员时，命中流程中的任意终端都必须扩展为完整流程；显式单终端成员命令保留外部依赖；组合内的流程单节点标题拖动在松手后回到固定槽位；组合外的节点可独立拖动并保留释放位置、归属与依赖，完整流程通过流程标签移动。'
+      'Creating a combination or moving workflow membership must include the complete workflow. Explicit terminal-scoped membership commands must not split dependencies across combination boundaries. Dragging a workflow terminal title inside a combination returns it to its fixed slot. Outside a combination, each terminal can move independently and keeps its released position, membership and dependencies; the workflow handle moves the complete workflow.',
+      '创建组合或调整流程成员时，命中流程中的任意终端都必须扩展为完整流程；显式单终端成员命令不得把依赖拆到组合边界两侧；组合内的流程单节点标题拖动在松手后回到固定槽位；组合外的节点可独立拖动并保留释放位置、归属与依赖，完整流程通过流程标签移动。'
     ),
     ordinaryTerminalScope: bilingual(
       'Ordinary terminal clicks, inspection, and configuration still affect only that terminal.',
       '普通单击、查看和配置仍只作用于当前终端。'
     ),
     crossBoundaryDependencies: bilingual(
-      'Dependency connections may cross combination boundaries; membership and disclosure changes preserve those connections.',
-      '依赖连线可以跨越组合边界；成员调整与展开收起必须保留这些连接。'
+      'Dependency connections must not cross combination boundaries. Both terminals must belong to the same combination or both remain outside all combinations. Membership changes must preserve this boundary; disclosure changes preserve connections.',
+      '依赖连线不得跨越组合边界。两端终端必须同属一个组合，或都位于组合之外；成员调整必须保持这一边界，展开收起保留连接。'
     ),
     emptyCombinationPersistence: bilingual(
       'A combination may remain empty until the user explicitly dissolves or removes it.',
       '组合可以保持为空，直到用户显式解散或删除它。'
     )
   }),
-  version: 3
+  version: 4
 })
 
 export const canvasExecutionSemanticInstructions = [

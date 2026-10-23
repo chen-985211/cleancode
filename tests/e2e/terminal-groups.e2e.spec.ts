@@ -349,7 +349,6 @@ describe('terminal group direct manipulation', () => {
         }
         const [a, b, c] = graph.blocks.map((block) => block.id) as [string, string, string]
         graph = await api.connectTerminalBlocks({ ...scope, sourceBlockId: a, targetBlockId: b })
-        graph = await api.connectTerminalBlocks({ ...scope, sourceBlockId: b, targetBlockId: c })
         graph = await api.createTerminalGroup({
           ...scope,
           name: 'Application',
@@ -363,7 +362,7 @@ describe('terminal group direct manipulation', () => {
         })
         await api.addQuickExecutionTarget({
           ...scope,
-          target: { type: 'workflow', terminalBlockIds: [a, b, c] }
+          target: { type: 'workflow', terminalBlockIds: [a, b] }
         })
         await api.updateGraphViewport({ ...scope, viewport: { x: 30, y: 30, zoom: 0.8 } })
         return { a, b, c, groupId, edges: graph.connections! }
@@ -444,8 +443,7 @@ describe('terminal group direct manipulation', () => {
           original.blocks[0]!.position.x
       )
       expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([])
-      // Construct an existing cross-boundary workflow with the public application command.
-      // Canvas title dragging preserves workflow membership; grouped terminals return to slots.
+      // Membership commands move the complete workflow; title dragging preserves its scope.
       await page.evaluate(
         async ({ ids, workbench }) =>
           window.cleancode!.moveTerminalWorkflowToGroup({
@@ -453,7 +451,7 @@ describe('terminal group direct manipulation', () => {
             workspaceId: workbench.graph.workspaceId,
             blockId: ids.a,
             targetTerminalGroupId: ids.groupId,
-            scope: 'terminal',
+            scope: 'workflow',
             position: { x: 1500, y: 300 }
           }),
         { ids, workbench: workbenches[0]! }
@@ -467,7 +465,7 @@ describe('terminal group direct manipulation', () => {
       )
       await waitForGraph(
         workbench,
-        (graph) => graph.terminalGroups[0]?.memberBlockIds.join() === ids.a
+        (graph) => graph.terminalGroups[0]?.memberBlockIds.join() === [ids.a, ids.b].join()
       )
       await waitForMotion(page)
       expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.position).toEqual({
@@ -493,64 +491,28 @@ describe('terminal group direct manipulation', () => {
       await group
         .getByRole('button', { name: 'Application 展开组合', exact: true, expanded: false })
         .waitFor()
-      const attachment = await page.evaluate(
-        async ({ groupId, edgeId }) => {
-          await new Promise<void>((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-          )
-          const material = document
-            .querySelector(`[data-terminal-group-id="${groupId}"] .terminal-group-node__material`)!
-            .getBoundingClientRect()
-          const path = document.querySelector<SVGPathElement>(
-            `.react-flow__edge[data-id="${edgeId}"] .react-flow__edge-path`
-          )!
-          const point = path.getPointAtLength(0)
-          const screen = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM()!)
-          return {
-            x: screen.x,
-            y: screen.y,
-            right: material.right,
-            centerY: material.top + material.height / 2
-          }
-        },
-        { groupId: ids.groupId, edgeId: ids.edges[0]!.id }
+      await page.waitForFunction(
+        () => document.querySelectorAll('.terminal-workflow-edge').length === 0
       )
-      expect(Math.abs(attachment.x - attachment.right)).toBeLessThan(2)
-      expect(Math.abs(attachment.y - attachment.centerY)).toBeLessThan(2)
       await waitForMotion(page)
-      expect(
-        await page.locator(`.react-flow__edge[data-id="${ids.edges[0]!.id}"] path`).count()
-      ).toBeGreaterThan(0)
+      expect(await terminal(page, ids.a).isVisible()).toBe(false)
+      expect(await terminal(page, ids.b).isVisible()).toBe(false)
       const folded = await requiredBox(group)
       await dragTitle(page, terminal(page, ids.c), { x: folded.x + 70, y: folded.y + 20 })
-      await waitForMotion(page)
-      expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([
-        ids.a
-      ])
-      await page.evaluate(
-        async ({ ids, workbench }) =>
-          window.cleancode!.moveTerminalWorkflowToGroup({
-            projectDirectory: workbench.project.directory,
-            workspaceId: workbench.graph.workspaceId,
-            blockId: ids.c,
-            targetTerminalGroupId: ids.groupId,
-            scope: 'terminal',
-            position: { x: 1500, y: 300 }
-          }),
-        { ids, workbench: workbenches[0]! }
-      )
       const foldedGraph = await waitForGraph(
         workbench,
-        (graph) => graph.terminalGroups[0]?.memberBlockIds.length === 2
+        (graph) => graph.terminalGroups[0]?.memberBlockIds.length === 3
       )
       expect(foldedGraph.terminalGroups[0]?.isCollapsed).toBe(true)
       expect(foldedGraph.connections).toEqual(ids.edges)
       await page.reload()
+      await page.getByRole('button', { name: 'Application 展开组合', exact: true }).click()
+      await terminal(page, ids.b).waitFor({ state: 'visible' })
       expect(await readTerminalSessionId(page, 'Build')).toBe(buildSessionId)
       await waitForMotion(page)
       const beforeWorkflowMove = await readE2eBlockGraph(workbench)
       // Quick slots drag only their binding; the visible workflow label owns canvas movement.
-      const label = terminal(page, ids.b).locator('.terminal-workflow-drag-handle')
+      const label = terminal(page, ids.a).locator('.terminal-workflow-drag-handle')
       const labelBox = await requiredBox(label)
       const paneBox = await requiredBox(page.locator('.react-flow__pane'))
       await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2)
@@ -559,18 +521,23 @@ describe('terminal group direct manipulation', () => {
       await page.mouse.up()
       const moved = await waitForGraph(
         workbench,
-        (graph) => graph.terminalGroups[0]?.memberBlockIds.length === 0
+        (graph) => graph.terminalGroups[0]?.memberBlockIds.join() === ids.c
       )
       expect(moved.connections).toEqual(ids.edges)
       const delta = {
         x: moved.blocks[0]!.position.x - beforeWorkflowMove.blocks[0]!.position.x,
         y: moved.blocks[0]!.position.y - beforeWorkflowMove.blocks[0]!.position.y
       }
-      for (const block of moved.blocks) {
+      for (const block of moved.blocks.filter((block) => block.id !== ids.c)) {
         const previous = beforeWorkflowMove.blocks.find((entry) => entry.id === block.id)!
         expect(block.position.x - previous.position.x).toBeCloseTo(delta.x)
         expect(block.position.y - previous.position.y).toBeCloseTo(delta.y)
       }
+      const remaining = beforeWorkflowMove.blocks.find((block) => block.id === ids.c)!
+      expect(moved.blocks.find((block) => block.id === ids.c)).toEqual({
+        ...remaining,
+        position: expect.any(Object)
+      })
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)
       await page.reload()
       await waitForTerminalDomText(
@@ -578,7 +545,9 @@ describe('terminal group direct manipulation', () => {
         'DISCLOSURE_SESSION_中文'
       )
       expect((await readE2eBlockGraph(workbench)).connections).toEqual(ids.edges)
-      expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([])
+      expect((await readE2eBlockGraph(workbench)).terminalGroups[0]?.memberBlockIds).toEqual([
+        ids.c
+      ])
       expect(await readTerminalSessionId(page, 'Prepare')).toBe(sessionId)
       await writeTerminalCommand(
         page,

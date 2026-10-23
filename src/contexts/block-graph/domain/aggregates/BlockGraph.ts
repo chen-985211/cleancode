@@ -79,6 +79,10 @@ import {
 } from '../services/QuickExecutionSlotRules'
 import { resolveTerminalRemovalBlockIds } from '../services/TerminalRemovalRules'
 import { BlockTemplateApplications } from '../services/BlockTemplateApplications'
+import {
+  assertTerminalConnectionsWithinGroupBoundary,
+  isTerminalConnectionWithinGroupBoundary
+} from '../services/TerminalConnectionBoundary'
 
 export type * from './BlockGraphTypes'
 
@@ -126,15 +130,21 @@ export class BlockGraph {
 
   static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
     let blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
-    const connections = normalizeRestoredTerminalConnections(snapshot.connections, blocks)
-    blocks = blocks.map((block) => ({ ...block, size: terminalExpansionSize(block, connections) }))
-    const groups = normalizeTerminalGroups(
-      snapshot.terminalGroups,
-      blocks,
-      connections,
-      createTerminalGroupId
+    const groups = normalizeTerminalGroups(snapshot.terminalGroups, blocks, createTerminalGroupId)
+    const connections = normalizeRestoredTerminalConnections(
+      snapshot.connections?.filter(
+        (connection) =>
+          typeof connection.sourceBlockId === 'string' &&
+          typeof connection.targetBlockId === 'string' &&
+          isTerminalConnectionWithinGroupBoundary(
+            groups,
+            connection.sourceBlockId,
+            connection.targetBlockId
+          )
+      ),
+      blocks
     )
-
+    blocks = blocks.map((block) => ({ ...block, size: terminalExpansionSize(block, connections) }))
     const layout = layoutTerminalGroups(groups, blocks, connections, 'preserve-valid')
 
     return new BlockGraph(
@@ -343,6 +353,7 @@ export class BlockGraph {
       input,
       createTerminalConnectionId
     )
+    assertTerminalConnectionsWithinGroupBoundary([result.connection], this.terminalGroupSnapshots)
     this.terminalConnectionSnapshots = [...result.connections]
     this.blockSnapshots = this.blockSnapshots.map((block) => ({
       ...block,
@@ -563,6 +574,7 @@ export class BlockGraph {
       sourceTerminalGroupId: sourceGroup?.id ?? null,
       targetTerminalGroupId: terminalGroupId
     })
+    assertTerminalConnectionsWithinGroupBoundary(this.terminalConnectionSnapshots, result.groups)
     this.blockSnapshots = result.blocks
     this.terminalGroupSnapshots = result.groups
     return Object.freeze([...movedBlockIds])

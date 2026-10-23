@@ -102,7 +102,7 @@ export const enErrorsMessages = {
   'error.TERMINAL_CONNECTION_DUPLICATE': 'This terminal dependency already exists.',
   'error.TERMINAL_CONNECTION_INVALID': 'A terminal cannot connect to itself.',
   'error.TERMINAL_CONNECTION_SCOPE_MISMATCH':
-    'Both ends of a connection must be in the same group space.',
+    'Connections cannot cross group boundaries. Move the complete workflow together.',
   'error.TERMINAL_SCOPE_MOVE_STALE': 'The workflow changed spaces. Try the move again.',
   'error.TERMINAL_EXECUTION_CONFIG_INVALID':
     'The terminal execution settings are invalid. Check exit codes, timeouts, and readiness conditions.',

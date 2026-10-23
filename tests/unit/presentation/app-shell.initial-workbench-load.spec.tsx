@@ -37,7 +37,8 @@ describe('app shell initial workbench load', () => {
     const shimmerCharacters = shimmerText?.querySelectorAll('.canvas-empty__loading-character')
     expect(shimmerCharacters).toHaveLength(10)
     expect(shimmerCharacters?.item(9)).toHaveStyle('--cc-loading-shimmer-delay: 0.9s')
-    expect(screen.getByText('正在恢复项目')).toBeInTheDocument()
+    expect(screen.queryByText('正在恢复项目')).not.toBeInTheDocument()
+    expect(document.querySelector('.app-shell__statusbar .status-dot')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
   })
 
