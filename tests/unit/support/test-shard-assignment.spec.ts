@@ -41,7 +41,7 @@ describe('test shard assignment', () => {
   it.each([
     { platform: 'linux', count: 4 },
     { platform: 'macos', count: 6 },
-    { platform: 'windows', count: 8 }
+    { platform: 'windows', count: 6 }
   ] as const)(
     'includes the complete current E2E suite and new files on $platform with $count shards',
     async ({ platform, count }) => {

@@ -149,7 +149,7 @@ pnpm test:e2e:smoke
 | Ubuntu 24.04 | node-pty + POSIX PTY/shell   | 与 macOS 相同，并使用 Linux `/proc` 证明监听 PID 和进程祖先关系                              |
 | Windows 2025 | node-pty + ConPTY/PowerShell | 全量静态与低层测试、构建、npm `.cmd` CLI、`Ctrl+C`、退出码、端口所有权和外层 PowerShell 可写 |
 
-[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过可复用的构建和分片测试流程，在每个平台分别构建一次原生产物，再运行 Linux 4、macOS 6、Windows 8 个独立 shard，共 18 个完整 E2E 任务。入口 workflow 显式连接每个平台自己的 build 与 E2E，不等待其他平台的构建矩阵；Windows packaged smoke 只在入口定义一次并依赖 Windows build，Linux/macOS 流程不声明 Windows 专用任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，各 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过可复用的构建和分片测试流程，在每个平台分别构建一次原生产物，再运行 Linux 4、macOS 6、Windows 6 个独立 shard，共 16 个完整 E2E 任务。入口 workflow 显式连接每个平台自己的 build 与 E2E，不等待其他平台的构建矩阵；Windows packaged smoke 只在入口定义一次并依赖 Windows build，Linux/macOS 流程不声明 Windows 专用任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，各 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
 
 ## 测试耗时与分片
 
@@ -157,7 +157,7 @@ Vitest 命令保留标准控制台结果，并把 JSON 报告写入被 Git 忽�
 
 E2E 分片由 `tests/support/e2eSequencer.ts` 使用同一份平台历史样本 `tests/fixtures/e2eDurations.json` 确定性分配。历史记录只提供耗时权重；测试集合始终来自 Vitest 实际发现结果。新文件使用历史中位数估算，已删除文件不得复活，输入顺序不影响分配，分片并集必须完整且无重复。更新权重时记录来源 commit/run，不能从未审查的远程 cache 直接决定测试是否执行。`test-shard-assignment.spec.ts` 覆盖多种分片数、未知文件、失效权重、输入顺序和完整当前套件。
 
-当前分片数按 `39822954624` 的平台耗时调整：Linux 最长测试分片约 403 秒、macOS 593 秒、Windows 682 秒。入口 workflow 传入各平台连续的一基分片索引，执行命令的总数取该 matrix 的实际 job 总数，避免索引与分母分别维护。每个 runner 内保持串行，平台间共享的只有不可变构建产物；允许 runner 全并发，但实际排队仍受 GitHub 配额和平台容量限制。增加 runner 会增加安装与准备开销，验收同时看墙钟时间和 runner 总分钟数。
+当前耗时权重来自完整通过的 `39841679402`（commit `ec7b2681`）。Linux 与 macOS 保持 4 / 6 片；Windows 从 8 片收敛到 6 片，按该轮文件耗时估算每片执行约 195–199 秒，以 2–4 分钟测试执行时间为目标。安装、下载与恢复产物另计，不承诺完整 job 在 4 分钟内；实际耗时仍需原生 CI 验证。Windows contract/unit 与 native integration 继续各保留两片，不能通过合并分片掩盖文件锁或资源清理竞态。入口 workflow 传入各平台连续的一基分片索引，执行命令的总数取该 matrix 的实际 job 总数，避免索引与分母分别维护。每个 runner 内保持串行，平台间共享的只有不可变构建产物；允许 runner 全并发，但实际排队仍受 GitHub 配额和平台容量限制。增加 runner 会增加安装与准备开销，验收同时看墙钟时间和 runner 总分钟数。
 
 ### 画布交互回归分层
 
