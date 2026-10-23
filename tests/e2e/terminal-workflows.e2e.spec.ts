@@ -108,12 +108,12 @@ async function createTwoRunningTerminals(
 ): Promise<{ readonly first: string; readonly second: string }> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   const firstSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
   // The next canvas placement must use the settled viewport, not the creation animation.
   await waitForTerminalViewportGeometry(page, firstSessionId)
 
-  await selectBlankCanvasAction(page, '新建终端积木')
+  await selectBlankCanvasAction(page, '新建终端')
   const secondSessionId = await waitForTerminalShellReady(page, 'Terminal 2')
 
   await page.getByRole('button', { name: '适应画布' }).click()

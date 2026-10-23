@@ -93,7 +93,7 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCount(page, 0)
 
       expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
       const terminalSelector = '[data-terminal-block-id]'
       await page.locator(terminalSelector).first().waitFor()
       const terminalResult = await waitForCreatedWorkbenchNodeResult(page, terminalSelector)

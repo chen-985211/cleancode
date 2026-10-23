@@ -47,7 +47,7 @@ describe('canvas selection viewport e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
 
       const node = page.locator('[data-terminal-block-id]').filter({ hasText: 'Terminal 1' })
       await node.waitFor()
@@ -112,7 +112,7 @@ describe('canvas selection viewport e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
 
       const node = page.locator('[data-terminal-block-id]').filter({ hasText: 'Terminal 1' })
       await node.waitFor()

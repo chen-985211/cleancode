@@ -158,7 +158,7 @@ describe('application settings', () => {
     render(<SettingsHarness initiallyOpen />)
 
     const terminalRecorder = screen.getByRole('button', {
-      name: '修改“新建终端积木”快捷键'
+      name: '修改“新建终端”快捷键'
     })
     expect(within(terminalRecorder).getAllByText(/⌘|T/)).toHaveLength(2)
     expect(terminalRecorder).not.toHaveTextContent('⇧')
@@ -197,14 +197,14 @@ describe('application settings', () => {
     expect(agentRecorder).toHaveTextContent('⇧')
     expect(agentRecorder).toHaveTextContent('A')
 
-    const terminalRecorder = screen.getByRole('button', { name: '修改“新建终端积木”快捷键' })
+    const terminalRecorder = screen.getByRole('button', { name: '修改“新建终端”快捷键' })
     fireEvent.click(terminalRecorder)
-    fireEvent.click(screen.getByRole('button', { name: '清除“新建终端积木”的快捷键' }))
+    fireEvent.click(screen.getByRole('button', { name: '清除“新建终端”的快捷键' }))
     expect(terminalRecorder).toHaveAttribute('aria-pressed', 'false')
     expect(terminalRecorder).toHaveTextContent('未分配')
 
     fireEvent.click(screen.getByRole('button', { name: '全部恢复默认' }))
-    expect(screen.getByRole('button', { name: '修改“新建终端积木”快捷键' })).toHaveTextContent('⌘T')
+    expect(screen.getByRole('button', { name: '修改“新建终端”快捷键' })).toHaveTextContent('⌘T')
   })
 
   it('updates the settings trigger tooltip when its shortcut binding changes', async () => {

@@ -25,9 +25,9 @@ describe('application shortcut tooltips', () => {
       createBranchWorkspace: '新建分支工作区 (⌘N)',
       previousWorkspace: '上一个工作区 (⌘⇧↑)',
       nextWorkspace: '下一个工作区 (⌘⇧↓)',
-      createTerminal: '新建终端积木 (⌘T)',
+      createTerminal: '新建终端 (⌘T)',
       createAgent: '新建 Agent (⌘⇧A)',
-      groupTerminals: '组合终端 (⌘G)',
+      groupTerminals: '新建组合 (⌘G)',
       zoomCanvasIn: '放大画布 (⌘])',
       zoomCanvasOut: '缩小画布 (⌘[)',
       fitCanvas: '适应画布 (⌘\\)',
@@ -43,7 +43,7 @@ describe('application shortcut tooltips', () => {
       quickExecution5: '执行快捷位 5 (⌘5)'
     })
     expect(otherLabels.createAgent).toBe('New Agent (Ctrl+Shift+A)')
-    expect(otherLabels.createTerminal).toBe('New terminal block (Ctrl+T)')
+    expect(otherLabels.createTerminal).toBe('New terminal (Ctrl+T)')
   })
 
   it('tracks custom bindings and omits empty shortcut parentheses', () => {
@@ -58,6 +58,6 @@ describe('application shortcut tooltips', () => {
     )
 
     expect(labels.toggleSidebar).toBe('切换侧边栏 (⌘⌥⇧K)')
-    expect(labels.groupTerminals).toBe('组合终端')
+    expect(labels.groupTerminals).toBe('新建组合')
   })
 })

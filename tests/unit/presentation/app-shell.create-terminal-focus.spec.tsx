@@ -109,7 +109,7 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    await selectBlankCanvasAction('新建终端积木')
+    await selectBlankCanvasAction('新建终端')
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalBlock).toHaveBeenCalledWith(
@@ -145,7 +145,7 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    await selectBlankCanvasAction('新建终端积木')
+    await selectBlankCanvasAction('新建终端')
 
     await waitFor(() =>
       expect(screen.getByTestId('mock-node-created-terminal')).toHaveAttribute(
@@ -198,7 +198,7 @@ describe('app shell create terminal focus', () => {
     render(<AppShell />)
 
     await screen.findByTestId('mock-react-flow')
-    await selectBlankCanvasAction('组合终端')
+    await selectBlankCanvasAction('新建组合')
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
@@ -302,7 +302,7 @@ interface MockReactFlowProps {
   readonly onPaneContextMenu?: (event: ReactMouseEvent) => void
 }
 
-async function selectBlankCanvasAction(action: '新建终端积木' | '组合终端'): Promise<void> {
+async function selectBlankCanvasAction(action: '新建终端' | '新建组合'): Promise<void> {
   await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
   fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
   const menuItem = await screen.findByRole('menuitem', { name: action })

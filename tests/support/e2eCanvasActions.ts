@@ -4,7 +4,7 @@ import { pollUntilState } from './e2ePolling'
 
 export async function selectBlankCanvasAction(
   page: Page,
-  action: '新建终端积木' | '组合终端'
+  action: '新建终端' | '新建组合'
 ): Promise<void> {
   await pollUntilState({
     description: 'blank-canvas actions to become available',

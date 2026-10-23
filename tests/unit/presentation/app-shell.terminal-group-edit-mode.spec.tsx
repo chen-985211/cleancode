@@ -304,7 +304,7 @@ describe('app shell terminal group edit mode', () => {
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThanOrEqual(2))
 
     fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
-    fireEvent.click(await screen.findByRole('menuitem', { name: '组合终端' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '新建组合' }))
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
@@ -334,7 +334,7 @@ describe('app shell terminal group edit mode', () => {
     render(<AppShell />)
     await enterTerminalGroupEditMode()
     fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
-    const createGroupItem = await screen.findByRole('menuitem', { name: '组合终端' })
+    const createGroupItem = await screen.findByRole('menuitem', { name: '新建组合' })
 
     expect(createGroupItem).toBeDisabled()
     expect(runtimeApi.createTerminalGroup).not.toHaveBeenCalled()

@@ -45,7 +45,7 @@ describe('quick execution command editing', () => {
     'edits an unconfigured folded terminal after reload and after a warm collapse',
     async () => {
       await page.getByRole('button', { name: '添加项目' }).click()
-      await selectBlankCanvasAction(page, '新建终端积木')
+      await selectBlankCanvasAction(page, '新建终端')
       await waitForTerminalShellReady(page, 'Terminal 1')
       await page.getByRole('button', { name: '添加画布对象' }).click()
       await page
