@@ -117,41 +117,53 @@ describe('terminal runtime recovery e2e', () => {
     }
   )
 
-  it(
-    'naturally exits Electron, PTYs, and the Provider within a bounded multi-terminal shutdown',
-    async () => {
-      const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
-      for (const terminalName of terminalNames.slice(1)) {
-        await selectBlankCanvasAction(page, '新建终端')
-        await ensureTerminalShellStarted(page, terminalName)
-      }
-      const sessionIds = await Promise.all(
-        terminalNames.map((name) => readTerminalSessionId(page, name))
-      )
-      const processIds = await Promise.all(
-        sessionIds.map((sessionId) => readTerminalProcessId(page, sessionId))
-      )
-      const provider = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
-      expect(provider).not.toBeNull()
-      const electronProcess = electronApp.process()
-      const shutdownStartedAt = performance.now()
+  describe('multi-terminal shutdown', () => {
+    const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
 
-      await closeElectronApp(electronApp)
-      const shutdownDurationMs = performance.now() - shutdownStartedAt
-      resources.electronApp = undefined
-      resources.page = undefined
+    // Serial PowerShell startup has its own budget, separate from shutdown validation.
+    beforeEach(
+      async () => {
+        for (const terminalName of terminalNames.slice(1)) {
+          await selectBlankCanvasAction(page, '新建终端')
+          await ensureTerminalShellStarted(page, terminalName)
+        }
+      },
+      process.platform === 'win32' ? 120_000 : electronScenarioTimeoutMs
+    )
 
-      expect(electronProcess.exitCode).toBe(0)
-      expect(electronProcess.signalCode).toBeNull()
-      expect(shutdownDurationMs).toBeLessThan(8_000)
-      await Promise.all(processIds.map((processId) => expectProcessToExit(processId)))
-      await waitForProcessIdExit(provider!.processId, 5_000)
-      expect(readE2eProcessOutput(electronApp).join('\n')).not.toContain(
-        'detachDestroyedTerminalView'
-      )
-    },
-    electronScenarioTimeoutMs
-  )
+    it(
+      'naturally exits Electron, PTYs, and the Provider within a bounded multi-terminal shutdown',
+      async () => {
+        const sessionIds = await Promise.all(
+          terminalNames.map((name) => readTerminalSessionId(page, name))
+        )
+        const processIds = await Promise.all(
+          sessionIds.map((sessionId) => readTerminalProcessId(page, sessionId))
+        )
+        const provider = await readAuthenticatedTerminalProviderMetadata(
+          workbench.appStateDirectory
+        )
+        expect(provider).not.toBeNull()
+        const electronProcess = electronApp.process()
+        const shutdownStartedAt = performance.now()
+
+        await closeElectronApp(electronApp)
+        const shutdownDurationMs = performance.now() - shutdownStartedAt
+        resources.electronApp = undefined
+        resources.page = undefined
+
+        expect(electronProcess.exitCode).toBe(0)
+        expect(electronProcess.signalCode).toBeNull()
+        expect(shutdownDurationMs).toBeLessThan(8_000)
+        await Promise.all(processIds.map((processId) => expectProcessToExit(processId)))
+        await waitForProcessIdExit(provider!.processId, 5_000)
+        expect(readE2eProcessOutput(electronApp).join('\n')).not.toContain(
+          'detachDestroyedTerminalView'
+        )
+      },
+      electronScenarioTimeoutMs
+    )
+  })
 
   it(
     'inherits retention across a quick-launch replacement and application restart',
