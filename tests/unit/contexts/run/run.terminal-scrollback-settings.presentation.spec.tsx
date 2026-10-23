@@ -9,16 +9,15 @@ describe('terminal scrollback settings section', () => {
     render(<TerminalScrollbackSettingsHarness />)
 
     const options = screen.getByRole('radiogroup', { name: '滚动历史' })
-    const selection = options.querySelector('.terminal-settings-options__selection')
 
-    expect(selection).toHaveAttribute('data-selection-motion-target', '1000')
+    expect(options).toHaveAttribute('data-value', '1000')
     expect(within(options).getAllByRole('radio')).toHaveLength(3)
     expect(within(options).getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
 
     fireEvent.click(within(options).getByRole('radio', { name: '5,000 行' }))
 
     expect(within(options).getByRole('radio', { name: '5,000 行' })).toBeChecked()
-    expect(selection).toHaveAttribute('data-selection-motion-target', '5000')
+    expect(options).toHaveAttribute('data-value', '5000')
   })
 })
 

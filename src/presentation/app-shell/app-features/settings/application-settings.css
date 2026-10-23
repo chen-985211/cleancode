@@ -246,10 +246,14 @@
 
 .terminal-settings-pane {
   width: min(100%, 760px);
+  display: grid;
+  justify-items: start;
+  gap: 36px;
 }
 
 .terminal-settings-pane__header h2 {
   margin: 0;
+  color: var(--cc-foreground);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.025em;
@@ -257,128 +261,26 @@
 }
 
 .terminal-settings-group {
-  margin: 20px 0 0;
-  border: 1px solid var(--cc-border);
-  border-radius: 12px;
-  background: var(--cc-surface);
-  box-shadow:
-    inset 0 1px 0 var(--cc-highlight-inset),
-    var(--cc-shadow-sm);
-  padding: 20px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .terminal-settings-group h3 {
-  margin: 0;
+  margin: 0 0 12px;
   color: var(--cc-foreground);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.4;
 }
 
-.terminal-settings-options {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin-top: 14px;
-  border: 1px solid var(--cc-border);
-  border-radius: 11px;
-  background: var(--cc-surface-subtle);
-  overflow: hidden;
-  padding: 0;
-  isolation: isolate;
-}
-
-.terminal-settings-options label {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  min-width: 0;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  padding: 0 12px;
-  color: var(--cc-muted-strong);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-}
-
-.terminal-settings-options label:hover {
-  background: var(--cc-surface-hover);
-  color: var(--cc-foreground);
-}
-
-.terminal-settings-options label:first-of-type {
-  border-radius: 10px 0 0 10px;
-}
-
-.terminal-settings-options label:last-of-type {
-  border-radius: 0 10px 10px 0;
-}
-
-.terminal-settings-options label:has(input:checked) {
-  color: var(--cc-settings-selection-foreground);
-}
-
-.terminal-settings-options label:has(input:focus-visible) {
-  outline: 2px solid var(--cc-settings-selection-accent);
-  outline-offset: -2px;
-}
-
-.terminal-settings-options input {
-  accent-color: var(--cc-settings-selection-accent);
-}
-
-.terminal-settings-options input:focus-visible {
-  outline: none;
-}
-
-.terminal-settings-options--workflow-build {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.terminal-settings-options--workflow-build label {
-  min-height: 76px;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 12px;
-}
-
-.terminal-settings-option-copy {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-  text-align: left;
-}
-
-.terminal-settings-option-copy__title {
-  color: var(--cc-foreground);
-  line-height: 1.35;
-}
-
-.terminal-settings-option-copy__description {
-  max-width: 60ch;
+.terminal-settings-description {
+  margin: 12px 0 0;
+  max-width: 48ch;
+  min-height: 3.2em;
   color: var(--cc-muted-strong);
   font-size: 12px;
-  font-weight: 400;
   line-height: 1.6;
   text-wrap: pretty;
-}
-
-.terminal-settings-options--workflow-build
-  label:has(input:checked)
-  .terminal-settings-option-copy__title {
-  color: var(--cc-settings-selection-foreground);
 }
 
 .shortcut-settings-pane__header {
@@ -681,15 +583,10 @@
   .shortcut-recorder + .shortcut-row-action {
     margin-left: auto;
   }
-
-  .terminal-settings-options {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .application-settings-back,
-  .terminal-settings-options label,
   .shortcut-settings-reset-all,
   .shortcut-recorder,
   .shortcut-row-action {
