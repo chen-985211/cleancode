@@ -473,9 +473,9 @@
 }
 
 .badge--git {
-  border-color: var(--cc-success-border);
-  background: var(--cc-success-soft);
-  color: var(--cc-success);
+  border-color: var(--cc-sidebar-branch-badge-border);
+  background: var(--cc-sidebar-branch-badge-surface);
+  color: var(--cc-sidebar-branch-badge-foreground);
 }
 
 .badge--default-workspace {
