@@ -7,6 +7,7 @@ import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/t
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types/terminalFlowNode'
 
 vi.mock('@xyflow/react', () => ({
+  useUpdateNodeInternals: () => () => undefined,
   Handle: ({ className }: { readonly className?: string }) => <span className={className} />,
   NodeResizeControl: ({ className, style }: ResizeControlProps) => (
     <span className={className} style={style} />
@@ -103,7 +104,7 @@ describe('workbench object node presence', () => {
     expect(surface).toHaveAttribute('inert')
   })
 
-  it('scales a disclosing group member on its visual surface without moving handles or resize controls', () => {
+  it('scales a disclosing group member and its ports while keeping resize controls on the layout anchor', () => {
     const { container } = render(
       <TerminalNode
         id="terminal-1"
@@ -137,7 +138,8 @@ describe('workbench object node presence', () => {
       'workbench-object-motion--spatial'
     )
     expect(anchor).not.toHaveClass('workbench-object-motion--group-expand')
-    expect(anchor?.querySelector('.terminal-node__handle')).not.toBeNull()
+    expect(surface?.querySelector('.terminal-node__handle')).not.toBeNull()
+    expect(surface?.querySelector('.terminal-node__resize-handle')).toBeNull()
     expect(anchor?.querySelector('.terminal-node__resize-handle')).not.toBeNull()
   })
 })

@@ -1,6 +1,7 @@
 import {
   Handle,
   Position,
+  useUpdateNodeInternals,
   type NodeProps,
   type ResizeDragEvent,
   type ResizeParams
@@ -13,11 +14,14 @@ import type { TerminalBlockMetadataInput } from '../../../../../contexts/block-g
 import { agentApprovalTargetHandleId } from '../agent/agentApprovalHandles'
 import {
   TerminalRuntimeActions,
-  TerminalWorkflowStatusBadge,
-  type TerminalRuntimeActionsProps
+  TerminalWorkflowStatusBadge
 } from '../../../../../contexts/run/presentation/components/TerminalRuntimeHeader'
+import type { TerminalSessionMenuItemsProps } from '../../../../../contexts/run/presentation/components/TerminalSessionMenuItems'
+import { TerminalMoreMenu } from './TerminalMoreMenu'
 import { TerminalServiceRuntimeBar } from '../../../../../contexts/run/presentation/components/TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
+import { useTerminalBodyMount } from './useTerminalBodyMount'
+import { useTerminalLaunchCommandEditing } from './useTerminalLaunchCommandEditing'
 import { TooltipLabel } from '../../../../shared/components/Tooltip'
 import { WorkbenchNodeResizer } from '../WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from '../WorkbenchNodeSelectionVeil'
@@ -33,11 +37,34 @@ import {
   readWorkbenchCanvasCreationGeometry,
   readWorkbenchCanvasObstructions
 } from '../../viewport/workbenchCanvasSafeViewport'
+import { TerminalWorkflowDragHandle } from './TerminalWorkflowDragHandle'
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
+import { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
+  const updateNodeInternals = useUpdateNodeInternals()
+  const isMoving = Boolean(data.objectMotion)
+  const wasMovingRef = useRef(isMoving)
+  useEffect(() => {
+    if (wasMovingRef.current && !isMoving) updateNodeInternals(block.id)
+    wasMovingRef.current = isMoving
+  }, [block.id, isMoving, updateNodeInternals])
+  const isCollapsed = Boolean(block.isCollapsed)
+  const isDisclosureLayout =
+    Boolean(data.isObjectMotionFrozen) ||
+    (data.objectMotion?.kind === 'group-reflow' && Boolean(data.objectMotion.shellRect))
   const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
   const session = useTerminalState(data.terminalStateStore, block.id, data.session, !isParked)
+  // Claiming the first run preserves the measurement view. A genuine replacement
+  // still resets the viewport's search, paste and focus state as a new session.
+  const [viewIdentity, setViewIdentity] = useState({ sessionId: session.sessionId, generation: 0 })
+  if (viewIdentity.sessionId !== session.sessionId) {
+    setViewIdentity({
+      sessionId: session.sessionId,
+      generation: viewIdentity.generation + (viewIdentity.sessionId === null ? 0 : 1)
+    })
+  }
   const isRunning = session.status === 'running'
   const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
   const isPresenceMotion =
@@ -45,7 +72,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const isPresenceExit = data.objectMotion?.kind === 'delete'
   const isPresencePending = data.objectPresence?.phase === 'pending'
   const isInteractionSuppressed =
-    isDisclosureExit || isPresenceExit || isPresencePending || isParked
+    isDisclosureExit ||
+    isPresenceExit ||
+    isPresencePending ||
+    isParked ||
+    Boolean(data.isObjectDragPreview)
+  const terminalShellRef = useRef<HTMLElement | null>(null)
+  const hasExpanded = useTerminalBodyMount(!isCollapsed, isInteractionSuppressed, terminalShellRef)
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [isSavingMetadata, setIsSavingMetadata] = useState(false)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
@@ -62,17 +95,29 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
   const metadataFormId = `terminal-metadata-form-${block.id}`
   const hasRequestedAutoStartRef = useRef(false)
-  const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
   const {
     className: objectMotionClassName,
     onAnimationEnd: onObjectMotionAnimationEnd,
     style: objectMotionStyle,
     surfaceRef: objectMotionSurfaceRef
-  } = useWorkbenchObjectMotionPresentation(data.objectMotion, data.onObjectMotionComplete)
+  } = useWorkbenchObjectMotionPresentation(
+    data.objectMotion,
+    data.onObjectMotionComplete,
+    data.isObjectMotionFrozen
+  )
+
+  const setTerminalShellRef = useCallback(
+    (surface: HTMLElement | null) => {
+      terminalShellRef.current = surface
+      if (!isPresenceMotion) objectMotionSurfaceRef(surface)
+    },
+    [isPresenceMotion, objectMotionSurfaceRef]
+  )
 
   const terminalNodeClassName = [
     'terminal-node',
+    isDisclosureLayout ? 'terminal-node--disclosure-transition' : '',
     isPresenceMotion ? '' : objectMotionClassName,
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
@@ -100,7 +145,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const handleDimensionsChange = useCallback(
     (dimensions: TerminalDimensions) => {
       lastDimensionsRef.current = dimensions
-      if (isInteractionSuppressed) return
+      if (isInteractionSuppressed || isCollapsed) return
 
       if (session.status === 'running') {
         data.onResize(block, dimensions)
@@ -121,6 +166,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       block,
       data,
       isInteractionSuppressed,
+      isCollapsed,
       session.isRecoveryPending,
       session.sessionId,
       session.status
@@ -134,7 +180,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   }, [session.isRecoveryPending])
 
   useEffect(() => {
-    if (isInteractionSuppressed) return
+    if (isInteractionSuppressed || isCollapsed) return
     if (
       session.status === 'idle' &&
       !session.sessionId &&
@@ -154,6 +200,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     block,
     data,
     isInteractionSuppressed,
+    isCollapsed,
     session.isRecoveryPending,
     session.sessionId,
     session.status
@@ -169,13 +216,12 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     setIsEditingMetadata(true)
   }, [])
 
-  useEffect(() => {
-    const requestId = data.launchCommandEditRequestId
-    if (requestId === undefined || requestId === lastLaunchCommandEditRequestIdRef.current) return
-
-    lastLaunchCommandEditRequestIdRef.current = requestId
-    startEditingLaunchCommand()
-  }, [data.launchCommandEditRequestId, startEditingLaunchCommand])
+  useTerminalLaunchCommandEditing({
+    data,
+    ready: !isCollapsed && hasExpanded && !isInteractionSuppressed,
+    surfaceRef: terminalShellRef,
+    onEdit: startEditingLaunchCommand
+  })
 
   const requestTerminalFocus = useCallback(() => {
     setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)
@@ -253,115 +299,150 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       }
       data-context-selected={data.isContextSelected || undefined}
       data-terminal-parked={data.isParkedInCollapsedGroup || undefined}
-      aria-hidden={isInteractionSuppressed || undefined}
-      inert={isInteractionSuppressed || undefined}
+      aria-hidden={(isInteractionSuppressed && !data.isObjectDragPreview) || undefined}
+      inert={(isInteractionSuppressed && !data.isObjectDragPreview) || undefined}
     >
+      {data.workflowDragTerminalIds && !isParked ? (
+        <TerminalWorkflowDragHandle data={data} />
+      ) : null}
       <WorkbenchNodeResizer
-        isVisible={!data.isTerminalGroupSelectionMode}
+        autoScale={false}
+        isVisible={!data.isTerminalGroupSelectionMode && !isCollapsed}
         minWidth={terminalNodeMinimumSize.width}
         minHeight={terminalNodeMinimumSize.height}
         className="terminal-node__resize-handle nodrag"
         onResizeStart={() => setIsResizingBlock(true)}
         onResizeEnd={resizeTerminalBlock}
       />
-      <Handle
-        className="terminal-node__handle terminal-node__handle--input"
-        type="target"
-        position={Position.Left}
-      />
-      <Handle
-        id={agentApprovalTargetHandleId}
-        className="agent-approval-intent-handle agent-approval-intent-handle--target"
-        type="target"
-        position={Position.Left}
-        isConnectable={false}
-      />
       <section
-        ref={isPresenceMotion ? undefined : objectMotionSurfaceRef}
-        className={terminalNodeClassName}
+        inert={data.isObjectDragPreview || undefined}
+        ref={setTerminalShellRef}
+        className={`${terminalNodeClassName}${isCollapsed ? ' terminal-node--collapsed' : ''}`}
         style={isPresenceMotion ? undefined : objectMotionStyle}
         onAnimationEnd={isPresenceMotion ? undefined : onObjectMotionAnimationEnd}
       >
-        <TerminalHeader
-          blockName={block.name}
-          blockDescription={block.description}
-          canQuickLaunch={block.launchCommand.trim().length > 0}
-          editButtonRef={editButtonRef}
-          metadataFormId={metadataFormId}
-          isEditingMetadata={isEditingMetadata}
-          isSavingMetadata={isSavingMetadata}
-          isRunning={isRunning}
-          isRecoveryPending={Boolean(session.isRecoveryPending)}
-          isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
-          isSelectedForTerminalGroup={data.isSelected}
-          canSelectForTerminalGroup={data.canSelectForTerminalGroup}
-          sessionKind={session.sessionKind ?? null}
-          retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
-          workflowStatus={data.workflowStatus}
-          isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
-          isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
-          onSelect={() => data.onSelect?.(block)}
-          onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
-          onToggleEditing={toggleEditingMetadata}
-          onStop={stopTerminal}
-          onQuickLaunch={quickLaunchTerminal}
-          onRestart={restartTerminal}
-          onToggleRetention={() => data.onToggleRetention?.(block)}
-          onRunFromHere={() => data.onRunFromHere?.(block)}
-          onStopWorkflow={() => data.onStopWorkflow?.()}
-          onDelete={() => data.onDelete(block)}
+        <Handle
+          className="terminal-node__handle terminal-node__handle--input"
+          type="target"
+          position={Position.Left}
         />
-        <TerminalMetadataForm
-          open={isEditingMetadata}
-          placement={metadataPlacement}
-          block={block}
-          formId={metadataFormId}
-          shouldFocusLaunchCommand={shouldFocusLaunchCommand}
-          onSave={saveMetadata}
-          onCancel={closeMetadata}
+        <Handle
+          id={agentApprovalTargetHandleId}
+          className="agent-approval-intent-handle agent-approval-intent-handle--target"
+          type="target"
+          position={Position.Left}
+          isConnectable={false}
         />
-        <TerminalServiceRuntimeBar
-          identity={session.runIdentity ?? null}
-          endpoint={session.actualEndpoint ?? null}
-          portState={session.servicePortState ?? null}
-          conflict={session.portConflict ?? null}
-          onCopyEndpoint={async (endpoint) => {
-            if (data.onCopyServiceEndpoint) {
-              await data.onCopyServiceEndpoint(endpoint)
-              return
+        <div className="terminal-node__content">
+          <TerminalHeader
+            areActionsMounted={hasExpanded}
+            isCollapsed={isCollapsed}
+            onToggleCollapsed={() =>
+              void data.onResizeBlock(block, {
+                position: block.position,
+                size: block.size,
+                isCollapsed: !isCollapsed
+              })
             }
-
-            await window.navigator.clipboard?.writeText(endpoint.displayAddress)
-          }}
-          onOpenEndpoint={(identity) => data.onOpenServiceEndpoint?.(identity)}
-          onLocateOwner={(owner) => data.onLocateManagedServiceOwner?.(owner)}
-          onEditPortConfiguration={startEditingMetadata}
-          onDismissConflict={() => {
-            if (session.runIdentity) data.onDismissPortConflict?.(session.runIdentity)
-          }}
-        />
-        <div className="terminal-frame">
-          <TerminalViewport
-            key={session.sessionId ?? 'idle'}
-            block={block}
-            session={session}
-            focusRequestId={focusRequestId}
-            isResizeSuspended={isResizingBlock}
-            isInputDisabled={session.status !== 'running' || Boolean(session.isRecoveryPending)}
-            onViewIdentityStale={data.onViewIdentityStale}
+            blockName={block.name}
+            blockDescription={block.description}
+            canQuickLaunch={block.launchCommand.trim().length > 0}
+            editButtonRef={editButtonRef}
+            metadataFormId={metadataFormId}
+            isEditingMetadata={isEditingMetadata}
+            isSavingMetadata={isSavingMetadata}
+            isRunning={isRunning}
+            isRecoveryPending={Boolean(session.isRecoveryPending)}
+            isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
+            isSelectedForTerminalGroup={data.isSelected}
+            canSelectForTerminalGroup={data.canSelectForTerminalGroup}
+            sessionKind={session.sessionKind ?? null}
+            retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
+            workflowStatus={data.workflowStatus}
+            isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
+            isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
+            onSelect={() => data.onSelect?.(block)}
+            onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
+            onToggleEditing={toggleEditingMetadata}
+            onStop={stopTerminal}
+            onQuickLaunch={quickLaunchTerminal}
             onRestart={restartTerminal}
-            onDimensionsChange={handleDimensionsChange}
-            onInput={data.onInput}
-            onPaste={data.onPaste}
+            onToggleRetention={() => data.onToggleRetention?.(block)}
+            onRunFromHere={() => data.onRunFromHere?.(block)}
+            onStopWorkflow={() => data.onStopWorkflow?.()}
+            onDelete={() => data.onDelete(block)}
           />
+          {hasExpanded ? (
+            <div
+              className="terminal-node__body"
+              inert={isCollapsed || undefined}
+              aria-hidden={isCollapsed || undefined}
+              style={
+                isCollapsed || isDisclosureLayout
+                  ? {
+                      width: block.size.width - 2,
+                      height: block.size.height - 48,
+                      flex: '0 0 auto'
+                    }
+                  : undefined
+              }
+            >
+              <TerminalMetadataForm
+                open={isEditingMetadata}
+                placement={metadataPlacement}
+                block={block}
+                formId={metadataFormId}
+                shouldFocusLaunchCommand={shouldFocusLaunchCommand}
+                onSave={saveMetadata}
+                onCancel={closeMetadata}
+              />
+              <TerminalServiceRuntimeBar
+                identity={session.runIdentity ?? null}
+                endpoint={session.actualEndpoint ?? null}
+                portState={session.servicePortState ?? null}
+                conflict={session.portConflict ?? null}
+                onCopyEndpoint={async (endpoint) => {
+                  if (data.onCopyServiceEndpoint) {
+                    await data.onCopyServiceEndpoint(endpoint)
+                    return
+                  }
+
+                  await window.navigator.clipboard?.writeText(endpoint.displayAddress)
+                }}
+                onOpenEndpoint={(identity) => data.onOpenServiceEndpoint?.(identity)}
+                onLocateOwner={(owner) => data.onLocateManagedServiceOwner?.(owner)}
+                onEditPortConfiguration={startEditingMetadata}
+                onDismissConflict={() => {
+                  if (session.runIdentity) data.onDismissPortConflict?.(session.runIdentity)
+                }}
+              />
+              <div className="terminal-frame">
+                <TerminalViewport
+                  key={viewIdentity.generation}
+                  block={block}
+                  session={session}
+                  focusRequestId={focusRequestId}
+                  isResizeSuspended={isResizingBlock || isMoving || isDisclosureLayout}
+                  isInputDisabled={
+                    session.status !== 'running' || Boolean(session.isRecoveryPending)
+                  }
+                  onViewIdentityStale={data.onViewIdentityStale}
+                  onRestart={restartTerminal}
+                  onDimensionsChange={handleDimensionsChange}
+                  onInput={data.onInput}
+                  onPaste={data.onPaste}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
         {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
+        <Handle
+          className="terminal-node__handle terminal-node__handle--output"
+          type="source"
+          position={Position.Right}
+        />
       </section>
-      <Handle
-        className="terminal-node__handle terminal-node__handle--output"
-        type="source"
-        position={Position.Right}
-      />
     </div>
   )
 })
@@ -389,6 +470,9 @@ function toWorkbenchNodeLayoutInput(layout: ResizeParams): WorkbenchNodeLayoutIn
 }
 
 interface TerminalHeaderProps {
+  readonly areActionsMounted: boolean
+  readonly isCollapsed: boolean
+  readonly onToggleCollapsed: () => void
   readonly editButtonRef: RefObject<HTMLButtonElement | null>
   readonly blockName: string
   readonly blockDescription: string
@@ -401,8 +485,8 @@ interface TerminalHeaderProps {
   readonly isTerminalGroupSelectionMode: boolean
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
-  readonly sessionKind: TerminalRuntimeActionsProps['sessionKind']
-  readonly retentionPolicy: TerminalRuntimeActionsProps['retentionPolicy']
+  readonly sessionKind: TerminalSessionMenuItemsProps['sessionKind']
+  readonly retentionPolicy: TerminalSessionMenuItemsProps['retentionPolicy']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
@@ -419,6 +503,9 @@ interface TerminalHeaderProps {
 }
 
 function TerminalHeader({
+  areActionsMounted,
+  isCollapsed,
+  onToggleCollapsed,
   editButtonRef,
   blockName,
   blockDescription,
@@ -500,58 +587,74 @@ function TerminalHeader({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <TerminalRuntimeActions
-          terminalName={blockName}
-          canQuickLaunch={canQuickLaunch}
-          isRunning={isRunning}
-          isRecoveryPending={isRecoveryPending}
-          sessionKind={sessionKind}
-          retentionPolicy={retentionPolicy}
-          isActiveWorkflowRoot={isActiveWorkflowRoot}
-          isStoppingWorkflow={isStoppingWorkflow}
-          onRunFromHere={onRunFromHere}
-          onStopWorkflow={onStopWorkflow}
-          onQuickLaunch={onQuickLaunch}
-          onStop={onStop}
-          onToggleRetention={onToggleRetention}
-          onRestart={onRestart}
-        />
-        <span className="terminal-node__action-divider" aria-hidden="true" />
-        <TooltipLabel content={editActionLabel}>
+        {!isCollapsed && areActionsMounted ? (
+          <>
+            <TerminalRuntimeActions
+              terminalName={blockName}
+              canQuickLaunch={canQuickLaunch}
+              isRecoveryPending={isRecoveryPending}
+              isActiveWorkflowRoot={isActiveWorkflowRoot}
+              isStoppingWorkflow={isStoppingWorkflow}
+              onRunFromHere={onRunFromHere}
+              onStopWorkflow={onStopWorkflow}
+              onQuickLaunch={onQuickLaunch}
+            />
+            <TooltipLabel content={editActionLabel}>
+              <button
+                className={[
+                  'terminal-node__action',
+                  'terminal-node__action--edit',
+                  isEditingMetadata ? 'terminal-node__action--active' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                type="button"
+                aria-label={t('terminal.namedAction', {
+                  blockName,
+                  action: editActionLabel
+                })}
+                ref={editButtonRef}
+                aria-controls={metadataFormId}
+                aria-expanded={isEditingMetadata}
+                aria-pressed={isEditingMetadata}
+                aria-disabled={isSavingMetadata || undefined}
+                onClick={onToggleEditing}
+              >
+                <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />
+              </button>
+            </TooltipLabel>
+            <TerminalMoreMenu
+              terminalName={blockName}
+              isRunning={isRunning}
+              isRecoveryPending={isRecoveryPending}
+              sessionKind={sessionKind}
+              retentionPolicy={retentionPolicy}
+              onStop={onStop}
+              onToggleRetention={onToggleRetention}
+              onRestart={onRestart}
+              onDelete={onDelete}
+            />
+            <span className="terminal-node__action-divider" aria-hidden="true" />
+          </>
+        ) : null}
+        <TooltipLabel
+          content={t(isCollapsed ? 'terminal.action.expand' : 'terminal.action.collapse')}
+        >
           <button
-            className={[
-              'terminal-node__action',
-              'terminal-node__action--edit',
-              isEditingMetadata ? 'terminal-node__action--active' : ''
-            ]
-              .filter(Boolean)
-              .join(' ')}
+            className="terminal-node__action terminal-node__disclosure"
             type="button"
             aria-label={t('terminal.namedAction', {
               blockName,
-              action: editActionLabel
+              action: t(isCollapsed ? 'terminal.action.expand' : 'terminal.action.collapse')
             })}
-            ref={editButtonRef}
-            aria-controls={metadataFormId}
-            aria-expanded={isEditingMetadata}
-            aria-pressed={isEditingMetadata}
-            aria-disabled={isSavingMetadata || undefined}
-            onClick={onToggleEditing}
+            aria-expanded={!isCollapsed}
+            onClick={onToggleCollapsed}
           >
-            <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />
-          </button>
-        </TooltipLabel>
-        <TooltipLabel content={t('terminal.action.delete')}>
-          <button
-            className="terminal-node__action terminal-node__action--danger"
-            type="button"
-            aria-label={t('terminal.namedAction', {
-              blockName,
-              action: t('terminal.action.delete')
-            })}
-            onClick={onDelete}
-          >
-            <WorkbenchIcon size={15} data-icon="terminal-delete" role="delete" />
+            {isCollapsed ? (
+              <PlusIcon size={16} aria-hidden="true" />
+            ) : (
+              <MinusIcon size={16} aria-hidden="true" />
+            )}
           </button>
         </TooltipLabel>
       </div>

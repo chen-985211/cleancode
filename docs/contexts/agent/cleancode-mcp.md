@@ -171,7 +171,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 `0.3.1` 不改变上述输入形状，而是把并行端口决策变成 Agent 可发现的协议事实。Developer Instructions、MCP 初始化说明、工具描述和嵌套 JSON Schema 统一要求：本地 HTTP/HTTPS/TCP 开发服务存在惯用端口时，默认使用 `preferred(port)` 与已经验证的注入；没有惯用端口时使用 `auto` 与已经验证的注入；只有用户或项目契约明确要求端口不可变化时才使用 `fixed`。环境变量注入只允许选择项目现有启动路径已经读取的变量，参数注入只允许选择现有 CLI 或任务包装器已经接受的安全 `{port}` 后缀；Agent 不得猜测 `PORT`、仅因日志出现 `8000` 就选择 `fixed + none`，也不得为支持动态端口擅自修改源码或项目配置。Schema 把推荐的 `preferred` 和 `auto` 分支放在 `fixed` 前，并提供可由同一 Schema 校验的结构化示例。
 
-`0.3.2` 引入共享画布语义投影；当前结构化契约 v2 允许组合为空或只包含一个完整执行单元，命中流程任意终端时 BlockGraph 仍以完整流程校验并原子提交成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
+`0.3.2` 引入共享画布语义投影；当前结构化契约 v3 允许组合为空、容纳终端与流程并保留跨组合依赖。显式终端标题拖动只调整单终端归属；Agent 的创建和流程成员工具仍以完整流程校验并原子提交成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
 
 `0.4.0` 新增 `create_terminal_workflow`。输入用一次调用内的稳定 `ref` 描述终端、内部连接和仅在用户明确组合意图时提供的可选组合；应用层把当前工作区全部 Agent 的已保存布局作为无优先级 `canvasRegions` 注入，BlockGraph 再与图内顶层对象共同寻找空位。BlockGraph 在一个仓储事务中完成定义校验、终端创建与完整执行配置、内部依赖、可选组合、确定性排列和计划校验；任一环节失败都不提交图。成功结果返回 `ref` 到持久化终端 ID、连接 ID、可选组合 ID、实际排列作用域和已验证计划，并以一次已提交图变更为 Presentation 提供连续演出事实；演出可以逐步或整体呈现，但不得把视觉阶段重新拆成多次工具调用。原有细粒度工具不删除、不改名，继续用于既有图的增量编辑。
 
@@ -181,7 +181,11 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点；终端、流程和组合分类由共享画布语义契约定义。
 
+完整流程移动允许来源成员跨越多个组合及根画布。`move_terminal_workflow_to_group` 先通过共享画布语义取得完整成员，再交给 BlockGraph 在事务内校验该集合；来源组合不同不表示请求陈旧。只有全部成员都已处于目标作用域时才返回无变化，不能只检查代表节点。成员集合在读取与提交之间变化时仍整体拒绝。
+
 `create_block` 显式提供 `position` 时原样采用；省略时，应用层把同工作区全部 Agent 的持久化布局统一注入为 `canvasRegions`，不赋予发起 Agent 特殊方向或距离优先级，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
+
+`update_terminal_group.isCollapsed` 复用界面的同一个 BlockGraph 折叠用例：`true` 收起，`false` 展开，成员与依赖关系不变；展开后的成员尺寸和排列继续遵循[积木图模型](../block-graph/block-graph.md#终端组合规则)。图快照中的组合 `position` 是已提交的空间锚点，`size` 是保存的展开尺寸，不是折叠图标底板或动画中间帧的尺寸。折叠应用图标、整区点击和展开收起动效由 Presentation 统一投影，无需新增 MCP 参数或由 Agent 模拟点击。`delete_terminal_group` 始终只解散组合并保留成员，不对应界面的“移除组合及其全部成员”；当前 MCP 未暴露该批量移除动作。
 
 Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置和依赖，再执行后续变更。完整新建路径按结构选择 `create_terminal`、`create_terminal_workflow` 或 `create_terminal_set`，在一次提交中返回新对象 ID、排列结果和已验证计划，不需要再串联细粒度工具；只有用户明确要求把既有流程组成新组合时，才使用空 `create_terminal_group` 加 `move_terminal_workflow_to_group`，不要优先使用兼容的 `memberBlockIds`。既有对象编辑路径仍按实际需要使用细粒度工具并在需要时重新排列、检查计划。Agent 的最终说明应报告持久化的策略与注入方式，不能把请求端口误报为本次运行的实际端点。
 

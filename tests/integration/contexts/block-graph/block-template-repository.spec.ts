@@ -40,6 +40,40 @@ describe('file system block template repository', () => {
     })
   })
 
+  it.each([true, false, undefined])(
+    'preserves optional collapsed state %s across disk round trips',
+    async (isCollapsed) => {
+      const path = join(directory, 'block-template-library.json')
+      const template = createTemplate('disclosure')
+      const stored = {
+        ...template,
+        nodes: template.nodes.map((node) => ({
+          ...node,
+          ...(isCollapsed === undefined ? {} : { isCollapsed })
+        }))
+      }
+      const repository = new FileSystemBlockTemplateRepository(path)
+      await repository.transact((library) => library.add(stored))
+      expect((await new FileSystemBlockTemplateRepository(path).get()).templates[0]).toEqual(stored)
+    }
+  )
+
+  it('rejects invalid collapsed state without overwriting the template store', async () => {
+    const path = join(directory, 'block-template-library.json')
+    const template = createTemplate('invalid')
+    const source = JSON.stringify({
+      version: 1,
+      templates: [
+        { ...template, nodes: template.nodes.map((node) => ({ ...node, isCollapsed: 'true' })) }
+      ]
+    })
+    await writeFile(path, source)
+    await expect(new FileSystemBlockTemplateRepository(path).get()).rejects.toMatchObject({
+      code: 'BLOCK_TEMPLATE_INVALID'
+    })
+    expect(await readFile(path, 'utf8')).toBe(source)
+  })
+
   it('serializes concurrent transactions without losing templates', async () => {
     const repository = new FileSystemBlockTemplateRepository(
       join(directory, 'block-template-library.json')

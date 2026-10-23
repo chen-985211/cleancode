@@ -395,15 +395,15 @@ describe('agent tool protocol', () => {
   it('projects the canonical canvas execution semantics into MCP and Provider instructions', () => {
     for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
       expect(instructions).toContain(canvasExecutionSemanticInstructions)
-      expect(instructions).toContain('persistent container and connection scope')
+      expect(instructions).toContain('persistent visual container')
       expect(instructions).toContain('may remain empty')
-      expect(instructions).toContain('same combination')
+      expect(instructions).toContain('may cross combination boundaries')
     }
 
     const createGroup = requireTool('create_terminal_group')
     const moveWorkflowToGroup = requireTool('move_terminal_workflow_to_group')
     expect(createGroup.description).toContain('may start empty')
-    expect(createGroup.description).toContain('connection scope')
+    expect(createGroup.description).toContain('dependencies may cross its boundary')
     expect(createGroup.inputSchema.required).toEqual(['name'])
     expect(readSchemaProperty(createGroup.inputSchema, 'memberBlockIds')).toMatchObject({
       type: 'array',

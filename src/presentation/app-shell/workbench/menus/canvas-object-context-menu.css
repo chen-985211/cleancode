@@ -10,15 +10,15 @@
   z-index: 220;
   display: grid;
   box-sizing: border-box;
-  width: 340px;
+  width: 260px;
   max-width: calc(100vw - 16px);
   gap: 1px;
   overflow: hidden;
   border: 0;
-  border-radius: 24px;
+  border-radius: 12px;
   background: var(--cc-canvas-node-menu-surface);
   box-shadow: var(--cc-shadow-floating);
-  padding: 8px;
+  padding: 5px;
 }
 
 .canvas-menu-motion-surface {
@@ -37,11 +37,11 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  height: 44px;
+  height: 32px;
   align-items: center;
-  gap: 18px;
+  gap: 10px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 7px;
   background: transparent;
   color: var(--cc-canvas-node-menu-foreground);
   font: inherit;
@@ -51,18 +51,18 @@
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  font-size: 15px;
+  font-size: 13px;
   font-synthesis: none;
   font-weight: 500;
   line-height: 1;
-  padding: 0 18px;
+  padding: 0 10px;
   text-align: left;
   transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .canvas-node-menu__item svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   flex: 0 0 auto;
   color: var(--cc-canvas-node-menu-icon);
 }
@@ -81,7 +81,8 @@
   background: var(--cc-canvas-node-menu-hover);
 }
 
-.canvas-node-menu__item:disabled {
+.canvas-node-menu__item:disabled,
+.canvas-node-menu__item[aria-disabled='true'] {
   opacity: 0.42;
 }
 
@@ -101,7 +102,7 @@
 
 .canvas-object-context-menu__rename {
   display: grid;
-  min-width: 272px;
+  min-width: 0;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;

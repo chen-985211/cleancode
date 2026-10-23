@@ -7,6 +7,7 @@ import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface ResizeTerminalBlockCommand {
+  readonly isCollapsed?: boolean
   readonly projectDirectory: string
   readonly workspaceId: string
   readonly blockId: string
@@ -24,7 +25,8 @@ export class ResizeTerminalBlockUseCase {
       (graph) =>
         graph.resizeTerminalBlock(command.blockId, {
           position: command.position,
-          size: command.size
+          size: command.size,
+          isCollapsed: command.isCollapsed
         })
     )
 

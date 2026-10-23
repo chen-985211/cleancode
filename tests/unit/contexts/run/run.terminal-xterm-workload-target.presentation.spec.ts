@@ -112,6 +112,33 @@ describe('terminal xterm workload target', () => {
     }
   })
 
+  it('reattaches the measured terminal DOM without constructing or opening another xterm', () => {
+    const surface = createTerminalXtermSurface('dark')
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+    document.body.append(first, second)
+    const attachment = {
+      element: first,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    }
+    surface.attach(attachment)
+    const terminalElement = first.firstElementChild
+    surface.detach(first)
+    surface.attach({ ...attachment, element: second })
+    expect(second.firstElementChild).toBe(terminalElement)
+    expect(xtermState.terminals).toHaveLength(1)
+    surface.detach(second)
+    surface.dispose()
+    first.remove()
+    second.remove()
+  })
+
   it('coalesces ordered output and leaves WebGL activation to non-critical scheduling', async () => {
     const surface = createTerminalXtermSurface('dark')
     const element = document.createElement('div')

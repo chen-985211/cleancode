@@ -25,6 +25,7 @@ export interface TerminalRenderingWorkloadCoordinator {
   beginInteraction(): void
   endInteraction(canvasZoom?: number): void
   setSidebarMotionActive(isActive: boolean): void
+  setObjectMotionActive(isActive: boolean): void
   updateCanvasZoom(canvasZoom: number): void
   requestRasterAlignment(): void
 }
@@ -36,19 +37,29 @@ export function createTerminalRenderingWorkloadCoordinator(
   >,
   workloadScheduler: Pick<TerminalWorkloadScheduler, 'beginInteraction' | 'endInteraction'>
 ): TerminalRenderingWorkloadCoordinator {
+  const rasterInteractions = new Set<string>()
+  const begin = (owner: string) => {
+    if (!rasterInteractions.size) rasterCoordinator.beginInteraction()
+    rasterInteractions.add(owner)
+    workloadScheduler.beginInteraction(owner)
+  }
+  const end = (owner: string, canvasZoom?: number) => {
+    rasterInteractions.delete(owner)
+    workloadScheduler.endInteraction(owner)
+    if (!rasterInteractions.size) rasterCoordinator.endInteraction(canvasZoom)
+    else if (canvasZoom !== undefined) rasterCoordinator.updateCanvasZoom(canvasZoom)
+  }
   return {
     requestRasterAlignment: () => rasterCoordinator.requestRasterAlignment(),
-    beginInteraction: () => {
-      rasterCoordinator.beginInteraction()
-      workloadScheduler.beginInteraction('canvas')
-    },
-    endInteraction: (canvasZoom) => {
-      rasterCoordinator.endInteraction(canvasZoom)
-      workloadScheduler.endInteraction('canvas')
-    },
+    beginInteraction: () => begin('canvas'),
+    endInteraction: (canvasZoom) => end('canvas', canvasZoom),
     setSidebarMotionActive: (isActive) => {
       if (isActive) workloadScheduler.beginInteraction('sidebar')
       else workloadScheduler.endInteraction('sidebar')
+    },
+    setObjectMotionActive: (isActive) => {
+      if (isActive) begin('object-motion')
+      else end('object-motion')
     },
     updateCanvasZoom: (canvasZoom) => rasterCoordinator.updateCanvasZoom(canvasZoom)
   }

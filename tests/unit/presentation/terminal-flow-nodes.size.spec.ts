@@ -6,6 +6,21 @@ import {
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('terminal flow nodes', () => {
+  it('projects a compact folded terminal without replacing its saved expanded size', () => {
+    const graph = createGraph()
+    const nodes = createTerminalFlowNodes({
+      graph: { ...graph, blocks: graph.blocks.map((block) => ({ ...block, isCollapsed: true })) },
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers()
+    })
+
+    expect(nodes[0]).toMatchObject({
+      style: { width: 220, height: 44 },
+      data: { block: expect.objectContaining({ size: { width: 760, height: 420 } }) }
+    })
+  })
+
   it('uses the terminal block size as the React Flow node dimensions', () => {
     const graph = createGraph()
 

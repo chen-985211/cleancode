@@ -38,6 +38,38 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 }
 
 describe('resize terminal block', () => {
+  it('persists disclosure independently of the expanded rectangle and restores it', async () => {
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
+    const block = graph.createTerminalBlock({
+      name: 'Shell',
+      description: '',
+      position: { x: 20, y: 40 }
+    })
+    const useCase = new ResizeTerminalBlockUseCase(new InMemoryBlockGraphRepository(graph))
+    const collapsed = await useCase.execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      blockId: block.id,
+      position: block.position,
+      size: block.size,
+      isCollapsed: true
+    })
+    expect(collapsed.blocks[0]).toMatchObject({ isCollapsed: true, size: block.size })
+    expect(BlockGraph.fromSnapshot(collapsed).blocks[0]).toMatchObject({
+      isCollapsed: true,
+      size: block.size
+    })
+    const expanded = await useCase.execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      blockId: block.id,
+      position: block.position,
+      size: block.size,
+      isCollapsed: false
+    })
+    expect(expanded.blocks[0]).toMatchObject({ isCollapsed: false, size: block.size })
+  })
+
   it('persists the terminal final rectangle through the resize use case', async () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',

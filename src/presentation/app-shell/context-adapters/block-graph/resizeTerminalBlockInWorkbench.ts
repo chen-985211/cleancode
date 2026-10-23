@@ -34,7 +34,8 @@ export async function resizeTerminalBlockInWorkbench({
         workspaceId: currentWorkspace.workspaceId,
         blockId: block.id,
         position: layout.position,
-        size: layout.size
+        size: layout.size,
+        ...(layout.isCollapsed === undefined ? {} : { isCollapsed: layout.isCollapsed })
       }) ?? Promise.resolve(undefined),
     (graphSnapshot) => {
       if (graphSnapshot) setCurrentGraph(graphSnapshot)

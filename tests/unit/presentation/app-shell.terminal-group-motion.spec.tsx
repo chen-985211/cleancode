@@ -94,7 +94,7 @@ describe('app shell terminal group object motion', () => {
     expect(reactFlowProps.latest?.edges).toEqual([
       expect.objectContaining({
         id: 'backend-frontend',
-        className: expect.stringContaining('workbench-object-edge--motion-pending')
+        data: { followsObjectMotion: true }
       })
     ])
   })

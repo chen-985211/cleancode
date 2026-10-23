@@ -5,7 +5,7 @@ import baseline from '../../fixtures/e2eDurations.json'
 import { assignTestShards } from '../../support/testShardAssignment'
 
 describe('test shard assignment', () => {
-  it.each([1, 2, 3, 7])('covers every discovered file once with %s shards', (count) => {
+  it.each([1, 2, 3, 4, 6, 8])('covers every discovered file once with %s shards', (count) => {
     const files = ['slow', 'medium', 'fast', 'new-file']
     const shards = assignTestShards(files, { slow: 100, medium: 50, fast: 10, deleted: 999 }, count)
     expect(shards).toHaveLength(count)
@@ -38,14 +38,18 @@ describe('test shard assignment', () => {
     expect(() => assignTestShards(['a', 'a'], {}, 2)).toThrow('stable identity')
   })
 
-  it.each(['linux', 'macos', 'windows'] as const)(
-    'includes the complete current E2E suite and new files on %s',
-    async (platform) => {
+  it.each([
+    { platform: 'linux', count: 4 },
+    { platform: 'macos', count: 6 },
+    { platform: 'windows', count: 6 }
+  ] as const)(
+    'includes the complete current E2E suite and new files on $platform with $count shards',
+    async ({ platform, count }) => {
       const files = (await readdir(join(process.cwd(), 'tests', 'e2e')))
         .filter((file) => file.endsWith('.spec.ts'))
         .map((file) => posix.join('tests', 'e2e', file))
       files.push('tests/e2e/future-feature.e2e.spec.ts')
-      const shards = assignTestShards(files, baseline.durationMs[platform], 3)
+      const shards = assignTestShards(files, baseline.durationMs[platform], count)
       expect(shards.flat().sort()).toEqual([...files].sort())
     }
   )

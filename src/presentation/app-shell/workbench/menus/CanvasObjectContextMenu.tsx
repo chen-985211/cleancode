@@ -68,8 +68,14 @@ export function CanvasObjectContextMenu({
     setMode('actions')
   }
 
+  const motionReady =
+    resolvedPosition?.mode === mode &&
+    resolvedPosition.pointerX === position.x &&
+    resolvedPosition.pointerY === position.y &&
+    resolvedPosition.requestId === requestId
+
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || !motionReady) return undefined
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
@@ -89,7 +95,7 @@ export function CanvasObjectContextMenu({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isMenuPresent, mode, onClose, open])
+  }, [isMenuPresent, mode, motionReady, onClose, open])
 
   useLayoutEffect(() => {
     if (open && !wasOpenRef.current) {
@@ -131,11 +137,6 @@ export function CanvasObjectContextMenu({
       : target.kind === 'agent'
         ? t('agent.actions', { agentName: target.agentId })
         : t(`canvas.contextMenu.${target.kind}Actions`)
-  const motionReady =
-    resolvedPosition?.mode === mode &&
-    resolvedPosition.pointerX === position.x &&
-    resolvedPosition.pointerY === position.y &&
-    resolvedPosition.requestId === requestId
 
   return createPortal(
     <CanvasNodeMenu
@@ -156,8 +157,7 @@ export function CanvasObjectContextMenu({
       }}
       style={{
         left: motionReady ? (resolvedPosition?.left ?? 0) : 0,
-        top: motionReady ? (resolvedPosition?.top ?? 0) : 0,
-        visibility: motionReady ? 'visible' : 'hidden'
+        top: motionReady ? (resolvedPosition?.top ?? 0) : 0
       }}
     >
       {target.kind === 'agent' && agentActions ? (

@@ -119,6 +119,22 @@ describe('workbench canvas drag isolation', () => {
     expect(onNodesChange).toHaveBeenCalledWith([agentChange])
   })
 
+  it('isolates a terminal title inside a workflow even when other terminals are selected', () => {
+    const { terminalNode } = createNodes()
+    const node = {
+      ...terminalNode,
+      data: { ...terminalNode.data, isIndependentCanvasTerminal: false }
+    }
+    const onNodesChange = vi.fn()
+    renderCanvas([node], onNodesChange)
+    const own = createPositionChange(node.id, 480, 260)
+    act(() => {
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, node)
+      reactFlowProps.latest?.onNodesChange?.([own, createPositionChange('terminal-2', 920, 260)])
+    })
+    expect(onNodesChange).toHaveBeenCalledWith([own])
+  })
+
   it('preserves intentional movement of multiple selected terminals', () => {
     const { agentNode, terminalNode } = createNodes()
     const secondTerminalNode: TerminalFlowNode = {

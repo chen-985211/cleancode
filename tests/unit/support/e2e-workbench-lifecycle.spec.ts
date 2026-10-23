@@ -194,6 +194,31 @@ describe('E2E workbench lifecycle', () => {
     }
   })
 
+  it('closes a passing scenario without waiting to discard its unused trace', async () => {
+    const electronProcess = createElectronProcess()
+    const tracing = {
+      start: vi.fn(),
+      stop: vi.fn().mockRejectedValue(new Error('slow trace flush'))
+    }
+    const electronApp = {
+      context: () => ({ tracing }),
+      on: vi.fn(),
+      windows: () => [],
+      process: () => electronProcess,
+      close: vi.fn(async () => {
+        electronProcess.exitCode = 0
+        electronProcess.emit('exit', 0, null)
+      })
+    } as unknown as ElectronApplication
+    e2eDiagnostics.initializeE2eDiagnostics(electronApp)
+    await e2eDiagnostics.startE2eTracing(electronApp)
+
+    await expect(closeElectronApp(electronApp)).resolves.toBeUndefined()
+    expect(electronApp.close).toHaveBeenCalledOnce()
+    expect(tracing.stop).not.toHaveBeenCalled()
+    expect(electronProcess.kill).not.toHaveBeenCalled()
+  })
+
   it('does not force-kill a process while asserting a natural exit', async () => {
     vi.useFakeTimers()
     try {

@@ -30,40 +30,40 @@ interface ResolveTerminalGroupDropActionInput {
   readonly draggedNode: TerminalGroupDropNode
   readonly editingTerminalGroupId?: string
   readonly nodes: readonly TerminalGroupDropNode[]
+  readonly previousAction?: TerminalGroupDropAction
+  readonly point?: { readonly x: number; readonly y: number }
 }
 
 export function resolveTerminalGroupDropAction({
   graph,
   draggedNode,
   editingTerminalGroupId,
-  nodes
+  nodes,
+  previousAction = { type: 'none' },
+  point
 }: ResolveTerminalGroupDropActionInput): TerminalGroupDropAction {
-  const terminalCenter = getNodeCenter(draggedNode)
+  const terminalCenter = point ?? getNodeCenter(draggedNode)
   const currentGroup = graph.terminalGroups.find((group) =>
     group.memberBlockIds.includes(draggedNode.id)
   )
   const groupNodes = nodes.filter((node) => node.type === 'terminalGroup')
-  const activeGroupId = editingTerminalGroupId ?? currentGroup?.id ?? groupNodes[0]?.id
-  if (!activeGroupId) return { type: 'none' }
-
-  if (currentGroup?.id === activeGroupId) {
-    if (isPointInsideRect(terminalCenter, currentGroup.position, currentGroup.size)) {
-      return { type: 'none' }
-    }
-
-    return {
-      type: 'leave-group',
-      terminalGroupId: currentGroup.id
-    }
-  }
-
-  const targetGroupNode = groupNodes.find(
-    (groupNode) => groupNode.id === activeGroupId && isPointInsideNode(terminalCenter, groupNode)
-  )
-
-  return targetGroupNode
-    ? { type: 'join-group', terminalGroupId: targetGroupNode.id }
-    : { type: 'none' }
+  // The caller supplies the immutable rectangles captured at drag start.
+  // Enter 12 units inside; stay accepted until 12 units outside the same boundary.
+  const targetGroupNode = groupNodes.find((node) => {
+    if (node.id === currentGroup?.id) return false
+    if (editingTerminalGroupId && node.id !== editingTerminalGroupId) return false
+    const wasTarget =
+      previousAction.type === 'join-group' && previousAction.terminalGroupId === node.id
+    return isPointInsideNode(terminalCenter, node, wasTarget ? 12 : -12)
+  })
+  if (targetGroupNode) return { type: 'join-group', terminalGroupId: targetGroupNode.id }
+  if (!currentGroup) return { type: 'none' }
+  const currentNode = groupNodes.find((node) => node.id === currentGroup.id)
+  const wasLeaving = previousAction.type === 'leave-group'
+  const isInside = currentNode
+    ? isPointInsideNode(terminalCenter, currentNode, wasLeaving ? -12 : 12)
+    : isPointInsideRect(terminalCenter, currentGroup.position, currentGroup.size)
+  return isInside ? { type: 'none' } : { type: 'leave-group', terminalGroupId: currentGroup.id }
 }
 
 export function resolveTerminalGroupDropFeedback(
@@ -120,12 +120,17 @@ function getNodeCenter(node: TerminalGroupDropNode): { readonly x: number; reado
 
 function isPointInsideNode(
   point: { readonly x: number; readonly y: number },
-  node: TerminalGroupDropNode
+  node: TerminalGroupDropNode,
+  margin = 0
 ): boolean {
-  return isPointInsideRect(point, node.position, {
-    width: resolveNodeDimension(node, 'width'),
-    height: resolveNodeDimension(node, 'height')
-  })
+  return isPointInsideRect(
+    point,
+    { x: node.position.x - margin, y: node.position.y - margin },
+    {
+      width: resolveNodeDimension(node, 'width') + margin * 2,
+      height: resolveNodeDimension(node, 'height') + margin * 2
+    }
+  )
 }
 
 function resolveNodeDimension(node: TerminalGroupDropNode, dimension: 'width' | 'height'): number {

@@ -28,6 +28,7 @@ jobs:
     with:
       platform_id: linux
       runner: ubuntu-24.04
+      shards: '[1, 2, 3, 4]'
 
   build_macos:
     name: Electron / macos
@@ -43,6 +44,7 @@ jobs:
     with:
       platform_id: macos
       runner: macos-15
+      shards: '[1, 2, 3, 4, 5, 6]'
 
   build_windows:
     name: Electron / windows
@@ -58,6 +60,7 @@ jobs:
     with:
       platform_id: windows
       runner: windows-2025
+      shards: '[1, 2, 3, 4, 5, 6]'
 
   packaged_windows:
     name: Electron / windows / Packaged Windows smoke

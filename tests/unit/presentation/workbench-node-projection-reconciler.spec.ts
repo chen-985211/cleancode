@@ -7,6 +7,27 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { reconcileWorkbenchNodeProjection } from '../../../src/presentation/app-shell/projections/workbenchNodeProjectionReconciler'
 
 describe('Workbench node projection reconciler', () => {
+  it('retains measured geometry across graph updates so existing edge handles stay initialized', () => {
+    const store = createTerminalStateStore(terminalStates)
+    const current = createNodes(createGraph(), store).map((node) => ({
+      ...node,
+      measured: { width: 640, height: 380 }
+    }))
+    const next = createNodes(createGraph(), store).map((node) => ({
+      ...node,
+      style: { ...node.style, width: 420, height: 280 }
+    }))
+    const reconciled = reconcileWorkbenchNodeProjection(next, current)
+    for (const node of reconciled) {
+      expect(node.measured).toEqual({ width: 640, height: 380 })
+      expect(node.style).toMatchObject({ width: 420, height: 280 })
+    }
+    const measured = next.map((node) => ({ ...node, measured: { width: 420, height: 280 } }))
+    expect(
+      reconcileWorkbenchNodeProjection(measured, reconciled).map((node) => node.measured)
+    ).toEqual(measured.map((node) => node.measured))
+  })
+
   it('returns the current array when every node projection is equivalent', () => {
     const store = createTerminalStateStore(terminalStates)
     const current = createNodes(createGraph(), store)
@@ -16,6 +37,31 @@ describe('Workbench node projection reconciler', () => {
 
     expect(reconciled).toBe(current)
     expect(reconciled.every((node, index) => node === current[index])).toBe(true)
+  })
+
+  it('refreshes workflow handles and terminal drag scope when dependencies change without geometry changes', () => {
+    const store = createTerminalStateStore(terminalStates)
+    const graph = createGraph()
+    const current = createNodes(graph, store)
+    const connected = {
+      ...graph,
+      connections: [{ id: 'link', sourceBlockId: 'terminal-2', targetBlockId: 'terminal-3' }]
+    }
+    const nodes = reconcileWorkbenchNodeProjection(createNodes(connected, store), current)
+    expect(nodes.find((node) => node.id === 'terminal-2')?.data.workflowDragTerminalIds).toEqual([
+      'terminal-2',
+      'terminal-3'
+    ])
+    expect(nodes.find((node) => node.id === 'terminal-3')?.data.isIndependentCanvasTerminal).toBe(
+      false
+    )
+    const disconnected = reconcileWorkbenchNodeProjection(createNodes(graph, store), nodes)
+    expect(
+      disconnected.find((node) => node.id === 'terminal-2')?.data.workflowDragTerminalIds
+    ).toBeUndefined()
+    expect(
+      disconnected.find((node) => node.id === 'terminal-3')?.data.isIndependentCanvasTerminal
+    ).toBe(true)
   })
 
   it('replaces only the node whose graph fact changed', () => {

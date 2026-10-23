@@ -188,6 +188,10 @@ describe('run terminal sessions e2e', () => {
       const beforeDragPosition = await readTerminalBlockPosition(workbench)
       const terminalHeader = terminalBlock.locator('.terminal-node__header')
       const headerBox = await readRequiredBoundingBox(terminalHeader)
+      const disabledAction = terminalBlock.locator('.terminal-node__action:disabled').first()
+      const pointerEventsBeforeDrag = await disabledAction.evaluate(
+        (button) => getComputedStyle(button).pointerEvents
+      )
 
       await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2)
       await page.mouse.down()
@@ -206,6 +210,9 @@ describe('run terminal sessions e2e', () => {
 
       expect(afterDragPosition.x - beforeDragPosition.x).toBeGreaterThan(160)
       expect(afterDragPosition.y - beforeDragPosition.y).toBeGreaterThan(90)
+      expect(
+        await disabledAction.evaluate((button) => getComputedStyle(button).pointerEvents)
+      ).toBe(pointerEventsBeforeDrag)
     },
     electronScenarioTimeoutMs
   )

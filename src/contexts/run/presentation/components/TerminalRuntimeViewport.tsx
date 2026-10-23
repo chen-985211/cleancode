@@ -85,6 +85,10 @@ export function TerminalRuntimeViewport({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const outputTailElementRef = useRef<HTMLPreElement | null>(null)
   const surfaceRef = useRef<TerminalSurface | null>(null)
+  const unboundSurfaceRef = useRef<{
+    surface: TerminalSurface
+    theme: ReturnType<typeof readTerminalSourceTheme>
+  } | null>(null)
   const requestRestoreRef = useRef<() => void>(() => undefined)
   const outputTailRef = useRef(appendTerminalOutputTail('', session.output))
   const runIdentityRef = useRef(session.runIdentity ?? null)
@@ -275,13 +279,20 @@ export function TerminalRuntimeViewport({
 
     const element = terminalElementRef.current
     const runIdentity = runIdentityRef.current
-    const createSurface = () => createTerminalXtermSurface(terminalSourceTheme)
+    const unbound = unboundSurfaceRef.current
+    const reusable = unbound?.theme === terminalSourceTheme ? unbound : null
+    unboundSurfaceRef.current = null
+    if (unbound && !reusable) unbound.surface.dispose()
+    const createSurface = () => reusable?.surface ?? createTerminalXtermSurface(terminalSourceTheme)
     const lease =
       runIdentity && surfaceRegistry ? surfaceRegistry.create(runIdentity, createSurface) : null
     const surface = lease?.surface ?? createSurface()
     const api = window.cleancode
     let isReleased = false
     let restoreTail = Promise.resolve()
+    const pendingSurface =
+      !runIdentity && !attachedSessionId ? { surface, theme: terminalSourceTheme } : null
+    unboundSurfaceRef.current = pendingSurface
 
     surfaceRef.current = surface
     surface.attach({
@@ -308,6 +319,9 @@ export function TerminalRuntimeViewport({
     )
 
     const requestRestore = (): void => {
+      // Measurement has no run snapshot. Preserve its fitted grid until the first
+      // authoritative attach instead of resetting it to a synthetic 80-by-24 screen.
+      if (pendingSurface) return
       setRestoreStatus('restoring')
       restoreTail = restoreTail
         .catch(() => undefined)
@@ -374,12 +388,20 @@ export function TerminalRuntimeViewport({
           .catch(() => undefined)
           .finally(() => surfaceRegistry?.release(lease.viewId))
       } else if (lease) surfaceRegistry?.release(lease.viewId)
-      else surface.dispose()
+      else if (!pendingSurface) surface.dispose()
       if (surfaceRef.current === surface) {
         surfaceRef.current = null
       }
     }
   }, [attachedSessionId, openSearch, surfaceIdentityKey, surfaceRegistry, terminalSourceTheme])
+
+  useEffect(
+    () => () => {
+      unboundSurfaceRef.current?.surface.dispose()
+      unboundSurfaceRef.current = null
+    },
+    []
+  )
 
   useEffect(() => {
     if (focusRequestId > 0) {

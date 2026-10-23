@@ -145,7 +145,7 @@ Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
 - Unit 测试通过 Vitest projects 按运行时需求分组：Presentation 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境，避免为不消费 DOM 的文件重复创建浏览器模拟环境。
-- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台只等待自身 build，再按已审查的平台历史耗时分到三个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台只等待自身 build，再按已审查的平台历史耗时分到 Linux 4、macOS 6、Windows 6 个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。

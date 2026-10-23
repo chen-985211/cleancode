@@ -16,7 +16,8 @@ import {
 import {
   readCreateTerminalBlockCommand,
   readCreateTerminalGroupCommand,
-  readMoveTerminalWorkflowToGroupCommand
+  readMoveTerminalWorkflowToGroupCommand,
+  readResizeTerminalBlockCommand
 } from './blockGraphTerminalContainerIpcCommands'
 
 interface TerminalDefinitionIpcCommand {
@@ -145,6 +146,8 @@ export interface BlockGraphIpcHandlersInput {
   readonly moveTerminalWorkflowToGroup: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
+    readonly scope?: 'terminal' | 'workflow'
+    readonly expectedBlockIds?: readonly string[]
     readonly blockId: string
     readonly targetTerminalGroupId: string | null
     readonly position: { readonly x: number; readonly y: number }
@@ -159,6 +162,7 @@ export interface BlockGraphIpcHandlersInput {
     readonly workspaceId: string
     readonly blockId: string
     readonly position: { readonly x: number; readonly y: number }
+    readonly isCollapsed?: boolean
     readonly size: { readonly width: number; readonly height: number }
   }) => Promise<BlockGraphSnapshot>
   readonly updateGraphViewport: (command: {
@@ -417,12 +421,13 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
       readonly workspaceId: string
       readonly blockId: string
       readonly position: { readonly x: number; readonly y: number }
+      readonly isCollapsed?: boolean
       readonly size: { readonly width: number; readonly height: number }
     },
     BlockGraphSnapshot
   >({
     channel: 'cleancode:resize-terminal-block',
-    handler: (command) => input.resizeTerminalBlock(command),
+    handler: (command) => input.resizeTerminalBlock(readResizeTerminalBlockCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'resizeTerminalBlock',

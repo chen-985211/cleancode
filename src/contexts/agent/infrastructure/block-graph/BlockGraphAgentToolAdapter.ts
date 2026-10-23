@@ -2,6 +2,7 @@ import {
   createExpectedAppError,
   createUnexpectedAppError
 } from '../../../../shared-kernel/application/errors/AppError'
+import { analyzeCanvasExecutionSelection } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
@@ -108,7 +109,8 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly position: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly moveTerminalWorkflowToGroup: (
-    command: AgentToolContext & AgentMoveTerminalWorkflowToGroupInput
+    command: AgentToolContext &
+      AgentMoveTerminalWorkflowToGroupInput & { readonly expectedBlockIds?: readonly string[] }
   ) => Promise<BlockGraphSnapshot>
   readonly resizeTerminalBlock: (command: {
     readonly projectDirectory: string
@@ -293,8 +295,21 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     input: AgentMoveTerminalWorkflowToGroupInput
   ): Promise<AgentMoveTerminalWorkflowToGroupResult> {
     const before = await this.tools.getDefaultGraph(context)
+    requireTerminalBlock(before, input.blockId)
+    const { expandedTerminalIds } = analyzeCanvasExecutionSelection({
+      terminals: before.blocks.map((block) => ({ terminalId: block.id })),
+      dependencies: (before.connections ?? []).map((edge) => ({
+        sourceTerminalId: edge.sourceBlockId,
+        targetTerminalId: edge.targetBlockId
+      })),
+      selectedTerminalIds: [input.blockId]
+    })
     const membershipBefore = indexTerminalGroupMembership(before.terminalGroups)
-    if ((membershipBefore.get(input.blockId) ?? null) === input.targetTerminalGroupId) {
+    if (
+      expandedTerminalIds.every(
+        (id) => (membershipBefore.get(id) ?? null) === input.targetTerminalGroupId
+      )
+    ) {
       return {
         affectedTerminalGroupIds: [],
         graph: toAgentBlockGraphSnapshot(before),
@@ -303,7 +318,11 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       }
     }
 
-    const graph = await this.tools.moveTerminalWorkflowToGroup({ ...context, ...input })
+    const graph = await this.tools.moveTerminalWorkflowToGroup({
+      ...context,
+      ...input,
+      expectedBlockIds: expandedTerminalIds
+    })
     const membershipAfter = indexTerminalGroupMembership(graph.terminalGroups)
     const movedBlockIds = graph.blocks
       .filter(

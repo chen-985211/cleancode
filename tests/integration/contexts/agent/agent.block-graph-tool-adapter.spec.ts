@@ -332,6 +332,69 @@ describe('agent block graph workflow tool adapter', () => {
     })
   })
 
+  it.each(['third group', 'representative group', 'root representative'] as const)(
+    'moves every member of a split workflow to the %s through the Agent port',
+    async (target) => {
+      const first = await adapter.createTerminalGroup(context, {
+        name: 'First',
+        memberBlockIds: [terminalIds.install],
+        position: { x: 2400, y: 0 }
+      })
+      const firstId = first.terminalGroups.find((group) => group.name === 'First')!.id
+      if (target !== 'root representative')
+        await adapter.createTerminalGroup(context, {
+          name: 'Second',
+          memberBlockIds: [terminalIds.build],
+          position: { x: 2400, y: 2000 }
+        })
+      const third = await adapter.createTerminalGroup(context, {
+        name: 'Target',
+        position: { x: 4800, y: 0 }
+      })
+      await adapter.connectTerminalBlocks(context, {
+        sourceBlockId: terminalIds.install,
+        targetBlockId: terminalIds.build
+      })
+      const before = await adapter.inspectGraph(context)
+      const targetId =
+        target === 'third group'
+          ? third.terminalGroups.find((group) => group.name === 'Target')!.id
+          : target === 'representative group'
+            ? firstId
+            : null
+      const result = await adapter.moveTerminalWorkflowToGroup(context, {
+        blockId: target === 'root representative' ? terminalIds.build : terminalIds.install,
+        canvasRegions: [],
+        ...(targetId
+          ? { targetTerminalGroupId: targetId }
+          : { targetTerminalGroupId: null, position: { x: 6000, y: 6000 } })
+      })
+      expect(result.graphChanged).toBe(true)
+      expect(result.graph.connections).toEqual(before.connections)
+      for (const id of [terminalIds.install, terminalIds.build]) {
+        expect(
+          result.graph.terminalGroups.find((group) => group.memberBlockIds.includes(id))?.id ?? null
+        ).toBe(targetId)
+      }
+      expect(result.graph.blocks.find((block) => block.id === terminalIds.test)).toEqual(
+        before.blocks.find((block) => block.id === terminalIds.test)
+      )
+      expect(await adapter.inspectGraph(context)).toEqual(result.graph)
+      const repeated = await adapter.moveTerminalWorkflowToGroup(context, {
+        blockId: terminalIds.install,
+        canvasRegions: [],
+        ...(targetId
+          ? { targetTerminalGroupId: targetId }
+          : { targetTerminalGroupId: null, position: { x: 9000, y: 9000 } })
+      })
+      expect(repeated).toMatchObject({
+        graphChanged: false,
+        movedBlockIds: [],
+        graph: result.graph
+      })
+    }
+  )
+
   it('treats moving an already root workflow to the root canvas as a true no-op', async () => {
     await adapter.connectTerminalBlocks(context, {
       sourceBlockId: terminalIds.install,
@@ -353,6 +416,54 @@ describe('agent block graph workflow tool adapter', () => {
       movedBlockIds: []
     })
     expect(await adapter.inspectGraph(context)).toEqual(before)
+  })
+
+  it('rejects a split workflow collision through MCP without persisting any of the move', async () => {
+    await adapter.createTerminalGroup(context, {
+      name: 'Source',
+      memberBlockIds: [terminalIds.build],
+      position: { x: 2400, y: 900 }
+    })
+    await adapter.connectTerminalBlocks(context, {
+      sourceBlockId: terminalIds.install,
+      targetBlockId: terminalIds.build
+    })
+    const before = await repository.findDefaultGraphSnapshot(
+      context.projectDirectory,
+      context.workspaceId
+    )
+    const destination = { x: 6000, y: 6000 }
+    const move = {
+      blockId: terminalIds.install,
+      targetTerminalGroupId: null,
+      position: destination
+    } as const
+
+    await expect(
+      adapter.moveTerminalWorkflowToGroup(context, {
+        ...move,
+        canvasRegions: [{ position: destination, size: { width: 720, height: 460 } }]
+      })
+    ).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'TERMINAL_GROUP_LAYOUT_CONFLICT'
+    )
+    // Read with a fresh repository so a cached projection cannot hide a partial save.
+    const freshRepository = new FileSystemBlockGraphRepository(appStateDirectory)
+    expect(
+      await freshRepository.findDefaultGraphSnapshot(context.projectDirectory, context.workspaceId)
+    ).toEqual(before)
+
+    const result = await adapter.moveTerminalWorkflowToGroup(context, {
+      ...move,
+      canvasRegions: []
+    })
+    expect(result.graphChanged).toBe(true)
+    expect(findBlock(result.graph, terminalIds.install).position).toEqual(destination)
+    expect(result.graph.terminalGroups.every((group) => group.memberBlockIds.length === 0)).toBe(
+      true
+    )
+    expect(result.graph.connections).toEqual(before?.connections)
+    expect(await createAdapter(freshRepository).inspectGraph(context)).toEqual(result.graph)
   })
 })
 

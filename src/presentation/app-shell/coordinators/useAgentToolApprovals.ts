@@ -19,7 +19,7 @@ import type {
   AgentToolApprovalViewState
 } from '../workbench/nodes/agent/agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
-import { transitionWorkbenchViewport } from '../workbench/viewport/workbenchViewportMotion'
+import { focusWorkbenchNodesInCanvas } from '../workbench/viewport/workbenchNavigationFocus'
 import { useI18n } from '../../i18n/useI18n'
 import type { Translate } from '../../i18n/messages'
 
@@ -146,13 +146,7 @@ export function useAgentToolApprovals({
         .map((nodeId) => instance.getNode(nodeId))
         .filter((node): node is WorkbenchFlowNode => Boolean(node))
 
-      if (focusNodes.length === 0) return
-      void transitionWorkbenchViewport(instance, {
-        intent: { type: 'spatial' },
-        nodes: focusNodes,
-        padding: 0.24,
-        type: 'fit-view'
-      })
+      focusWorkbenchNodesInCanvas(instance, focusNodes)
     },
     [reactFlowInstanceRef]
   )

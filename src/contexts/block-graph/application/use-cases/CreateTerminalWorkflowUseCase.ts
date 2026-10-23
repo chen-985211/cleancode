@@ -7,6 +7,7 @@ import type {
 } from '../dto/BlockGraphSnapshot'
 import { defaultTerminalExecutionConfig } from '../dto/BlockGraphSnapshot'
 import type { TerminalWorkflowPlanSnapshot } from '../dto/TerminalWorkflowPlanSnapshot'
+import { defaultWorkflowTerminalSize } from '../../domain/services/TerminalExpansionSize'
 import { buildTerminalWorkflowPlan } from '../../domain/services/TerminalWorkflowPlan'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
@@ -70,7 +71,13 @@ export class CreateTerminalWorkflowUseCase {
             launchCommand: terminal.launchCommand,
             name: terminal.name,
             position: { x: 0, y: terminalIndex },
-            size: terminal.size
+            size:
+              terminal.size ??
+              (command.connections.some(
+                (edge) => edge.sourceRef === terminal.ref || edge.targetRef === terminal.ref
+              )
+                ? defaultWorkflowTerminalSize
+                : undefined)
           })
           graph.updateTerminalDefinition(block.id, {
             description: terminal.description,

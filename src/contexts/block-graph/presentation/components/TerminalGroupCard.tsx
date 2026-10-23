@@ -16,14 +16,8 @@ import type {
 } from '../../application/dto/BlockGraphSnapshot'
 import type { UpdateTerminalGroupMetadataInput } from '../../domain/aggregates/BlockGraphTypes'
 import {
-  GroupAddIcon,
   GroupCancelIcon,
   GroupCollapseIcon,
-  GroupContentsIcon,
-  GroupDissolveIcon,
-  GroupExpandIcon,
-  GroupMemberUnlinkIcon,
-  GroupRenameIcon,
   GroupRestartIcon,
   GroupSaveIcon,
   GroupSavingIcon,
@@ -32,6 +26,7 @@ import {
 } from './TerminalGroupIcons'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { WorkbenchIcon } from '../../../../presentation/shared/components/WorkbenchIcons'
 import type { TerminalGroupDropFeedback } from '../view-models/TerminalGroupPresentationTypes'
 
 interface TerminalGroupCardData {
@@ -59,6 +54,7 @@ export interface TerminalGroupCardProps {
   readonly isExpanding?: boolean
   readonly isPending?: boolean
   readonly leadingContent?: ReactNode
+  readonly renderMoreMenu: (onRename: () => void) => ReactNode
   readonly memberRows?: ReactNode
   readonly selectionContent?: ReactNode
   readonly surfaceClassName?: string
@@ -73,7 +69,7 @@ export function TerminalGroupCard({
   isExpanding = false,
   isPending = false,
   leadingContent,
-  memberRows,
+  renderMoreMenu,
   selectionContent,
   surfaceClassName,
   surfaceRef,
@@ -148,117 +144,126 @@ export function TerminalGroupCard({
     >
       <div className="terminal-group-node__material" aria-hidden="true" />
       {leadingContent}
-      <div
-        data-workbench-node-title="true"
-        className={[
-          'terminal-group-node__header',
-          isEditingName ? 'terminal-group-node__header--editing' : ''
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <div className="terminal-group-node__title">
+      {isExpanding && !group.isCollapsed ? (
+        <div className="terminal-group-node__launcher-exit" aria-hidden="true">
+          <GroupLauncherIdentity name={group.name} />
+        </div>
+      ) : null}
+      {group.isCollapsed ? (
+        <CollapsedGroupButton data={data} />
+      ) : (
+        <div
+          data-workbench-node-title="true"
+          className={[
+            'terminal-group-node__header',
+            isEditingName ? 'terminal-group-node__header--editing' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className="terminal-group-node__title">
+            {isEditingName ? (
+              <form
+                id={nameFormId}
+                className="terminal-group-name-form nodrag"
+                aria-busy={isSavingName}
+                onSubmit={saveName}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape' || isSavingName) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  cancelEditingName()
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <input
+                  aria-label={t('group.name')}
+                  ref={nameInputRef}
+                  value={draftName}
+                  onChange={(event) => setDraftName(event.target.value)}
+                />
+              </form>
+            ) : (
+              <TooltipLabel content={group.name}>
+                <strong className="terminal-group-node__name">{group.name}</strong>
+              </TooltipLabel>
+            )}
+          </div>
+
           {isEditingName ? (
-            <form
-              id={nameFormId}
-              className="terminal-group-name-form nodrag"
-              aria-busy={isSavingName}
-              onSubmit={saveName}
-              onKeyDown={(event) => {
-                if (event.key !== 'Escape' || isSavingName) return
-                event.preventDefault()
-                event.stopPropagation()
-                cancelEditingName()
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <input
-                aria-label={t('group.name')}
-                ref={nameInputRef}
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-              />
-            </form>
+            <EditActions
+              formId={nameFormId}
+              canSave={Boolean(trimmedDraftName)}
+              isSaving={isSavingName}
+              onCancel={cancelEditingName}
+            />
           ) : (
-            <TooltipLabel content={group.name}>
-              <strong className="terminal-group-node__name">{group.name}</strong>
-            </TooltipLabel>
+            <GroupActionToolbar data={data} isInline moreMenu={renderMoreMenu(startEditingName)} />
           )}
         </div>
+      )}
 
-        {isEditingName ? (
-          group.isCollapsed ? null : (
-            <EditActions
-              formId={nameFormId}
-              canSave={Boolean(trimmedDraftName)}
-              isSaving={isSavingName}
-              onCancel={cancelEditingName}
-            />
-          )
-        ) : group.isCollapsed ? (
-          <DisclosureButton data={data} />
-        ) : (
-          <GroupActionToolbar data={data} isInline onRename={startEditingName} />
-        )}
-      </div>
-
-      {group.isCollapsed ? (
-        isEditingName ? (
-          <div className="terminal-group-node__toolbar terminal-group-node__toolbar--editing">
-            <EditActions
-              formId={nameFormId}
-              canSave={Boolean(trimmedDraftName)}
-              isSaving={isSavingName}
-              onCancel={cancelEditingName}
-            />
-          </div>
-        ) : (
-          <GroupActionToolbar data={data} onRename={startEditingName} />
-        )
-      ) : null}
-
-      {group.isCollapsed ? (
-        <div className="terminal-group-node__members">{memberRows}</div>
-      ) : isExpanding ? (
-        <div
-          className="terminal-group-node__members terminal-group-node__members--motion-exit"
-          aria-hidden="true"
-          inert
-        >
-          {memberRows}
-        </div>
+      {data.dropFeedback ? (
+        <span className="terminal-group-node__drop-hint" role="status">
+          {t(data.dropFeedback === 'join' ? 'group.dropJoin' : 'group.dropLeave')}
+        </span>
       ) : null}
       {!group.isCollapsed && group.memberBlockIds.length === 0 ? (
-        data.isEditing ? null : (
-          <button
-            className="terminal-group-node__empty-state terminal-group-node__empty-state--action nodrag"
-            type="button"
-            aria-label={t('group.namedAction', {
-              groupName: group.name,
-              action: t('group.action.addContents')
-            })}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => data.onEditGroup?.(group)}
-          >
-            <GroupAddIcon size={20} />
-            <span>{t('group.action.addContents')}</span>
-          </button>
-        )
+        <div className="terminal-group-node__empty-state">{t('group.dragHint')}</div>
       ) : null}
       {selectionContent}
     </section>
   )
 }
 
+function CollapsedGroupButton({ data }: { readonly data: TerminalGroupCardData }) {
+  const { t } = useI18n()
+  const label = t('group.namedAction', {
+    groupName: data.group.name,
+    action: t('group.action.expandGroup')
+  })
+
+  return (
+    <TooltipLabel content={label} dismissOnDragStart>
+      <button
+        className="terminal-group-node__header terminal-group-node__launcher"
+        type="button"
+        data-workbench-node-title="true"
+        aria-label={label}
+        aria-expanded={false}
+        onClick={() => void data.onToggleGroupCollapsed(data.group, false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+        }}
+      >
+        <GroupLauncherIdentity name={data.group.name} />
+      </button>
+    </TooltipLabel>
+  )
+}
+
+function GroupLauncherIdentity({ name }: { readonly name: string }) {
+  return (
+    <>
+      <span className="terminal-group-node__expand-icon" aria-hidden="true">
+        <WorkbenchIcon role="terminal-group" className="terminal-group-node__identity-icon" />
+      </span>
+      <strong className="terminal-group-node__name">{name}</strong>
+    </>
+  )
+}
+
 interface GroupActionToolbarProps {
   readonly data: TerminalGroupCardData
   readonly isInline?: boolean
-  readonly onRename: () => void
+  readonly moreMenu: ReactNode
 }
 
-function GroupActionToolbar({ data, isInline = false, onRename }: GroupActionToolbarProps) {
+function GroupActionToolbar({ data, isInline = false, moreMenu }: GroupActionToolbarProps) {
   const group = data.group
   const { t } = useI18n()
+
+  if (group.isCollapsed) return null
 
   return (
     <div
@@ -312,63 +317,8 @@ function GroupActionToolbar({ data, isInline = false, onRename }: GroupActionToo
         </IconButton>
       </div>
 
-      <span
-        className="terminal-group-node__toolbar-divider terminal-group-node__toolbar-divider--runtime"
-        aria-hidden="true"
-      />
-
-      <div
-        className="terminal-group-node__action-group terminal-group-node__action-group--structure"
-        data-control-group="structure"
-      >
-        <IconButton
-          label={t('group.namedAction', {
-            groupName: group.name,
-            action: t('group.action.manageContents')
-          })}
-          tooltip={t('group.action.manageContents')}
-          surface="raised"
-          pressed={data.isEditing}
-          onClick={() => data.onEditGroup?.(group)}
-        >
-          <GroupContentsIcon />
-        </IconButton>
-        <IconButton
-          label={t('group.namedAction', {
-            groupName: group.name,
-            action: t('group.action.rename')
-          })}
-          tooltip={t('group.action.rename')}
-          surface="raised"
-          onClick={onRename}
-        >
-          <GroupRenameIcon />
-        </IconButton>
-        {isInline ? <DisclosureButton data={data} /> : null}
-      </div>
-
-      <span
-        className="terminal-group-node__toolbar-divider terminal-group-node__toolbar-divider--structure"
-        aria-hidden="true"
-      />
-
-      <div
-        className="terminal-group-node__action-group terminal-group-node__action-group--danger"
-        data-control-group="danger"
-      >
-        <IconButton
-          label={t('group.namedAction', {
-            groupName: group.name,
-            action: t('group.action.dissolve')
-          })}
-          tooltip={t('group.action.dissolveDescription')}
-          tone="danger"
-          surface="raised"
-          onClick={() => void data.onDissolveGroup(group)}
-        >
-          <GroupDissolveIcon />
-        </IconButton>
-      </div>
+      {moreMenu}
+      <DisclosureButton data={data} />
     </div>
   )
 }
@@ -380,10 +330,7 @@ interface DisclosureButtonProps {
 function DisclosureButton({ data }: DisclosureButtonProps) {
   const group = data.group
   const { t } = useI18n()
-  const action = group.isCollapsed ? t('group.action.expand') : t('group.action.collapse')
-  const groupAction = group.isCollapsed
-    ? t('group.action.expandGroup')
-    : t('group.action.collapseGroup')
+  const groupAction = t('group.action.collapseGroup')
 
   return (
     <TooltipLabel content={groupAction}>
@@ -395,8 +342,7 @@ function DisclosureButton({ data }: DisclosureButtonProps) {
         onPointerDown={(event) => event.stopPropagation()}
         onClick={() => void data.onToggleGroupCollapsed(group, !group.isCollapsed)}
       >
-        {group.isCollapsed ? <GroupExpandIcon /> : <GroupCollapseIcon />}
-        <span>{action}</span>
+        <GroupCollapseIcon />
       </button>
     </TooltipLabel>
   )
@@ -500,11 +446,8 @@ interface TerminalGroupMemberRowProps {
 export function TerminalGroupMemberRow({
   block,
   status,
-  statusLabel,
-  onRemove
+  statusLabel
 }: TerminalGroupMemberRowProps) {
-  const { t } = useI18n()
-
   return (
     <div className={`terminal-group-node__member terminal-group-node__member--${status}`}>
       <span className="terminal-group-node__member-status" aria-hidden="true" />
@@ -512,20 +455,6 @@ export function TerminalGroupMemberRow({
         <span className="terminal-group-node__member-name">{block.name}</span>
       </TooltipLabel>
       <span className="terminal-group-node__member-status-label">{statusLabel}</span>
-      <TooltipLabel content={t('group.action.removeMember')}>
-        <button
-          className="terminal-group-node__member-remove nodrag"
-          type="button"
-          aria-label={t('group.memberNamedAction', {
-            blockName: block.name,
-            action: t('group.action.removeMember')
-          })}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onRemove}
-        >
-          <GroupMemberUnlinkIcon />
-        </button>
-      </TooltipLabel>
     </div>
   )
 }

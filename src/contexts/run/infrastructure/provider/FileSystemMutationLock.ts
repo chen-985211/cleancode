@@ -303,7 +303,15 @@ async function recoverReclaimBarrier(
   await pruneAbandonedCandidates(options, corruptObservations)
   await moveFixedBarrierToUnique(options, options.directory)
   for (const barrier of await listUniqueReclaimBarriers(options, options.directory)) {
-    const claimed = await readLockSnapshot(options, barrier)
+    let claimed: FileSystemMutationLockSnapshot | null
+    try {
+      claimed = await readLockSnapshot(options, barrier)
+    } catch (error) {
+      if (!isTransientLockFileSystemError(error)) throw error
+      // A concurrent close can make a retiring directory temporarily unreadable
+      // on Windows. hasReclaimBarrier still blocks acquisition while it exists.
+      continue
+    }
     if (!claimed) {
       await options.fileSystem.rm(barrier, { force: true, recursive: true })
       continue

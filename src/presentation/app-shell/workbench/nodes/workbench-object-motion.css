@@ -51,7 +51,7 @@
 
 .terminal-group-node.workbench-object-motion--spatial {
   transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
-    scale(var(--workbench-object-motion-scale)) scale(var(--terminal-group-drop-scale));
+    scale(var(--workbench-object-motion-scale));
 }
 
 :is(.terminal-node-anchor, .agent-console-node):is(
@@ -69,35 +69,75 @@
   pointer-events: none;
 }
 
+.terminal-group-node.workbench-object-motion--group-collapse {
+  --terminal-group-collapsed-progress: var(--workbench-object-motion-content-opacity);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand {
+  --terminal-group-collapsed-progress: calc(1 - var(--workbench-object-motion-content-opacity));
+}
+
+.terminal-group-node.workbench-object-motion--group-reflow {
+  --terminal-group-collapsed-progress: 0;
+}
+
+.terminal-group-node:is(
+  .workbench-object-motion--group-expand,
+  .workbench-object-motion--group-collapse,
+  .workbench-object-motion--group-reflow
+) {
+  --terminal-group-shell-x: var(--workbench-object-motion-shell-x);
+  --terminal-group-shell-y: var(--workbench-object-motion-shell-y);
+  --terminal-group-material-x: calc(
+    var(--workbench-object-motion-shell-x) + var(--terminal-group-app-icon-inset) *
+      var(--terminal-group-collapsed-progress)
+  );
+  --terminal-group-material-y: calc(
+    var(--workbench-object-motion-shell-y) + var(--terminal-group-app-icon-top) *
+      var(--terminal-group-collapsed-progress)
+  );
+  --terminal-group-material-width: calc(
+    var(--workbench-object-motion-shell-width) - var(--terminal-group-app-icon-inset) * 2 *
+      var(--terminal-group-collapsed-progress)
+  );
+  --terminal-group-material-height: calc(
+    var(--workbench-object-motion-shell-height) - var(--terminal-group-app-icon-inset) * 2 *
+      var(--terminal-group-collapsed-progress)
+  );
+  --terminal-group-material-radius: calc(
+    var(--cc-canvas-node-radius) +
+      (var(--terminal-group-app-icon-radius) - var(--cc-canvas-node-radius)) *
+      var(--terminal-group-collapsed-progress)
+  );
+}
+
 .terminal-group-node:is(
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-reflow
   )
   > .terminal-group-node__material {
   inset: 0 auto auto 0;
   width: var(--workbench-object-motion-shell-width);
   height: var(--workbench-object-motion-shell-height);
-  transform: translate3d(
-    var(--workbench-object-motion-shell-x),
-    var(--workbench-object-motion-shell-y),
-    0
-  );
+  transform: translate3d(var(--terminal-group-shell-x), var(--terminal-group-shell-y), 0);
   will-change: transform, width, height;
 }
 
+/* Reveal the launcher as the same opaque shell arrives at its icon footprint. */
 .terminal-group-node.workbench-object-motion--group-collapse
-  > :not(.terminal-group-node__material) {
-  opacity: var(--workbench-object-motion-content-opacity);
+  > :not(.terminal-group-node__material, .react-flow__handle, .workbench-node-selection-veil) {
+  opacity: clamp(0, calc((var(--workbench-object-motion-content-opacity) - 0.8) * 5), 1);
 }
 
-.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
-  width: var(--workbench-object-motion-shell-width);
+.terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-reflow
+  )
+  > .terminal-group-node__header {
+  width: var(--terminal-group-material-width);
   overflow: hidden;
-  transform: translate3d(
-    var(--workbench-object-motion-shell-x),
-    var(--workbench-object-motion-shell-y),
-    0
-  );
+  transform: translate3d(var(--terminal-group-material-x), var(--terminal-group-material-y), 0);
   transition: none;
   will-change: transform, width;
 }
@@ -105,13 +145,25 @@
 .terminal-group-node.workbench-object-motion--group-expand
   > :not(
     .terminal-group-node__material,
-    .terminal-group-node__header,
-    .terminal-group-node__members--motion-exit
-  ),
-.terminal-group-node.workbench-object-motion--group-expand
-  > .terminal-group-node__header
-  > :not(.terminal-group-node__title) {
-  opacity: var(--workbench-object-motion-content-opacity);
+    .terminal-group-node__launcher-exit,
+    .terminal-group-node__members--motion-exit,
+    .workbench-node-selection-veil,
+    .react-flow__handle
+  ) {
+  opacity: clamp(0, calc((var(--workbench-object-motion-content-opacity) - 0.2) / 0.8), 1);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__empty-state {
+  inset: 58px auto auto 18px;
+  width: max(0px, calc(var(--terminal-group-material-width) - 36px));
+  height: max(0px, calc(var(--terminal-group-material-height) - 76px));
+  overflow: hidden;
+  transform: translate3d(var(--terminal-group-material-x), var(--terminal-group-material-y), 0);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__launcher-exit {
+  opacity: clamp(0, calc(1 - var(--workbench-object-motion-content-opacity) * 5), 1);
+  transform: translate3d(var(--terminal-group-shell-x), var(--terminal-group-shell-y), 0);
 }
 
 .terminal-group-node.workbench-object-motion--group-expand
@@ -139,13 +191,23 @@
   transform-origin: center;
 }
 
-.terminal-node.workbench-object-motion--group-expand > * {
+.terminal-node.workbench-object-motion--group-expand > .terminal-node__content {
   opacity: var(--workbench-object-motion-content-opacity);
 }
 
+.terminal-node.workbench-object-motion--group-reflow {
+  width: var(--workbench-object-motion-shell-width, 100%);
+  height: var(--workbench-object-motion-shell-height, 100%);
+  transform: translate3d(
+      calc(var(--workbench-object-motion-x) + var(--workbench-object-motion-shell-x, 0px)),
+      calc(var(--workbench-object-motion-y) + var(--workbench-object-motion-shell-y, 0px)),
+      0
+    )
+    scale(var(--workbench-object-motion-scale));
+  will-change: transform, width, height;
+}
+
 .terminal-node.workbench-object-motion--group-collapse {
-  visibility: hidden;
-  opacity: 0;
   pointer-events: none;
 }
 
@@ -161,6 +223,10 @@
   transform: none;
   box-shadow: var(--cc-shadow-node);
   transition: none;
+}
+
+.react-flow__node.dragging .terminal-group-node--collapsed {
+  box-shadow: none;
 }
 
 .terminal-workflow-edge {
@@ -309,8 +375,24 @@
   }
 
   .terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-reflow
+  ) {
+    --terminal-group-collapsed-progress: 0;
+    --terminal-group-shell-x: 0px;
+    --terminal-group-shell-y: 0px;
+    --terminal-group-material-x: 0px;
+    --terminal-group-material-y: 0px;
+    --terminal-group-material-width: 100%;
+    --terminal-group-material-height: 100%;
+    --terminal-group-material-radius: var(--cc-canvas-node-radius);
+  }
+
+  .terminal-group-node:is(
       .workbench-object-motion--group-expand,
-      .workbench-object-motion--group-collapse
+      .workbench-object-motion--group-collapse,
+      .workbench-object-motion--group-reflow
     )
     > .terminal-group-node__material {
     width: 100%;
@@ -318,7 +400,29 @@
     transform: none;
   }
 
+  .terminal-group-node.terminal-group-node--collapsed {
+    --terminal-group-collapsed-progress: 1;
+    --terminal-group-material-x: var(--terminal-group-app-icon-inset);
+    --terminal-group-material-y: var(--terminal-group-app-icon-top);
+    --terminal-group-material-width: var(--terminal-group-app-icon-size);
+    --terminal-group-material-height: var(--terminal-group-app-icon-size);
+    --terminal-group-material-radius: var(--terminal-group-app-icon-radius);
+  }
+
+  .terminal-group-node.workbench-object-motion--group-collapse > .terminal-group-node__launcher,
   .terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+    opacity: 1;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__launcher-exit {
+    display: none;
+  }
+
+  .terminal-group-node:is(
+      .workbench-object-motion--group-expand,
+      .workbench-object-motion--group-reflow
+    )
+    > .terminal-group-node__header {
     width: 100%;
     transform: none;
   }

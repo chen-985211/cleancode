@@ -77,6 +77,7 @@ export interface TerminalConnectionSnapshot {
 }
 
 export interface TerminalBlockSnapshot {
+  readonly isCollapsed?: boolean
   readonly id: string
   readonly type: 'terminal'
   readonly name: string
@@ -176,6 +177,7 @@ export interface CreateDefaultGraphInput {
 
 export interface CreateTerminalBlockInput {
   readonly id?: string
+  readonly isCollapsed?: boolean
   readonly name: string
   readonly description: string
   readonly launchCommand?: string
@@ -203,6 +205,7 @@ export interface ConnectTerminalBlocksInput {
 export type UpdateTerminalExecutionConfigInput = TerminalExecutionConfigSnapshot
 
 export interface ResizeTerminalBlockInput {
+  readonly isCollapsed?: boolean
   readonly position: BlockPositionSnapshot
   readonly size: Partial<TerminalBlockSizeSnapshot>
 }
@@ -231,6 +234,12 @@ export const maximumCanvasZoom = 1.6
 export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
   width: 720,
   height: 460
+}
+
+export function terminalBlockVisibleSize(
+  block: Pick<TerminalBlockSnapshot, 'size' | 'isCollapsed'>
+): TerminalBlockSizeSnapshot {
+  return block.isCollapsed ? { width: Math.min(220, block.size.width), height: 44 } : block.size
 }
 
 export const minimumTerminalBlockSize: TerminalBlockSizeSnapshot = {

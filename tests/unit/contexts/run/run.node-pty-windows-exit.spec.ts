@@ -216,12 +216,13 @@ function createPreReadyWindowsTerminalHarness() {
 
 function createBundledConptyAgentHarness() {
   const destroyInput = vi.fn()
+  const inputSocket = Object.assign(new EventEmitter(), { destroy: destroyInput })
   const disposeWorker = vi.fn()
   const listenForDrainData = vi.fn()
   const nativeKill = vi.fn()
   const agent = Object.create(WindowsPtyAgent.prototype) as {
     _conoutSocketWorker: { dispose: () => void }
-    _inSocket: { destroy: () => void }
+    _inSocket: EventEmitter & { destroy: () => void }
     _killRequested: boolean
     _outSocket: { on: (event: string, listener: () => void) => void }
     _pty: number
@@ -231,7 +232,7 @@ function createBundledConptyAgentHarness() {
     kill(): void
   }
   agent._conoutSocketWorker = { dispose: disposeWorker }
-  agent._inSocket = { destroy: destroyInput }
+  agent._inSocket = inputSocket
   agent._killRequested = false
   agent._outSocket = { on: listenForDrainData }
   agent._pty = 42
@@ -243,6 +244,7 @@ function createBundledConptyAgentHarness() {
     destroyInput,
     disposeWorker,
     kill: () => agent.kill(),
+    inputSocket,
     listenForDrainData,
     nativeKill
   }

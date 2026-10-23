@@ -75,10 +75,10 @@ describe('workbench object motion styles', () => {
       /\.terminal-node:is\(\s*\.workbench-object-motion--group-expand,\s*\.workbench-object-motion--group-collapse\s*\)/
     )
     expect(objectMotionStyles).toMatch(
-      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
+      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\.terminal-node__content/
     )
-    expect(collapsingMemberRule).toContain('visibility: hidden;')
-    expect(collapsingMemberRule).toContain('opacity: 0;')
+    expect(collapsingMemberRule).not.toContain('visibility: hidden;')
+    expect(collapsingMemberRule).not.toContain('opacity: 0;')
     expect(collapsingMemberRule).toContain('pointer-events: none;')
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
@@ -89,7 +89,7 @@ describe('workbench object motion styles', () => {
   it('morphs one group material between committed geometries while members move', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
     const expandingHeaderRule = readRule(
-      '.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header'
+      '.terminal-group-node:is(.workbench-object-motion--group-expand, .workbench-object-motion--group-reflow) > .terminal-group-node__header'
     )
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
@@ -107,16 +107,22 @@ describe('workbench object motion styles', () => {
     expect(materialRule).toContain('background: transparent;')
     expect(materialRule).not.toContain('opacity: var(--workbench-object-motion-content-opacity);')
     expect(materialRule).not.toContain('transform:')
+    expect(materialFillRule).toContain('var(--terminal-group-material-x)')
+    expect(materialFillRule).toContain('var(--terminal-group-material-y)')
+    expect(materialFillRule).toContain('width: var(--terminal-group-material-width);')
+    expect(materialFillRule).toContain('height: var(--terminal-group-material-height);')
     expect(materialFillRule).toContain('background: var(--terminal-group-surface);')
     expect(objectMotionStyles).toContain('width: var(--workbench-object-motion-shell-width);')
-    expect(objectMotionStyles).toContain('height: var(--workbench-object-motion-shell-height);')
+    expect(objectMotionStyles).toContain('var(--workbench-object-motion-shell-height) -')
+    expect(objectMotionStyles).toContain('var(--terminal-group-app-icon-inset) * 2 *')
+    expect(objectMotionStyles).toContain('var(--terminal-group-collapsed-progress)')
     expect(objectMotionStyles).toMatch(
       /translate3d\(\s*var\(--workbench-object-motion-shell-x\),\s*var\(--workbench-object-motion-shell-y\),\s*0\s*\)/
     )
     expect(objectMotionStyles).toContain('will-change: transform, width, height;')
-    expect(expandingHeaderRule).toContain('width: var(--workbench-object-motion-shell-width);')
-    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-x)')
-    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-y)')
+    expect(expandingHeaderRule).toContain('width: var(--terminal-group-material-width);')
+    expect(expandingHeaderRule).toContain('var(--terminal-group-material-x)')
+    expect(expandingHeaderRule).toContain('var(--terminal-group-material-y)')
     expect(expandingHeaderRule).toContain('will-change: transform, width;')
     expect(expandingHeaderRule).toContain('overflow: hidden;')
     expect(expandingHeaderRule).toContain('transition: none;')
@@ -127,9 +133,8 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain(
       'opacity: calc(1 - var(--workbench-object-motion-content-opacity));'
     )
-    expect(objectMotionStyles).toMatch(
-      /workbench-object-motion--group-expand[\s\S]*> \.terminal-group-node__header[\s\S]*> :not\(\.terminal-group-node__title\)/
-    )
+    expect(objectMotionStyles).toContain('.terminal-group-node__launcher-exit')
+    expect(objectMotionStyles).not.toContain('> :not(.terminal-group-node__title)')
     expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')
@@ -138,8 +143,8 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
     expect(objectMotionStyles).not.toContain('.workbench-object-motion--group-accept')
-    expect(groupRule).toContain('--terminal-group-drop-scale: 1;')
-    expect(groupRule).toContain('transform: scale(var(--terminal-group-drop-scale));')
+    expect(groupRule).not.toContain('--terminal-group-drop-scale')
+    expect(groupRule).not.toContain('transform:')
     expect(dropTargetRule).not.toContain('background:')
     expect(dropTargetRule).not.toContain('box-shadow:')
     expect(dropTargetRule).not.toMatch(/\b(border|outline|transform):/)
@@ -210,7 +215,9 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-x')
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-y')
     expect(objectMotionStyles).not.toContain('translate3d(0, -3px, 0)')
-    expect(terminalGroupStyles).toContain('.terminal-group-drop-spring--active')
+    expect(terminalGroupStyles).toContain(
+      '.terminal-group-node--drop-join > .terminal-group-node__material'
+    )
     expect(objectMotionStyles).toContain('.react-flow__node.dragging')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
     nodeRules.forEach((rule) => {
@@ -290,7 +297,13 @@ describe('workbench object motion styles', () => {
 })
 
 function readRule(selector: string): string {
-  return objectMotionStyles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+  const normalize = (value: string) =>
+    value.replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+  return (
+    normalize(objectMotionStyles)
+      .split(`${normalize(selector)} {`)[1]
+      ?.split('}')[0] ?? ''
+  )
 }
 
 function readTerminalGroupRule(selector: string): string {

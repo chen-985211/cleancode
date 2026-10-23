@@ -55,6 +55,41 @@ describe('terminal flow nodes for terminal groups', () => {
     expect(nodes[0]).toMatchObject({ id: 'development-group', type: 'terminalGroup' })
   })
 
+  it.each([false, true])(
+    'keeps one complete workflow handle accessible across a folded boundary=%s',
+    (isCollapsed) => {
+      const base = createGraph({ isCollapsed })
+      const graph = {
+        ...base,
+        terminalGroups: base.terminalGroups.map((group) => ({
+          ...group,
+          memberBlockIds: ['backend-terminal']
+        })),
+        connections: [
+          {
+            id: 'edge',
+            sourceBlockId: 'backend-terminal',
+            targetBlockId: 'frontend-terminal',
+            trigger: 'on-success' as const
+          }
+        ]
+      }
+      const nodes = createTerminalFlowNodes({
+        graph,
+        handlers: createHandlers(),
+        hoveredTerminalBlockId: null
+      })
+      const handles = nodes.filter(
+        (node) => node.type === 'terminal' && node.data.workflowDragTerminalIds
+      )
+      expect(handles).toHaveLength(1)
+      expect(handles[0]?.id).toBe(isCollapsed ? 'frontend-terminal' : 'backend-terminal')
+      expect(new Set(handles[0]?.data.workflowDragTerminalIds as readonly string[])).toEqual(
+        new Set(['backend-terminal', 'frontend-terminal'])
+      )
+    }
+  )
+
   it('can project collapsed member templates without making them visible by default', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph({ isCollapsed: true }),
@@ -73,13 +108,9 @@ describe('terminal flow nodes for terminal groups', () => {
     ])
   })
 
-  it.each([
-    { memberCount: 2, expectedHeight: 160 },
-    { memberCount: 5, expectedHeight: 268 },
-    { memberCount: 10, expectedHeight: 448 }
-  ])(
-    'sizes a collapsed terminal group for $memberCount visible member summaries',
-    ({ memberCount, expectedHeight }) => {
+  it.each([{ memberCount: 2 }, { memberCount: 5 }, { memberCount: 10 }])(
+    'keeps a collapsed application square regardless of $memberCount members',
+    ({ memberCount }) => {
       const nodes = createTerminalFlowNodes({
         graph: createGraph({ isCollapsed: true, memberCount }),
         selectedTerminalBlockIds: [],
@@ -92,7 +123,7 @@ describe('terminal flow nodes for terminal groups', () => {
       expect(nodes[0]).toMatchObject({
         id: 'development-group',
         type: 'terminalGroup',
-        style: { width: 360, height: expectedHeight }
+        style: { width: 112, height: 112 }
       })
     }
   )

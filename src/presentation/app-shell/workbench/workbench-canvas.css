@@ -196,6 +196,8 @@
 
 .react-flow__node {
   z-index: 3 !important;
+  /* React Flow owns the layout anchor; springs animate the inner surface. */
+  transition-property: none;
 }
 
 .react-flow__node-agentConsole {
@@ -210,6 +212,12 @@
   stroke: var(--cc-muted);
   stroke-width: 2;
   stroke-linecap: round;
+}
+
+.terminal-workflow-edge :is(.react-flow__edge-path, .react-flow__edge-interaction) {
+  /* Endpoints already follow the node presentation. The global reduced-motion
+     duration must not introduce an implicit CSS transition of the SVG path. */
+  transition-property: none;
 }
 
 .terminal-workflow-edge--active .react-flow__edge-path {

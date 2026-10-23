@@ -10,10 +10,10 @@ describe('terminal connection canvas scope', () => {
     terminalGroups: [{ id: 'development', memberBlockIds: ['inside-a', 'inside-b'] }]
   } as unknown as BlockGraphSnapshot
 
-  it('allows only endpoints in the same root or combination scope', () => {
+  it('allows valid endpoints across root and combination scopes', () => {
     expect(isTerminalConnectionAllowedInCanvasScope(graph, 'root-a', 'root-b', null)).toBe(true)
     expect(isTerminalConnectionAllowedInCanvasScope(graph, 'inside-a', 'inside-b', null)).toBe(true)
-    expect(isTerminalConnectionAllowedInCanvasScope(graph, 'root-a', 'inside-a', null)).toBe(false)
+    expect(isTerminalConnectionAllowedInCanvasScope(graph, 'root-a', 'inside-a', null)).toBe(true)
   })
 
   it('focuses connection creation and deletion on the combination being edited', () => {

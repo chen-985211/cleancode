@@ -7,10 +7,10 @@ export function createTerminalWorkflowEdges(
   graph: BlockGraphSnapshot | null,
   nodeStatuses: Readonly<Record<string, WorkflowRunNodeStatus>>
 ): Edge[] {
-  const collapsedMemberIds = new Set(
+  const collapsedGroupByMemberId = new Map(
     (graph?.terminalGroups ?? [])
       .filter((group) => group.isCollapsed)
-      .flatMap((group) => group.memberBlockIds)
+      .flatMap((group) => group.memberBlockIds.map((id) => [id, group.id] as const))
   )
   const expandedMemberIds = new Set(
     (graph?.terminalGroups ?? [])
@@ -19,19 +19,25 @@ export function createTerminalWorkflowEdges(
   )
 
   return (graph?.connections ?? [])
-    .filter(
-      (connection) =>
-        !collapsedMemberIds.has(connection.sourceBlockId) &&
-        !collapsedMemberIds.has(connection.targetBlockId)
-    )
+    .filter((connection) => {
+      const sourceGroup = collapsedGroupByMemberId.get(connection.sourceBlockId)
+      const targetGroup = collapsedGroupByMemberId.get(connection.targetBlockId)
+      return !sourceGroup || sourceGroup !== targetGroup
+    })
     .map((connection) => {
       const status = nodeStatuses[connection.targetBlockId]
 
       return {
         id: connection.id,
-        source: connection.sourceBlockId,
-        target: connection.targetBlockId,
-        type: 'smoothstep',
+        source: collapsedGroupByMemberId.get(connection.sourceBlockId) ?? connection.sourceBlockId,
+        target: collapsedGroupByMemberId.get(connection.targetBlockId) ?? connection.targetBlockId,
+        sourceHandle: collapsedGroupByMemberId.has(connection.sourceBlockId)
+          ? 'workflow-output'
+          : undefined,
+        targetHandle: collapsedGroupByMemberId.has(connection.targetBlockId)
+          ? 'workflow-input'
+          : undefined,
+        type: 'terminalDependency',
         className: ['terminal-workflow-edge', resolveEdgeStatusClassName(status)]
           .filter(Boolean)
           .join(' '),

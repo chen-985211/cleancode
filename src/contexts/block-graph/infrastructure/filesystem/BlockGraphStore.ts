@@ -152,6 +152,7 @@ function validateTerminalBlock(rawBlock: unknown) {
     typeof rawBlock.id !== 'string' ||
     typeof rawBlock.name !== 'string' ||
     typeof rawBlock.description !== 'string' ||
+    (rawBlock.isCollapsed !== undefined && typeof rawBlock.isCollapsed !== 'boolean') ||
     !isPosition(rawBlock.position)
   ) {
     throw new TypeError('Invalid terminal block snapshot.')

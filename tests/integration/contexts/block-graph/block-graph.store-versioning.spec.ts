@@ -90,7 +90,7 @@ describe('block graph versioned store', () => {
     })
   })
 
-  it('repairs legacy cross-space workflows on read and persists version 5 on the next transaction', async () => {
+  it('preserves legacy cross-space dependencies and membership while upgrading only on a write', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graphPath = await initializeAndFindGraphPath(
       repository,
@@ -143,7 +143,7 @@ describe('block graph versioned store', () => {
 
     expect(restored?.connections).toHaveLength(1)
     expect(restored?.terminalGroups).toEqual([
-      expect.objectContaining({ id: 'legacy-group', memberBlockIds: [] })
+      expect.objectContaining({ id: 'legacy-group', memberBlockIds: [source.id] })
     ])
     await expect(readFile(graphPath, 'utf8')).resolves.toBe(versionThreeStore)
 
@@ -156,7 +156,9 @@ describe('block graph versioned store', () => {
         connections: [
           expect.objectContaining({ sourceBlockId: source.id, targetBlockId: target.id })
         ],
-        terminalGroups: [expect.objectContaining({ id: 'legacy-group', memberBlockIds: [] })]
+        terminalGroups: [
+          expect.objectContaining({ id: 'legacy-group', memberBlockIds: [source.id] })
+        ]
       },
       version: 5
     })

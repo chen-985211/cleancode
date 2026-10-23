@@ -1,13 +1,7 @@
-import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
 import { FlowArrowIcon } from '@phosphor-icons/react/dist/csr/FlowArrow'
-import { PushPinIcon } from '@phosphor-icons/react/dist/csr/PushPin'
 import { StopIcon } from '@phosphor-icons/react/dist/csr/Stop'
 import type { Icon, IconWeight } from '@phosphor-icons/react'
 
-import type {
-  TerminalRetentionPolicy,
-  TerminalSessionKind
-} from '../../application/dto/TerminalSessionSnapshot'
 import type { WorkflowRunNodeStatus } from '../../application/dto/WorkflowRunSnapshot'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
@@ -16,35 +10,23 @@ import { WorkbenchIcon } from '../../../../presentation/shared/components/Workbe
 export interface TerminalRuntimeActionsProps {
   readonly terminalName: string
   readonly canQuickLaunch: boolean
-  readonly isRunning: boolean
   readonly isRecoveryPending: boolean
-  readonly sessionKind: TerminalSessionKind | null | undefined
-  readonly retentionPolicy: TerminalRetentionPolicy
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
   readonly onRunFromHere: () => void
   readonly onStopWorkflow: () => void
   readonly onQuickLaunch: () => void
-  readonly onStop: () => void
-  readonly onToggleRetention: () => void
-  readonly onRestart: () => void
 }
 
 export function TerminalRuntimeActions({
   terminalName,
   canQuickLaunch,
-  isRunning,
   isRecoveryPending,
-  sessionKind,
-  retentionPolicy,
   isActiveWorkflowRoot,
   isStoppingWorkflow,
   onRunFromHere,
   onStopWorkflow,
-  onQuickLaunch,
-  onStop,
-  onToggleRetention,
-  onRestart
+  onQuickLaunch
 }: TerminalRuntimeActionsProps) {
   const { t } = useI18n()
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
@@ -56,13 +38,6 @@ export function TerminalRuntimeActions({
       ? t('terminal.action.stoppingWorkflow')
       : t('terminal.action.stopWorkflow')
     : t('terminal.action.runWorkflow')
-  const isRetained = retentionPolicy === 'keep-after-application-exit'
-  const isWorkflowRetentionUnavailable = sessionKind === 'workflow'
-  const retentionActionLabel = isWorkflowRetentionUnavailable
-    ? t('terminal.retention.workflowUnavailable')
-    : isRetained
-      ? t('terminal.retention.disable')
-      : t('terminal.retention.enable')
 
   return (
     <>
@@ -122,71 +97,6 @@ export function TerminalRuntimeActions({
             data-icon="terminal-launch"
             role={canQuickLaunch ? 'launch' : 'settings'}
             size={15}
-          />
-        </button>
-      </TooltipLabel>
-      <TooltipLabel content={t('terminal.action.stopCommand')}>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName: terminalName,
-            action: t('terminal.action.stopCommand')
-          })}
-          disabled={!isRunning || isRecoveryPending}
-          onClick={onStop}
-        >
-          <TerminalRuntimeActionIcon
-            IconComponent={StopIcon}
-            dataIcon="terminal-stop-command"
-            glyph="stop"
-            role="stop"
-            size={14}
-            weight="fill"
-          />
-        </button>
-      </TooltipLabel>
-      <TooltipLabel content={retentionActionLabel}>
-        <button
-          className={`terminal-node__action terminal-node__action--retention${isRetained ? ' terminal-node__action--retention-active' : ''}`}
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName: terminalName,
-            action: retentionActionLabel
-          })}
-          aria-pressed={isRetained}
-          aria-disabled={isWorkflowRetentionUnavailable || undefined}
-          disabled={!isRunning || isRecoveryPending}
-          onClick={isWorkflowRetentionUnavailable ? undefined : onToggleRetention}
-        >
-          <TerminalRuntimeActionIcon
-            IconComponent={PushPinIcon}
-            dataIcon="terminal-retention"
-            glyph="push-pin"
-            role="retention"
-            size={14}
-            weight={isRetained ? 'fill' : 'bold'}
-          />
-        </button>
-      </TooltipLabel>
-      <TooltipLabel content={t('terminal.action.restartEmptyDescription')}>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName: terminalName,
-            action: t('terminal.action.restartEmpty')
-          })}
-          disabled={isRecoveryPending}
-          onClick={onRestart}
-        >
-          <TerminalRuntimeActionIcon
-            IconComponent={ArrowClockwiseIcon}
-            dataIcon="terminal-restart"
-            glyph="arrow-clockwise"
-            role="restart"
-            size={16}
-            weight="bold"
           />
         </button>
       </TooltipLabel>

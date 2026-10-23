@@ -14,10 +14,13 @@ export function isolateWorkbenchNodeDragChanges(
       return true
     }
 
-    if (activeDraggedNode.type === 'agentConsole') {
-      return change.id === activeDraggedNode.id
-    }
-
-    return !readAgentIdFromFlowNodeId(change.id)
+    // Inside a workflow or combination, a terminal title grabs just that terminal.
+    // Independent terminals retain intentional multi-selection / stack dragging.
+    if (
+      activeDraggedNode.type === 'terminal' &&
+      activeDraggedNode.data.isIndependentCanvasTerminal !== false
+    )
+      return !readAgentIdFromFlowNodeId(change.id)
+    return change.id === activeDraggedNode.id
   })
 }

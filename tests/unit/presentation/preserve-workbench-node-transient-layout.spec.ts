@@ -3,6 +3,95 @@ import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 
 describe('preserve workbench node transient layout', () => {
+  it.each(['refresh', 'replacement', 'layout-change', 'complete', 'suspended'] as const)(
+    'preserves the active drag-return lifecycle across %s',
+    (update) => {
+      const base = createTerminalNode({
+        position: { x: 120, y: 80 },
+        style: { width: 420, height: 306 }
+      })
+      const motion = {
+        id: 'drag-return:1:terminal-1',
+        kind: 'group-reflow' as const,
+        offset: { x: 90, y: 70 }
+      }
+      const onComplete = vi.fn()
+      const current: TerminalFlowNode = {
+        ...base,
+        data: {
+          ...base.data,
+          objectMotion: update === 'complete' ? undefined : motion,
+          onObjectMotionComplete: onComplete,
+          isObjectMotionFrozen: update === 'suspended'
+        }
+      }
+      const fresh = createTerminalNode({
+        position: update === 'layout-change' ? { x: 800, y: 80 } : base.position,
+        blockPosition: update === 'layout-change' ? { x: 800, y: 80 } : base.data.block.position,
+        style: { width: 420, height: 306 },
+        output: 'new output during release'
+      })
+      const replacement = { ...motion, id: 'new-layout', offset: { x: -40, y: 0 } }
+      const next: TerminalFlowNode = {
+        ...fresh,
+        data: { ...fresh.data, objectMotion: update === 'replacement' ? replacement : undefined }
+      }
+
+      const [projected] = preserveWorkbenchNodeTransientLayout([next], [current])
+      expect(projected!.data.objectMotion).toEqual(
+        update === 'refresh' ? motion : update === 'replacement' ? replacement : undefined
+      )
+      if (update === 'refresh') {
+        expect(projected!.data.onObjectMotionComplete).toBe(onComplete)
+        expect(projected!.data).toMatchObject({ session: { output: 'new output during release' } })
+      }
+    }
+  )
+
+  it.each([false, true])(
+    'keeps measured nodes initialized when committed layout changes, resized=%s',
+    (resized) => {
+      const current = createTerminalNode({
+        position: { x: 320, y: 240 },
+        blockPosition: { x: 120, y: 80 },
+        style: { width: 420, height: 306 },
+        measured: { width: 420, height: 306 }
+      })
+      const next = createTerminalNode({
+        position: { x: 320, y: 240 },
+        blockPosition: { x: 320, y: 240 },
+        style: resized ? { width: 560, height: 420 } : { width: 420, height: 306 },
+        blockSize: resized ? { width: 560, height: 420 } : { width: 420, height: 306 }
+      })
+      const [projected] = preserveWorkbenchNodeTransientLayout([next], [current])
+      // Translations retain valid handle measurements; a changed size must be remeasured.
+      expect(projected).toEqual(resized ? next : { ...next, measured: current.measured })
+    }
+  )
+  it('keeps a protected drag preview visible and suspended when graph facts have not changed yet', () => {
+    const next = createTerminalNode({
+      position: { x: 120, y: 80 },
+      style: { width: 420, height: 306 }
+    })
+    const current = {
+      ...next,
+      data: {
+        ...next.data,
+        isParkedInCollapsedGroup: false,
+        isObjectDragPreview: true,
+        isObjectMotionFrozen: true
+      }
+    }
+    const [projected] = preserveWorkbenchNodeTransientLayout([next], [current], new Set([next.id]))
+    expect(projected?.data).toMatchObject({
+      isParkedInCollapsedGroup: false,
+      isObjectDragPreview: true,
+      isObjectMotionFrozen: true
+    })
+    const [released] = preserveWorkbenchNodeTransientLayout([next], [current])
+    expect(released?.data.isObjectDragPreview).toBeUndefined()
+  })
+
   it('keeps current positions and sizes while refreshing node data', () => {
     const currentNode = createTerminalNode({
       position: { x: 320, y: 240 },
@@ -104,6 +193,22 @@ describe('preserve workbench node transient layout', () => {
     expect(preserveWorkbenchNodeTransientLayout([nextNode], protectedProjection)).toEqual([
       nextNode
     ])
+  })
+
+  it('uses compact geometry when disclosure changes without changing the expanded size', () => {
+    const current = createTerminalNode({
+      position: { x: 120, y: 80 },
+      style: { width: 560, height: 340 },
+      blockSize: { width: 560, height: 340 }
+    })
+    const collapsed = {
+      ...current,
+      style: { width: 300, height: 42 },
+      data: { ...current.data, block: { ...current.data.block, isCollapsed: true } }
+    }
+
+    expect(preserveWorkbenchNodeTransientLayout([collapsed], [current])).toEqual([collapsed])
+    expect(preserveWorkbenchNodeTransientLayout([current], [collapsed])).toEqual([current])
   })
 
   it('uses the next terminal group layout when the persisted group bounds change', () => {

@@ -24,7 +24,6 @@ import {
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
 } from '../support/e2eTerminal'
-import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
 import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 describe('terminal workflows e2e', () => {
@@ -44,7 +43,7 @@ describe('terminal workflows e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
-    // Compact CI geometry lets closing editors overlap neighboring connection handles.
+    // Compact CI geometry keeps fixed canvas controls close to terminal title actions.
     await page.setViewportSize({ width: 1024, height: 681 })
   }, electronLaunchTimeoutMs)
 
@@ -72,6 +71,9 @@ describe('terminal workflows e2e', () => {
         'Terminal 2',
         createE2ePrintCommand('workflow-build-complete')
       )
+      await page.getByRole('button', { name: '适应画布' }).click()
+      await waitForTerminalViewportGeometry(page, initialSessions.first)
+      await waitForTerminalViewportGeometry(page, initialSessions.second)
       await connectTerminalNodes(page)
 
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()
@@ -126,6 +128,10 @@ async function configureLaunchCommand(
   terminalName: string,
   command: string
 ): Promise<void> {
+  // Overview may place compact title actions beneath the fixed workbench toolbar.
+  // Minimap navigation also reaches terminals outside the current viewport.
+  await page.getByRole('button', { name: `聚焦终端 ${terminalName}`, exact: true }).click()
+  await waitForTerminalViewportGeometry(page, await readTerminalSessionId(page, terminalName))
   await page.getByRole('button', { name: `${terminalName} 配置启动命令` }).click()
   const input = page.getByRole('textbox', { name: '启动命令' })
   await input.fill(command)
@@ -139,21 +145,9 @@ async function connectTerminalNodes(page: Page): Promise<void> {
   const targetHandle = terminalNodeByTitle(page, 'Terminal 2').locator(
     '.terminal-node__handle--input'
   )
-  const sourceBox = await readRequiredBoundingBox(sourceHandle)
-  const targetBox = await readRequiredBoundingBox(targetHandle)
-  const sourcePoint = {
-    x: sourceBox.x + sourceBox.width - 1,
-    y: sourceBox.y + sourceBox.height / 2
-  }
-  const targetPoint = {
-    x: targetBox.x + 1,
-    y: targetBox.y + targetBox.height / 2
-  }
-
-  await page.mouse.move(sourcePoint.x, sourcePoint.y)
-  await page.mouse.down()
-  await page.mouse.move(targetPoint.x, targetPoint.y, { steps: 20 })
-  await page.mouse.up()
+  // Fit-to-canvas can resume after two identical geometry samples on a busy
+  // runner. Let locator actionability check the live handles before dragging.
+  await sourceHandle.dragTo(targetHandle, { steps: 20 })
   await page.locator('.react-flow__edge').waitFor({ state: 'attached' })
 }
 

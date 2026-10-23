@@ -55,8 +55,11 @@ export function CanvasPaneContextMenu({
     readonly pointerY: number
   } | null>(null)
 
+  const motionReady =
+    resolvedPosition?.pointerX === position.x && resolvedPosition.pointerY === position.y
+
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || !motionReady) return undefined
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
@@ -76,7 +79,7 @@ export function CanvasPaneContextMenu({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isMenuPresent, onClose, open])
+  }, [isMenuPresent, motionReady, onClose, open])
 
   useLayoutEffect(() => {
     if (open && !wasOpenRef.current) {
@@ -112,8 +115,6 @@ export function CanvasPaneContextMenu({
 
   const createTerminalLabel = t('toolbar.newTerminal')
   const groupTerminalsLabel = t('toolbar.groupTerminals')
-  const motionReady =
-    resolvedPosition?.pointerX === position.x && resolvedPosition.pointerY === position.y
 
   return createPortal(
     <CanvasNodeMenu
@@ -132,8 +133,7 @@ export function CanvasPaneContextMenu({
       onKeyDown={(event) => keepMenuItemFocused(event, menuRef.current)}
       style={{
         left: motionReady ? (resolvedPosition?.left ?? 0) : 0,
-        top: motionReady ? (resolvedPosition?.top ?? 0) : 0,
-        visibility: motionReady ? 'visible' : 'hidden'
+        top: motionReady ? (resolvedPosition?.top ?? 0) : 0
       }}
     >
       <CanvasPaneContextMenuItem

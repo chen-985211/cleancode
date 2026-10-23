@@ -22,6 +22,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
+    useUpdateNodeInternals: () => () => undefined,
     NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
@@ -115,8 +116,9 @@ describe('app shell managed terminal launch', () => {
       })
     })
 
+    await openTerminalActions()
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
+      expect(screen.getByRole('menuitem', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
     )
     expect(screen.queryByText('运行中')).not.toBeInTheDocument()
     expect(screen.queryByText('新会话')).not.toBeInTheDocument()
@@ -244,4 +246,9 @@ function createNotificationController(): AppNotificationController {
     notify: vi.fn(() => 'notification-1'),
     update: vi.fn(() => true)
   }
+}
+
+async function openTerminalActions(): Promise<void> {
+  const trigger = await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' })
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
 }

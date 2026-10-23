@@ -10,6 +10,43 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('workbench node changes', () => {
+  it.each([false, true])(
+    'keeps the group origin fixed during member resize, single=%s',
+    (single) => {
+      const graph = createGraph()
+      const nodes = createTerminalFlowNodes({
+        graph: single
+          ? {
+              ...graph,
+              blocks: graph.blocks.slice(0, 1),
+              terminalGroups: graph.terminalGroups.map((group) => ({
+                ...group,
+                memberBlockIds: ['backend-terminal']
+              }))
+            }
+          : graph,
+        hoveredTerminalBlockId: null,
+        handlers: createHandlers()
+      })
+      const before = nodes[0]!
+      const changed = applyWorkbenchNodeChanges(
+        [
+          { id: 'backend-terminal', type: 'position', position: { x: 180, y: 120 } },
+          {
+            id: 'backend-terminal',
+            type: 'dimensions',
+            dimensions: { width: 1200, height: 600 },
+            resizing: true,
+            setAttributes: true
+          }
+        ],
+        nodes
+      )
+      const group = changed[0]!
+      expect(group.position).toEqual(before.position)
+      expect(group.style!.width).toBeGreaterThan(1200 - (before.position.x - 180))
+    }
+  )
   it('moves terminal group members while the group node is being dragged', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph(),
@@ -36,7 +73,7 @@ describe('workbench node changes', () => {
     ])
   })
 
-  it('updates the expanded terminal group shell while a member terminal is dragged', () => {
+  it('freezes the expanded group shell while a member terminal is dragged', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph(),
       selectedTerminalGroupId: 'development-group',
@@ -59,7 +96,7 @@ describe('workbench node changes', () => {
       expect.objectContaining({
         id: 'development-group',
         position: { x: 288, y: 164 },
-        style: { width: 1284, height: 458 }
+        style: { width: 984, height: 458 }
       }),
       expect.objectContaining({ id: 'backend-terminal', position: { x: 320, y: 240 } }),
       expect.objectContaining({ id: 'frontend-terminal', position: { x: 1120, y: 240 } })
@@ -96,6 +133,22 @@ describe('workbench node changes', () => {
       expect.objectContaining({ id: 'backend-terminal', position: { x: 320, y: 240 } }),
       expect.objectContaining({ id: 'frontend-terminal', position: { x: 1120, y: 240 } })
     ])
+  })
+
+  it('does not let observer measurements overwrite committed group bounds during disclosure or dragging', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph(),
+      handlers: createHandlers(),
+      hoveredTerminalBlockId: null
+    }).map((node) =>
+      node.id === 'frontend-terminal' ? { ...node, position: { x: 1520, y: 900 } } : node
+    )
+    const before = nodes.find((node) => node.type === 'terminalGroup')!
+    const changed = applyWorkbenchNodeChanges(
+      [{ id: 'frontend-terminal', type: 'dimensions', dimensions: { width: 420, height: 306 } }],
+      nodes
+    )
+    expect(changed.find((node) => node.type === 'terminalGroup')).toEqual(before)
   })
 
   it('keeps the committed group shell fixed while workflow members are entering', () => {

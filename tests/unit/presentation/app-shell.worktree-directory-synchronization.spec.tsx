@@ -19,6 +19,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
+    useUpdateNodeInternals: () => () => undefined,
     NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
@@ -100,7 +101,8 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    await openTerminalActions()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
     await waitFor(() =>
@@ -143,7 +145,8 @@ describe('app shell worktree directory synchronization', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    await openTerminalActions()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
     await waitFor(() => expect(onTerminalWorkingDirectoryChanged).toHaveBeenCalledOnce())
 
     act(() => {
@@ -209,7 +212,8 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    await openTerminalActions()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() =>
       expect(createTerminalBlock).toHaveBeenCalledWith({
@@ -232,7 +236,8 @@ describe('app shell worktree directory synchronization', () => {
       })
     )
     await screen.findByText('/tmp/alpha-project-worktrees/feature-sidebar')
-    await screen.findByRole('button', { name: 'Terminal 1 停止当前命令' })
+    await openTerminalActions()
+    await screen.findByRole('menuitem', { name: 'Terminal 1 停止当前命令' })
   })
 
   it('keeps a manually selected workspace when an existing terminal cwd still points at a worktree', async () => {
@@ -272,7 +277,8 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    await openTerminalActions()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
@@ -443,4 +449,9 @@ function createTerminalWorkingDirectorySnapshot(sessionId: string, workingDirect
 
 async function waitForStableWorkspaceSelectionWindow(): Promise<void> {
   await new Promise((resolve) => window.setTimeout(resolve, 1700))
+}
+
+async function openTerminalActions(): Promise<void> {
+  const trigger = await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' })
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
 }

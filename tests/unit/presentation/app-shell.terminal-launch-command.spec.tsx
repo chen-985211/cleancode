@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ComponentType, ReactNode } from 'react'
-
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -22,6 +21,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
+    useUpdateNodeInternals: () => () => undefined,
     NodeResizeControl: () => null,
     Panel: ({
       children,
@@ -267,8 +267,9 @@ describe('app shell terminal launch command', () => {
     fireEvent.click(quickLaunchButton)
     await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     fireEvent.click(
-      await screen.findByRole('button', {
+      await screen.findByRole('menuitemcheckbox', {
         name: 'Terminal 1 应用退出后继续运行此会话'
       })
     )
@@ -289,9 +290,10 @@ describe('app shell terminal launch command', () => {
       })
     )
     expect(setTerminalRetention).toHaveBeenCalledTimes(2)
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     expect(
-      screen.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' })
-    ).toHaveAttribute('aria-pressed', 'true')
+      screen.getByRole('menuitemcheckbox', { name: 'Terminal 1 应用退出后不再保留此会话' })
+    ).toHaveAttribute('aria-checked', 'true')
   })
 
   it('keeps a new quick launch running when inherited retention cannot be checkpointed', async () => {
@@ -328,8 +330,9 @@ describe('app shell terminal launch command', () => {
     })
     fireEvent.click(quickLaunchButton)
     await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     fireEvent.click(
-      await screen.findByRole('button', {
+      await screen.findByRole('menuitemcheckbox', {
         name: 'Terminal 1 应用退出后继续运行此会话'
       })
     )
@@ -343,12 +346,13 @@ describe('app shell terminal launch command', () => {
       title: '无法更新会话保留设置',
       message: '会话保留设置未能更新。'
     })
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
+      expect(screen.getByRole('menuitem', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
     )
     expect(
-      screen.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' })
-    ).toHaveAttribute('aria-pressed', 'false')
+      screen.getByRole('menuitemcheckbox', { name: 'Terminal 1 应用退出后继续运行此会话' })
+    ).toHaveAttribute('aria-checked', 'false')
   })
 
   it('clears the previous visible output when quick launching a replacement session', async () => {
@@ -441,7 +445,8 @@ describe('app shell terminal launch command', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
 
     expect(emitTerminalOutput).toEqual(expect.any(Function))
@@ -459,7 +464,8 @@ describe('app shell terminal launch command', () => {
       expect(screen.getByLabelText('Terminal 1 文本输出')).toHaveTextContent('restart-stale-output')
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(2))
     await waitFor(() =>
@@ -497,7 +503,8 @@ describe('app shell terminal launch command', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() =>
       expect(screen.getByLabelText('Terminal 1 文本输出')).toHaveTextContent('early-shell-prompt')
@@ -519,7 +526,8 @@ describe('app shell terminal launch command', () => {
 
     render(<AppShell />)
 
-    const restartButton = await screen.findByRole('button', {
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
+    const restartButton = await screen.findByRole('menuitem', {
       name: 'Terminal 1 重开空终端会话'
     })
     fireEvent.click(restartButton)

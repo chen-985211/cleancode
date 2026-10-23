@@ -70,7 +70,7 @@ describe('balanced terminal layout', () => {
     })
   })
 
-  it('packs small execution units together instead of stretching a wide combination vertically', () => {
+  it('keeps the fixed left aligned group rows when arranging the combination', () => {
     const graph = createGraph()
     createTerminal(graph, 'interactive-shell', 0)
     createTerminal(graph, 'local-build', 320)
@@ -99,15 +99,15 @@ describe('balanced terminal layout', () => {
     })
 
     expect(readPositions(graph)).toEqual({
-      'build-app': { x: 1_680, y: 332 },
-      'check-app': { x: 1_196, y: 332 },
-      'interactive-shell': { x: 1_438, y: 28 },
-      'local-build': { x: 1_922, y: 28 },
-      'start-app': { x: 2_164, y: 332 }
+      'build-app': { x: 1_680, y: 484 },
+      'check-app': { x: 1_196, y: 484 },
+      'interactive-shell': { x: 1_196, y: -124 },
+      'local-build': { x: 1_196, y: 180 },
+      'start-app': { x: 2_164, y: 484 }
     })
     expect(graph.terminalGroups[0]).toMatchObject({
-      position: { x: 1_164, y: -48 },
-      size: { height: 696, width: 1_452 }
+      position: { x: 1_164, y: -200 },
+      size: { height: 1000, width: 1_452 }
     })
   })
 })

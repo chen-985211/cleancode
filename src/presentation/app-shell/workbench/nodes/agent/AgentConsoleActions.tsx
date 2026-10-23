@@ -53,10 +53,15 @@ export function AgentConsoleActions({
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
   const menuId = `agent-actions-menu-${agent.agentId}`
 
-  useEffect(() => {
-    if (mode !== 'menu') return undefined
+  const motionReady = menuPosition !== null
 
-    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+  useLayoutEffect(() => {
+    if (mode === 'menu' && motionReady)
+      menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+  }, [isMenuPresent, mode, motionReady])
+
+  useEffect(() => {
+    if (mode !== 'menu' || !motionReady) return undefined
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
       const target = event.target as Node
@@ -76,7 +81,7 @@ export function AgentConsoleActions({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isMenuPresent, mode])
+  }, [isMenuPresent, mode, motionReady])
 
   useLayoutEffect(() => {
     if (mode !== 'menu') return undefined
@@ -240,7 +245,7 @@ export function AgentConsoleActions({
           }}
           id={menuId}
           menuId={menuId}
-          motionReady={menuPosition !== null}
+          motionReady={motionReady}
           open={mode === 'menu'}
           role="menu"
           aria-label={t('agent.actions', { agentName: agent.name })}
@@ -259,8 +264,7 @@ export function AgentConsoleActions({
           ref={menuRef}
           style={{
             left: menuPosition?.left ?? 0,
-            top: menuPosition?.top ?? 0,
-            visibility: menuPosition ? 'visible' : 'hidden'
+            top: menuPosition?.top ?? 0
           }}
         >
           <CanvasMenuItem

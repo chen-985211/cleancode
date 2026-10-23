@@ -10,11 +10,34 @@ import {
 } from '../../../../src/contexts/block-graph/presentation/components/TerminalGroupCard'
 
 describe('terminal group card', () => {
+  it('retains a passive launcher identity only while expansion is being presented', () => {
+    const data = createData()
+    const { container, rerender } = render(
+      <TerminalGroupCard data={data} isExpanding renderMoreMenu={() => null} />
+    )
+    const identity = container.querySelector('.terminal-group-node__launcher-exit')
+    expect(identity).toHaveAttribute('aria-hidden', 'true')
+    expect(identity).toHaveTextContent(data.group.name)
+    expect(identity!.querySelector('[data-icon-role="terminal-group"]')).not.toBeNull()
+    expect(identity!.querySelector('button, [tabindex]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /展开组合/ })).not.toBeInTheDocument()
+    fireEvent.click(identity!)
+    expect(data.onToggleGroupCollapsed).not.toHaveBeenCalled()
+    rerender(<TerminalGroupCard data={data} renderMoreMenu={() => null} />)
+    expect(container.querySelector('.terminal-group-node__launcher-exit')).toBeNull()
+  })
+
   it('owns group metadata editing and publishes the trimmed name', async () => {
     const onUpdateGroupMetadata = vi.fn(async () => undefined)
-    render(<TerminalGroupCard data={createData({ onUpdateGroupMetadata })} memberRows={null} />)
+    render(
+      <TerminalGroupCard
+        data={createData({ onUpdateGroupMetadata })}
+        memberRows={null}
+        renderMoreMenu={(onRename) => <button onClick={onRename}>重命名组合</button>}
+      />
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 重命名组合' }))
+    fireEvent.click(screen.getByRole('button', { name: '重命名组合' }))
     fireEvent.change(screen.getByRole('textbox', { name: '组合名称' }), {
       target: { value: '  新组合  ' }
     })
@@ -29,16 +52,22 @@ describe('terminal group card', () => {
   it('publishes runtime and structure intents without owning their execution', () => {
     const onStartGroup = vi.fn()
     const onEditGroup = vi.fn()
-    render(<TerminalGroupCard data={createData({ onEditGroup, onStartGroup })} memberRows={null} />)
+    render(
+      <TerminalGroupCard
+        data={createData({ onEditGroup, onStartGroup })}
+        memberRows={null}
+        renderMoreMenu={(onRename) => <button onClick={onRename}>重命名组合</button>}
+      />
+    )
 
     fireEvent.click(screen.getByRole('button', { name: '启动项目 启动组合命令' }))
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 管理组合内容' }))
+    expect(screen.queryByRole('button', { name: '启动项目 管理组合内容' })).not.toBeInTheDocument()
 
     expect(onStartGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development' }))
-    expect(onEditGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development' }))
+    expect(onEditGroup).not.toHaveBeenCalled()
   })
 
-  it('renders an injected runtime status while owning the membership removal intent', () => {
+  it('renders a member summary without a second membership removal control', () => {
     const onRemove = vi.fn()
     render(
       <TerminalGroupMemberRow
@@ -50,8 +79,8 @@ describe('terminal group card', () => {
     )
 
     expect(screen.getByText('运行中')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'API 移出组合' }))
-    expect(onRemove).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'API 移出组合' })).not.toBeInTheDocument()
+    expect(onRemove).not.toHaveBeenCalled()
   })
 })
 

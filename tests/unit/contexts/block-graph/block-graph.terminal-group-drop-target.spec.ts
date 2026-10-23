@@ -2,6 +2,37 @@ import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/ap
 import { resolveTerminalGroupDropAction } from '../../../../src/contexts/block-graph/presentation/view-models/terminalGroupDropTarget'
 
 describe('terminal group drop target', () => {
+  it('finds any group without an editing mode, including a collapsed group', () => {
+    const group = { ...createGroupNode(), id: 'other', style: { width: 360, height: 100 } }
+    expect(
+      resolveTerminalGroupDropAction({
+        graph: createGraph(),
+        draggedNode: createTerminalNode('worker', { x: 190, y: 80 }),
+        nodes: [{ ...createGroupNode(), position: { x: -1000, y: -1000 } }, group]
+      })
+    ).toEqual({ type: 'join-group', terminalGroupId: 'other' })
+  })
+
+  it('keeps the previous target in the edge hysteresis band', () => {
+    const previousAction = { type: 'join-group' as const, terminalGroupId: 'development' }
+    expect(
+      resolveTerminalGroupDropAction({
+        graph: createGraph(),
+        draggedNode: createTerminalNode('worker', { x: 855, y: 100 }),
+        nodes: [createGroupNode()],
+        previousAction
+      })
+    ).toEqual(previousAction)
+    expect(
+      resolveTerminalGroupDropAction({
+        graph: createGraph(),
+        draggedNode: createTerminalNode('worker', { x: 890, y: 100 }),
+        nodes: [createGroupNode()],
+        previousAction
+      })
+    ).toEqual({ type: 'none' })
+  })
+
   it('joins an ungrouped terminal whose center enters the edited group', () => {
     expect(
       resolveTerminalGroupDropAction({

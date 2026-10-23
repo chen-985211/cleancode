@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/workbench/nodes/agent/agentToolApprovalTypes'
@@ -10,12 +10,55 @@ import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 describe('Agent connection approval location', () => {
   beforeEach(() => {
     stubReducedMotionPreference()
+    const canvas = document.createElement('div')
+    canvas.className = 'react-flow'
+    canvas.getBoundingClientRect = () => new DOMRect(280, 0, 1000, 800)
+    Object.defineProperties(canvas, { clientWidth: { value: 1000 }, clientHeight: { value: 800 } })
+    document.body.append(canvas)
   })
 
   afterEach(() => {
+    document.body.replaceChildren()
     vi.unstubAllGlobals()
     Object.defineProperty(window, 'cleancode', { configurable: true, value: undefined })
   })
+
+  it.each([1.3, 0.96])(
+    'locates approval targets with stable readable zoom and safe-area centering: %s',
+    (zoom) => {
+      for (const rect of [new DOMRect(300, 0, 180, 220), new DOMRect(600, 700, 300, 50)]) {
+        const chrome = document.createElement('div')
+        chrome.setAttribute('data-workbench-canvas-obstruction', '')
+        chrome.getBoundingClientRect = () => rect
+        document.body.append(chrome)
+      }
+      const setViewport = vi.fn<(viewport: Viewport) => Promise<boolean>>(async () => true)
+      const instance = {
+        getNode: (id: string) => createFlowNode(id),
+        getNodesBounds: () => ({ x: 1700, y: 600, width: 240, height: 100 }),
+        getViewport: () => ({ x: 0, y: 0, zoom }),
+        setViewport
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+      const { result } = renderHook(() =>
+        useAgentToolApprovals({
+          graph,
+          projectDirectory: '/repo/app',
+          reactFlowInstanceRef: { current: instance },
+          setCurrentGraph: vi.fn(),
+          workspaceId: 'main'
+        })
+      )
+      act(() => result.current.locate(connectionApproval))
+      const viewport = setViewport.mock.calls[0]![0] as unknown as {
+        x: number
+        y: number
+        zoom: number
+      }
+      expect(viewport.zoom).toBeCloseTo(zoom)
+      expect(viewport.x + 1820 * viewport.zoom).toBeCloseTo(500)
+      expect(viewport.y + 650 * viewport.zoom).toBeCloseTo(460)
+    }
+  )
 
   it('fits the Agent and both visible connection endpoints without changing selection', () => {
     const visibleNodes = new Map([
@@ -25,7 +68,7 @@ describe('Agent connection approval location', () => {
     ])
     const getNode = vi.fn((nodeId: string) => visibleNodes.get(nodeId))
     const getNodesBounds = vi.fn(() => ({ height: 400, width: 800, x: 40, y: 40 }))
-    const setViewport = vi.fn(async () => true)
+    const setViewport = vi.fn<(viewport: Viewport) => Promise<boolean>>(async () => true)
     const reactFlowInstance = {
       getNode,
       getNodesBounds,

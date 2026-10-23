@@ -50,7 +50,6 @@
 }
 
 .terminal-group-node__action {
-  --terminal-group-icon-cutout: var(--terminal-group-control);
   position: relative;
   display: inline-flex;
   width: 39px;
@@ -93,14 +92,12 @@
 }
 
 .terminal-group-node__action:hover:not(:disabled) {
-  --terminal-group-icon-cutout: var(--terminal-group-control-hover);
   background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
 
 .terminal-group-node__action[aria-pressed='true'] {
-  --terminal-group-icon-cutout: var(--cc-terminal-control-active);
   background: var(--cc-terminal-control-active);
   color: var(--cc-terminal-control-foreground);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-foreground) inset;
@@ -108,7 +105,6 @@
 
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
-  --terminal-group-icon-cutout: var(--cc-terminal-control-pressed);
   transform: translateY(1px);
   background: var(--cc-terminal-control-pressed);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
@@ -251,19 +247,31 @@
 
 .terminal-group-node__toolbar--inline .terminal-group-node__disclosure {
   height: 28px;
-  min-width: 54px;
-  padding: 0 7px;
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
   font-size: 10.5px;
 }
 
-.terminal-group-icon__cutout {
-  fill: var(--terminal-group-icon-cutout);
-  stroke: var(--terminal-group-icon-cutout);
+.terminal-group-node__toolbar--inline {
+  gap: 3px;
 }
 
-.terminal-group-icon__disconnect-accent {
-  fill: var(--cc-danger);
-  stroke: var(--cc-danger);
+.terminal-group-node__drop-hint {
+  position: absolute;
+  z-index: 4;
+  top: 100%;
+  left: 50%;
+  margin-top: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 @keyframes terminal-group-saving-spin {

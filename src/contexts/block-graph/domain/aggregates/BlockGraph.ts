@@ -24,17 +24,21 @@ import {
 } from './BlockGraphTypes'
 import {
   analyzeTerminalGroupMemberSelection,
-  createTerminalGroupBounds,
+  minimumTerminalGroupSize,
   expandTerminalGroupMemberIdsToCompleteWorkflows,
   normalizeTerminalGroupBounds,
-  normalizeTerminalGroups,
-  normalizeRequestedTerminalGroupSize
+  normalizeTerminalGroups
 } from '../services/TerminalGroupRules'
-import { applyTerminalGroupMembershipMove } from '../services/TerminalGroupMemberLayout'
 import {
-  assertTerminalConnectionWithinOneScope,
-  migrateCrossScopeWorkflowComponentsToRoot
-} from '../services/TerminalConnectionScopeRules'
+  applyTerminalGroupMembershipMove,
+  createTerminalGroupLayout,
+  layoutTerminalGroups
+} from '../services/TerminalGroupMemberLayout'
+import { resizedTerminalBlock, terminalExpansionSize } from '../services/TerminalExpansionSize'
+import {
+  expandTerminalGroupLayout,
+  reflowTerminalDisclosure
+} from '../services/TerminalDisclosureLayout'
 import {
   applyTerminalGroupLayoutPlan,
   applyTerminalLayoutPlan,
@@ -66,7 +70,7 @@ import {
   createTerminalGroupId
 } from '../services/BlockGraphIdentifiers'
 import type { BlockTemplateSnapshot, InstantiatedBlockTemplateSnapshot } from './BlockTemplateTypes'
-import { normalizeBlockTemplate } from '../services/BlockTemplateProjection'
+import { instantiateBlockTemplate } from '../services/BlockTemplateInstantiation'
 import {
   createEmptyQuickExecutionSlots,
   normalizeQuickExecutionTarget,
@@ -86,6 +90,7 @@ export {
   minimumCanvasZoom,
   minimumTerminalBlockSize
 } from './BlockGraphTypes'
+export { terminalBlockVisibleSize } from './BlockGraphTypes'
 export { defaultTerminalGroupSize } from '../services/TerminalGroupRules'
 export type {
   ArrangeTerminalLayoutInput,
@@ -120,24 +125,26 @@ export class BlockGraph {
   }
 
   static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
-    const blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
+    let blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
     const connections = normalizeRestoredTerminalConnections(snapshot.connections, blocks)
+    blocks = blocks.map((block) => ({ ...block, size: terminalExpansionSize(block, connections) }))
     const groups = normalizeTerminalGroups(
       snapshot.terminalGroups,
       blocks,
       connections,
       createTerminalGroupId
     )
-    const scopeMigration = migrateCrossScopeWorkflowComponentsToRoot(groups, connections)
+
+    const layout = layoutTerminalGroups(groups, blocks, connections, 'preserve-valid')
 
     return new BlockGraph(
       snapshot.id,
       snapshot.projectId,
       snapshot.workspaceId,
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
-      blocks,
+      layout.blocks,
       connections,
-      [...scopeMigration.terminalGroups],
+      layout.groups,
       restoreQuickExecutionSlots(snapshot.quickExecutionSlots),
       new BlockTemplateApplications(snapshot.templateApplications)
     )
@@ -221,7 +228,8 @@ export class BlockGraph {
         successExitCodes: [...defaultTerminalExecutionConfig.successExitCodes]
       },
       position: input.position,
-      size: normalizeTerminalBlockSize(input.size)
+      size: normalizeTerminalBlockSize(input.size),
+      ...(input.isCollapsed === undefined ? {} : { isCollapsed: input.isCollapsed })
     }
 
     this.blockSnapshots = [...this.blockSnapshots, block]
@@ -248,52 +256,7 @@ export class BlockGraph {
       return this.templateApplications.apply(operationId, sourceTemplate, () =>
         this.instantiateBlockTemplate(sourceTemplate, origin)
       )
-    const template = normalizeBlockTemplate(sourceTemplate)
-    const blockIdByTemplateNodeId = new Map<string, string>()
-
-    for (const node of template.nodes) {
-      const block = this.createTerminalBlock({
-        name: node.name,
-        description: node.description,
-        launchCommand: node.launchCommand,
-        position: {
-          x: origin.x + node.position.x,
-          y: origin.y + node.position.y
-        },
-        size: node.size
-      })
-      this.updateTerminalDefinition(block.id, {
-        name: node.name,
-        description: node.description,
-        launchCommand: node.launchCommand,
-        executionConfig: node.executionConfig
-      })
-      blockIdByTemplateNodeId.set(node.templateNodeId, block.id)
-    }
-
-    for (const connection of template.connections) {
-      this.connectTerminalBlocks({
-        sourceBlockId: blockIdByTemplateNodeId.get(connection.sourceTemplateNodeId)!,
-        targetBlockId: blockIdByTemplateNodeId.get(connection.targetTemplateNodeId)!
-      })
-    }
-
-    const blockIds = template.nodes.map((node) => blockIdByTemplateNodeId.get(node.templateNodeId)!)
-    const terminalGroup =
-      template.type === 'combination'
-        ? this.createTerminalGroup({ name: template.name, memberBlockIds: blockIds })
-        : null
-
-    return Object.freeze({
-      blockIds: Object.freeze(blockIds),
-      terminalGroupId: terminalGroup?.id ?? null,
-      executionScope: terminalGroup
-        ? Object.freeze({
-            terminalGroupId: terminalGroup.id,
-            type: 'terminal-group' as const
-          })
-        : Object.freeze({ blockIds: Object.freeze([...blockIds]), type: 'block-set' as const })
-    })
+    return instantiateBlockTemplate(this, sourceTemplate, origin)
   }
 
   moveBlock(blockId: string, position: BlockPositionSnapshot): void {
@@ -323,24 +286,28 @@ export class BlockGraph {
   }
 
   resizeTerminalBlock(blockId: string, input: ResizeTerminalBlockInput): void {
-    let hasUpdatedBlock = false
-    const size = normalizeTerminalBlockSize(input.size)
+    const previousBlock = this.requireTerminalBlock(blockId)
+    const resized = resizedTerminalBlock(previousBlock, input, this.terminalConnectionSnapshots)
+    this.blockSnapshots = this.blockSnapshots.map((block) =>
+      block.id === blockId ? resized : block
+    )
 
-    this.blockSnapshots = this.blockSnapshots.map((block) => {
-      if (block.id !== blockId) {
-        return block
-      }
-
-      hasUpdatedBlock = true
-
-      return { ...block, position: input.position, size }
-    })
-
-    if (!hasUpdatedBlock) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    if (
+      (input.isCollapsed !== undefined &&
+        Boolean(previousBlock.isCollapsed) !== input.isCollapsed) ||
+      this.terminalGroupSnapshots.some((group) => group.memberBlockIds.includes(blockId))
+    ) {
+      const layout = reflowTerminalDisclosure(
+        blockId,
+        this.blockSnapshots,
+        this.terminalGroupSnapshots,
+        this.terminalConnectionSnapshots
+      )
+      this.blockSnapshots = layout.blocks
+      this.terminalGroupSnapshots = layout.groups
+    } else {
+      this.normalizeGroupsContainingBlock(blockId)
     }
-
-    this.normalizeGroupsContainingBlock(blockId)
   }
 
   updateTerminalBlockMetadata(blockId: string, input: UpdateTerminalBlockMetadataInput): void {
@@ -370,11 +337,6 @@ export class BlockGraph {
   }
 
   connectTerminalBlocks(input: ConnectTerminalBlocksInput): TerminalConnectionSnapshot {
-    assertTerminalConnectionWithinOneScope(
-      input.sourceBlockId,
-      input.targetBlockId,
-      this.terminalGroupSnapshots
-    )
     const result = addTerminalConnection(
       this.blockSnapshots,
       this.terminalConnectionSnapshots,
@@ -382,14 +344,23 @@ export class BlockGraph {
       createTerminalConnectionId
     )
     this.terminalConnectionSnapshots = [...result.connections]
+    this.blockSnapshots = this.blockSnapshots.map((block) => ({
+      ...block,
+      size: terminalExpansionSize(block, this.terminalConnectionSnapshots)
+    }))
+    this.reflowTerminalGroups([input.sourceBlockId, input.targetBlockId])
 
     return result.connection
   }
 
   disconnectTerminalBlocks(connectionId: string): void {
+    const connection = this.terminalConnectionSnapshots.find((edge) => edge.id === connectionId)
     this.terminalConnectionSnapshots = [
       ...removeTerminalConnection(this.terminalConnectionSnapshots, connectionId)
     ]
+    this.reflowTerminalGroups(
+      connection ? [connection.sourceBlockId, connection.targetBlockId] : []
+    )
   }
 
   deleteBlock(blockId: string): void {
@@ -408,30 +379,36 @@ export class BlockGraph {
   deleteBlocks(blockIds: readonly string[]): void {
     const deletedBlockIds = new Set(blockIds)
     for (const blockId of deletedBlockIds) this.requireTerminalBlock(blockId)
+    const affectedMembers = this.terminalGroupSnapshots
+      .filter((group) => group.memberBlockIds.some((id) => deletedBlockIds.has(id)))
+      .flatMap((group) => group.memberBlockIds)
     this.blockSnapshots = this.blockSnapshots.filter((block) => !deletedBlockIds.has(block.id))
     this.terminalConnectionSnapshots = this.terminalConnectionSnapshots.filter(
       (connection) =>
         !deletedBlockIds.has(connection.sourceBlockId) &&
         !deletedBlockIds.has(connection.targetBlockId)
     )
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
-      normalizeTerminalGroupBounds(
-        {
-          ...group,
-          memberBlockIds: group.memberBlockIds.filter(
-            (memberBlockId) => !deletedBlockIds.has(memberBlockId)
-          )
-        },
-        this.blockSnapshots
-      )
-    )
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
+      const memberBlockIds = group.memberBlockIds.filter((id) => !deletedBlockIds.has(id))
+      return {
+        ...group,
+        memberBlockIds,
+        ...(group.memberBlockIds.length > 0 && memberBlockIds.length === 0
+          ? { size: minimumTerminalGroupSize }
+          : {})
+      }
+    })
+    this.reflowTerminalGroups(affectedMembers)
   }
 
   ensureTerminalBlockExists(blockId: string): void {
     this.requireTerminalBlock(blockId)
   }
 
-  createTerminalGroup(input: CreateTerminalGroupInput): TerminalGroupSnapshot {
+  createTerminalGroup(
+    input: CreateTerminalGroupInput,
+    memberLayout: 'flow-rows' | 'preserve' = 'flow-rows'
+  ): TerminalGroupSnapshot {
     const name = input.name.trim()
 
     if (!name) {
@@ -453,28 +430,15 @@ export class BlockGraph {
     }
     this.ensureTerminalGroupMembersAreAvailable(memberBlockIds)
 
-    const derivedBounds = createTerminalGroupBounds(memberBlockIds, this.blockSnapshots)
-    const initialPosition = input.position ?? derivedBounds.position
-    const initialSize = input.size
-      ? normalizeRequestedTerminalGroupSize(input.size)
-      : derivedBounds.size
-
-    const group = normalizeTerminalGroupBounds(
-      {
-        id: input.id ?? createTerminalGroupId(),
-        type: 'terminal-group',
-        name,
-        position: initialPosition,
-        size: initialSize,
-        isCollapsed: false,
-        memberBlockIds
-      },
-      this.blockSnapshots
+    const layout = createTerminalGroupLayout(
+      { ...input, id: input.id ?? createTerminalGroupId(), name, memberBlockIds },
+      this.blockSnapshots,
+      this.terminalConnectionSnapshots,
+      memberLayout
     )
-
-    this.terminalGroupSnapshots = [...this.terminalGroupSnapshots, group]
-
-    return group
+    this.blockSnapshots = layout.blocks
+    this.terminalGroupSnapshots = [...this.terminalGroupSnapshots, layout.group]
+    return layout.group
   }
 
   updateTerminalGroupMetadata(
@@ -508,21 +472,15 @@ export class BlockGraph {
   }
 
   setTerminalGroupCollapsed(terminalGroupId: string, isCollapsed: boolean): void {
-    let hasUpdatedGroup = false
-
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
-      if (group.id !== terminalGroupId) {
-        return group
-      }
-
-      hasUpdatedGroup = true
-
-      return { ...group, isCollapsed }
-    })
-
-    if (!hasUpdatedGroup) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
-    }
+    if (Boolean(this.requireTerminalGroup(terminalGroupId).isCollapsed) === isCollapsed) return
+    const group = { ...this.requireTerminalGroup(terminalGroupId), isCollapsed }
+    const layout = isCollapsed
+      ? { blocks: this.blockSnapshots, group }
+      : expandTerminalGroupLayout(group, this.blockSnapshots, this.terminalConnectionSnapshots)
+    this.blockSnapshots = layout.blocks
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((candidate) =>
+      candidate.id === terminalGroupId ? layout.group : candidate
+    )
   }
 
   moveTerminalGroup(terminalGroupId: string, position: BlockPositionSnapshot): void {
@@ -567,28 +525,32 @@ export class BlockGraph {
   moveTerminalWorkflowToGroup(
     blockId: string,
     terminalGroupId: string | null,
-    position?: BlockPositionSnapshot
-  ): void {
+    position?: BlockPositionSnapshot,
+    scope?: 'terminal' | 'workflow',
+    expectedBlockIds?: readonly string[]
+  ): readonly string[] {
     this.requireTerminalBlock(blockId)
     if (terminalGroupId) this.requireTerminalGroup(terminalGroupId)
 
     const movedBlockIds = new Set(
-      expandTerminalGroupMemberIdsToCompleteWorkflows(
-        this.blockSnapshots,
-        this.terminalConnectionSnapshots,
-        [blockId]
-      )
+      scope === 'terminal'
+        ? [blockId]
+        : expandTerminalGroupMemberIdsToCompleteWorkflows(
+            this.blockSnapshots,
+            this.terminalConnectionSnapshots,
+            [blockId]
+          )
     )
     const sourceGroup = this.findTerminalGroupByBlockId(blockId)
-
-    for (const movedBlockId of movedBlockIds) {
-      const currentGroup = this.findTerminalGroupByBlockId(movedBlockId)
-      if ((currentGroup?.id ?? null) !== (sourceGroup?.id ?? null)) {
-        throw createExpectedAppError(
-          'TERMINAL_SCOPE_MOVE_STALE',
-          'Terminal workflow scope changed before it could be moved.'
-        )
-      }
+    if (
+      expectedBlockIds &&
+      (new Set(expectedBlockIds).size !== movedBlockIds.size ||
+        expectedBlockIds.some((id) => !movedBlockIds.has(id)))
+    ) {
+      throw createExpectedAppError(
+        'TERMINAL_SCOPE_MOVE_STALE',
+        'Terminal workflow scope changed before it could be moved.'
+      )
     }
 
     const result = applyTerminalGroupMembershipMove({
@@ -603,6 +565,7 @@ export class BlockGraph {
     })
     this.blockSnapshots = result.blocks
     this.terminalGroupSnapshots = result.groups
+    return Object.freeze([...movedBlockIds])
   }
 
   dissolveTerminalGroup(terminalGroupId: string): void {
@@ -646,6 +609,21 @@ export class BlockGraph {
         )
       }
     }
+  }
+
+  private reflowTerminalGroups(affectedBlockIds: readonly string[]): void {
+    const groups = this.terminalGroupSnapshots.filter((group) =>
+      group.memberBlockIds.some((id) => affectedBlockIds.includes(id))
+    )
+    const layout = layoutTerminalGroups(
+      groups,
+      this.blockSnapshots,
+      this.terminalConnectionSnapshots
+    )
+    this.blockSnapshots = layout.blocks
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map(
+      (group) => layout.groups.find((updated) => updated.id === group.id) ?? group
+    )
   }
 
   private requireTerminalBlock(blockId: string): TerminalBlockSnapshot {

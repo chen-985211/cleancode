@@ -1,13 +1,8 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Fragment, memo, useCallback } from 'react'
+import { Fragment, memo } from 'react'
 
-import type { TerminalBlockSnapshot } from '../../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  TerminalGroupCard,
-  TerminalGroupMemberRow
-} from '../../../../../contexts/block-graph/presentation/components/TerminalGroupCard'
-import { useTerminalGroupDropSpring } from '../../../../../contexts/block-graph/presentation/motion/useTerminalGroupDropSpring'
-import { useTerminalState } from '../../../../../contexts/run/presentation/view-models/terminalStateStore'
+import { TerminalGroupCard } from '../../../../../contexts/block-graph/presentation/components/TerminalGroupCard'
+import { TerminalGroupMoreMenu } from './TerminalGroupMoreMenu'
 import { useI18n } from '../../../../i18n/useI18n'
 import {
   agentApprovalConnectionSourceHandleId,
@@ -24,16 +19,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const { t } = useI18n()
   const objectMotion = useWorkbenchObjectMotionPresentation(
     data.objectMotion,
-    data.onObjectMotionComplete
-  )
-  const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback)
-  const objectMotionSurfaceRef = objectMotion.surfaceRef
-  const motionSurfaceRef = useCallback(
-    (surface: HTMLElement | null) => {
-      dropSpringSurfaceRef(surface)
-      objectMotionSurfaceRef(surface)
-    },
-    [dropSpringSurfaceRef, objectMotionSurfaceRef]
+    data.onObjectMotionComplete,
+    data.isObjectMotionFrozen
   )
   const isPending = data.objectPresence?.phase === 'pending'
   const surfaceClassName = [
@@ -47,11 +34,32 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   return (
     <TerminalGroupCard
       data={data}
+      renderMoreMenu={(onRename) => (
+        <TerminalGroupMoreMenu
+          name={data.group.name}
+          onRename={onRename}
+          onDissolve={() => void data.onDissolveGroup(data.group)}
+        />
+      )}
+      isExpanding={objectMotion.kind === 'group-expand'}
       isContextSelected={data.isContextSelected}
-      isExpanding={data.objectMotion?.kind === 'group-expand'}
       isPending={isPending}
       leadingContent={
         <Fragment>
+          <Handle
+            id="workflow-input"
+            className="terminal-node__handle terminal-node__handle--input"
+            type="target"
+            position={Position.Left}
+            isConnectable={false}
+          />
+          <Handle
+            id="workflow-output"
+            className="terminal-node__handle terminal-node__handle--output"
+            type="source"
+            position={Position.Right}
+            isConnectable={false}
+          />
           <Handle
             id={agentApprovalConnectionSourceHandleId}
             className="agent-approval-intent-handle agent-approval-connection-handle--source"
@@ -80,42 +88,15 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           ) : null}
         </Fragment>
       }
-      memberRows={data.memberBlocks.map((block) => (
-        <TerminalGroupMemberRowAdapter key={block.id} block={block} data={data} />
-      ))}
       selectionContent={
         !data.isEditing && (data.isSelected || data.isContextSelected) ? (
           <WorkbenchNodeSelectionVeil />
         ) : null
       }
       surfaceClassName={surfaceClassName}
-      surfaceRef={motionSurfaceRef}
+      surfaceRef={objectMotion.surfaceRef}
       surfaceStyle={objectMotion.style}
       onSurfaceAnimationEnd={objectMotion.onAnimationEnd}
     />
   )
 })
-
-function TerminalGroupMemberRowAdapter({
-  block,
-  data
-}: {
-  readonly block: TerminalBlockSnapshot
-  readonly data: TerminalGroupFlowNode['data']
-}) {
-  const { t } = useI18n()
-  const status = useTerminalState(
-    data.terminalStateStore,
-    block.id,
-    data.memberStates[block.id]
-  ).status
-
-  return (
-    <TerminalGroupMemberRow
-      block={block}
-      status={status}
-      statusLabel={t(`terminal.status.${status}`)}
-      onRemove={() => void data.onRemoveTerminalFromGroup(data.group, block)}
-    />
-  )
-}

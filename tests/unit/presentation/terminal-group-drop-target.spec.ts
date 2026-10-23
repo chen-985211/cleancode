@@ -77,7 +77,7 @@ describe('terminal group drop target', () => {
     })
   })
 
-  it('uses persisted group bounds when deciding whether a member leaves the group', () => {
+  it('uses the captured displayed group bounds when deciding whether a member leaves the group', () => {
     const action = resolveTerminalGroupDropAction({
       graph: createGraph({
         memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
@@ -96,10 +96,7 @@ describe('terminal group drop target', () => {
       ]
     })
 
-    expect(action).toEqual({
-      type: 'leave-group',
-      terminalGroupId: 'development-group'
-    })
+    expect(action).toEqual({ type: 'none' })
   })
 
   it('updates only the affected group and reuses an unchanged preview snapshot', () => {

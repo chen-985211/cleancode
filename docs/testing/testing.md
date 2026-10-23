@@ -149,13 +149,29 @@ pnpm test:e2e:smoke
 | Ubuntu 24.04 | node-pty + POSIX PTY/shell   | 与 macOS 相同，并使用 Linux `/proc` 证明监听 PID 和进程祖先关系                              |
 | Windows 2025 | node-pty + ConPTY/PowerShell | 全量静态与低层测试、构建、npm `.cmd` CLI、`Ctrl+C`、退出码、端口所有权和外层 PowerShell 可写 |
 
-[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过可复用的构建和分片测试流程，在每个平台分别构建一次原生产物，再运行该平台三个独立 shard，共九个完整 E2E 任务。入口 workflow 显式连接每个平台自己的 build 与 E2E，不等待其他平台的构建矩阵；Windows packaged smoke 只在入口定义一次并依赖 Windows build，Linux/macOS 流程不声明 Windows 专用任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，三个 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+[Electron E2E workflow](../../.github/workflows/e2e.yml) 通过可复用的构建和分片测试流程，在每个平台分别构建一次原生产物，再运行 Linux 4、macOS 6、Windows 6 个独立 shard，共 16 个完整 E2E 任务。入口 workflow 显式连接每个平台自己的 build 与 E2E，不等待其他平台的构建矩阵；Windows packaged smoke 只在入口定义一次并依赖 Windows build，Linux/macOS 流程不声明 Windows 专用任务。Windows build job 额外准备一份与当前平台、架构、Electron 和 `node-pty` 版本精确匹配的 native artifact，各 Windows shard 恢复后必须重新执行 Electron native probe，不得各自重复编译。Windows packaged terminal 与 Provider smoke 使用同一份已验证产物在独立 job 中打包，并与源码 E2E shards 并行；它们仍是必需验收，不能被完整 shard 替代。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
 
 ## 测试耗时与分片
 
 Vitest 命令保留标准控制台结果，并把 JSON 报告写入被 Git 忽略的 `test-results/timings/`。`pnpm report:test-timings` 输出最慢文件、通过/失败/跳过数量和栅格阶段耗时；CI 无论成功或失败都上传各 runner 的报告，保留 14 天。文件耗时可能包含 hooks，不能把并行文件时长相加当作墙钟耗时。性能判断需要同时比较首轮失败率、整体墙钟时间和 runner 总分钟数，不允许靠自动 retry 或删除测试改善数字。
 
 E2E 分片由 `tests/support/e2eSequencer.ts` 使用同一份平台历史样本 `tests/fixtures/e2eDurations.json` 确定性分配。历史记录只提供耗时权重；测试集合始终来自 Vitest 实际发现结果。新文件使用历史中位数估算，已删除文件不得复活，输入顺序不影响分配，分片并集必须完整且无重复。更新权重时记录来源 commit/run，不能从未审查的远程 cache 直接决定测试是否执行。`test-shard-assignment.spec.ts` 覆盖多种分片数、未知文件、失效权重、输入顺序和完整当前套件。
+
+当前耗时权重来自完整通过的 `39841679402`（commit `ec7b2681`）。Linux 与 macOS 保持 4 / 6 片；Windows 从 8 片收敛到 6 片，按该轮文件耗时估算每片执行约 195–199 秒，以 2–4 分钟测试执行时间为目标。安装、下载与恢复产物另计，不承诺完整 job 在 4 分钟内；实际耗时仍需原生 CI 验证。Windows contract/unit 与 native integration 继续各保留两片，不能通过合并分片掩盖文件锁或资源清理竞态。入口 workflow 传入各平台连续的一基分片索引，执行命令的总数取该 matrix 的实际 job 总数，避免索引与分母分别维护。每个 runner 内保持串行，平台间共享的只有不可变构建产物；允许 runner 全并发，但实际排队仍受 GitHub 配额和平台容量限制。增加 runner 会增加安装与准备开销，验收同时看墙钟时间和 runner 总分钟数。
+
+### 画布交互回归分层
+
+参数矩阵优先由低层 owner 测试承担；完整应用保留真实指针、焦点、渲染和持久化边界的代表性场景。下沉覆盖后才精简重复参数，不通过 skip 或放宽断言压缩时长：
+
+| 行为                           | 低层覆盖                                                                                                                                                                                     | 保留的 Electron 主路径                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 快捷栏目标、组合状态和聚焦范围 | `quick-execution-focus.spec.ts`、`quick-execution-actions.spec.tsx`、`block-graph.quick-execution-bar.presentation.spec.tsx`                                                                 | 折叠组合连续聚焦、窄窗口完整目标可见、真实拖拽不移动画布对象；另保留命令执行与编辑焦点流程       |
+| 标题选择与拖动                 | `workbench-node-selection.interactions.spec.tsx` 覆盖三种对象 × 三种选择状态                                                                                                                 | 每种对象保留点击阈值边界、已选中另一节点时拖动及真实键盘输入；不在 E2E 重复完整选择矩阵          |
+| 终端连线、展开和组合几何       | `terminal-dependency-edge.spec.tsx`、`terminal-edge-motion-geometry.spec.ts`、`workbench-object-spring*.spec.ts`、`workbench-group-member-motion.spec.ts`、BlockGraph disclosure/layout 测试 | 非整数缩放下实际拖动、resize、连线附着、展开中拖动、快速反向与无重叠帧；WebGL 保留多成员压力场景 |
+
+箭头方向与连接端点的参数矩阵直接验证生产 SVG 组件，真实 SVG 附着继续由 resize 场景覆盖。纯几何、主题或缩放参数不应各自再启动一份完整应用。真实 PTY、Provider 恢复、工作区切换、端口治理、应用退出和安装包路径继续保留 E2E。
+
+成功场景直接关闭 Playwright Electron context，由其终止追踪并释放临时资源；不额外等待一轮无须保存的 trace flush。失败场景仍在关闭前有界导出追踪、截图和诊断，真实进程退出与 Provider 清理仍独立验证，不能吞掉关闭失败。
 
 栅格测试保留 DPR × ESM/CJS × zoom/raster/theme/columns 的全部参数和同一个像素断言。`terminalRasterBrowser` 分别记录模块加载、准备、渲染事件、下一帧和像素读取耗时。默认使用屏幕外非激活窗口；`CLEANCODE_RASTER_WINDOW_MODE=hidden` 仅用于定向诊断旧隐藏窗口调度。窗口配置不构成性能或可见性证据，仍须在三个原生平台检查完成结果和实际耗时。
 
@@ -280,7 +296,7 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 代表性覆盖正常退出重开、renderer/main/Provider 故障和多终端自然退出。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入、精确会话身份和可写 live/只读 history 交互的组合；永久关闭、项目清理、工作流保留限制、启动锁回收、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
 
-单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 必须在 macOS、Linux 和 Windows 分别生成该系统的不可变 `out` 和 Electron runtime artifact；同一系统的三个 shard 共享对应 artifact，不能跨系统复用 Electron 或 `node-pty` 产物。Windows `node-pty` cache key 必须覆盖架构、lockfile、补丁、Electron builder 配置和 native 准备/验证脚本，不得使用宽泛 restore key；build job 导出的 run-scoped native artifact 必须携带平台、架构、Electron 和 `node-pty` 版本 manifest，消费者恢复后删除 fallback 并通过真实 Electron probe 才能启动测试或打包。分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
+单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 必须在 macOS、Linux 和 Windows 分别生成该系统的不可变 `out` 和 Electron runtime artifact；同一系统的全部 shard 共享对应 artifact，不能跨系统复用 Electron 或 `node-pty` 产物。Windows `node-pty` cache key 必须覆盖架构、lockfile、补丁、Electron builder 配置和 native 准备/验证脚本，不得使用宽泛 restore key；build job 导出的 run-scoped native artifact 必须携带平台、架构、Electron 和 `node-pty` 版本 manifest，消费者恢复后删除 fallback 并通过真实 Electron probe 才能启动测试或打包。分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
 
 `pnpm test:e2e:smoke` 只运行带 `smoke` 标签的关键路径；`pnpm test:e2e` 运行完整套件。两者默认使用屏幕外非激活的真实 Electron `BrowserWindow`，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux CI 使用 Xvfb 提供显示服务器。跨平台终端场景必须使用 `tests/support/e2eTerminal.ts` 的平台 shell、PATH 和 Node 命令生成器，不得在通用 spec 中直接写 `/bin/sh`、`printf`、`pwd` 或 Unix shebang 假设。
 

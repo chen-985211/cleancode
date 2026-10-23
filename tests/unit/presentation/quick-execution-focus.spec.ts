@@ -1,17 +1,128 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
+import { motionPreferenceStore } from '../../../src/presentation/shared/motion/motionPreference'
 
 import type { TerminalGroupSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { focusQuickExecutionTargetInCanvas } from '../../../src/presentation/app-shell/workbench/viewport/quickExecutionFocus'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
+import {
+  cancelWorkbenchViewportMotion,
+  setWorkbenchViewportReducedMotion,
+  transitionWorkbenchViewport
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('quick execution canvas focus', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    vi.spyOn(motionPreferenceStore, 'getSnapshot').mockReturnValue(true)
+    const canvas = document.createElement('div')
+    canvas.className = 'react-flow'
+    document.body.append(canvas)
   })
 
   afterEach(() => {
+    cancelWorkbenchViewportMotion()
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    document.body.replaceChildren()
   })
+
+  it('inherits the pending focus zoom instead of a temporary mid-flight zoom', () => {
+    vi.spyOn(motionPreferenceStore, 'getSnapshot').mockReturnValue(false)
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    const setViewport = vi.fn(async () => true)
+    const instance = {
+      getNode: (id: string) => createNode(id, 'terminal'),
+      getNodesBounds: () => ({ x: 1700, y: 600, width: 240, height: 100 }),
+      getViewport: () => ({ x: 0, y: 0, zoom: 0.8 }),
+      setViewport
+    } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    void transitionWorkbenchViewport(instance, {
+      type: 'center',
+      center: { x: 2000, y: 700 },
+      zoom: 1.6,
+      intent: { type: 'adaptive-focus', canvasSize: { width: 1024, height: 768 } }
+    })
+    focusQuickExecutionTargetInCanvas({
+      instance,
+      target: { type: 'workflow', terminalBlockIds: ['terminal-1', 'terminal-2'] },
+      terminalGroups: []
+    })
+    setWorkbenchViewportReducedMotion(true, instance)
+    expect(setViewport).toHaveBeenLastCalledWith(expect.objectContaining({ zoom: 1.6 }), {
+      duration: 0
+    })
+  })
+
+  it.each([
+    { type: 'terminal' as const, terminalBlockId: 'terminal-1' },
+    { type: 'workflow' as const, terminalBlockIds: ['terminal-1', 'terminal-2'] },
+    { type: 'combination' as const, terminalGroupId: 'combination-1' }
+  ])('uses the directional focus zoom policy for a compact $type', (target) => {
+    for (const [currentZoom, expectedZoom] of [
+      [1.6, 1.6],
+      [0.96, 0.96],
+      [0.5, 1]
+    ]) {
+      const setViewport = vi.fn(async () => true)
+      const instance = {
+        getNode: (id: string) => createNode(id, 'terminal'),
+        getNodesBounds: () => ({ x: 1700, y: 600, width: 240, height: 100 }),
+        getViewport: () => ({ x: 0, y: 0, zoom: currentZoom }),
+        setViewport
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+      focusQuickExecutionTargetInCanvas({ instance, target, terminalGroups: [] })
+      expect(setViewport).toHaveBeenCalledWith(expect.objectContaining({ zoom: expectedZoom }), {
+        duration: 0
+      })
+    }
+  })
+
+  it.each([
+    { type: 'terminal' as const, terminalBlockId: 'terminal-1' },
+    { type: 'workflow' as const, terminalBlockIds: ['terminal-1', 'terminal-2'] },
+    { type: 'combination' as const, terminalGroupId: 'combination-1' }
+  ])(
+    'centers the complete $type inside the visible safe viewport at different window sizes',
+    (target) => {
+      for (const width of [1000, 1900]) {
+        document.body.replaceChildren()
+        const canvas = document.createElement('div')
+        canvas.className = 'react-flow'
+        canvas.getBoundingClientRect = () => new DOMRect(280, 0, width, 900)
+        Object.defineProperties(canvas, {
+          clientWidth: { value: width },
+          clientHeight: { value: 900 }
+        })
+        document.body.append(canvas)
+        for (const rect of [new DOMRect(300, 0, 180, 220), new DOMRect(600, 800, 300, 50)]) {
+          const obstruction = document.createElement('div')
+          obstruction.setAttribute('data-workbench-canvas-obstruction', '')
+          obstruction.getBoundingClientRect = () => rect
+          document.body.append(obstruction)
+        }
+        const bounds = { x: 1700, y: -600, width: 900, height: 400 }
+        const setViewport = vi.fn<(viewport: Viewport) => Promise<boolean>>(async () => true)
+        const instance = {
+          getNode: (id: string) =>
+            createNode(id, id === 'combination-1' ? 'terminalGroup' : 'terminal'),
+          getNodesBounds: () => bounds,
+          getViewport: () => ({ x: -200, y: 40, zoom: 0.5 }),
+          setViewport
+        } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+        expect(focusQuickExecutionTargetInCanvas({ instance, target, terminalGroups: [] })).toBe(
+          true
+        )
+        const viewport = setViewport.mock.calls[0]![0] as { x: number; y: number; zoom: number }
+        const left = bounds.x * viewport.zoom + viewport.x
+        const top = bounds.y * viewport.zoom + viewport.y
+        expect(Math.abs(left + (bounds.width * viewport.zoom) / 2 - width / 2)).toBeLessThan(2)
+        expect(Math.abs(top + (bounds.height * viewport.zoom) / 2 - 510)).toBeLessThan(2)
+        expect(left).toBeGreaterThanOrEqual(24)
+        expect(left + bounds.width * viewport.zoom).toBeLessThanOrEqual(width - 24)
+        expect(top).toBeGreaterThanOrEqual(244)
+        expect(top + bounds.height * viewport.zoom).toBeLessThanOrEqual(776)
+      }
+    }
+  )
 
   it.each([
     {
@@ -129,6 +240,27 @@ describe('quick execution canvas focus', () => {
     ).toBe(false)
     expect(setViewport).not.toHaveBeenCalled()
   })
+
+  it.each(['hidden', 'empty', 'unmounted'] as const)(
+    'leaves the viewport alone when the focus target is %s',
+    (state) => {
+      if (state === 'unmounted') document.body.replaceChildren()
+      const setViewport = vi.fn(async () => true)
+      const instance = {
+        getNode: (id: string) => ({ ...createNode(id, 'terminal'), hidden: state === 'hidden' }),
+        getNodesBounds: vi.fn(),
+        setViewport
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+      expect(
+        focusQuickExecutionTargetInCanvas({
+          instance,
+          target: { type: 'workflow', terminalBlockIds: state === 'empty' ? [] : ['terminal-1'] },
+          terminalGroups: []
+        })
+      ).toBe(false)
+      expect(setViewport).not.toHaveBeenCalled()
+    }
+  )
 })
 
 function createNode(id: string, type: 'terminal' | 'terminalGroup'): WorkbenchFlowNode {
@@ -154,20 +286,4 @@ function createTerminalGroup(
     size: { height: 100, width: 120 },
     type: 'terminal-group'
   }
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }

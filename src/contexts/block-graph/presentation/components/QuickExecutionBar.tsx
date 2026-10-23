@@ -221,6 +221,7 @@ export function QuickExecutionBar({
     }
     const returnFromInvalidDrop = (event: globalThis.DragEvent): void => {
       if (!draggedNumberRef.current || isQuickExecutionDropTarget(event.target)) return
+      if (event.target instanceof Element && event.target.closest('.react-flow')) return
       event.preventDefault()
       event.stopPropagation()
       returnReorderFromDocument()
@@ -374,6 +375,7 @@ export function QuickExecutionBar({
         .filter(Boolean)
         .join(' ')}
       data-quick-execution-bar
+      data-quick-execution-arranging={isArranging || undefined}
       style={{
         width:
           draggedNumber !== null || returnAnimation || clearAnimation ? dragRowWidth : undefined

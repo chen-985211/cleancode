@@ -61,38 +61,50 @@ describe('block graph terminal container IPC contract', () => {
     expect(ipcMain.hasHandler('cleancode:remove-terminal-from-group')).toBe(false)
   })
 
-  it.each([null, 'development'])(
-    'moves one complete workflow to target group %s',
-    async (target) => {
-      const ipcMain = new FakeIpcMain()
-      const moveTerminalWorkflowToGroup = vi.fn(async () => createGraphSnapshot())
-      registerBlockGraphIpcHandlers({
-        ipcMain,
-        logger: silentLogger,
-        moveTerminalWorkflowToGroup
-      } as unknown as BlockGraphIpcHandlersInput)
-      const command = {
-        blockId: 'terminal-1',
-        position: { x: 640, y: 420 },
-        projectDirectory: '/repo/app',
-        targetTerminalGroupId: target,
-        workspaceId: 'main'
-      }
-
-      await expect(
-        ipcMain.invoke<BlockGraphSnapshot>('cleancode:move-terminal-workflow-to-group', command)
-      ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
-      expect(moveTerminalWorkflowToGroup).toHaveBeenCalledWith(command)
-
-      await expect(
-        ipcMain.invoke('cleancode:move-terminal-workflow-to-group', {
-          ...command,
-          position: undefined
-        })
-      ).resolves.toMatchObject({ error: { code: 'INVALID_IPC_COMMAND' }, ok: false })
-      expect(moveTerminalWorkflowToGroup).toHaveBeenCalledTimes(1)
+  it.each(
+    [null, 'development'].flatMap((target) =>
+      [undefined, 'terminal', 'workflow'].map((scope) => ({ target, scope }))
+    )
+  )('moves the explicit $scope scope to target group $target', async ({ target, scope }) => {
+    const ipcMain = new FakeIpcMain()
+    const moveTerminalWorkflowToGroup = vi.fn(async () => createGraphSnapshot())
+    registerBlockGraphIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      moveTerminalWorkflowToGroup
+    } as unknown as BlockGraphIpcHandlersInput)
+    const command = {
+      blockId: 'terminal-1',
+      position: { x: 640, y: 420 },
+      projectDirectory: '/repo/app',
+      targetTerminalGroupId: target,
+      workspaceId: 'main',
+      ...(scope ? { scope } : {}),
+      ...(scope === 'workflow' ? { expectedBlockIds: ['terminal-1', 'terminal-2'] } : {})
     }
-  )
+
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:move-terminal-workflow-to-group', command)
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+    expect(moveTerminalWorkflowToGroup).toHaveBeenCalledWith(command)
+
+    await expect(
+      ipcMain.invoke('cleancode:move-terminal-workflow-to-group', {
+        ...command,
+        position: undefined
+      })
+    ).resolves.toMatchObject({ error: { code: 'INVALID_IPC_COMMAND' }, ok: false })
+    await expect(
+      ipcMain.invoke('cleancode:move-terminal-workflow-to-group', {
+        ...command,
+        expectedBlockIds: ['terminal-1', 'terminal-1']
+      })
+    ).resolves.toMatchObject({ ok: false, error: { code: 'INVALID_IPC_COMMAND' } })
+    expect(moveTerminalWorkflowToGroup).toHaveBeenCalledTimes(1)
+    await expect(
+      ipcMain.invoke('cleancode:move-terminal-workflow-to-group', { ...command, scope: 'unknown' })
+    ).resolves.toMatchObject({ ok: false, error: { code: 'INVALID_IPC_COMMAND' } })
+  })
 })
 
 class FakeIpcMain implements IpcMainLike {

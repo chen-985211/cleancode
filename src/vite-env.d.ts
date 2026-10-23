@@ -383,6 +383,8 @@ declare global {
       moveTerminalWorkflowToGroup(command: {
         readonly projectDirectory: string
         readonly workspaceId: string
+        readonly scope?: 'terminal' | 'workflow'
+        readonly expectedBlockIds?: readonly string[]
         readonly blockId: string
         readonly targetTerminalGroupId: string | null
         readonly position: BlockPositionSnapshot
@@ -397,6 +399,7 @@ declare global {
         readonly workspaceId: string
         readonly blockId: string
         readonly position: BlockPositionSnapshot
+        readonly isCollapsed?: boolean
         readonly size: TerminalBlockSizeSnapshot
       }): Promise<BlockGraphSnapshot>
       updateGraphViewport(command: {

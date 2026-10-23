@@ -7,7 +7,6 @@
 }
 
 .terminal-group-node {
-  --terminal-group-drop-scale: 1;
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);
   --terminal-group-surface: var(--cc-terminal-shell);
@@ -16,6 +15,16 @@
   --terminal-group-control-hover: var(--cc-terminal-control-hover);
   --terminal-group-foreground: var(--cc-foreground);
   --terminal-group-muted: var(--cc-muted);
+  --terminal-group-collapsed-progress: 0;
+  --terminal-group-app-icon-size: 64px;
+  --terminal-group-app-icon-top: 2px;
+  --terminal-group-app-icon-inset: 24px;
+  --terminal-group-material-x: 0px;
+  --terminal-group-material-y: 0px;
+  --terminal-group-material-width: 100%;
+  --terminal-group-material-height: 100%;
+  --terminal-group-material-radius: var(--cc-canvas-node-radius);
+  --terminal-group-app-icon-radius: 16px;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -28,12 +37,7 @@
   border: 0;
   border-radius: var(--cc-canvas-node-radius);
   background: transparent;
-  transform: scale(var(--terminal-group-drop-scale));
   transform-origin: center;
-}
-
-.terminal-group-drop-spring--active {
-  will-change: transform;
 }
 
 .terminal-group-node::after {
@@ -48,26 +52,41 @@
   transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-enter);
 }
 
+/* Keep the measured footprint separate from its single painted surface. */
 .terminal-group-node__material {
   position: absolute;
   z-index: 0;
   inset: 0;
-  border-radius: var(--cc-canvas-node-radius);
   background: transparent;
-  box-shadow:
-    0 3px 8px var(--cc-shadow-color),
-    0 16px 32px var(--cc-shadow-color),
-    0 0 0 1px var(--terminal-group-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset;
   pointer-events: none;
 }
 
 .terminal-group-node__material::before {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  inset: 0 auto auto 0;
+  width: var(--terminal-group-material-width);
+  height: var(--terminal-group-material-height);
+  transform: translate3d(
+    calc(var(--terminal-group-material-x) - var(--terminal-group-shell-x, 0px)),
+    calc(var(--terminal-group-material-y) - var(--terminal-group-shell-y, 0px)),
+    0
+  );
+  border-radius: var(--terminal-group-material-radius);
   background: var(--terminal-group-surface);
+  box-shadow:
+    0 calc(3px - 2px * var(--terminal-group-collapsed-progress))
+      calc(8px - 6px * var(--terminal-group-collapsed-progress)) var(--cc-shadow-color),
+    0 calc(16px - 12px * var(--terminal-group-collapsed-progress))
+      calc(32px - 22px * var(--terminal-group-collapsed-progress)) var(--cc-shadow-color),
+    0 0 0 1px var(--terminal-group-border) inset,
+    0 calc(1px - 1px * var(--terminal-group-collapsed-progress)) 0 var(--cc-neutral-overlay) inset;
   content: '';
+}
+
+.terminal-group-node > .react-flow__handle {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .terminal-group-node__empty-state {
@@ -133,12 +152,100 @@
   box-sizing: border-box;
   border-radius: var(--cc-canvas-node-radius) var(--cc-canvas-node-radius) 0 0;
   padding: 6px 12px 6px 15px;
-  background: var(--terminal-group-surface);
+  background: transparent;
   overflow: visible;
 }
 
 .terminal-group-node__header--editing {
   box-shadow: 0 -2px 0 var(--cc-primary-border) inset;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__header {
+  height: 100%;
+  flex: 1 1 auto;
+  border-radius: 0;
+  padding: var(--terminal-group-app-icon-top) 6px 0;
+  background: transparent;
+}
+
+.terminal-group-node__launcher,
+.terminal-group-node__launcher-exit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  font: inherit;
+  outline: none;
+}
+
+.terminal-group-node__launcher-exit {
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto auto 0;
+  width: calc(var(--terminal-group-app-icon-size) + var(--terminal-group-app-icon-inset) * 2);
+  box-sizing: border-box;
+  padding: var(--terminal-group-app-icon-top) 6px 0;
+  pointer-events: none;
+}
+
+.terminal-group-node__expand-icon {
+  display: inline-flex;
+  width: var(--terminal-group-app-icon-size);
+  height: var(--terminal-group-app-icon-size);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--terminal-group-app-icon-radius);
+  padding: 8px;
+  background: transparent;
+  color: var(--terminal-group-muted);
+  transition: color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.terminal-group-node__launcher:hover .terminal-group-node__expand-icon,
+.terminal-group-node__launcher:active .terminal-group-node__expand-icon {
+  color: var(--terminal-group-foreground);
+}
+
+.terminal-group-node--collapsed:has(.terminal-group-node__launcher:hover)
+  > .terminal-group-node__material::before {
+  background: var(--terminal-group-control-hover);
+}
+
+.terminal-group-node__launcher:focus-visible .terminal-group-node__expand-icon {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+
+.terminal-group-node__identity-icon {
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+
+.terminal-group-node--collapsed .terminal-group-node__name,
+.terminal-group-node__launcher-exit .terminal-group-node__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.terminal-group-node--collapsed {
+  --terminal-group-collapsed-progress: 1;
+  --terminal-group-material-x: var(--terminal-group-app-icon-inset);
+  --terminal-group-material-y: var(--terminal-group-app-icon-top);
+  --terminal-group-material-width: var(--terminal-group-app-icon-size);
+  --terminal-group-material-height: var(--terminal-group-app-icon-size);
+  --terminal-group-material-radius: var(--terminal-group-app-icon-radius);
 }
 
 .terminal-group-node__title {
@@ -373,4 +480,14 @@
     0 0 0 2px var(--cc-primary-ring),
     0 0 0 1px var(--cc-primary-border) inset,
     0 1px 2px var(--cc-shadow-color);
+}
+
+.terminal-group-node--drop-join > .terminal-group-node__material::before,
+.terminal-group-node--drop-leave > .terminal-group-node__material::before {
+  outline: 2px solid var(--cc-primary-border);
+  outline-offset: 3px;
+}
+
+.terminal-group-node--drop-leave > .terminal-group-node__material::before {
+  outline-style: dashed;
 }

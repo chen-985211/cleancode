@@ -8,6 +8,8 @@ export interface MoveTerminalWorkflowToGroupCommand {
   readonly canvasRegions?: readonly TerminalLayoutRegion[]
   readonly projectDirectory: string
   readonly workspaceId: string
+  readonly scope?: 'terminal' | 'workflow'
+  readonly expectedBlockIds?: readonly string[]
   readonly blockId: string
   readonly targetTerminalGroupId: string | null
   readonly position?: { readonly x: number; readonly y: number }
@@ -21,16 +23,17 @@ export class MoveTerminalWorkflowToGroupUseCase {
       this.graphRepository,
       command,
       (graph) => {
-        const before = graph.toSnapshot()
-        graph.moveTerminalWorkflowToGroup(
+        const movedBlockIds = graph.moveTerminalWorkflowToGroup(
           command.blockId,
           command.targetTerminalGroupId,
-          command.position
+          command.position,
+          command.scope,
+          command.expectedBlockIds
         )
         if (command.canvasRegions) {
           assertTerminalGroupMembershipMoveFitsCanvas({
             after: graph.toSnapshot(),
-            before,
+            movedBlockIds,
             canvasRegions: command.canvasRegions,
             targetTerminalGroupId: command.targetTerminalGroupId
           })

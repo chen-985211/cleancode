@@ -10,7 +10,6 @@ import { useI18n } from '../../i18n/useI18n'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 
 interface UseAppShellBlockActionsInput {
-  readonly beginTerminalGroupSelection?: (groupId: string) => void
   readonly canCreateTerminalGroup?: boolean
   readonly completeTerminalGroupSelection?: () => void
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -23,7 +22,7 @@ interface UseAppShellBlockActionsInput {
 }
 
 export function useAppShellBlockActions({
-  beginTerminalGroupSelection,
+  setSelectedTerminalGroupId,
   currentWorkbench,
   currentWorkspace,
   notifications,
@@ -54,9 +53,9 @@ export function useAppShellBlockActions({
       const createdGroupId = graphSnapshot.terminalGroups.find(
         (group) => !existingGroupIds.has(group.id)
       )?.id
-      if (createdGroupId) beginTerminalGroupSelection?.(createdGroupId)
+      if (createdGroupId) setSelectedTerminalGroupId?.(createdGroupId)
     },
-    [beginTerminalGroupSelection, currentWorkbench, currentWorkspace, setCurrentGraph, t]
+    [setSelectedTerminalGroupId, currentWorkbench, currentWorkspace, setCurrentGraph, t]
   )
 
   const deleteTerminalBlock = useCallback(

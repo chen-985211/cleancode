@@ -39,6 +39,8 @@ interface WorkbenchObjectPresence {
 }
 
 export interface WorkbenchObjectMotionNodeData {
+  readonly isObjectDragPreview?: boolean
+  readonly isObjectMotionFrozen?: boolean
   readonly isObjectLayoutChoreographed?: boolean
   readonly objectMotion?: WorkbenchObjectMotion
   readonly objectPresence?: WorkbenchObjectPresence

@@ -71,6 +71,24 @@ describe('workbench object motion presentation', () => {
     expect(result.current.className).toBe('')
   })
 
+  it('exposes the presented disclosure phase through refreshes, reversal and drag interruption', () => {
+    const initialProps: { motion?: WorkbenchObjectMotion; suspended?: boolean } = {
+      motion: createMotion('group-expand')
+    }
+    const { result, rerender } = renderHook(
+      ({ motion, suspended }: typeof initialProps) =>
+        useWorkbenchObjectMotionPresentation(motion, undefined, suspended),
+      { initialProps }
+    )
+    expect(result.current.kind).toBe('group-expand')
+    rerender({ motion: undefined })
+    expect(result.current.kind).toBe('group-expand')
+    rerender({ motion: { ...createMotion('group-collapse'), id: 'reverse' } })
+    expect(result.current.kind).toBe('group-collapse')
+    rerender({ motion: undefined, suspended: true })
+    expect(result.current.kind).toBeUndefined()
+  })
+
   it('exposes a spring surface for group motion without projecting a fixed CSS endpoint', () => {
     const onComplete = vi.fn()
     const { result } = renderHook(() =>

@@ -9,6 +9,10 @@ on:
       runner:
         type: string
         required: true
+      shards:
+        description: Consecutive one-based shard indices as a JSON array
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -21,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(inputs.shards) }}
 
     steps:
       - uses: actions/checkout@v6
@@ -78,13 +82,13 @@ jobs:
         if: runner.os == 'Linux'
         env:
           CLEANCODE_E2E_PREBUILT: '1'
-        run: xvfb-run --auto-servernum pnpm test:e2e --shard=${{ matrix.shard }}/3
+        run: xvfb-run --auto-servernum pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - name: Run E2E shard
         if: runner.os != 'Linux'
         env:
           CLEANCODE_E2E_PREBUILT: '1'
           CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
-        run: pnpm test:e2e --shard=${{ matrix.shard }}/3
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Summarize test timings
         if: always()

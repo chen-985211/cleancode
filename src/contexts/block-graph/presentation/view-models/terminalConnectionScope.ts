@@ -16,9 +16,12 @@ export function isTerminalConnectionAllowedInCanvasScope(
 
   const sourceScope = resolveTerminalScope(graph, sourceBlockId)
   const targetScope = resolveTerminalScope(graph, targetBlockId)
-  if (sourceScope !== targetScope) return false
 
-  return editingTerminalGroupId === null || sourceScope === editingTerminalGroupId
+  return (
+    editingTerminalGroupId === null ||
+    sourceScope === editingTerminalGroupId ||
+    targetScope === editingTerminalGroupId
+  )
 }
 
 export function isTerminalConnectionEditableInCanvasScope(
