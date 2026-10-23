@@ -67,7 +67,6 @@ export const enCanvasMessages = {
   'canvas.emptyPreview':
     'This is browser preview mode. Use the Electron desktop app for live projects and terminals.',
   'canvas.statusPreview': 'Browser preview',
-  'canvas.statusConnected': 'Local runtime connected',
   'canvas.statusRuntimeInitializing': 'Restoring terminal runtime',
   'canvas.statusRuntimeUnavailable': 'Terminal runtime unavailable',
   'canvas.statusProjectRestoring': 'Restoring projects',

@@ -143,6 +143,7 @@
 .workbench-canvas__center-motion-surface {
   position: absolute;
   inset: 0;
+  bottom: calc(var(--cc-statusbar-height) + var(--cc-statusbar-bottom));
   z-index: 5;
   pointer-events: none;
 }
@@ -546,21 +547,64 @@
 }
 
 .app-shell__statusbar {
+  position: absolute;
+  z-index: 7;
+  bottom: var(--cc-statusbar-bottom);
+  left: 6px;
+  isolation: isolate;
   display: flex;
-  height: 26px;
-  flex: 0 0 auto;
+  width: calc(100% - 12px);
+  height: var(--cc-statusbar-height);
   align-items: center;
   gap: 7px;
-  border-top: 1px solid var(--cc-border);
-  background: var(--cc-chrome-raised);
+  border: 1px solid transparent;
+  border-radius: var(--cc-statusbar-radius);
+  background: transparent;
   padding: 0 12px;
-  color: var(--cc-muted);
+  color: var(--cc-statusbar-foreground);
   font-size: 11px;
 }
 
+.app-shell__statusbar::after {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--cc-statusbar-border);
+  border-radius: inherit;
+  box-shadow: var(--cc-shadow-xs);
+  content: '';
+  pointer-events: none;
+}
+
 .app-shell__statusbar[data-project-sidebar-motion-state='expanded'] {
-  width: calc(100% - var(--cc-sidebar-expanded-width));
+  width: calc(100% - var(--cc-sidebar-expanded-width) - 12px);
   margin-left: var(--cc-sidebar-expanded-width);
+}
+
+.canvas-statusbar-glass {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--cc-statusbar-sheen), var(--cc-statusbar-background);
+  box-shadow: inset 0 1px 0 var(--cc-statusbar-border);
+  pointer-events: none;
+  backdrop-filter: var(--cc-statusbar-glass-filter, none);
+}
+
+.canvas-statusbar-glass__filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .canvas-statusbar-glass {
+    background: var(--cc-chrome);
+    backdrop-filter: none;
+  }
 }
 
 .app-shell__statusbar .status-dot {
@@ -580,7 +624,7 @@
   margin-left: 3px;
   border-left: 1px solid var(--cc-divider);
   padding-left: 10px;
-  color: var(--cc-muted-strong);
+  color: var(--cc-statusbar-foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   text-overflow: ellipsis;

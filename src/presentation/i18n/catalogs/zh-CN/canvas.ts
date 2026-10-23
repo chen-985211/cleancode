@@ -60,7 +60,6 @@ export const zhCNCanvasMessages = {
   'canvas.retryRestore': '重试',
   'canvas.emptyPreview': '当前是浏览器预览模式，真实项目和终端功能请在 Electron 桌面应用中使用',
   'canvas.statusPreview': '浏览器预览模式',
-  'canvas.statusConnected': '已连接本地运行时',
   'canvas.statusRuntimeInitializing': '正在恢复终端运行时',
   'canvas.statusRuntimeUnavailable': '终端运行时不可用',
   'canvas.statusProjectRestoring': '正在恢复项目',

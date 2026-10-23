@@ -5,6 +5,16 @@
   --cc-canvas: #e8eaeb;
   --cc-chrome: #f3f5f8;
   --cc-chrome-raised: #f8f9fb;
+  --cc-statusbar-background: rgb(255 255 255 / 8%);
+  --cc-statusbar-border: rgb(255 255 255 / 42%);
+  --cc-statusbar-foreground: var(--cc-muted-strong);
+  --cc-statusbar-sheen: linear-gradient(
+    115deg,
+    rgb(255 255 255 / 12%),
+    rgb(255 255 255 / 0%) 42%,
+    rgb(255 255 255 / 0%) 67%,
+    rgb(255 255 255 / 6%)
+  );
   --cc-chrome-translucent: rgb(243 245 248 / 78%);
   --cc-sidebar-hover: #eef0f3;
   --cc-sidebar-selection: #e9ebee;
@@ -112,6 +122,16 @@
   --cc-canvas: #17191b;
   --cc-chrome: #171b22;
   --cc-chrome-raised: #1b2028;
+  --cc-statusbar-background: rgb(30 35 39 / 20%);
+  --cc-statusbar-border: rgb(255 255 255 / 12%);
+  --cc-statusbar-foreground: var(--cc-muted-strong);
+  --cc-statusbar-sheen: linear-gradient(
+    115deg,
+    rgb(255 255 255 / 5%),
+    rgb(255 255 255 / 0%) 42%,
+    rgb(255 255 255 / 0%) 67%,
+    rgb(255 255 255 / 3%)
+  );
   --cc-chrome-translucent: rgb(23 27 34 / 82%);
   --cc-sidebar-hover: #1d2128;
   --cc-sidebar-selection: #22262d;
@@ -208,6 +228,9 @@
 }
 
 :root {
+  --cc-statusbar-height: 26px;
+  --cc-statusbar-bottom: 4px;
+  --cc-statusbar-radius: 22px;
   --cc-branch-selector-hover: color-mix(in srgb, var(--cc-foreground) 2%, var(--cc-surface-raised));
   --cc-terminal-control: var(--cc-terminal-shell);
   --cc-terminal-control-hover: color-mix(

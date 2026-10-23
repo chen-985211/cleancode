@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/useI18n'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import type { InitialWorkbenchLoadPhase } from '../shell/lifecycle/useInitialWorkbenchLoad'
 import { WorkbenchIcon } from '../../shared/components/WorkbenchIcons'
+import { CanvasStatusbarGlass } from './CanvasStatusbarGlass'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -141,8 +142,22 @@ export function CanvasStatusbar({
     currentWorkspace,
     notifications
   })
+  const statusLabel = !isDesktopRuntime
+    ? t('canvas.statusPreview')
+    : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
+      ? t('canvas.statusProjectRestoring')
+      : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
+        ? t('canvas.statusProjectRestoreFailed')
+        : terminalRuntimeAvailability.phase === 'initializing'
+          ? t('canvas.statusRuntimeInitializing')
+          : terminalRuntimeAvailability.phase === 'unavailable'
+            ? t('canvas.statusRuntimeUnavailable')
+            : currentWorkbench
+              ? null
+              : t('canvas.statusWaiting')
+
   return (
-    <footer ref={motionRef} className="app-shell__statusbar">
+    <footer ref={motionRef} className="app-shell__statusbar" data-workbench-canvas-obstruction>
       {isDesktopRuntime && currentWorkbench && currentWorkspace ? (
         <WorkspaceExternalOpenControl
           key={`${currentWorkbench.project.id}:${currentWorkspace.workspaceId}`}
@@ -151,25 +166,16 @@ export function CanvasStatusbar({
           onOpen={workspaceExternalOpen.openWorkspace}
         />
       ) : null}
-      <span
-        className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
-      />
-      <span>
-        {!isDesktopRuntime
-          ? t('canvas.statusPreview')
-          : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
-            ? t('canvas.statusProjectRestoring')
-            : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
-              ? t('canvas.statusProjectRestoreFailed')
-              : terminalRuntimeAvailability.phase === 'initializing'
-                ? t('canvas.statusRuntimeInitializing')
-                : terminalRuntimeAvailability.phase === 'unavailable'
-                  ? t('canvas.statusRuntimeUnavailable')
-                  : currentWorkbench
-                    ? t('canvas.statusConnected')
-                    : t('canvas.statusWaiting')}
-      </span>
+      {statusLabel ? (
+        <>
+          <span
+            className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
+          />
+          <span>{statusLabel}</span>
+        </>
+      ) : null}
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
+      <CanvasStatusbarGlass />
     </footer>
   )
 }
