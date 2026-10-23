@@ -17,6 +17,8 @@ export const enCanvasMessages = {
   'toolbar.agentSettings': 'Agent settings…',
   'canvas.label': 'Block canvas',
   'canvas.contextMenu.canvasActions': 'Canvas actions',
+  'canvas.contextMenu.connectionActions': 'Connection actions',
+  'canvas.contextMenu.disconnect': 'Disconnect',
   'canvas.contextMenu.terminalActions': 'Terminal actions',
   'canvas.contextMenu.workflowActions': 'Workflow actions',
   'canvas.contextMenu.combinationActions': 'Combination actions',

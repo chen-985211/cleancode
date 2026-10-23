@@ -114,11 +114,11 @@ describe('workbench canvas Agent approval edges', () => {
     act(() => {
       reactFlowProps.latest?.onEdgesDelete?.([
         proxy as Edge,
-        { id: 'connection-persistent', source: 'terminal-a', target: 'terminal-b' }
+        { id: 'connection-a-b', source: 'terminal-a', target: 'terminal-b' }
       ])
     })
     expect(deleteEdges).toHaveBeenCalledWith([
-      { id: 'connection-persistent', source: 'terminal-a', target: 'terminal-b' }
+      { id: 'connection-a-b', source: 'terminal-a', target: 'terminal-b' }
     ])
   })
 })

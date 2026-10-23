@@ -14,6 +14,8 @@ export const zhCNCanvasMessages = {
   'toolbar.agentSettings': 'Agent 设置…',
   'canvas.label': '积木画布',
   'canvas.contextMenu.canvasActions': '画布操作',
+  'canvas.contextMenu.connectionActions': '连线操作',
+  'canvas.contextMenu.disconnect': '断开连接',
   'canvas.contextMenu.terminalActions': '终端操作',
   'canvas.contextMenu.workflowActions': '流程操作',
   'canvas.contextMenu.combinationActions': '组合操作',

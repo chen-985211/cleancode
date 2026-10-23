@@ -18,6 +18,8 @@ import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from '../../../i18n/useI18n'
+import { CanvasMenuItem } from '../../../shared/components/CanvasMenuItem'
+import { WorkbenchIcon } from '../../../shared/components/WorkbenchIcons'
 
 interface CanvasObjectContextMenuProps {
   readonly agentActions?: {
@@ -28,11 +30,17 @@ interface CanvasObjectContextMenuProps {
   readonly open: boolean
   readonly position: { readonly x: number; readonly y: number }
   readonly requestId: number
-  readonly target: CanvasObjectContextTarget
+  readonly target:
+    | CanvasObjectContextTarget
+    | {
+        readonly kind: 'connection'
+        readonly connectionId: string
+      }
   readonly onClose: () => void
   readonly onFavorite?: (terminalBlockIds: readonly string[]) => void
   readonly onAddToQuickExecution?: (target: CanvasTerminalObjectContextTarget) => void
   readonly onRemove?: (target: CanvasObjectContextTarget) => void
+  readonly onDisconnect?: (connectionId: string) => void
 }
 
 export function CanvasObjectContextMenu({
@@ -44,7 +52,8 @@ export function CanvasObjectContextMenu({
   onClose,
   onFavorite,
   onAddToQuickExecution,
-  onRemove
+  onRemove,
+  onDisconnect
 }: CanvasObjectContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -132,17 +141,23 @@ export function CanvasObjectContextMenu({
   }, [isMenuPresent, mode, position.x, position.y, requestId])
 
   const ariaLabel =
-    target.kind === 'agent' && agentActions
-      ? t('agent.actions', { agentName: agentActions.agent.name })
-      : target.kind === 'agent'
-        ? t('agent.actions', { agentName: target.agentId })
-        : t(`canvas.contextMenu.${target.kind}Actions`)
+    target.kind === 'connection'
+      ? t('canvas.contextMenu.connectionActions')
+      : target.kind === 'agent' && agentActions
+        ? t('agent.actions', { agentName: agentActions.agent.name })
+        : target.kind === 'agent'
+          ? t('agent.actions', { agentName: target.agentId })
+          : t(`canvas.contextMenu.${target.kind}Actions`)
 
   return createPortal(
     <CanvasNodeMenu
       ref={menuRef}
       anchor={position}
-      menuId="canvas-object-context-menu"
+      menuId={
+        target.kind === 'connection'
+          ? 'canvas-connection-context-menu'
+          : 'canvas-object-context-menu'
+      }
       motionReady={motionReady}
       open={open}
       role={mode === 'rename' ? 'dialog' : 'menu'}
@@ -160,7 +175,19 @@ export function CanvasObjectContextMenu({
         top: motionReady ? (resolvedPosition?.top ?? 0) : 0
       }}
     >
-      {target.kind === 'agent' && agentActions ? (
+      {target.kind === 'connection' ? (
+        <CanvasMenuItem
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose()
+            onDisconnect?.(target.connectionId)
+          }}
+        >
+          <WorkbenchIcon role="disconnect" size={16} />
+          <span>{t('canvas.contextMenu.disconnect')}</span>
+        </CanvasMenuItem>
+      ) : target.kind === 'agent' && agentActions ? (
         <AgentCanvasContextActions
           key={resetKey}
           agent={agentActions.agent}
