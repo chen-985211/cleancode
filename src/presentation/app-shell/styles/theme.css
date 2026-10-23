@@ -23,6 +23,9 @@
   --cc-sidebar-selection-foreground: #43474c;
   --cc-sidebar-focus-ring: #7a7a7a;
   --cc-sidebar-current-marker: #737373;
+  --cc-sidebar-branch-badge-surface: #e7eaf0;
+  --cc-sidebar-branch-badge-foreground: #545d6b;
+  --cc-sidebar-branch-badge-border: #d0d5df;
   --cc-sidebar-drag-surface: #e6e7e8;
   --cc-sidebar-drag-border: #9b9b9b;
   --cc-sidebar-drag-indicator: #737373;
@@ -145,6 +148,9 @@
   --cc-sidebar-selection-foreground: #eceff3;
   --cc-sidebar-focus-ring: #8c8c8c;
   --cc-sidebar-current-marker: #a3a3a3;
+  --cc-sidebar-branch-badge-surface: #2a3039;
+  --cc-sidebar-branch-badge-foreground: #c4cad3;
+  --cc-sidebar-branch-badge-border: #3b424d;
   --cc-sidebar-drag-surface: #2a2c2f;
   --cc-sidebar-drag-border: #696969;
   --cc-sidebar-drag-indicator: #b0b0b0;
