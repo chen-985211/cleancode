@@ -246,15 +246,15 @@ describe('application settings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '终端' }))
 
-    expect(screen.getByRole('heading', { name: '终端' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '终端', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '滚动历史', level: 3 })).toBeInTheDocument()
+    expect(document.querySelector('.terminal-settings-pane input[type="radio"]')).toBeNull()
     expect(screen.queryByText('调整终端历史记录，不会重启正在运行的会话。')).not.toBeInTheDocument()
     expect(
       screen.queryByText('后台终端状态和可见终端视图使用相同的历史上限。')
     ).not.toBeInTheDocument()
     const scrollbackOptions = screen.getByRole('radiogroup', { name: '滚动历史' })
-    expect(
-      scrollbackOptions.querySelector('.terminal-settings-options__selection')
-    ).toHaveAttribute('data-selection-motion-target', '1000')
+    expect(scrollbackOptions).toHaveAttribute('data-value', '1000')
     expect(within(scrollbackOptions).getAllByRole('radio')).toHaveLength(3)
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
     fireEvent.click(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' }))

@@ -1,0 +1,100 @@
+.elastic-segment {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(var(--elastic-count), minmax(0, 1fr));
+  max-width: 100%;
+  border-radius: 11px;
+  background: var(--cc-segment-track);
+  padding: 3px;
+  isolation: isolate;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.elastic-segment button,
+.elastic-segment__material span {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.elastic-segment button {
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cc-segment-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.elastic-segment button:hover {
+  color: var(--cc-segment-hover-text);
+}
+
+.elastic-segment:not([data-input-method='pointer']) button:focus-visible {
+  outline: 2px solid var(--cc-settings-selection-accent);
+  outline-offset: 5px;
+}
+
+.elastic-segment button:active {
+  opacity: 0.78;
+}
+
+.elastic-segment[data-motion-state='pressed'],
+.elastic-segment[data-motion-state='dragging'] {
+  cursor: grabbing;
+}
+
+.elastic-segment[data-motion-state='dragging'] button {
+  cursor: grabbing;
+}
+
+.elastic-segment__material {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--elastic-count), minmax(0, 1fr));
+  border-radius: inherit;
+  background: var(--cc-segment-thumb);
+  padding: 3px;
+  color: var(--cc-segment-active-text);
+  pointer-events: none;
+  clip-path: inset(
+    var(--elastic-inset, 3px)
+      var(
+        --elastic-right,
+        calc(
+          3px + (100% - 6px) / var(--elastic-count) *
+            (var(--elastic-count) - var(--elastic-selected) - 1)
+        )
+      )
+      var(--elastic-inset, 3px)
+      var(--elastic-left, calc(3px + (100% - 6px) / var(--elastic-count) * var(--elastic-selected)))
+      round 8px
+  );
+}
+
+.elastic-segment[aria-disabled='true'] {
+  opacity: 0.5;
+}
+
+.elastic-segment[aria-disabled='true'] button {
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .elastic-segment button,
+  .elastic-segment__material span {
+    padding-inline: 12px;
+  }
+}

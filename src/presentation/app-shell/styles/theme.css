@@ -30,6 +30,11 @@
   --cc-settings-selection-foreground: #43474c;
   --cc-settings-selection-accent: #777777;
   --cc-settings-selection-border: #9b9b9b;
+  --cc-segment-track: #d7d9dc;
+  --cc-segment-thumb: #ffffff;
+  --cc-segment-text: #55585d;
+  --cc-segment-hover-text: #25272b;
+  --cc-segment-active-text: #202124;
   --cc-settings-switch-on: #6b87aa;
   --cc-settings-switch-thumb: var(--cc-primary-contrast);
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
@@ -147,6 +152,11 @@
   --cc-settings-selection-foreground: #e4e7eb;
   --cc-settings-selection-accent: #b0b0b0;
   --cc-settings-selection-border: #696969;
+  --cc-segment-track: #27272a;
+  --cc-segment-thumb: #fafafa;
+  --cc-segment-text: #b4b4b9;
+  --cc-segment-hover-text: #fafafa;
+  --cc-segment-active-text: #18181b;
   --cc-settings-switch-on: #566f8a;
   --cc-settings-switch-thumb: #e2e8f0;
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);

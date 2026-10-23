@@ -2,7 +2,7 @@ import type { TerminalScrollbackRows } from '../../../../contexts/run/applicatio
 import { TerminalScrollbackSettingsSection } from '../../../../contexts/run/presentation/components/TerminalScrollbackSettingsSection'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { useI18n } from '../../../i18n/useI18n'
-import { useSelectionIndicatorMotion } from '../../../shared/hooks/useSelectionMotion'
+import { ElasticSegmentedControl } from '../../../shared/components/ElasticSegmentedControl'
 
 interface TerminalSettingsPaneProps {
   readonly scrollbackRows: TerminalScrollbackRows
@@ -18,8 +18,6 @@ export function TerminalSettingsPane({
   onTerminalWorkflowBuildModeChange
 }: TerminalSettingsPaneProps) {
   const { t } = useI18n()
-  const [workflowSelectionContainerRef, workflowSelectionIndicatorRef] =
-    useSelectionIndicatorMotion(terminalWorkflowBuildMode)
 
   return (
     <div className="terminal-settings-pane">
@@ -32,37 +30,20 @@ export function TerminalSettingsPane({
       />
       <section className="terminal-settings-group" aria-labelledby="terminal-workflow-build-title">
         <h3 id="terminal-workflow-build-title">{t('settings.terminal.workflowBuild')}</h3>
-        <div
-          ref={workflowSelectionContainerRef}
-          className="terminal-settings-options terminal-settings-options--workflow-build"
-          role="radiogroup"
-          aria-labelledby="terminal-workflow-build-title"
-        >
-          <span
-            ref={workflowSelectionIndicatorRef}
-            className="selection-motion-indicator terminal-settings-options__selection"
-            data-selection-motion-target={terminalWorkflowBuildMode}
-            aria-hidden="true"
-          />
-          {(['progressive', 'simultaneous'] as const).map((mode) => (
-            <label data-selection-motion-option={mode} key={mode}>
-              <input
-                type="radio"
-                name="terminal-workflow-build-mode"
-                checked={terminalWorkflowBuildMode === mode}
-                onChange={() => onTerminalWorkflowBuildModeChange(mode)}
-              />
-              <span className="terminal-settings-option-copy">
-                <span className="terminal-settings-option-copy__title">
-                  {t(`settings.terminal.workflowBuild.${mode}`)}
-                </span>
-                <span className="terminal-settings-option-copy__description">
-                  {t(`settings.terminal.workflowBuild.${mode}Description`)}
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
+        <ElasticSegmentedControl
+          labelledBy="terminal-workflow-build-title"
+          describedBy="terminal-workflow-build-description"
+          value={terminalWorkflowBuildMode}
+          onChange={onTerminalWorkflowBuildModeChange}
+          options={(['progressive', 'simultaneous'] as const).map((mode) => ({
+            value: mode,
+            label: t(`settings.terminal.workflowBuild.${mode}`),
+            description: t(`settings.terminal.workflowBuild.${mode}Description`)
+          }))}
+        />
+        <p id="terminal-workflow-build-description" className="terminal-settings-description">
+          {t(`settings.terminal.workflowBuild.${terminalWorkflowBuildMode}Description`)}
+        </p>
       </section>
     </div>
   )

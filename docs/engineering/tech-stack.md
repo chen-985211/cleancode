@@ -13,6 +13,7 @@
 | 包管理         | pnpm                                                                                |
 | 桌面壳         | Electron                                                                            |
 | 前端框架       | React                                                                               |
+| 手势动效       | Motion（仅弹性分段选择的表现层物理交互）                                            |
 | 类型系统       | TypeScript                                                                          |
 | 构建与开发     | electron-vite、Vite、electron-builder                                               |
 | 积木画布       | React Flow（`@xyflow/react`）                                                       |

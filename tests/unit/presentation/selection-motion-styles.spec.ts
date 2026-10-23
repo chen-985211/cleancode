@@ -72,7 +72,6 @@ describe('selection motion styles', () => {
 
     expect(switchThumbRule).toContain('var(--cc-selection-motion-progress, 0)')
     expect(switchThumbRule).not.toContain('transition: transform')
-    expect(selectionStyles).toContain('.terminal-settings-options__selection')
     expect(agentSettingsStyles).toContain('.agent-settings-segmented__selection')
     expect(agentSettingsStyles).toContain('var(--cc-selection-motion-progress, 0)')
   })
