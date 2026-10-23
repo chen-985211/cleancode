@@ -45,6 +45,7 @@ export const enSettingsMessages = {
   'settings.shortcuts.command.zoomCanvasIn': 'Zoom in canvas',
   'settings.shortcuts.command.zoomCanvasOut': 'Zoom out canvas',
   'settings.shortcuts.command.fitCanvas': 'Fit canvas',
+  'settings.shortcuts.command.organizeCanvas': 'Organize canvas',
   'settings.shortcuts.command.toggleMinimap': 'Collapse or expand minimap',
   'settings.shortcuts.command.quickExecution1': 'Run quick slot 1',
   'settings.shortcuts.command.quickExecution2': 'Run quick slot 2',

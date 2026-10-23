@@ -101,6 +101,28 @@ describe('canvas organization viewport', () => {
     expect(hook.onFailure).not.toHaveBeenCalled()
   })
 
+  it('ignores key auto-repeat while waiting to center the committed layout', async () => {
+    let complete!: (result: typeof bounds) => void
+    const onOrganizeCanvas = vi.fn(
+      () =>
+        new Promise<typeof bounds>((resolve) => {
+          complete = resolve
+        })
+    )
+    const hook = renderOrganization({ onOrganizeCanvas })
+    let pending!: Promise<void>
+    act(() => {
+      pending = hook.result.current.organize()
+    })
+    fireEvent.keyDown(document, { key: 'f', metaKey: true, shiftKey: true, repeat: true })
+    await act(async () => {
+      complete(bounds)
+      await pending
+    })
+    expect(onOrganizeCanvas).toHaveBeenCalledOnce()
+    expect(hook.setViewport).toHaveBeenCalledOnce()
+  })
+
   it('centers oversized content at the existing minimum zoom', async () => {
     const hook = renderOrganization({
       onOrganizeCanvas: async () => ({ x: -10_000, y: -8_000, width: 20_000, height: 16_000 })

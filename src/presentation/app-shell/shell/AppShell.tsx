@@ -635,6 +635,7 @@ export function AppShell({
           terminalWorkflowBuildPresentation={terminalWorkflowBuildPresentation}
           shortcutTooltips={shortcutTooltips}
           shortcutPlatform={shortcutPlatform}
+          shortcutBindings={bindings}
           placementTemplate={blockTemplates.placementTemplate}
           onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
           onPlaceBlockTemplate={blockTemplates.place}

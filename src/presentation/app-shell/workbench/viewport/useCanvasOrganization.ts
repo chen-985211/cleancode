@@ -44,15 +44,18 @@ export function useCanvasOrganization({
     if (!instance || !onOrganizeCanvas || pendingRef.current || items.length === 0) return
     const request = ++requestRef.current
     pendingRef.current = true
+    const cancelFocusOnKeyDown = (event: KeyboardEvent): void => {
+      if (!event.repeat) cancelFocus()
+    }
     const stopFollowingInput = (): void => {
       document.removeEventListener('pointerdown', cancelFocus, true)
-      document.removeEventListener('keydown', cancelFocus, true)
+      document.removeEventListener('keydown', cancelFocusOnKeyDown, true)
       document.removeEventListener('wheel', cancelFocus, true)
       if (inputCleanupRef.current === stopFollowingInput) inputCleanupRef.current = null
     }
     inputCleanupRef.current = stopFollowingInput
     document.addEventListener('pointerdown', cancelFocus, true)
-    document.addEventListener('keydown', cancelFocus, true)
+    document.addEventListener('keydown', cancelFocusOnKeyDown, true)
     document.addEventListener('wheel', cancelFocus, { capture: true, passive: true })
     try {
       onUserAction?.()

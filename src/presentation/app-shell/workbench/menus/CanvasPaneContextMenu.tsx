@@ -24,7 +24,8 @@ interface CanvasPaneContextMenuProps {
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
     'createTerminal' | 'groupTerminals'
-  >
+  > &
+    Partial<Pick<ApplicationShortcutTooltipLabels, 'organizeCanvas'>>
   readonly onClose: () => void
   readonly onCreateTerminal: () => void
   readonly onGroupTerminals: () => void
@@ -160,7 +161,10 @@ export function CanvasPaneContextMenu({
         disabled={!canOrganizeCanvas}
         iconRole="arrangement-grid"
         label={t('canvas.arrangement.organize')}
-        shortcut={null}
+        shortcut={readShortcutHint(
+          shortcutTooltips.organizeCanvas ?? '',
+          t('canvas.arrangement.organize')
+        )}
         onSelect={() => {
           onClose()
           onOrganizeCanvas?.()
@@ -185,7 +189,13 @@ function CanvasPaneContextMenuItem({
   readonly onSelect: () => void
 }) {
   return (
-    <CanvasMenuItem type="button" role="menuitem" disabled={disabled} onClick={onSelect}>
+    <CanvasMenuItem
+      type="button"
+      role="menuitem"
+      title={label}
+      disabled={disabled}
+      onClick={onSelect}
+    >
       <WorkbenchIcon role={iconRole} size={16} />
       <span className="canvas-pane-context-menu__label">{label}</span>
       {shortcut ? (

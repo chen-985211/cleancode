@@ -61,33 +61,42 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 })
 
 describe('workbench canvas object context menu', () => {
-  it('organizes every complete object from the pane menu without requiring selection', async () => {
-    const onOrganizeCanvas = vi.fn<NonNullable<WorkbenchCanvasProps['onOrganizeCanvas']>>(
-      async () => null
-    )
-    renderCanvas({ onOrganizeCanvas, selectedTerminalBlockIds: ['standalone'] })
-    act(() =>
-      reactFlowProps.latest?.onPaneContextMenu?.({
-        clientX: 320,
-        clientY: 240,
-        preventDefault: vi.fn()
-      })
-    )
-    const organize = screen.getByRole('menuitem', { name: '整理画布' })
-    expect(organize).toBeEnabled()
-    await act(async () => fireEvent.click(organize))
-    expect(onOrganizeCanvas).toHaveBeenCalledOnce()
-    expect(onOrganizeCanvas.mock.calls[0]?.[0].map((item) => item.reference)).toEqual(
-      expect.arrayContaining([
-        { kind: 'agent', agentId: 'reviewer' },
-        { kind: 'terminal', terminalId: 'standalone' },
-        { kind: 'workflow', terminalIds: ['workflow-a', 'workflow-b', 'workflow-c'] },
-        { kind: 'combination', terminalGroupId: 'combination' }
-      ])
-    )
-    expect(onOrganizeCanvas.mock.calls[0]?.[0]).toHaveLength(4)
-    expect(normallySelectedNodeIds()).toEqual(['standalone'])
-  })
+  it.each(['menu', 'shortcut'] as const)(
+    'organizes every complete object from %s without requiring selection',
+    async (entry) => {
+      const onOrganizeCanvas = vi.fn<NonNullable<WorkbenchCanvasProps['onOrganizeCanvas']>>(
+        async () => null
+      )
+      renderCanvas({ onOrganizeCanvas, selectedTerminalBlockIds: ['standalone'] })
+      if (entry === 'menu') {
+        act(() =>
+          reactFlowProps.latest?.onPaneContextMenu?.({
+            clientX: 320,
+            clientY: 240,
+            preventDefault: vi.fn()
+          })
+        )
+        const organize = screen.getByRole('menuitem', { name: '整理画布' })
+        expect(organize).toBeEnabled()
+        await act(async () => fireEvent.click(organize))
+      } else {
+        await act(async () =>
+          fireEvent.keyDown(document, { key: 'f', metaKey: true, shiftKey: true })
+        )
+      }
+      expect(onOrganizeCanvas).toHaveBeenCalledOnce()
+      expect(onOrganizeCanvas.mock.calls[0]?.[0].map((item) => item.reference)).toEqual(
+        expect.arrayContaining([
+          { kind: 'agent', agentId: 'reviewer' },
+          { kind: 'terminal', terminalId: 'standalone' },
+          { kind: 'workflow', terminalIds: ['workflow-a', 'workflow-b', 'workflow-c'] },
+          { kind: 'combination', terminalGroupId: 'combination' }
+        ])
+      )
+      expect(onOrganizeCanvas.mock.calls[0]?.[0]).toHaveLength(4)
+      expect(normallySelectedNodeIds()).toEqual(['standalone'])
+    }
+  )
 
   beforeEach(() => {
     stubReducedMotionPreference()

@@ -12,7 +12,10 @@ import type { TerminalRuntimeAvailabilitySnapshot } from '../../../contexts/run/
 import type { AppNotificationController } from '../../shared/notifications/appNotifications'
 import type { AgentToolApprovalViewState } from './nodes/agent/agentToolApprovalTypes'
 import type { ApplicationShortcutTooltipLabels } from '../app-features/shortcuts/applicationShortcutTooltips'
-import type { ShortcutPlatform } from '../app-features/shortcuts/applicationShortcuts'
+import type {
+  ApplicationShortcutBindings,
+  ShortcutPlatform
+} from '../app-features/shortcuts/applicationShortcuts'
 import type { MinimapFlowNode, WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import type { InitialWorkbenchLoadPhase } from '../shell/lifecycle/useInitialWorkbenchLoad'
@@ -63,6 +66,7 @@ export interface WorkbenchCanvasProps {
       | 'zoomCanvasOut'
     >
   readonly shortcutPlatform?: ShortcutPlatform
+  readonly shortcutBindings?: ApplicationShortcutBindings
   readonly placementTemplate?: BlockTemplateSnapshot
   readonly onPlaceBlockTemplate?: (origin: {
     readonly x: number

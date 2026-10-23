@@ -17,6 +17,72 @@ describe('application shortcut preference', () => {
   })
   afterEach(() => vi.restoreAllMocks())
 
+  it.each(['mac', 'other'] as const)(
+    'extends v8 on %s without changing existing custom or cleared bindings',
+    (platform) => {
+      const preserved = {
+        ...v8DefaultBindings,
+        createAgent: { alt: true, key: 'K', primary: false, shift: false },
+        groupTerminals: null
+      }
+      const bindings = readApplicationShortcutBindings(
+        {
+          getItem: () => JSON.stringify({ version: 8, bindings: preserved })
+        },
+        platform
+      )
+      expect(bindings).toEqual({
+        ...preserved,
+        organizeCanvas: { alt: false, key: 'F', primary: true, shift: true }
+      })
+    }
+  )
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])(
+    'preserves a v%s custom binding that occupies the organize shortcut',
+    (version) => {
+      const catalogs = {
+        1: ['openSettings', 'createTerminal', 'createAgent', 'groupTerminals'],
+        2: ['openSettings', 'toggleSidebar', 'createTerminal', 'createAgent', 'groupTerminals'],
+        3: [
+          'openSettings',
+          'toggleSidebar',
+          'createTerminal',
+          'createAgent',
+          'groupTerminals',
+          'zoomCanvasIn',
+          'zoomCanvasOut',
+          'fitCanvas'
+        ]
+      } as const
+      const commands: readonly string[] =
+        version <= 3 ? catalogs[version as 1 | 2 | 3] : Object.keys(v6DefaultBindings)
+      const bindings: Record<string, unknown> = Object.fromEntries(
+        Object.entries(defaultApplicationShortcutBindings).filter(([command]) =>
+          version >= 7 ? command !== 'organizeCanvas' : commands.includes(command)
+        )
+      )
+      if (version === 4) {
+        for (const direction of ['Left', 'Right', 'Up', 'Down']) {
+          bindings[`panCanvas${direction}`] = bindings[`selectCanvasNode${direction}`]
+          delete bindings[`selectCanvasNode${direction}`]
+        }
+      }
+      const custom = { alt: false, key: 'F', primary: true, shift: true }
+      bindings.createAgent = custom
+      bindings.groupTerminals = null
+      const migrated = readApplicationShortcutBindings(
+        {
+          getItem: () => JSON.stringify({ version, bindings })
+        },
+        'mac'
+      )
+      expect(migrated.createAgent).toEqual(custom)
+      expect(migrated.groupTerminals).toBeNull()
+      expect(migrated.organizeCanvas).toBeNull()
+    }
+  )
+
   it('resets and persists the complete platform default catalog', () => {
     const { result } = renderHook(() => useApplicationShortcutPreference('other'))
     act(() => result.current.changeBinding('selectCanvasNodeLeft', null))
@@ -76,7 +142,7 @@ describe('application shortcut preference', () => {
       JSON.stringify({
         version: 7,
         bindings: {
-          ...defaultApplicationShortcutBindings,
+          ...v8DefaultBindings,
           selectCanvasNodeRight: custom,
           selectCanvasNodeUp: null,
           createAgent: occupied
@@ -101,8 +167,18 @@ describe('application shortcut preference', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
     expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey)!)).toMatchObject({
-      version: 8
+      version: 9
     })
+  })
+
+  it('preserves explicit Ctrl arrows while extending v8 on Windows', () => {
+    const bindings = readApplicationShortcutBindings(
+      {
+        getItem: () => JSON.stringify({ version: 8, bindings: v8DefaultBindings })
+      },
+      'other'
+    )
+    expect(bindings).toEqual(defaultApplicationShortcutBindings)
   })
 
   it('uses the complete default catalog when no preference exists', () => {
@@ -249,6 +325,7 @@ describe('application shortcut preference', () => {
       quickExecution3: defaultApplicationShortcutBindings.quickExecution3,
       quickExecution4: defaultApplicationShortcutBindings.quickExecution4,
       quickExecution5: defaultApplicationShortcutBindings.quickExecution5,
+      organizeCanvas: defaultApplicationShortcutBindings.organizeCanvas,
       selectCanvasNodeLeft: v4Bindings.panCanvasLeft,
       selectCanvasNodeRight: null,
       selectCanvasNodeUp: v4Bindings.panCanvasUp,
@@ -341,12 +418,12 @@ describe('application shortcut preference', () => {
     })
   })
 
-  it('writes the complete catalog with preference schema v8', () => {
+  it('writes the complete catalog with preference schema v9', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 8
+      version: 9
     })
   })
 
@@ -386,6 +463,12 @@ describe('application shortcut preference', () => {
 
 const v6DefaultBindings = Object.fromEntries(
   Object.entries(defaultApplicationShortcutBindings).filter(
-    ([command]) => !command.startsWith('quickExecution')
+    ([command]) => !command.startsWith('quickExecution') && command !== 'organizeCanvas'
+  )
+)
+
+const v8DefaultBindings = Object.fromEntries(
+  Object.entries(defaultApplicationShortcutBindings).filter(
+    ([command]) => command !== 'organizeCanvas'
   )
 )
