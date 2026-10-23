@@ -64,7 +64,6 @@ export const zhCNCanvasMessages = {
   'canvas.statusPreview': '浏览器预览模式',
   'canvas.statusRuntimeInitializing': '正在恢复终端运行时',
   'canvas.statusRuntimeUnavailable': '终端运行时不可用',
-  'canvas.statusProjectRestoring': '正在恢复项目',
   'canvas.statusProjectRestoreFailed': '项目恢复失败',
   'canvas.statusWaiting': '等待项目',
   'canvas.layoutSaveFailedTitle': '无法保存画布布局',

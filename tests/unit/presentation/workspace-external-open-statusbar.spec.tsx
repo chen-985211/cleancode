@@ -10,6 +10,35 @@ import {
 } from '../../fixtures/presentation/appShellFixtures'
 
 describe('workspace external open statusbar placement', () => {
+  it.each(
+    (['zh-CN', 'en'] as const).flatMap((locale) =>
+      (['initializing', 'ready', 'unavailable', 'shutting-down'] as const).map((phase) => ({
+        locale,
+        phase
+      }))
+    )
+  )(
+    'keeps the statusbar quiet during project restoration in $locale with runtime $phase',
+    ({ locale, phase }) => {
+      const { container } = render(
+        <I18nProvider initialLocale={locale}>
+          <CanvasStatusbar
+            isDesktopRuntime
+            terminalRuntimeAvailability={{ phase, epoch: 1, errorCode: null, retryable: false }}
+            initialWorkbenchLoadPhase="loading"
+            currentWorkbench={null}
+            currentWorkspace={undefined}
+            notifications={ignoreAppNotifications}
+          />
+        </I18nProvider>
+      )
+
+      const statusbar = container.querySelector('.app-shell__statusbar')
+      expect(statusbar?.textContent).toBe('')
+      expect(statusbar?.querySelector('.status-dot')).toBeNull()
+    }
+  )
+
   it.each([
     { locale: 'zh-CN', openLabel: '打开当前工作区', connectedLabel: '已连接本地运行时' },
     {

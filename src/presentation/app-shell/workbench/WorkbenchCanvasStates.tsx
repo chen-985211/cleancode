@@ -145,7 +145,7 @@ export function CanvasStatusbar({
   const statusLabel = !isDesktopRuntime
     ? t('canvas.statusPreview')
     : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
-      ? t('canvas.statusProjectRestoring')
+      ? null
       : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
         ? t('canvas.statusProjectRestoreFailed')
         : terminalRuntimeAvailability.phase === 'initializing'

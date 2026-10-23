@@ -71,7 +71,6 @@ export const enCanvasMessages = {
   'canvas.statusPreview': 'Browser preview',
   'canvas.statusRuntimeInitializing': 'Restoring terminal runtime',
   'canvas.statusRuntimeUnavailable': 'Terminal runtime unavailable',
-  'canvas.statusProjectRestoring': 'Restoring projects',
   'canvas.statusProjectRestoreFailed': 'Project restoration failed',
   'canvas.statusWaiting': 'Waiting for a project',
   'canvas.layoutSaveFailedTitle': 'Could not save canvas layout',
