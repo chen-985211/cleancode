@@ -2,6 +2,7 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot,
+  CanvasLayerItemReference,
   CanvasStackSnapshot
 } from './CanvasArrangementTypes'
 
@@ -12,6 +13,7 @@ export interface CreateCanvasStackInput {
 }
 
 export class CanvasArrangement {
+  private layerOrder: readonly CanvasLayerItemReference[] = []
   private constructor(
     readonly projectId: string,
     readonly workspaceId: string,
@@ -32,6 +34,7 @@ export class CanvasArrangement {
     for (const stack of snapshot.stacks) {
       arrangement.appendStack(stack)
     }
+    arrangement.setLayerOrder(snapshot.layerOrder ?? [])
 
     return arrangement
   }
@@ -53,6 +56,17 @@ export class CanvasArrangement {
 
   createStack(input: CreateCanvasStackInput): CanvasStackSnapshot {
     return this.appendStack(input)
+  }
+
+  setLayerOrder(items: readonly CanvasLayerItemReference[]): void {
+    const normalized = items.map((item) => {
+      const reference = normalizeItem(item)
+      if (!reference || reference.kind === 'workflow') invalid('Invalid canvas layer identity.')
+      return reference
+    })
+    const keys = normalized.map(CanvasArrangement.itemKey)
+    if (new Set(keys).size !== keys.length) invalid('Canvas layer identities must be unique.')
+    this.layerOrder = Object.freeze(normalized)
   }
 
   private appendStack(input: CreateCanvasStackInput): CanvasStackSnapshot {
@@ -147,7 +161,10 @@ export class CanvasArrangement {
     return moved
   }
 
-  reconcile(validItemKeys: readonly string[]): {
+  reconcile(
+    validItemKeys: readonly string[],
+    validLayerItemKeys?: readonly string[]
+  ): {
     readonly changed: boolean
     readonly removedStackIds: readonly string[]
   } {
@@ -177,6 +194,14 @@ export class CanvasArrangement {
     }
 
     this.stacks = nextStacks
+    if (validLayerItemKeys) {
+      const validLayerKeys = new Set(validLayerItemKeys)
+      const nextOrder = this.layerOrder.filter((item) =>
+        validLayerKeys.has(CanvasArrangement.itemKey(item))
+      )
+      changed ||= nextOrder.length !== this.layerOrder.length
+      this.layerOrder = Object.freeze(nextOrder)
+    }
     return { changed, removedStackIds }
   }
 
@@ -184,6 +209,9 @@ export class CanvasArrangement {
     return Object.freeze({
       projectId: this.projectId,
       workspaceId: this.workspaceId,
+      ...(this.layerOrder.length
+        ? { layerOrder: Object.freeze(this.layerOrder.map((item) => Object.freeze({ ...item }))) }
+        : {}),
       stacks: Object.freeze(
         this.stacks.map((stack) =>
           Object.freeze({

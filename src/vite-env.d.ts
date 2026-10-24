@@ -26,6 +26,7 @@ import type {
   CanvasArrangementSnapshot
 } from './contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from './contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
+import type { SaveCanvasLayerOrderCommand } from './contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
 import type {
   AgentProviderAvailability,
   AgentProviderDescriptor
@@ -289,6 +290,7 @@ declare global {
         readonly stackId: string
         readonly workspaceId: string
       }): Promise<CanvasArrangementSnapshot>
+      saveCanvasLayerOrder(command: SaveCanvasLayerOrderCommand): Promise<CanvasArrangementSnapshot>
       moveCanvasStack(command: {
         readonly anchor: { readonly x: number; readonly y: number }
         readonly projectDirectory: string

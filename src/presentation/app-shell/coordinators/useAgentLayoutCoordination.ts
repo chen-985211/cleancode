@@ -28,7 +28,7 @@ interface UseAgentLayoutCoordinationInput {
   readonly moveWorkbenchNode: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
-  ) => Promise<void>
+  ) => Promise<boolean | void>
   readonly moveWorkspaceAgent: (
     agent: WorkspaceAgentSnapshot,
     position: { readonly x: number; readonly y: number },
@@ -123,18 +123,21 @@ export function useAgentLayoutCoordination({
     ]
   )
   const onNodeDragStop = useCallback(
-    async (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): Promise<void> => {
+    async (
+      event: globalThis.MouseEvent | TouchEvent,
+      node: WorkbenchFlowNode
+    ): Promise<boolean> => {
       const protection = dragProtectionByNodeIdRef.current.get(node.id)
       try {
         if (node.type !== 'agentConsole') {
-          await moveWorkbenchNode(event, node)
-          return
+          return (await moveWorkbenchNode(event, node)) !== false
         }
 
         const width = resolveNodeSize(node.style?.width, node.data.agent.layout.size.width)
         const height = resolveNodeSize(node.style?.height, node.data.agent.layout.size.height)
         try {
           await moveWorkspaceAgent(node.data.agent, node.position, { width, height })
+          return true
         } catch (error) {
           nodeStore.setNodes((nodes) => restoreWorkbenchNodeLayout(nodes, null, node))
           throw error

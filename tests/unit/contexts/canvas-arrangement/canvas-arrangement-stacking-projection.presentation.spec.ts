@@ -1,7 +1,6 @@
 import type { CanvasArrangementSnapshot } from '../../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { CanvasArrangementSelectionItem } from '../../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import {
-  createCanvasArrangementStackingZIndexProjection,
   resolveCanvasStackDragTarget,
   type CanvasArrangementProjectionNode
 } from '../../../../src/contexts/canvas-arrangement/presentation/view-models/canvasArrangementStackingProjection'
@@ -36,14 +35,6 @@ describe('canvas arrangement stacking projection', () => {
     },
     { id: 'agent-node-1', reference: { kind: 'agent', agentId: 'agent-1' } }
   ]
-
-  it('projects stable object bands without depending on Workbench node types', () => {
-    const zIndex = createCanvasArrangementStackingZIndexProjection(arrangement, nodes)
-
-    expect(zIndex.get('terminal-1')!).toBeLessThan(zIndex.get('group-1')!)
-    expect(zIndex.get('group-1')!).toBeLessThan(zIndex.get('group-terminal-1')!)
-    expect(zIndex.get('group-terminal-1')!).toBeLessThan(zIndex.get('agent-node-1')!)
-  })
 
   it('includes the complete combination when a member starts the stack drag', () => {
     const target = resolveCanvasStackDragTarget({

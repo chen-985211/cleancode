@@ -8,10 +8,6 @@ import {
   type CanvasArrangementSelectionItem
 } from './canvasArrangementSelection'
 
-const stackZIndexBase = 100
-const stackZIndexStride = 100
-const objectZIndexStride = 10
-
 type CanvasArrangementProjectionReference = Exclude<
   CanvasArrangementItemReference,
   { readonly kind: 'workflow' }
@@ -21,43 +17,6 @@ export interface CanvasArrangementProjectionNode {
   readonly id: string
   readonly memberNodeIds?: readonly string[]
   readonly reference: CanvasArrangementProjectionReference
-}
-
-export function createCanvasArrangementStackingZIndexProjection(
-  arrangement: CanvasArrangementSnapshot | undefined,
-  nodes: readonly CanvasArrangementProjectionNode[]
-): ReadonlyMap<string, number> {
-  const zIndexByNodeId = new Map<string, number>()
-  if (!arrangement) return zIndexByNodeId
-
-  arrangement.stacks.forEach((stack, stackIndex) => {
-    stack.items.forEach((item, itemIndex) => {
-      const base = stackZIndexBase + stackIndex * stackZIndexStride + itemIndex * objectZIndexStride
-
-      if (item.kind === 'workflow') {
-        nodes
-          .filter(
-            (node) =>
-              node.reference.kind === 'terminal' &&
-              item.terminalIds.includes(node.reference.terminalId)
-          )
-          .forEach((node) => zIndexByNodeId.set(node.id, base + 1))
-        return
-      }
-
-      const node = nodes.find(
-        (candidate) =>
-          canvasArrangementItemKey(candidate.reference) === canvasArrangementItemKey(item)
-      )
-      if (!node) return
-      zIndexByNodeId.set(node.id, item.kind === 'combination' ? base : base + 1)
-      if (item.kind === 'combination') {
-        node.memberNodeIds?.forEach((memberNodeId) => zIndexByNodeId.set(memberNodeId, base + 1))
-      }
-    })
-  })
-
-  return zIndexByNodeId
 }
 
 export interface CanvasStackDragTarget {

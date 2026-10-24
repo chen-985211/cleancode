@@ -22,8 +22,13 @@ export interface CanvasStackSnapshot {
   readonly items: readonly CanvasArrangementItemReference[]
 }
 
+// Workflow membership is derived from the current graph. Persist stable object
+// identities, including hidden combination members, rather than a flow ID or z-index.
+export type CanvasLayerItemReference = Exclude<CanvasArrangementItemReference, { kind: 'workflow' }>
+
 export interface CanvasArrangementSnapshot {
   readonly projectId: string
   readonly workspaceId: string
   readonly stacks: readonly CanvasStackSnapshot[]
+  readonly layerOrder?: readonly CanvasLayerItemReference[]
 }

@@ -24,7 +24,6 @@ import type { AgentToolApprovalController } from '../workbench/nodes/agent/agent
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { projectWorkbenchObjectMotion } from '../projections/workbenchObjectMotion'
 import { prefersReducedMotion } from '../workbench/viewport/workbenchViewportMotion'
-import { projectCanvasArrangementStackingOntoNodes } from '../projections/workbenchCanvasArrangementStackingProjection'
 import type { CanvasArrangementMotionChoreography } from '../../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 import {
   createTerminalStateStore,
@@ -206,27 +205,24 @@ export function useWorkbenchFlowNodes({
         (node) => node.type !== 'terminal' || !collapsedGraphMemberIds.has(node.id)
       )
       const agents = resolveWorkspaceAgents(currentWorkbench)
-      const nextNodes = projectCanvasArrangementStackingOntoNodes(
-        currentWorkbench?.canvasArrangement,
-        [
-          ...agents.map((agent) =>
-            createAgentConsoleFlowNode({
-              agent,
-              approvalController: currentAgentToolApprovals,
-              currentWorkbench,
-              currentWorkspace: currentWorkspace ?? null,
-              isSelected: selectedAgentId === agent.agentId,
-              onGraphUpdated: onAgentGraphUpdated,
-              onMcpCapabilityChange,
-              onRemove: onRemoveAgent,
-              onRename: onRenameAgent,
-              onResize: onResizeAgent,
-              onSelect: onSelectAgent
-            })
-          ),
-          ...terminalNodes
-        ]
-      )
+      const nextNodes = [
+        ...agents.map((agent) =>
+          createAgentConsoleFlowNode({
+            agent,
+            approvalController: currentAgentToolApprovals,
+            currentWorkbench,
+            currentWorkspace: currentWorkspace ?? null,
+            isSelected: selectedAgentId === agent.agentId,
+            onGraphUpdated: onAgentGraphUpdated,
+            onMcpCapabilityChange,
+            onRemove: onRemoveAgent,
+            onRename: onRenameAgent,
+            onResize: onResizeAgent,
+            onSelect: onSelectAgent
+          })
+        ),
+        ...terminalNodes
+      ]
       const graphId = graph?.id ?? null
       const shouldPreserveTransientLayout = graphIdUsedForNodesRef.current === graphId
       graphIdUsedForNodesRef.current = graphId

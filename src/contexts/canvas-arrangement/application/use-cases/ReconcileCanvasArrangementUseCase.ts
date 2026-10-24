@@ -5,6 +5,7 @@ export interface ReconcileCanvasArrangementCommand {
   readonly projectDirectory: string
   readonly projectId: string
   readonly validItemKeys: readonly string[]
+  readonly validLayerItemKeys?: readonly string[]
   readonly workspaceId: string
 }
 
@@ -15,7 +16,7 @@ export class ReconcileCanvasArrangementUseCase {
     const transaction = await this.repository.transactWorkspace(
       command.projectDirectory,
       { projectId: command.projectId, workspaceId: command.workspaceId },
-      (arrangement) => arrangement.reconcile(command.validItemKeys)
+      (arrangement) => arrangement.reconcile(command.validItemKeys, command.validLayerItemKeys)
     )
 
     return transaction.snapshot

@@ -6,6 +6,32 @@ import { useAppShellNodeDragActions } from '../../../src/presentation/app-shell/
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 
 describe('AppShell node drag actions', () => {
+  it.each(['success', 'returned', 'rejected'])(
+    'returns a usable drag result for %s and reports save errors once',
+    async (outcome) => {
+      const notify = vi.fn()
+      const { result } = renderHook(() =>
+        useAppShellNodeDragActions({
+          addQuickExecutionTarget: vi.fn(),
+          cancelNodeDrag: vi.fn(),
+          graph: createGraph(),
+          layoutSaveFailedMessage: 'Save failed',
+          layoutSaveFailedTitle: 'Layout',
+          nodeStore: createWorkbenchNodeStore([]),
+          notify,
+          onNodeDragStop: vi.fn(async () => {
+            if (outcome === 'rejected') throw new Error('save failed')
+            return outcome === 'success'
+          })
+        })
+      )
+      await expect(
+        result.current.commitWorkbenchNodeDrag({} as MouseEvent, {} as WorkbenchFlowNode)
+      ).resolves.toBe(outcome === 'success')
+      expect(notify).toHaveBeenCalledTimes(outcome === 'rejected' ? 1 : 0)
+    }
+  )
+
   it('restores committed terminal layout before binding a quick execution drop', async () => {
     const movedNode = {
       id: 'terminal-1',

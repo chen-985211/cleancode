@@ -12,11 +12,6 @@ export function createTerminalWorkflowEdges(
       .filter((group) => group.isCollapsed)
       .flatMap((group) => group.memberBlockIds.map((id) => [id, group.id] as const))
   )
-  const expandedMemberIds = new Set(
-    (graph?.terminalGroups ?? [])
-      .filter((group) => !group.isCollapsed)
-      .flatMap((group) => group.memberBlockIds)
-  )
 
   return (graph?.connections ?? [])
     .filter((connection) => {
@@ -43,12 +38,7 @@ export function createTerminalWorkflowEdges(
           .join(' '),
         animated: status === 'running',
         markerEnd: { type: MarkerType.ArrowClosed, color: 'context-stroke' },
-        deletable: true,
-        zIndex:
-          expandedMemberIds.has(connection.sourceBlockId) ||
-          expandedMemberIds.has(connection.targetBlockId)
-            ? 3
-            : undefined
+        deletable: true
       }
     })
 }
