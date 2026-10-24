@@ -1,11 +1,3 @@
-.react-flow__node-terminalGroup {
-  z-index: 1 !important;
-}
-
-.react-flow__node-terminalGroup.selected {
-  z-index: 2 !important;
-}
-
 .terminal-group-node {
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);

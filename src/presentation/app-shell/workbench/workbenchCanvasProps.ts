@@ -129,7 +129,7 @@ export interface WorkbenchCanvasProps {
   readonly onNodeDragStop: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
-  ) => void
+  ) => boolean | void | Promise<boolean | void>
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onViewportInteractionStart?: () => void
   readonly terminalZoomRasterCoordinator?: TerminalZoomRasterCanvasCoordinator

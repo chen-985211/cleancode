@@ -171,7 +171,9 @@ describe('terminal group drag actions', () => {
     act(() => result.current.beginTerminalGroupDrag({} as MouseEvent, terminal))
     const moved = { ...terminal, position: { x: 450, y: 280 } }
     nodeStore.setNodes((nodes) => nodes.map((node) => (node.id === terminal.id ? moved : node)))
-    await act(() => result.current.moveWorkbenchNode({} as MouseEvent, moved))
+    await act(async () => {
+      expect(await result.current.moveWorkbenchNode({} as MouseEvent, moved)).toBe(false)
+    })
     expect(api.moveTerminalWorkflowToGroup).not.toHaveBeenCalled()
     expect(api.moveBlock).not.toHaveBeenCalled()
     expect(nodeStore.getNodes().find((node) => node.id === terminal.id)).toMatchObject({
@@ -257,7 +259,7 @@ describe('terminal group drag actions', () => {
           })
       )
       act(() => result.current.beginTerminalGroupDrag({} as MouseEvent, group))
-      let pending!: Promise<void>
+      let pending!: Promise<boolean>
       act(() => {
         pending = result.current.moveWorkbenchNode({} as MouseEvent, {
           ...group,
