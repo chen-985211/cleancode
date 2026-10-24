@@ -130,6 +130,8 @@ Issue 正文由 `react-markdown` 10.1.0 和 `remark-gfm` 4.0.1 进行只读渲�
 
 当前桌面应用在按运行渠道和开发源码 worktree 隔离的 Electron 应用数据目录中，以 `project-state-v2` 作为当前业务状态根，使用版本化 JSON 保存项目、积木图、应用级收藏模板库、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。积木图写入 v5 并兼容读取 v2、v3、v4 与 v5，收藏模板库使用独立的 `block-template-library.json` 并只接受 schema v1，Agent 定义写入 schema v6 并兼容读取 v5；图和 Agent 都以稳定 `workspaceId` 定位，模板库则以稳定 `projectId` 区分项目作用域并保留独立的全局作用域。项目内 `.cleancode` 和旧应用状态根不会被读取、迁移或回写。产品尚未公开期间旧测试数据不构成兼容性约束，旧状态保留在原位置但不加载。发布包与人工发布测试共享正式目录，每个未打包源码 worktree 使用稳定独立的开发 profile，自动化测试通过显式临时目录隔离。Run 终端恢复目录使用独立 schema v2 JSON checkpoint 与 schema v1 有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
 
+CanvasArrangement 使用按项目与工作区隔离的 `canvas-arrangement.json` schema v4，保存视觉堆叠关系和类型化对象层级顺序。兼容读取 v1、v2、v3；旧版本缺少层级顺序时使用默认顺序，后续写入升级 v4。顺序与堆叠共用串行仓储事务和原子替换，不直接保存 React Flow 的数值层级。
+
 Electron Platform 在应用数据目录根部使用独立的 `window-state-v1.json` 保存主窗口正常尺寸、位置与正常、最大化或全屏模式；它是 Platform 拥有的技术偏好，不属于 `project-state-v2` 业务状态根或任何限界上下文仓储。该文件只接受 schema v1，缺失、损坏或不支持的版本均回退到安全默认窗口状态；显示器变化时保存的正常窗口边界会先规范化到当前可用工作区。最小化不持久化，屏幕外后台 E2E 只恢复尺寸。写入使用临时文件、文件同步与原子重命名。
 
 Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 保存终端画布与 Agent 协作两类开关；旧记录缺少字段或分类值非法时分别回退到开启，读取不回写。新 Agent 的 MCP 默认开关与已有 Agent 的独立开关保持原有作用域。

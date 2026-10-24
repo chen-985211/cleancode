@@ -52,7 +52,6 @@ export function createAgentConsoleFlowNode({
     position: agent.layout.position,
     selectable: false,
     selected: isSelected,
-    zIndex: 4,
     style: agent.layout.size,
     data: {
       identity: createCanvasObjectIdentity({

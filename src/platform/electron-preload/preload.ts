@@ -120,6 +120,8 @@ const cleancodeApi = {
   createCanvasStack: (command: unknown) =>
     invokeCleancode('cleancode:create-canvas-stack', command),
   moveCanvasStack: (command: unknown) => invokeCleancode('cleancode:move-canvas-stack', command),
+  saveCanvasLayerOrder: (command: unknown) =>
+    invokeCleancode('cleancode:save-canvas-layer-order', command),
   removeCanvasStack: (command: unknown) =>
     invokeCleancode('cleancode:remove-canvas-stack', command),
   createTerminalBlock: (command: unknown) =>

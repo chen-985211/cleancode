@@ -27,6 +27,7 @@ import type { MoveCanvasStackHandler } from '../context-adapters/canvas-arrangem
 import type { TerminalZoomRasterCanvasCoordinator } from './viewport/useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchNodeStore } from './nodes/workbenchNodeStore'
 import type { OrganizeCanvasHandler } from './viewport/useCanvasOrganization'
+import type { SaveCanvasLayerOrderCommand } from '../../../contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -78,6 +79,7 @@ export interface WorkbenchCanvasProps {
   readonly onArrangeCanvasSelection?: ArrangeCanvasSelectionHandler
   readonly onOrganizeCanvas?: OrganizeCanvasHandler
   readonly onMoveCanvasStack?: MoveCanvasStackHandler
+  readonly onSaveCanvasLayerOrder?: (command: SaveCanvasLayerOrderCommand) => Promise<void>
   readonly onDeleteTerminalScope?: (
     target: BatchTerminalRemovalTargetSnapshot
   ) => Promise<void> | void
@@ -129,7 +131,7 @@ export interface WorkbenchCanvasProps {
   readonly onNodeDragStop: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
-  ) => void
+  ) => boolean | void | Promise<boolean | void>
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onViewportInteractionStart?: () => void
   readonly terminalZoomRasterCoordinator?: TerminalZoomRasterCanvasCoordinator

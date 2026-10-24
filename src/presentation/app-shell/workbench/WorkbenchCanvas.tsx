@@ -22,11 +22,8 @@ import { filterMinimapNodes } from './minimap/minimapInteraction'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import { inactiveTerminalWorkflowController } from '../coordinators/inactiveTerminalWorkflowController'
 import { WorkbenchToolbar } from './toolbar/WorkbenchToolbar'
-import { createAgentApprovalIntentEdges } from '../projections/agentApprovalPresentation'
-import { projectAgentConnectionApprovalsOntoWorkflowEdges } from '../projections/agentApprovalConnectionProjection'
 import { workbenchEdgeTypes } from './nodes/workbenchNodeTypes'
 import { useI18n } from '../../i18n/useI18n'
-import { createWorkbenchObjectMotionEdgeProjector } from '../projections/workbenchObjectMotion'
 import { useWorkbenchNodes } from './nodes/workbenchNodeStore'
 import { LiveBlockTemplatePlacementPreview } from './creation/LiveBlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './creation/useBlockTemplateCanvasInteraction'
@@ -39,7 +36,6 @@ import { toQuickExecutionTarget } from '../../../contexts/block-graph/presentati
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { CanvasMenuMotionProvider } from './menus/CanvasMenuMotionProvider'
 import { useCanvasPaneContextMenu } from './menus/useCanvasPaneContextMenu'
-import { projectTerminalWorkflowBuildOntoEdges } from '../projections/terminalWorkflowBuildEdgePresentation'
 import { isTerminalConnectionAllowedInCanvasScope } from '../../../contexts/block-graph/presentation/view-models/terminalConnectionScope'
 import { useCanvasConnectionInteraction } from './useCanvasConnectionInteraction'
 import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotion'
@@ -63,6 +59,8 @@ import {
 } from './workbenchCanvasInteractionTargets'
 import { useWorkbenchCanvasViewportRestoration } from './viewport/useWorkbenchCanvasViewportRestoration'
 import { useWorkflowCanvasDragging } from './useWorkflowCanvasDragging'
+import { useWorkbenchCanvasEdges } from './useWorkbenchCanvasEdges'
+import { useWorkbenchCanvasLayers } from './useWorkbenchCanvasLayers'
 import type { WorkbenchCanvasProps } from './workbenchCanvasProps'
 import { ignoreAppNotifications } from '../../shared/notifications/appNotifications'
 import {
@@ -108,6 +106,7 @@ export function WorkbenchCanvas({
   onArrangeCanvasSelection,
   onOrganizeCanvas,
   onMoveCanvasStack,
+  onSaveCanvasLayerOrder,
   onDeleteTerminalScope,
   onAddQuickExecutionTarget,
   onClearQuickExecutionSlot,
@@ -146,36 +145,27 @@ export function WorkbenchCanvas({
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
   const { t } = useI18n()
-  const motionEdgeProjectorRef = useRef<ReturnType<
-    typeof createWorkbenchObjectMotionEdgeProjector
-  > | null>(null)
-  const motionEdgeProjector = (motionEdgeProjectorRef.current ??=
-    createWorkbenchObjectMotionEdgeProjector())
   const nodes = useWorkbenchNodes(nodeStore)
   useTerminalObjectMotionWorkload(nodes, terminalZoomRasterCoordinator)
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
-  const approvalEdges = useMemo(
-    () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null, t),
-    [approvalIntents, currentWorkbench?.graph, t]
-  )
-  const workflowEdges = useMemo(
-    () =>
-      projectAgentConnectionApprovalsOntoWorkflowEdges(
-        projectTerminalWorkflowBuildOntoEdges(workflow.edges, terminalWorkflowBuildPresentation),
-        approvalIntents,
-        currentWorkbench?.graph ?? null
-      ),
-    [approvalIntents, currentWorkbench?.graph, terminalWorkflowBuildPresentation, workflow.edges]
-  )
-  const baseEdges = useMemo(
-    () => [...workflowEdges, ...approvalEdges],
-    [approvalEdges, workflowEdges]
-  )
-  const edges = useMemo(
-    () => motionEdgeProjector.project(baseEdges, nodes),
-    [baseEdges, motionEdgeProjector, nodes]
-  )
+  const edges = useWorkbenchCanvasEdges({
+    approvalIntents,
+    currentWorkbench,
+    terminalWorkflowBuildPresentation,
+    workflow,
+    nodes
+  })
+  const layers = useWorkbenchCanvasLayers({
+    currentWorkbench,
+    nodes,
+    edges,
+    onNodeDragStart,
+    onNodeDragStop,
+    onCancelNodeDrag,
+    onMoveCanvasStack,
+    onSaveCanvasLayerOrder
+  })
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
   const canvasArrangement = useWorkbenchCanvasArrangement({
     currentWorkbench,
@@ -183,13 +173,13 @@ export function WorkbenchCanvas({
     nodeStore,
     nodes,
     onCancelNodeDrag,
-    onMoveCanvasStack,
-    onNodeDragStart
+    onMoveCanvasStack: layers.onMoveCanvasStack,
+    onNodeDragStart: layers.onNodeDragStart
   })
   const objectContextMenu = useCanvasObjectContextMenu({
-    edges,
+    edges: layers.edges,
     graph: currentWorkbench?.graph ?? null,
-    nodes,
+    nodes: layers.nodes,
     onRequestSaveBlockTemplate,
     onRequestDeleteTerminalScope: onDeleteTerminalScope,
     onRequestQuickExecutionBinding: onAddQuickExecutionTarget
@@ -269,7 +259,7 @@ export function WorkbenchCanvas({
     instanceRef: reactFlowInstanceRef,
     nodeStore,
     surfaceRef: canvasSurfaceRef,
-    onCancel: onCancelNodeDrag
+    onCancel: layers.onCancelNodeDrag
   })
   const activeDraggedNodeRef = nodeDragSession.activeRef
   const cancelledDragIdRef = nodeDragSession.cancelledRef
@@ -281,12 +271,12 @@ export function WorkbenchCanvas({
       cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
       cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
       onViewportInteractionStart?.()
-      onNodeDragStart(event, node, ids)
+      layers.onNodeDragStart(event, node, ids)
     },
     onPreview: onNodeDrag,
-    onCommit: onNodeDragStop,
+    onCommit: layers.onNodeDragStop,
     onViewportChange,
-    onCancel: onCancelNodeDrag
+    onCancel: layers.onCancelNodeDrag
   })
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
@@ -440,6 +430,7 @@ export function WorkbenchCanvas({
                 canvasArrangement.arrangement
               )}
               {...connectionInteraction.flowProps}
+              zIndexMode="manual"
               edgeTypes={workbenchEdgeTypes}
               isValidConnection={(connection: Connection | Edge) =>
                 isTerminalConnectionAllowedInCanvasScope(
@@ -560,10 +551,11 @@ export function WorkbenchCanvas({
                   )
                   setIsQuickExecutionDropTarget(false)
                   if (isDropTarget && target && onQuickExecutionNodeDrop) {
+                    layers.cancelDrag()
                     void onQuickExecutionNodeDrop(target, node)
                     return
                   }
-                  onNodeDragStop(event, nodeDragSession.projectNode(node))
+                  void layers.onNodeDragStop(event, nodeDragSession.projectNode(node))
                 } finally {
                   activeDraggedNodeRef.current = null
                   if (viewportMoveCompletionRef.current === 'node-drag') {

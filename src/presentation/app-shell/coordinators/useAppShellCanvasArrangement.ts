@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { CanvasArrangementSnapshot } from '../../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { SaveCanvasLayerOrderCommand } from '../../../contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
 import { useI18n } from '../../i18n/useI18n'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import { useCanvasArrangementActions } from './useCanvasArrangementActions'
@@ -45,7 +46,23 @@ export function useAppShellCanvasArrangement({
     [setCurrentWorkbench, setWorkbenches]
   )
 
-  return useCanvasArrangementActions({
+  const saveLayerOrder = useCallback(
+    async (command: SaveCanvasLayerOrderCommand): Promise<void> => {
+      try {
+        setCurrentArrangement(await window.cleancode!.saveCanvasLayerOrder(command))
+      } catch (error) {
+        notify({
+          kind: 'error',
+          message: t('canvas.arrangement.failed'),
+          title: t('canvas.arrangement.failedTitle')
+        })
+        throw error
+      }
+    },
+    [notify, setCurrentArrangement, t]
+  )
+
+  const actions = useCanvasArrangementActions({
     currentWorkbench,
     currentWorkspace,
     failureMessage: t('canvas.arrangement.failed'),
@@ -55,4 +72,5 @@ export function useAppShellCanvasArrangement({
     setCurrentArrangement,
     setCurrentGraph
   })
+  return { ...actions, saveLayerOrder }
 }

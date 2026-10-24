@@ -24,6 +24,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { createCodexAgent, launchWorkspaceAgentsE2e } from '../support/e2eWorkspaceAgents'
+import { setElectronContentSize } from '../support/e2eWindow'
 
 const nodeCases = {
   terminal: { title: '.terminal-node__title strong' },
@@ -51,9 +52,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
     workbench = launched.workbench
     fakeCodex = launched.fakeCodex
     // Keep zoomed titles clear of canvas controls on runners with small displays.
-    await resources.electronApp!.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]!.setContentSize(1440, 1000)
-    )
+    await setElectronContentSize(resources.electronApp!, { width: 1440, height: 1000 })
     await page.waitForFunction(() => innerWidth >= 1440 && innerHeight >= 1000)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expectDesktopRuntime(page)

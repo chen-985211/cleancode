@@ -232,7 +232,7 @@ export function useTerminalGroupDragActions({
 
   const moveWorkbenchNode = useCallback(
     async (event: DragEvent, node: WorkbenchFlowNode) => {
-      if (cancelledIdRef.current === node.id || !currentWorkbench || !currentWorkspace) return
+      if (cancelledIdRef.current === node.id || !currentWorkbench || !currentWorkspace) return false
       const generation = dragGenerationRef.current
       cancelledIdRef.current = node.id
       const session = sessionRef.current
@@ -240,7 +240,7 @@ export function useTerminalGroupDragActions({
       let committedGraph = currentWorkbench.graph
       if (node.type === 'agentConsole') {
         clearTerminalGroupDropPreview()
-        return
+        return false
       }
       const action =
         node.type === 'terminal' && !session?.isWorkflowTerminal
@@ -287,7 +287,7 @@ export function useTerminalGroupDragActions({
               completeDragReturn
             )
           )
-          return
+          return false
         }
         await layoutCommitQueue.enqueue(
           `${node.type}:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:${node.id}`,
@@ -327,6 +327,7 @@ export function useTerminalGroupDragActions({
             }
           }
         )
+        return true
       } catch (error) {
         if (dragGenerationRef.current !== generation) throw error
         if (session) {

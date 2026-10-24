@@ -74,7 +74,7 @@ describe('canvas arrangement filesystem persistence', () => {
     await writeFile(
       filePath,
       JSON.stringify({
-        version: 4,
+        version: 5,
         arrangement: { projectId: 'project-1', workspaceId: 'main', stacks: [] }
       })
     )
@@ -109,8 +109,8 @@ describe('canvas arrangement filesystem persistence', () => {
     )
 
     expect(contents).toEqual({
-      version: 3,
-      arrangement: { projectId: 'project-1', workspaceId: 'main', stacks: [] }
+      version: 4,
+      arrangement: { projectId: 'project-1', workspaceId: 'main', stacks: [], layerOrder: [] }
     })
   })
 

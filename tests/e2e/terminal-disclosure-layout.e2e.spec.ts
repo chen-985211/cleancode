@@ -127,7 +127,11 @@ describe('terminal disclosure flow rows', () => {
           let frame = 0,
             frames = 0,
             curvedFrames = 0
-          const tick = () => {
+          const channel = new MessageChannel()
+          // Sample after every shell has applied this frame's spring update,
+          // matching recordEdgeFrames rather than mixing two animation frames.
+          const tick = () => channel.port2.postMessage(null)
+          const sample = () => {
             const rects = ids.map((id) =>
               document
                 .querySelector(`[data-terminal-block-id="${id}"] .terminal-node`)!
@@ -156,12 +160,17 @@ describe('terminal disclosure flow rows', () => {
               if (Math.abs(from.y - to.y) > 10 && actual.getAttribute('d')?.includes('C'))
                 curvedFrames++
             }
+          }
+          channel.port1.onmessage = () => {
+            sample()
             frame = requestAnimationFrame(tick)
           }
           frame = requestAnimationFrame(tick)
           return {
             stop() {
               cancelAnimationFrame(frame)
+              channel.port1.close()
+              channel.port2.close()
               return { overlaps, frames, curvedFrames }
             }
           }

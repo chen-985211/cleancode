@@ -191,22 +191,9 @@
   cursor: var(--cc-canvas-pointer);
 }
 
-.react-flow__nodes {
-  z-index: 2;
-}
-
 .react-flow__node {
-  z-index: 3 !important;
   /* React Flow owns the layout anchor; springs animate the inner surface. */
   transition-property: none;
-}
-
-.react-flow__node-agentConsole {
-  z-index: 2 !important;
-}
-
-.react-flow__node.selected {
-  z-index: 4 !important;
 }
 
 .terminal-workflow-edge .react-flow__edge-path {

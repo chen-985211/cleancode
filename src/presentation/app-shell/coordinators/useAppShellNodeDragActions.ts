@@ -21,7 +21,7 @@ interface UseAppShellNodeDragActionsInput {
   readonly onNodeDragStop: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
-  ) => Promise<void>
+  ) => Promise<boolean | void>
 }
 
 export function useAppShellNodeDragActions({
@@ -44,14 +44,20 @@ export function useAppShellNodeDragActions({
   )
 
   const commitWorkbenchNodeDrag = useCallback(
-    (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
-      void onNodeDragStop(event, node).catch(() => {
+    async (
+      event: globalThis.MouseEvent | TouchEvent,
+      node: WorkbenchFlowNode
+    ): Promise<boolean> => {
+      try {
+        return (await onNodeDragStop(event, node)) !== false
+      } catch {
         notify({
           kind: 'error',
           message: layoutSaveFailedMessage,
           title: layoutSaveFailedTitle
         })
-      })
+        return false
+      }
     },
     [layoutSaveFailedMessage, layoutSaveFailedTitle, notify, onNodeDragStop]
   )

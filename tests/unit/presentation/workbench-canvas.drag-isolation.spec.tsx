@@ -15,6 +15,7 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 import { applyWorkbenchViewport } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportAdapter'
 import { createWorkbenchDirectZoomController } from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
 import type { WorkbenchCanvasProps } from '../../../src/presentation/app-shell/workbench/workbenchCanvasProps'
+import { inactiveTerminalWorkflowController } from '../../../src/presentation/app-shell/coordinators/inactiveTerminalWorkflowController'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null,
@@ -68,6 +69,131 @@ describe('workbench canvas drag isolation', () => {
     viewportMotionSpies.cancel.mockClear()
     directZoomSpies.cancel.mockClear()
   })
+
+  it.each(['release', 'Escape', 'pointercancel', 'lostpointercapture', 'blur'])(
+    'raises the complete workflow and retains only a successful %s',
+    async (finish) => {
+      const { agentNode, terminalNode } = createNodes()
+      const second = { ...terminalNode, id: 'terminal-2' }
+      const nodes = [terminalNode, agentNode, second]
+      const edge = {
+        id: 'dependency',
+        source: terminalNode.id,
+        target: second.id,
+        type: 'terminalDependency'
+      }
+      renderCanvas(nodes, vi.fn(), vi.fn(), vi.fn(), {
+        terminalWorkflow: { ...inactiveTerminalWorkflowController, edges: [edge] }
+      })
+      const readLayers = () => ({
+        nodes: Object.fromEntries(
+          reactFlowProps.latest!.nodes!.map((node) => [node.id, node.zIndex ?? 0])
+        ),
+        edge: reactFlowProps.latest!.edges!.find((entry) => entry.id === edge.id)!.zIndex ?? 0
+      })
+      const before = readLayers()
+      act(() => reactFlowProps.latest!.onNodeDragStart!({} as MouseEvent, terminalNode))
+      const during = readLayers()
+      expect(during.nodes[terminalNode.id]).toBe(during.nodes[second.id])
+      expect(during.edge).toBeGreaterThan(during.nodes[agentNode.id]!)
+      expect(during.nodes[terminalNode.id]).toBeGreaterThan(during.edge)
+      expect(reactFlowProps.latest!.nodes!.map((node) => node.selected)).toEqual(
+        nodes.map((node) => node.selected)
+      )
+      await act(async () => {
+        if (finish === 'release')
+          reactFlowProps.latest!.onNodeDragStop!({} as MouseEvent, {
+            ...terminalNode,
+            position: { x: terminalNode.position.x + 40, y: terminalNode.position.y }
+          })
+        else if (finish === 'Escape')
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+        else window.dispatchEvent(new Event(finish))
+      })
+      expect(readLayers()).toEqual(finish === 'release' ? during : before)
+      expect(reactFlowProps.latest!.zIndexMode).toBe('manual')
+    }
+  )
+
+  it.each([true, false])(
+    'settles a whole stack with success=%s without losing its internal order',
+    async (success) => {
+      const { agentNode, terminalNode } = createNodes()
+      const second = {
+        ...terminalNode,
+        id: 'terminal-2',
+        data: { ...terminalNode.data, block: { ...terminalNode.data.block, id: 'terminal-2' } }
+      }
+      let complete!: (value: boolean) => void
+      const pending = new Promise<boolean>((resolve) => {
+        complete = resolve
+      })
+      const onMoveCanvasStack = vi.fn(() => pending)
+      const onNodeDragStop = vi.fn(async () => true)
+      const onCancelNodeDrag = vi.fn()
+      const graph = {
+        id: 'graph',
+        projectId: 'project',
+        workspaceId: 'main',
+        viewport: { x: 0, y: 0, zoom: 1 },
+        blocks: [terminalNode.data.block, second.data.block],
+        connections: [],
+        terminalGroups: [],
+        quickExecutionSlots: []
+      }
+      renderCanvas([agentNode, terminalNode, second], vi.fn(), vi.fn(), vi.fn(), {
+        currentWorkbench: {
+          graph,
+          gitBranches: [],
+          project: { id: 'project', name: 'Project', directory: '/project', workspaces: [] },
+          canvasArrangement: {
+            projectId: 'project',
+            workspaceId: 'main',
+            stacks: [
+              {
+                id: 'stack',
+                anchor: terminalNode.position,
+                items: [
+                  { kind: 'terminal', terminalId: terminalNode.id },
+                  { kind: 'terminal', terminalId: second.id }
+                ]
+              }
+            ]
+          }
+        } as WorkbenchCanvasProps['currentWorkbench'],
+        onNodeDragStop,
+        onCancelNodeDrag,
+        onMoveCanvasStack
+      })
+      const readOrder = () =>
+        [...reactFlowProps.latest!.nodes!]
+          .sort((a, b) => a.zIndex! - b.zIndex!)
+          .map((node) => node.id)
+      // First cover the stack, then drag it back above the Agent.
+      act(() => reactFlowProps.latest!.onNodeDragStart!({} as MouseEvent, agentNode))
+      await act(async () => {
+        reactFlowProps.latest!.onNodeDragStop!({} as MouseEvent, {
+          ...agentNode,
+          position: { x: 50, y: 70 }
+        })
+      })
+      const before = readOrder()
+      expect(before.at(-1)).toBe(agentNode.id)
+      act(() => reactFlowProps.latest!.onNodeDragStart!({} as MouseEvent, terminalNode))
+      act(() =>
+        reactFlowProps.latest!.onNodeDragStop!({} as MouseEvent, {
+          ...terminalNode,
+          position: { x: terminalNode.position.x + 80, y: terminalNode.position.y }
+        })
+      )
+      expect(onMoveCanvasStack).toHaveBeenCalledOnce()
+      expect(onCancelNodeDrag).toHaveBeenCalledWith(terminalNode.id)
+      expect(onNodeDragStop).toHaveBeenCalledOnce()
+      expect(readOrder()).toEqual([agentNode.id, terminalNode.id, second.id])
+      await act(async () => complete(success))
+      expect(readOrder()).toEqual(success ? [agentNode.id, terminalNode.id, second.id] : before)
+    }
+  )
 
   it.each([
     { expected: 'true', reduceVisualNoise: true },
@@ -380,6 +506,8 @@ interface MockReactFlowProps {
   readonly children?: ReactNode
   readonly multiSelectionKeyCode?: string | null
   readonly nodes?: WorkbenchFlowNode[]
+  readonly edges?: ReactFlowModule.Edge[]
+  readonly zIndexMode?: string
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void

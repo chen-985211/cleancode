@@ -191,6 +191,7 @@ describe('app shell terminal group edit mode', () => {
     const movedNode = { ...terminalNode, position: { x: 860, y: 520 } }
 
     act(() => {
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, terminalNode)
       reactFlowProps.latest?.onNodesChange?.([
         { id: terminalNode.id, type: 'position', position: movedNode.position, dragging: false }
       ])
@@ -484,7 +485,7 @@ describe('app shell terminal group edit mode', () => {
     )
 
     expect(backendNode).toBeDefined()
-
+    act(() => reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, backendNode!))
     await reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
       ...backendNode!,
       position: { x: 1280, y: 260 }

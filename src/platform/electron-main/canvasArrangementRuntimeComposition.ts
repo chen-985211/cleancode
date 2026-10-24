@@ -6,11 +6,15 @@ import { GetCanvasArrangementUseCase } from '../../contexts/canvas-arrangement/a
 import { MoveCanvasStackUseCase } from '../../contexts/canvas-arrangement/application/use-cases/MoveCanvasStackUseCase'
 import { ReconcileCanvasArrangementUseCase } from '../../contexts/canvas-arrangement/application/use-cases/ReconcileCanvasArrangementUseCase'
 import { RemoveCanvasStackUseCase } from '../../contexts/canvas-arrangement/application/use-cases/RemoveCanvasStackUseCase'
+import { SaveCanvasLayerOrderUseCase } from '../../contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
 import { FileSystemCanvasArrangementRepository } from '../../contexts/canvas-arrangement/infrastructure/persistence/FileSystemCanvasArrangementRepository'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
 import { registerCanvasArrangementIpcHandlers } from './canvasArrangementIpcHandlers'
-import { resolveValidCanvasArrangementItemKeys } from './canvasArrangementReconciliationAdapter'
+import {
+  resolveValidCanvasArrangementItemKeys,
+  resolveValidCanvasLayerItemKeys
+} from './canvasArrangementReconciliationAdapter'
 
 export function createCanvasArrangementRuntime(storageDirectory: string) {
   const repository = new FileSystemCanvasArrangementRepository(storageDirectory)
@@ -19,6 +23,7 @@ export function createCanvasArrangementRuntime(storageDirectory: string) {
   const moveStack = new MoveCanvasStackUseCase(repository)
   const reconcileArrangement = new ReconcileCanvasArrangementUseCase(repository)
   const removeStack = new RemoveCanvasStackUseCase(repository)
+  const saveLayerOrder = new SaveCanvasLayerOrderUseCase(repository)
 
   return {
     registerIpcHandlers(ipcMain: IpcMainLike, logger: Logger): void {
@@ -27,7 +32,8 @@ export function createCanvasArrangementRuntime(storageDirectory: string) {
         ipcMain,
         logger,
         moveStack: (command) => moveStack.execute(command),
-        removeStack: (command) => removeStack.execute(command)
+        removeStack: (command) => removeStack.execute(command),
+        saveLayerOrder: (command) => saveLayerOrder.execute(command)
       })
     },
     async loadWorkspace(input: {
@@ -38,11 +44,12 @@ export function createCanvasArrangementRuntime(storageDirectory: string) {
       readonly workspaceId: string
     }): Promise<CanvasArrangementSnapshot> {
       let arrangement = await getArrangement.execute(input)
-      if (arrangement.stacks.length === 0) return arrangement
+      if (arrangement.stacks.length === 0 && !arrangement.layerOrder?.length) return arrangement
 
       arrangement = await reconcileArrangement.execute({
         projectDirectory: input.projectDirectory,
         projectId: input.projectId,
+        validLayerItemKeys: resolveValidCanvasLayerItemKeys(input.graph, input.agents),
         validItemKeys: resolveValidCanvasArrangementItemKeys(
           arrangement,
           input.graph,

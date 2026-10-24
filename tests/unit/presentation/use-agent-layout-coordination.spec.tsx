@@ -16,6 +16,28 @@ describe('Agent layout coordination', () => {
     vi.unstubAllGlobals()
   })
 
+  it.each(['terminal', 'terminalGroup'] as const)(
+    'passes through an uncommitted %s move',
+    async (type) => {
+      const node = { ...createNode('node', 'terminal'), type } as WorkbenchFlowNode
+      const { result } = renderHook(() =>
+        useAgentLayoutCoordination({
+          clearTerminalGroupDropPreview: vi.fn(),
+          currentProjectId: 'project',
+          currentWorkspaceId: 'main',
+          moveWorkbenchNode: vi.fn(async () => false),
+          moveWorkspaceAgent: vi.fn(),
+          nodeStore: createWorkbenchNodeStore([node]),
+          reactFlowInstanceRef: { current: null },
+          setCurrentGraph: vi.fn()
+        })
+      )
+      await act(async () => {
+        expect(await result.current.onNodeDragStop({} as MouseEvent, node)).toBe(false)
+      })
+    }
+  )
+
   it('keeps a user-dragged terminal protected and focuses once its commit settles', async () => {
     const terminalNode = createNode('terminal-1', 'terminal')
     const agentNode = createNode('agent:agent-1', 'agentConsole')
@@ -45,7 +67,7 @@ describe('Agent layout coordination', () => {
     expect(setCurrentGraph).toHaveBeenCalledWith(createGraph())
     expect(setViewport).not.toHaveBeenCalled()
 
-    let committed!: Promise<void>
+    let committed!: Promise<boolean>
     act(() => {
       committed = result.current.onNodeDragStop({} as MouseEvent, terminalNode)
     })
@@ -145,7 +167,7 @@ describe('Agent layout coordination', () => {
       })
     )
     act(() => result.current.onNodeDragStart({} as MouseEvent, group))
-    let previousRelease!: Promise<void>
+    let previousRelease!: Promise<boolean>
     act(() => {
       previousRelease = result.current.onNodeDragStop({} as MouseEvent, group)
     })

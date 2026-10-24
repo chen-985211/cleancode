@@ -235,7 +235,6 @@ function createTerminalFlowNode({
     position: buildInitialPosition ?? block.position,
     selectable: false,
     selected: isSelected,
-    zIndex: 3,
     style: {
       width: terminalBlockVisibleSize(block).width,
       height: terminalBlockVisibleSize(block).height
@@ -312,7 +311,6 @@ function createTerminalGroupFlowNode({
     position: group.position,
     selectable: false,
     selected: selectedTerminalGroupId === group.id,
-    zIndex: 1,
     style: {
       width: size.width,
       height: size.height
