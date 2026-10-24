@@ -14,6 +14,25 @@ describe('app shell minimap', () => {
     })
   })
 
+  it('starts collapsed in the bottom-right corner and toggles from the same control', () => {
+    render(<AppShell />)
+
+    const toggle = screen.getByRole('button', { name: '展开小地图' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle.closest('.react-flow__panel')).toHaveClass('bottom', 'right')
+    expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAccessibleName('收起小地图')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('img', { name: '积木导航小地图' })).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAccessibleName('展开小地图')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
+  })
+
   it('keeps collapsed terminal groups visible in the minimap', async () => {
     const collapsedWorkbench = createTerminalGroupWorkbench(true)
 
@@ -26,6 +45,7 @@ describe('app shell minimap', () => {
 
     render(<AppShell />)
 
+    fireEvent.click(await screen.findByRole('button', { name: '展开小地图' }))
     expect(await screen.findByRole('button', { name: '聚焦终端组合 启动项目' })).toBeInTheDocument()
   })
 
@@ -41,6 +61,7 @@ describe('app shell minimap', () => {
 
     render(<AppShell />)
 
+    fireEvent.click(await screen.findByRole('button', { name: '展开小地图' }))
     expect(await screen.findByRole('button', { name: '聚焦终端 Terminal 1' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '聚焦终端组合 启动项目' })).not.toBeInTheDocument()
   })
@@ -74,6 +95,7 @@ describe('app shell minimap', () => {
 
     render(<AppShell />)
 
+    fireEvent.click(await screen.findByRole('button', { name: '展开小地图' }))
     fireEvent.click(await screen.findByRole('button', { name: '聚焦 Agent Agent 1' }))
 
     expect(document.querySelector('[data-agent-console-node]')).toHaveClass(

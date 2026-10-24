@@ -610,7 +610,7 @@ export function WorkbenchCanvas({
               proOptions={{ hideAttribution: true }}
             >
               <Background color="var(--cc-border-strong)" gap={24} size={1} />
-              <Panel className="canvas-minimap-panel" position="top-left">
+              <Panel className="canvas-minimap-panel" position="bottom-right">
                 <CanvasMinimap
                   isCollapsed={isMinimapCollapsed}
                   nodes={minimapNodes}

@@ -205,6 +205,7 @@ describe('canvas minimap', () => {
     const viewportControls = screen.getByRole('group', { name: '画布视图控制' })
     const navigationRow = container.querySelector('.canvas-minimap__navigation-row')!
 
+    expect(navigationRow.previousElementSibling).toHaveClass('canvas-minimap__panel')
     expect(Array.from(navigationRow.children)).toEqual([viewportControls, minimapControls])
     expect(within(minimapControls).getAllByRole('button')).toHaveLength(1)
     expect(within(minimapControls).getByRole('button', { name: '收起小地图' })).toBeInTheDocument()

@@ -58,8 +58,8 @@ describe('app shell', () => {
     expect(screen.getByRole('menuitem', { name: '新建组合' })).toBeDisabled()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByLabelText('积木画布')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: '积木导航小地图' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
     expect(screen.queryByText('小地图')).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: 'Agent 面板' })).not.toBeInTheDocument()
     expect(

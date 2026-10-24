@@ -231,9 +231,13 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await selectTheme(page, 'dark')
       await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
 
+      await page.getByRole('button', { name: '展开小地图' }).click()
       const agentMinimapNode = page.locator('[data-minimap-node-id^="agent:"]').first()
       await agentMinimapNode.focus()
       await agentMinimapNode.press('Enter')
+      // Sample the terminal surface without the bottom-right navigation overlay.
+      await page.getByRole('button', { name: '收起小地图' }).click()
+      await page.locator('.canvas-minimap__panel').waitFor({ state: 'detached' })
       await expectProjectionColorContinuity(page, agentProjection, 'agent')
     },
     electronScenarioTimeoutMs
