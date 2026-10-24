@@ -1,6 +1,7 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -74,6 +75,13 @@ export function useAgentToolApprovals({
       )
     })
   }, [])
+
+  useEffect(() => {
+    const api = window.cleancode
+    if (!projectDirectory || !workspaceId || !api?.replayAgentToolApprovals) return
+    // Approval projection must recover even when a retained console skips session attachment.
+    void api.replayAgentToolApprovals({ projectDirectory, workspaceId }).catch(() => undefined)
+  }, [projectDirectory, workspaceId])
 
   const removeApproval = useCallback((approvalId: string) => {
     setApprovals((current) =>

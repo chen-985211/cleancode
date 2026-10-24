@@ -1,3 +1,4 @@
+import { TerminalSurfacePresentation } from './terminalSurfacePresentation'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon, type ISearchOptions } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
@@ -16,6 +17,7 @@ import type {
   TerminalSearchResults,
   TerminalSurface,
   TerminalSurfaceAttachment,
+  TerminalSurfaceRetentionHandlers,
   TerminalSurfaceWorkloadTarget
 } from './terminalSurfaceRegistry'
 import {
@@ -43,6 +45,8 @@ export function createTerminalXtermSurface(
 
 class XtermTerminalSurface implements TerminalSurface {
   private readonly terminal: XTerm
+  private readonly presentation: TerminalSurfacePresentation
+  private restoreRevision = 0
   private readonly fitAddon = new FitAddon()
   private readonly searchAddon = new SearchAddon({ highlightLimit: 1000 })
   private readonly unicodeAddon = new Unicode11Addon()
@@ -78,6 +82,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private readonly pendingOutputListeners = new Set<() => void>()
   private readonly terminalInputListeners = new Set<() => void>()
   private element: HTMLDivElement | null = null
+  private retainedHost: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private dataSubscription: IDisposable | null = null
   private searchSubscription: IDisposable | null = null
@@ -95,7 +100,9 @@ class XtermTerminalSurface implements TerminalSurface {
   private lastPublishedHasPendingOutput = false
   private lastPublishedIsOutputSettled = false
   private hasSnapshot = false
+  private restoredScreen: { readonly sequence: number; readonly content: string } | null = null
   private restoreRequired = false
+  private presentationSequence = 0
   private expectedSequence = 0
   private lastQueuedSequence = 0
   private pendingOutputBytes = 0
@@ -124,6 +131,7 @@ class XtermTerminalSurface implements TerminalSurface {
       scrollback: terminalSurfaceScrollbackRows,
       theme: readCanonicalTerminalTheme(terminalSourceTheme)
     })
+    this.presentation = new TerminalSurfacePresentation(this.terminal)
     this.terminal.loadAddon(this.fitAddon)
     this.terminal.loadAddon(this.searchAddon)
     this.terminal.loadAddon(this.unicodeAddon)
@@ -144,6 +152,14 @@ class XtermTerminalSurface implements TerminalSurface {
     if (this.isDisposed) return
     if (this.element && this.element !== attachment.element) this.detach(this.element)
 
+    this.restoreRevision += 1
+    this.terminal.options.cursorBlink = true
+    const resume = Boolean(
+      attachment.resume && this.retainedHost && this.hasSnapshot && !this.isRestoring
+    )
+    this.isRestoring = !resume
+    this.presentationSequence = this.lastQueuedSequence
+    this.presentation.attach(attachment.element, resume)
     this.element = attachment.element
     this.xtermRasterTarget.attach(attachment.element)
     this.element.dataset.terminalRenderer = this.rendererController.state
@@ -162,7 +178,7 @@ class XtermTerminalSurface implements TerminalSurface {
       this.terminal.open(attachment.element)
       installTerminalSelectionCopy(this.terminal, { onOpenSearch: () => this.onOpenSearch() })
       this.dataSubscription = this.terminal.onData((input) => {
-        for (const listener of this.terminalInputListeners) listener()
+        if (this.element) for (const listener of this.terminalInputListeners) listener()
         this.onInput(input)
       })
       this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>
@@ -175,13 +191,19 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.terminal.element) attachment.element.append(this.terminal.element)
     }
 
+    this.retainedHost?.remove()
+    this.retainedHost = null
+    if (!resume || !this.isOutputSettled()) this.presentation.conceal()
     this.fitAndReportDimensions()
+    if (resume) this.terminal.refresh(0, this.terminal.rows - 1)
     this.resizeObserver = new ResizeObserver(this.requestFitAndReportDimensions)
     this.resizeObserver.observe(attachment.element)
   }
 
-  detach(element: HTMLDivElement): void {
+  detach(element: HTMLDivElement, preserve = false): void {
     if (this.element !== element) return
+    this.restoreRevision += 1
+    this.presentation.detach(preserve)
     if (this.pendingFitAnimationFrame !== null) {
       window.cancelAnimationFrame(this.pendingFitAnimationFrame)
       this.pendingFitAnimationFrame = null
@@ -190,7 +212,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     this.xtermRasterTarget.detach(element)
-    this.terminal.element?.remove()
+    if (!preserve) this.terminal.element?.remove()
     this.element = null
   }
 
@@ -244,16 +266,31 @@ class XtermTerminalSurface implements TerminalSurface {
 
   async restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult> {
     if (this.isDisposed) return 'retry'
+    const revision = ++this.restoreRevision
+    this.presentation.conceal()
     this.isRestoring = true
     this.notifyPendingOutputChange()
     this.notifyOutputSettledChange()
     await this.waitForIdle()
-    if (this.isDisposed) return 'retry'
+    if (this.isDisposed || revision !== this.restoreRevision) return 'retry'
 
-    this.terminal.reset()
-    this.terminal.resize(snapshot.dimensions.columns, snapshot.dimensions.rows)
+    const previousBuffer = this.terminal.buffer.active
+    const bottomOffset = this.hasSnapshot ? previousBuffer.baseY - previousBuffer.viewportY : 0
+    const canReuseBuffer =
+      this.hasSnapshot &&
+      !this.restoreRequired &&
+      snapshot.sequence === this.expectedSequence &&
+      snapshot.sequence === this.restoredScreen?.sequence &&
+      snapshot.content === this.restoredScreen.content &&
+      snapshot.dimensions.columns === this.terminal.cols &&
+      snapshot.dimensions.rows === this.terminal.rows
     this.terminal.options.scrollback = snapshot.scrollbackRows
-    await this.writeToTerminal(snapshot.content)
+    if (!canReuseBuffer) {
+      this.terminal.reset()
+      this.terminal.resize(snapshot.dimensions.columns, snapshot.dimensions.rows)
+      await this.writeToTerminal(snapshot.content)
+    }
+    if (this.isDisposed || revision !== this.restoreRevision) return 'retry'
     this.expectedSequence = snapshot.sequence
     while (this.pendingOutputs[0]?.sequence <= snapshot.sequence) this.pendingOutputs.shift()
     this.recalculatePendingState(snapshot.sequence)
@@ -264,12 +301,18 @@ class XtermTerminalSurface implements TerminalSurface {
       return 'retry'
     }
 
+    this.presentationSequence = this.lastQueuedSequence
+    this.restoredScreen = { sequence: snapshot.sequence, content: snapshot.content }
     this.hasSnapshot = true
     this.isRestoring = false
     this.notifyPendingOutputChange()
     this.notifyOutputSettledChange()
     this.fitAndReportDimensions()
+    if (bottomOffset > 0) {
+      this.terminal.scrollToLine(Math.max(0, this.terminal.buffer.active.baseY - bottomOffset))
+    } else this.terminal.scrollToBottom()
     if (this.searchQuery) this.find(this.searchQuery, 'incremental')
+    this.presentRestoredContent()
     return 'ready'
   }
 
@@ -315,10 +358,64 @@ class XtermTerminalSurface implements TerminalSurface {
     this.notifyOutputSettledChange()
   }
 
+  park(): void {
+    this.presentation.detach()
+    this.terminal.blur()
+    this.terminal.options.cursorBlink = false
+    this.onDimensionsChange = () => undefined
+    this.onInput = () => undefined
+    this.onOpenLink = () => undefined
+    this.onOpenSearch = () => undefined
+    this.onRestoreRequired = () => undefined
+    this.onSearchResultsChange = () => undefined
+    this.lastReportedDimensions = null
+    this.clearSearch()
+  }
+
+  retain(handlers: TerminalSurfaceRetentionHandlers): boolean {
+    const element = this.element
+    if (!element || !this.hasSnapshot || this.isRestoring || !this.isRendererActivationSettled)
+      return false
+    const host = document.createElement('div')
+    host.setAttribute('inert', '')
+    host.setAttribute('aria-hidden', 'true')
+    // Keep the renderer connected and measurable without exposing pixels or keyboard input.
+    // Opacity also lets xterm paint accepted background output before a hot reveal.
+    host.style.cssText = `position:fixed;left:0;top:0;opacity:0;pointer-events:none;contain:strict;width:${element.clientWidth}px;height:${element.clientHeight}px;`
+    document.body.append(host)
+    this.retainedHost = host
+    this.onInput = handlers.onInput
+    this.onRestoreRequired = handlers.onRestoreRequired
+    this.onDimensionsChange = () => undefined
+    this.onOpenLink = () => undefined
+    this.onOpenSearch = () => undefined
+    this.onSearchResultsChange = () => undefined
+    this.clearSearch()
+    this.terminal.blur()
+    this.terminal.options.cursorBlink = false
+    if (this.terminal.element) host.append(this.terminal.element)
+    this.detach(element, true)
+    this.lastReportedDimensions = null
+    return true
+  }
+
+  private presentRestoredContent(): void {
+    this.presentation.present(
+      () =>
+        !this.isDisposed &&
+        !this.isRestoring &&
+        this.hasSnapshot &&
+        this.isRendererActivationSettled &&
+        this.expectedSequence >= this.presentationSequence
+    )
+  }
+
   dispose(): void {
     if (this.isDisposed) return
     if (this.element) this.detach(this.element)
     this.isDisposed = true
+    this.restoreRevision += 1
+    this.presentation.detach()
     this.pendingOutputs.length = 0
     this.pendingOutputBytes = 0
     this.notifyPendingOutputChange()
@@ -330,6 +427,8 @@ class XtermTerminalSurface implements TerminalSurface {
     this.fileLinkProviderSubscription?.dispose()
     this.rendererController.dispose()
     this.terminal.dispose()
+    this.retainedHost?.remove()
+    this.retainedHost = null
   }
 
   private async drainOutput(
@@ -363,6 +462,7 @@ class XtermTerminalSurface implements TerminalSurface {
         }
         this.notifyPendingOutputChange()
         this.notifyOutputSettledChange()
+        this.presentRestoredContent()
         resolve({ bytesWritten: batch.byteLength, durationMs })
       })
     })
@@ -410,11 +510,13 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.element) this.element.dataset.terminalRendererReady = 'true'
       this.notifyNonCriticalWorkChange()
       this.requestFitAndReportDimensions()
+      this.presentRestoredContent()
     }
   }
 
   private requestRestore(): void {
     if (this.isRestoring) return
+    this.presentation.conceal()
     this.isRestoring = true
     this.clearPendingOutputs(this.expectedSequence)
     this.hasSnapshot = false
@@ -504,7 +606,10 @@ class XtermTerminalSurface implements TerminalSurface {
 
   private fitAndReportDimensions(): void {
     if (!this.element) return
+    const { cols, rows } = this.terminal
     this.fitAddon.fit()
+    if (cols !== this.terminal.cols || rows !== this.terminal.rows) this.presentation.conceal()
+    this.presentRestoredContent()
     const dimensions = { columns: this.terminal.cols, rows: this.terminal.rows }
     if (
       dimensions.columns <= 0 ||

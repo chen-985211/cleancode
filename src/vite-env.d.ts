@@ -270,6 +270,10 @@ declare global {
         readonly approvalId: string
       }): Promise<AgentToolApprovalDecisionResult>
       rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
+      replayAgentToolApprovals(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+      }): Promise<void>
       onAgentActivityChanged(
         listener: (snapshot: TerminalAgentActivitySnapshot) => void
       ): () => void

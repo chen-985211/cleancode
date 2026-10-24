@@ -356,6 +356,13 @@ export class AgentSessionService {
     return this.approvalCoordinator.list()
   }
 
+  replayToolApprovals(command: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+  }): void {
+    this.approvalCoordinator.replayWaiting(command)
+  }
+
   async disposeSession(command: {
     readonly projectDirectory: string
     readonly workspaceId: string

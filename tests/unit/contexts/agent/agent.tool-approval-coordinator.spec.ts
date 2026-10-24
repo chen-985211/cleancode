@@ -5,6 +5,102 @@ import type { ManagedAgentSession } from '../../../../src/contexts/agent/applica
 import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 
 describe('Agent tool approval coordinator', () => {
+  it('replays waiting workspace approvals in arrival order without executing or reattaching', async () => {
+    const publish = vi.fn()
+    const sessions = [
+      { projectDirectory: '/repo/app', workspaceId: 'main' },
+      { projectDirectory: '/repo/app', workspaceId: 'main' },
+      { projectDirectory: '/repo/app', workspaceId: 'other' },
+      { projectDirectory: '/repo/other', workspaceId: 'main' }
+    ].map((scope, index) => {
+      const session = createManagedSession()
+      return {
+        ...session,
+        ...scope,
+        agentId: `agent-${index}`,
+        callbacks: { ...session.callbacks, onToolApprovalRequested: publish },
+        sessionId: `session-${index}`
+      }
+    })
+    const execute = vi.fn(async (command) => awaitingApproval(command.toolCallId))
+    const coordinator = new AgentToolApprovalCoordinator(
+      {
+        cancel: async (command, reason) => ({
+          output: { reason, type: 'tool_canceled' },
+          status: 'canceled',
+          toolCallId: command.toolCallId
+        }),
+        execute
+      },
+      (sessionId) => sessions.find((session) => session.sessionId === sessionId)
+    )
+    const calls = sessions.map((session, index) =>
+      coordinator.execute(session, {
+        input: { connectionId: 'connection-1' },
+        sessionId: session.sessionId,
+        toolCallId: `approval-${index}`,
+        toolName: 'disconnect_terminal_blocks'
+      })
+    )
+    await vi.waitFor(() => expect(coordinator.list()).toHaveLength(4))
+    publish.mockClear()
+
+    coordinator.replayWaiting({ projectDirectory: '/repo/app', workspaceId: 'main' })
+
+    expect(publish.mock.calls.map(([request]) => request.approvalId)).toEqual([
+      'approval-0',
+      'approval-1'
+    ])
+    expect(execute).toHaveBeenCalledTimes(4)
+    await coordinator.reject('approval-0')
+    publish.mockClear()
+    coordinator.replayWaiting({ projectDirectory: '/repo/app', workspaceId: 'main' })
+    expect(publish.mock.calls.map(([request]) => request.approvalId)).toEqual(['approval-1'])
+    for (const session of sessions) await coordinator.cancelSession(session.sessionId)
+    await Promise.all(calls)
+  })
+
+  it('does not replay an executing approval or a stopping session as waiting', async () => {
+    const session = createManagedSession()
+    let finish!: (result: AgentToolExecutionResult) => void
+    const coordinator = new AgentToolApprovalCoordinator(
+      {
+        cancel: vi.fn(),
+        execute: vi
+          .fn()
+          .mockResolvedValueOnce(awaitingApproval('approval-1'))
+          .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+      },
+      () => session
+    )
+    const call = coordinator.execute(session, {
+      input: { connectionId: 'connection-1' },
+      sessionId: session.sessionId,
+      toolCallId: 'approval-1',
+      toolName: 'disconnect_terminal_blocks'
+    })
+    await vi.waitFor(() => expect(coordinator.list()).toHaveLength(1))
+    const publish = vi.mocked(session.callbacks.onToolApprovalRequested)
+    publish.mockClear()
+    const scope = { projectDirectory: '/repo/app', workspaceId: 'main' }
+    session.isStopping = true
+    coordinator.replayWaiting(scope)
+    expect(publish).not.toHaveBeenCalled()
+    session.isStopping = false
+    coordinator.replayWaiting(scope)
+    expect(publish).toHaveBeenCalledOnce()
+
+    publish.mockClear()
+    const approval = coordinator.approve('approval-1')
+    coordinator.replayWaiting(scope)
+    expect(publish).not.toHaveBeenCalled()
+    finish(completedGraphResult('approval-1', true))
+    await expect(call).resolves.toMatchObject({ status: 'completed' })
+    await expect(approval).resolves.toMatchObject({ status: 'completed' })
+    coordinator.replayWaiting(scope)
+    expect(publish).not.toHaveBeenCalled()
+  })
+
   it('waits for an already approved call to finish instead of canceling it', async () => {
     let finishApprovedCall: (result: AgentToolExecutionResult) => void = () => undefined
     const execute = vi

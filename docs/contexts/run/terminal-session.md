@@ -123,11 +123,12 @@ Run 仍是 terminal 生命周期 owner。终端自然退出、显式关闭、rep
 
 1. `AttachView` 暂停 PTY 输出，等待模型完成已接受写入，生成 snapshot，并把 terminal query 响应权从隐藏模型交给该视图后恢复输出。
 2. snapshot 生成和 IPC 返回期间的 live output 进入 renderer 的有界队列；renderer 先恢复 snapshot，再接续大于 snapshot sequence 的连续事件。
-3. `DetachView` 只暂停输出并把响应权交还模型，不终止 PTY。旧 xterm 在主进程确认 detach 前保持可用，确认后立即销毁。
-4. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
-5. `ReplaceSession`、显式关闭和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出、工作流历史保留停止和 Provider 故障只保留有界最终模型，不伪造 live 状态。
-6. `AttachView` 请求完整匹配当前运行身份、但对应 `TerminalSession` 仍处于 `idle` 启动窗口时返回 `TERMINAL_RUNTIME_NOT_READY`；renderer 可以对同一身份执行有界且可取消的重试，IPC 不为该预期生命周期收敛写 warning。尚未成功建立的 view 在该窗口 detach 时视为已经释放。
-7. `AttachView` 返回 `RUN_SCOPE_STALE` 表示请求携带的完整运行身份已经终局失效；renderer 必须立即结束本次 attach，不得用同一身份定时重试。只有 React 接收到新的 `viewIdentity` 或 generation 后才允许发起下一次 attach。该结果仍通过结构化 IPC 错误返回调用方，但属于预期的作用域收敛，不记录 warning。
+3. 已完成 attach/restore 的视图离开工作区时，优先保留同一个已挂载 xterm、viewId、连续输出流和 query 响应权。Run 表现层 registry 统一拥有后台保留预算：每个窗口最多 6 个挂载或冷实例，离开视图满 5 分钟释放。容量淘汰在同一轮 React commit 交接结束后的 microtask 执行，先允许切入视图认领原租约，再将剩余后台实例裁剪到 6 个；不能在切出卸载、切入挂载之间淘汰即将复用的实例。后台挂载移入透明、inert、不可访问的等尺寸宿主，关闭光标闪烁与交互回调，以隐藏优先级消费输出，协议响应直接绑定原会话，不能使用已卸载组件的可变输入回调。命中相同完整运行身份时延续原租约，不重新 attach、不生成或重放完整 snapshot；较新视图、已知运行退出、身份替换、sequence 缺口或队列超限使旧保留失效。
+4. 淘汰时才执行 `DetachView`，它暂停输出并把响应权交还模型，不终止 PTY。确认前旧视图保持可用，确认或失败后释放注册、宿主与 renderer。在途 attach/restore 不能热保留，必须先等待恢复尾链结束再 detach；确认后，输出已收敛的实例仍可作为无租约冷缓存保留。冷创建或冷缓存命中使用新 viewId 和权威 snapshot，隐藏正文直到接续已接受输出、最终 fit、滚动定位和全视口绘制完成。热命中保留已绘制画面与原生滚动位置；尚有输出待解析或网格改变时，以接纳水位和完整绘制作为显示屏障，不重新恢复历史。持续新输出不得无限延后首帧。共享 workload 调度器在常态下优先处理焦点、可见、隐藏输出，但后台输出和 renderer 初始化连续等待 250 ms 后必须进入到期队列，按等待起点和服务次序逐个取得执行机会，不得依赖全局输出清空。每次到期回调至多推进一个输出片段或初始化任务；输出取得服务后重新计龄，初始化独立计龄。新输出通知可以重排回调，但不能重置既有工作的截止点。直接交互期间仍延后 renderer 初始化，交互结束后沿用累计等待；持有查询响应权的隐藏输出仍必须获得到期处理机会。冷缓存仅在序号、尺寸和上次权威屏幕均未变化时跳过解析，恢复时保留距末尾的行数偏移并裁剪到现有历史范围。
+5. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
+6. `ReplaceSession`、显式关闭和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出、工作流历史保留停止和 Provider 故障只保留有界最终模型，不伪造 live 状态。
+7. `AttachView` 请求完整匹配当前运行身份、但对应 `TerminalSession` 仍处于 `idle` 启动窗口时返回 `TERMINAL_RUNTIME_NOT_READY`；renderer 可以对同一身份执行有界且可取消的重试，IPC 不为该预期生命周期收敛写 warning。尚未成功建立的 view 在该窗口 detach 时视为已经释放。
+8. `AttachView` 返回 `RUN_SCOPE_STALE` 表示请求携带的完整运行身份已经终局失效；renderer 必须立即结束本次 attach，不得用同一身份定时重试。只有 React 接收到新的 `viewIdentity` 或 generation 后才允许发起下一次 attach。该结果仍通过结构化 IPC 错误返回调用方，但属于预期的作用域收敛，不记录 warning。
 
 Provider Client 的全局普通终端输出投影只接收 block-owned terminal；agent-owned terminal 输出只进入其精确绑定的 view 和进程回调。表现层对找不到匹配运行身份的普通终端输出必须保持状态引用不变，不能把 Agent 全屏重绘暂存为普通终端启动输出，也不能触发画布节点重投影。
 
@@ -137,7 +138,7 @@ renderer 以 `terminal-working-directory` 事件即时更新终端所属工作�
 
 应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Terminal Provider 处理，再让两个上下文 complete 并清除本地引用。Agent prepare 中可先请求当前 Agent Provider 前台 launch 正常结束，并在身份 reporter 仍存活时排空最终持久化；超时只结束这次 launch 级等待，之后仍进入统一 PTY handoff。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Terminal Provider release，也不证明全部 PTY 已物理退出。Terminal Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Terminal Provider 或形成不可用告警；正常运行期的工作目录查询失败保留模型缓存，真实 Provider 断连仍由连接生命周期独立发布 runtime unavailable。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
-因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能有一个响应者。OSC 10/11 默认前景色和背景色查询始终由权威 headless model 使用固定源主题回答，使协议响应不依赖可延迟的 renderer workload；可见 renderer xterm 必须消费同一查询但不再次响应。其他 terminal query 在视图接管期间继续由模型消费但不响应，并由当前 renderer xterm 唯一响应。
+因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。未保留挂载的后台终端不接收逐字节输出；有界热保留视图继续接收精确租约的输出。macOS/Linux 的 terminal query 在任意时刻只能有一个响应者。OSC 10/11 默认前景色和背景色查询始终由权威 headless model 使用固定源主题回答，使协议响应不依赖可延迟的 renderer workload；renderer xterm 必须消费同一查询但不再次响应。其他 terminal query 在视图接管期间继续由模型消费但不响应，并由当前可见或热保留 renderer xterm 唯一响应，淘汰 detach 后才交还模型。
 
 Windows 系统 ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的 OSC 查询和鼠标模式，只输出 screen buffer 差异；这会同时破坏默认颜色查询和可见 xterm 的鼠标输入。Run 因此固定启用 node-pty 随包的 ConPTY DLL，使完整 VT 序列进入既有模型/视图交接链路；OSC 10/11 由权威 headless model 唯一响应，其他查询由隐藏模型或当前 renderer xterm 中的一个响应。验证所用的 Codex 0.148 Windows 默认色路径不发送 OSC 10/11，而是直接用 `GetConsoleScreenBufferInfoEx` 读取当前 screen-buffer attributes 与 color table；`COLORFGBG` 和 xterm default palette 不能替代这项 Win32 事实。
 

@@ -157,9 +157,9 @@ Run 为普通 terminal 和 Agent foreground launch 都固定 `TERM=xterm-256colo
 
 Agent terminal 由 Run 承载，并在首次附加时固定 `terminalSourceTheme`。同一 terminal 再次附加时，renderer 发送当前有效主题作为新运行时提议，Run 为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；重新启动 Provider 或开始新对话只替换 terminal 内的 launch，不替换 terminal，也不改变 source theme。应用重启建立新 terminal 时才可以采用新的当前主题。
 
-Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequence 和 attach/detach 协议。工作区导航可以销毁 renderer xterm；隐藏期间 PTY 输出继续进入 Run 的 headless 模型，返回时创建新 surface，先注册定向视图，再恢复完整 snapshot 并接续严格连续的输出事件。不得依赖 renderer 常驻，也不得把截断输出尾部重新送入 parser。
+Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequence 和 attach/detach 协议。工作区导航优先热保留 renderer xterm；隐藏期间 PTY 输出继续进入 Run 的 headless 模型，并投递给仍持有租约的隐藏视图。热命中延续同一 surface 和 viewId；未命中时取得新建或冷缓存的 surface，先注册新的定向视图，再恢复完整 snapshot 并接续严格连续的输出事件。不得依赖 renderer 常驻，也不得把截断输出尾部重新送入 parser。
 
-Provider launch replacement 不会重置 surface 或终端模型。只有 Agent terminal identity 真正变化时才按新 snapshot 恢复视图；旧 identity、旧 `viewId` 或 sequence 缺口都必须触发拒绝或有界重试。Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放 terminal、模型与视图租约；普通视图卸载只释放可丢弃 surface。
+Provider launch replacement 不会重置 surface 或终端模型。只有 Agent terminal identity 真正变化时才按新 snapshot 恢复视图；旧 identity、旧 `viewId` 或 sequence 缺口都必须触发拒绝或有界重试。Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放 terminal、模型与视图租约；普通视图卸载优先转入有界热保留；不满足条件时释放视图租约，已确认 detach 且输出收敛的 surface 可进入冷缓存。
 
 [`agent-terminal-view.spec.tsx`](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 证明 Agent 使用共享 snapshot/sequence 视图协议、定向输出、输入、resize 和清理；[`run.terminal-surface-registry.presentation.spec.ts`](../../tests/unit/contexts/run/run.terminal-surface-registry.presentation.spec.ts) 证明共享 registry 的精确 `viewId` 路由；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和 ANSI 输出证明工作区往返、源主题固定与最终像素明暗。
 
@@ -169,22 +169,34 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 同一工作区的重试是 single-flight。重新启动或新对话 attach 失败时，hook 保留原 terminal binding，输入仍指向原 session；切换作用域会使旧请求失效，迟到结果不能覆盖新工作区。排障时分别记录测量 key、attach operation、session binding 和 workspace generation，避免把 Provider launch 失败、Agent session attach 失败与后续 `AttachView` snapshot 恢复失败混为同一问题。[`agent-console.attach-lifecycle.spec.tsx`](../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx) 覆盖失败可见、重复重试、既有 binding 保留和迟到作用域隔离。
 
+## 工作区切换的首帧与实例缓存
+
+共享 surface 在冷 attach、重放和 sequence 缺口恢复期间用 xterm 内层的 `opacity: 0` 隐藏正文，保留外层布局、字宽测量和渲染优先级。快照解析结束并不代表可见帧完成：必须先接续恢复期间已接受的输出，完成 fit 和滚动定位，等待 renderer 初始化或 DOM 降级结束，收到覆盖全部可见行的 `onRender` 后再于下一帧显示。热命中直接保留已绘制画面；若输出或尺寸需要收敛，完整 `onRender` 当帧即可显示，无需再增加一帧等待。重复输出调度不得反复取消已经等待显示的帧；detach、下一次 restore 和尺寸变化必须使旧回调失效。不要使用固定延迟猜测渲染完成。
+
+窗口级 registry 以同一个预算最多保留 6 个后台挂载或冷 surface，每个最多保留 5 分钟。容量裁剪在同一轮 commit 的挂载交接结束后执行，避免切出的一组终端把即将切入的一组提前淘汰。热保留把 xterm 移入透明、inert、等尺寸的已连接宿主，关闭光标闪烁和交互入口，保持隐藏优先级输出调度及唯一 query 响应租约。切回在 layout effect 中重新绑定宿主，延续 viewId、buffer 和已绘制画面，不请求 snapshot；尺寸变化或尚未消费的输出通过绘制屏障收敛。淘汰才 detach，并在确认后释放 renderer、宿主和注册。隐藏流缺口/超限触发淘汰；未完成 attach/restore 的视图使用原来的有序 detach 与冷缓存路径。
+
+真实 Electron 验证位于 `tests/integration/contexts/run/run.terminal-surface-presentation.spec.ts`：使用生产 surface 和 registry，给历史与目标画面不同颜色，读取第一张可见 WebGL 帧逐行像素，覆盖冷创建、缓存复用、尺寸改变与 generation 替换，并验证历史阅读位置与 DOM renderer 降级。热路径重复切换并逐帧检查无空白、无恢复、原租约和首帧像素，记录首帧延迟分布；隐藏新输出与 CSI 查询使用同一实例验证。完整 worktree E2E 另外记录真实点击到终端可见的耗时与切入后的空白帧，验证真实 PTY 下的唯一响应者。计时与截图写入 `test-results/terminal-surface-presentation/`；局部挂载耗时不能冒充完整工作区耗时。单元测试补充恢复水位、持续输出、迟到回调、缓存上限、过期及 detach 交接顺序。
+
+Agent 路径还必须覆盖 session binding 在 surface 之前的生命周期：仅向 surface 测试预先传入 session，会漏掉真实 AgentConsole 重挂载时先等待测量和异步 attach 的空白窗口。`tests/integration/contexts/agent/agent.workspace-presentation.spec.ts` 使用生产 AgentConsole、AppShellProviders 和 CSS，在 StrictMode 下对两个各含 6 个 Agent 的工作区反复切换，连续检查 20 帧的全部终端、原 DOM 身份、无新增 attach/snapshot，以及 WebGL 逐行像素和 DOM 降级正文。`agent-terminal-theme-workspaces.e2e.spec.ts` 再验证真实应用、IPC 与 Agent PTY 的返回路径；普通终端和 Agent 共用 20 帧观测，不能首帧 ready 后就停止检测。Agent 计时与截图写入 `test-results/agent-workspace-presentation/`，首次帧延迟和整段观测时长分别记录。
+
+持续输出排障必须同时观察首帧初始化和隐藏 parser 的进展。共享 workload 调度器常态保留焦点优先；后台输出与初始化等待 250 ms 后按各自等待起点进入到期队列，一次仅处理一个片段或任务。新通知不得后移绝对截止点或反复取消已到期的回调，输出执行后重置自己的等待年龄，不能让一直有输出的目标永久占据到期队列。直接交互期间不强制初始化 WebGL，结束后继续累计等待；隐藏查询解析仍可到期推进。`run.terminal-workload-scheduler.spec.ts` 覆盖各输出优先级、6 个隐藏响应者、交互期、混合任务和每毫秒到达的输出通知；`run.terminal-surface-presentation.spec.ts` 在真实 Electron 中注入持续积压的竞争目标，检查 WebGL/DOM 首帧完整，以及隐藏 CSI 查询唯一响应、输出可见和原租约复用。竞争目标保持有输出，不以停止生产者作为通过条件。
+
 ## 普通终端的 worktree 重挂载
 
 普通终端的 PTY 和权威屏幕模型由 Run 上下文按完整运行身份持有，React 画布只负责当前工作区的可见投影。工作区切换可以卸载 `TerminalViewport` 并最终销毁 renderer xterm；隐藏期间的 ANSI 解析、滚动历史、终端模式和输出序号继续由主进程模型维护。
 
-普通终端内手动启动的 TUI 可以查询默认颜色并缓存主题判断，但普通终端还存在 renderer 未挂载的隐藏阶段。每个 terminal generation 因此固定创建时的 `terminalSourceTheme`：各平台都由 headless 模型在隐藏时按 canonical palette 回答 terminal query，可见 xterm 接管后使用同一 palette，attach/detach 交接保证两者不会同时响应。Windows 随包 ConPTY DLL 负责把查询交给这条链路；不发查询而直接读取 Win32 attributes 的 Codex 0.148 只在稳定 command shim 内获得 invocation-scoped ConsoleColor bridge，直接 Agent 则使用 foreground `started` 前的既有准备。应用主题变化只通过 source dataset 的统一视觉转换投影，不修改运行中 CLI 已识别的 palette。新 generation 可以采用新的当前主题，恢复的同一 generation 必须沿用 checkpoint record 中的原主题。
+普通终端内手动启动的 TUI 可以查询默认颜色并缓存主题判断，但普通终端还存在 renderer 未挂载的隐藏阶段。每个 terminal generation 因此固定创建时的 `terminalSourceTheme`：各平台在没有 renderer 租约时由 headless 模型按 canonical palette 回答 terminal query，可见或热保留 xterm 持有租约时使用同一 palette，attach/detach 交接保证两者不会同时响应；OSC 10/11 始终由模型唯一响应。Windows 随包 ConPTY DLL 负责把查询交给这条链路；不发查询而直接读取 Win32 attributes 的 Codex 0.148 只在稳定 command shim 内获得 invocation-scoped ConsoleColor bridge，直接 Agent 则使用 foreground `started` 前的既有准备。应用主题变化只通过 source dataset 的统一视觉转换投影，不修改运行中 CLI 已识别的 palette。新 generation 可以采用新的当前主题，恢复的同一 generation 必须沿用 checkpoint record 中的原主题。
 
-普通终端必须保持以下恢复顺序：
+普通终端命中热保留时按上节延续原租约；未命中时必须保持以下恢复顺序：
 
-1. 每次可见挂载创建新的 xterm 和唯一 `viewId`，并在请求 snapshot 前注册 surface，使较早到达的 live output 可以进入临时队列。
+1. 每次可见挂载取得新建或完整身份匹配的缓存 xterm，创建唯一的新 `viewId`，并在请求 snapshot 前注册 surface，使较早到达的 live output 可以进入临时队列。
 2. 主进程 attach 先暂停 PTY 输出、排空模型写入并生成带 `RestoreMarker` 的 snapshot，再把 terminal query 响应权交给当前视图并恢复 PTY 输出。
-3. renderer 先按 snapshot 原始行列 reset 和 replay，再丢弃不大于 snapshot sequence 的事件，只接续严格连续的后续输出，最后按当前可见容器重新 fit。
+3. renderer 隐藏正文后先按 snapshot 原始行列 reset 和 replay（满足上文完整复用条件时可跳过重复解析），再丢弃不大于 snapshot sequence 的事件，只接续严格连续的后续输出，最后按当前可见容器重新 fit、恢复滚动位置并等待完整绘制后显示。
 4. 恢复队列上限为 1 MiB；sequence 缺口或溢出触发新的 attach，恢复重试有界，不能继续无界累计。
-5. worktree 切走时先从 DOM detach，但在主进程确认响应权已经交回隐藏模型前暂不 dispose xterm；确认后释放 surface。该动作不终止 PTY，也不撤销自然退出模型的进程内恢复资格。
+5. worktree 切走时优先转入有界热保留；不满足热保留条件时先从 DOM detach，但在主进程确认响应权已经交回隐藏模型前暂不 dispose xterm，确认后释放租约，surface 按有界冷缓存策略保留或销毁。该动作不终止 PTY，也不撤销自然退出模型的进程内恢复资格。
 6. session replacement、显式终止、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放对应 PTY、模型、视图租约和缓冲。
 
-隐藏普通终端不再持续接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见视图取得定向租约后才接收带 sequence 的低延迟事件。各平台隐藏时由模型响应 terminal query、可见时由 renderer xterm 响应，attach/detach 使用 PTY pause、模型 flush 和确认后销毁，保证同一查询不会由两端重复响应；Windows 随包 ConPTY DLL 保留这类查询。Agent foreground 与普通 Codex shim 的 ConsoleColor bridge 只改变同一 Console 的短期 Win32 probe 事实，私有输出 gate 在这条唯一输出流进入模型前消费 host 控制 span，不建立第二套响应权。
+未热保留的隐藏普通终端不接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见或热保留视图持有定向租约时接收带 sequence 的低延迟事件。OSC 10/11 始终由模型唯一响应，其他 terminal query 由当前租约的 renderer xterm 响应，无租约时由模型响应；attach/detach 使用 PTY pause、模型 flush 和确认后释放视图租约，保证同一查询不会由两端重复响应。Windows 随包 ConPTY DLL 保留这类查询。Agent foreground 与普通 Codex shim 的 ConsoleColor bridge 只改变同一 Console 的短期 Win32 probe 事实，私有输出 gate 在这条唯一输出流进入模型前消费 host 控制 span，不建立第二套响应权。
 
 快照还必须包含尚未结束的控制序列前缀：例如切走时输出停在 `ESC [`，重新挂载后必须把下一块的 `2;1H` 接成光标指令，不能把它绘制成文字。这个前缀由 Run 模型统一维护，已执行的控制字符不重复回放；相关跨块与恢复矩阵由 [`run.terminal-view-stream-continuity.spec.ts`](../../tests/integration/contexts/run/run.terminal-view-stream-continuity.spec.ts) 使用真实 xterm 与未中断输出对比验证。
 
@@ -194,7 +206,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model 承担；`.xterm-viewport` 不再是可用 `scrollTop` 判断历史是否存在的原生滚动容器。自动化验证优先使用 xterm 支持的 `Shift+PageUp` 用户交互和可见行结果，不得用旧 DOM 元素的 `scrollHeight` 作为 buffer oracle。
 
-[`run.terminal-surface-registry.presentation.spec.ts`](../../tests/unit/contexts/run/run.terminal-surface-registry.presentation.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`run.terminal-runtime-viewport.interaction.presentation.spec.tsx`](../../tests/unit/contexts/run/run.terminal-runtime-viewport.interaction.presentation.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`run.foreground-job-shell-control.spec.ts`](../../tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts) 证明 Windows Agent launch script 在 started 前选择正确 ConsoleColor；[`run.terminal-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.terminal-private-output-control.spec.ts) 与 [`run.node-pty-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.node-pty-private-output-control.spec.ts) 证明普通终端 private span 跨 chunk 过滤、错误 token 透传、私有环境原子激活和 Provider ANSI 保留；[`agent.terminal-activity-windows-command-shim.spec.ts`](../../tests/integration/contexts/agent/agent.terminal-activity-windows-command-shim.spec.ts) 在原生 Windows 中证明 light/dark Codex probe、非零退出、`Ctrl+C`、ConsoleColor 恢复和 shell 可写；[`run.windows-agent-pty.spec.ts`](../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) 继续证明随包 ConPTY 保留 mouse mode 与直接 Agent fallback；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
+[`run.terminal-surface-registry.presentation.spec.ts`](../../tests/unit/contexts/run/run.terminal-surface-registry.presentation.spec.ts) 证明精确 `viewId` 路由、缓存有界回收、热命中沿用租约与冷恢复创建新租约；[`run.terminal-runtime-viewport.interaction.presentation.spec.tsx`](../../tests/unit/contexts/run/run.terminal-runtime-viewport.interaction.presentation.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后释放或缓存；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`run.foreground-job-shell-control.spec.ts`](../../tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts) 证明 Windows Agent launch script 在 started 前选择正确 ConsoleColor；[`run.terminal-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.terminal-private-output-control.spec.ts) 与 [`run.node-pty-private-output-control.spec.ts`](../../tests/unit/contexts/run/run.node-pty-private-output-control.spec.ts) 证明普通终端 private span 跨 chunk 过滤、错误 token 透传、私有环境原子激活和 Provider ANSI 保留；[`agent.terminal-activity-windows-command-shim.spec.ts`](../../tests/integration/contexts/agent/agent.terminal-activity-windows-command-shim.spec.ts) 在原生 Windows 中证明 light/dark Codex probe、非零退出、`Ctrl+C`、ConsoleColor 恢复和 shell 可写；[`run.windows-agent-pty.spec.ts`](../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) 继续证明随包 ConPTY 保留 mouse mode 与直接 Agent fallback；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后重新挂载视图、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
 
 ## 普通终端的 Unicode 与 renderer 降级
 
@@ -274,7 +286,7 @@ Agent 控制台与普通终端共享 Run 视图不变量；Agent 额外维护首
 8. 行内最后一个可见字形不超过行右边界，终端没有水平溢出。
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
 10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
-11. 同一 Agent terminal 的终端源主题在运行期间保持不变；工作区往返可以创建新 surface，但必须从同一 Run 模型恢复 canonical palette、snapshot 和连续 sequence。
+11. 同一 Agent terminal 的终端源主题在运行期间保持不变；工作区往返热命中延续原 surface 与连续 sequence；未命中时从同一 Run 模型恢复 canonical palette、snapshot 和连续 sequence。
 12. 未过滤 wrapper 承载当前主题背景和上/左/下阅读留白，mismatch filter 只作用于源主题 direct viewport；两者最终颜色连续，第一方覆盖层位于被过滤子树之外。
 
 ## 排障流程

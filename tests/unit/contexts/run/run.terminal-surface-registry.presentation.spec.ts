@@ -6,6 +6,145 @@ import {
 } from '../../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 
 describe('terminal surface registry disposable views', () => {
+  it('claims the incoming workspace before trimming outgoing mounts from the same commit', async () => {
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(
+      () => {
+        const surface = createFakeSurface()
+        surface.retain = vi.fn(() => true)
+        return surface
+      },
+      () => `view-${++id}`
+    )
+    const scopes = ['incoming', 'outgoing'].map((workspaceId) =>
+      Array.from({ length: 6 }, (_, index) => ({
+        ...createIdentity(),
+        workspaceId,
+        blockId: `block-${index}`
+      }))
+    )
+    const incoming = scopes[0]!.map((identity) => registry.create(identity))
+    const outgoing = scopes[1]!.map((identity) => registry.create(identity))
+    const detach = vi.fn(async () => undefined)
+    for (const lease of incoming) registry.retain(lease.viewId, { detach, onInput: vi.fn() })
+    await Promise.resolve()
+    for (const lease of outgoing) registry.retain(lease.viewId, { detach, onInput: vi.fn() })
+    const resumed = scopes[0]!.map((identity) => registry.create(identity))
+    await Promise.resolve()
+    expect(resumed.map((lease) => lease.viewId)).toEqual(incoming.map((lease) => lease.viewId))
+    expect(resumed.every((lease) => lease.retained)).toBe(true)
+    expect(detach).not.toHaveBeenCalled()
+    registry.disposeAll()
+  })
+
+  it('keeps the live lease and output stream when a mounted terminal is retained', () => {
+    const surface = createFakeSurface()
+    surface.retain = vi.fn(() => true)
+    const detach = vi.fn(async () => undefined)
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => `view-${++id}`
+    )
+    const identity = createIdentity()
+    const first = registry.create(identity)
+    expect(registry.retain(first.viewId, { detach, onInput: vi.fn() })).toBe(true)
+    registry.write(createOutputEvent(identity, first.viewId, 1, 'hidden output'))
+    expect(surface.write).toHaveBeenCalledWith({ sequence: 1, data: 'hidden output' })
+    const second = registry.create(identity)
+    expect(second).toMatchObject({ viewId: first.viewId, surface, retained: true })
+    expect(detach).not.toHaveBeenCalled()
+    registry.disposeAll()
+  })
+
+  it('hands the response lease back exactly once on bounded eviction, then disposes', async () => {
+    let id = 0
+    let acknowledge!: () => void
+    const detach = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          acknowledge = resolve
+        })
+    )
+    const registry = new TerminalSurfaceRegistry(
+      () => {
+        const surface = createFakeSurface()
+        surface.retain = vi.fn(() => true)
+        return surface
+      },
+      () => `view-${++id}`
+    )
+    const leases = Array.from({ length: 7 }, (_, index) => {
+      const lease = registry.create({ ...createIdentity(), blockId: `block-${index}` })
+      registry.retain(lease.viewId, { detach, onInput: vi.fn() })
+      return lease
+    })
+    await Promise.resolve()
+    expect(detach).toHaveBeenCalledOnce()
+    expect(leases[0]!.surface.dispose).not.toHaveBeenCalled()
+    acknowledge()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(leases[0]!.surface.dispose).toHaveBeenCalledOnce()
+    registry.disposeAll()
+  })
+
+  it('retires a hidden stream that needs restoration instead of keeping a broken hot entry', async () => {
+    const surface = createFakeSurface()
+    let requireRestore!: () => void
+    surface.retain = vi.fn((handlers) => {
+      requireRestore = handlers.onRestoreRequired
+      return true
+    })
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => `view-${++id}`
+    )
+    const first = registry.create(createIdentity())
+    const detach = vi.fn(async () => undefined)
+    registry.retain(first.viewId, { detach, onInput: vi.fn() })
+    requireRestore()
+    requireRestore()
+    await Promise.resolve()
+    expect(detach).toHaveBeenCalledOnce()
+    expect(registry.create(createIdentity()).viewId).not.toBe(first.viewId)
+    registry.disposeAll()
+  })
+
+  it.each(['timeout', 'exit', 'replacement', 'shutdown'] as const)(
+    'releases mounted retention on %s without reviving the old lease',
+    async (reason) => {
+      vi.useFakeTimers()
+      let id = 0
+      const registry = new TerminalSurfaceRegistry(
+        () => {
+          const surface = createFakeSurface()
+          surface.retain = vi.fn(() => true)
+          return surface
+        },
+        () => `view-${++id}`
+      )
+      try {
+        const identity = createIdentity()
+        const first = registry.create(identity)
+        const detach = vi.fn(async () => undefined)
+        registry.retain(first.viewId, { detach, onInput: vi.fn() })
+        if (reason === 'timeout') vi.advanceTimersByTime(5 * 60_000)
+        if (reason === 'exit') registry.forget(identity)
+        if (reason === 'replacement') registry.create({ ...identity, generation: 2 })
+        if (reason === 'shutdown') registry.disposeAll()
+        await Promise.resolve()
+        expect(detach).toHaveBeenCalledOnce()
+        expect(first.surface.dispose).toHaveBeenCalledOnce()
+        if (reason !== 'shutdown') expect(registry.create(identity).viewId).not.toBe(first.viewId)
+      } finally {
+        registry.disposeAll()
+        vi.useRealTimers()
+      }
+    }
+  )
+
   it('creates a fresh disposable surface whenever the same run becomes visible again', () => {
     const surfaces: FakeTerminalSurface[] = []
     let nextViewId = 0
@@ -41,6 +180,79 @@ describe('terminal surface registry disposable views', () => {
       oldestPendingOutputAgeMs: 0,
       pendingOutputTargetCount: 0
     })
+  })
+
+  it('reuses an acknowledged detached surface with a new output lease', () => {
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++id}`)
+    const identity = createIdentity()
+    const first = registry.create(identity)
+    registry.release(first.viewId, { retain: true })
+    const second = registry.create(identity)
+    expect(second.surface).toBe(first.surface)
+    expect(second.viewId).not.toBe(first.viewId)
+    registry.write(createOutputEvent(identity, first.viewId, 1, 'late old view'))
+    expect(second.surface.write).not.toHaveBeenCalled()
+    registry.disposeAll()
+  })
+
+  it('bounds retained instances and expires them even without another acquisition', async () => {
+    vi.useFakeTimers()
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++id}`)
+    const leases = Array.from({ length: 7 }, (_, index) => {
+      const lease = registry.create({ ...createIdentity(), blockId: `block-${index}` })
+      registry.release(lease.viewId, { retain: true })
+      return lease
+    })
+    await Promise.resolve()
+    expect(leases[0]!.surface.dispose).toHaveBeenCalledOnce()
+    expect(leases[6]!.surface.dispose).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(5 * 60_000)
+    for (const lease of leases) expect(lease.surface.dispose).toHaveBeenCalledOnce()
+    registry.disposeAll()
+    vi.useRealTimers()
+  })
+
+  it('does not retain unfinished output or revive a previous run generation', () => {
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++id}`)
+    const first = registry.create(createIdentity())
+    registry.release(first.viewId, { retain: true })
+    const next = registry.create({ ...createIdentity(), generation: 2, runId: 'run-2' })
+    expect(next.surface).not.toBe(first.surface)
+    expect(first.surface.dispose).toHaveBeenCalledOnce()
+    vi.mocked(next.surface.isOutputSettled).mockReturnValue(false)
+    registry.release(next.viewId, { retain: true })
+    expect(next.surface.dispose).toHaveBeenCalledOnce()
+    registry.disposeAll()
+  })
+
+  it('discards a delayed detach after a newer view has already been retained', () => {
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++id}`)
+    const old = registry.create(createIdentity())
+    const current = registry.create(createIdentity())
+    registry.release(current.viewId, { retain: true })
+    registry.release(old.viewId, { retain: true })
+    expect(old.surface.dispose).toHaveBeenCalledOnce()
+    expect(registry.create(createIdentity()).surface).toBe(current.surface)
+    registry.disposeAll()
+  })
+
+  it('invalidates cached and releasing views when their run ends', () => {
+    let id = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++id}`)
+    const identity = createIdentity()
+    const cached = registry.create(identity)
+    registry.release(cached.viewId, { retain: true })
+    registry.forget(identity)
+    expect(cached.surface.dispose).toHaveBeenCalledOnce()
+    const pending = registry.create(identity)
+    registry.forget(identity)
+    registry.release(pending.viewId, { retain: true })
+    expect(pending.surface.dispose).toHaveBeenCalledOnce()
+    registry.disposeAll()
   })
 
   it('routes sequenced output only to the exact live view lease', () => {
@@ -287,6 +499,7 @@ function createFakeSurface(): FakeTerminalSurface {
     })),
     isBracketedPasteMode: vi.fn<TerminalSurface['isBracketedPasteMode']>(() => false),
     isOutputSettled: vi.fn<TerminalSurface['isOutputSettled']>(() => true),
+    park: vi.fn(),
     onOutputSettled: vi.fn<TerminalSurface['onOutputSettled']>(() => () => undefined),
     restore: vi.fn<TerminalSurface['restore']>(),
     setScrollbackRows: vi.fn<TerminalSurface['setScrollbackRows']>(),

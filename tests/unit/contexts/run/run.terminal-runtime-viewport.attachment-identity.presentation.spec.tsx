@@ -17,6 +17,7 @@ vi.mock('../../../../src/contexts/run/presentation/terminal-surface/terminalXter
     getDiagnostics: vi.fn(() => ({ pendingOutputBytes: 0, rendererState: 'dom' })),
     isBracketedPasteMode: vi.fn(() => false),
     isOutputSettled: vi.fn(() => true),
+    park: vi.fn(),
     onOutputSettled: vi.fn(() => () => undefined),
     restore: vi.fn(async () => 'ready' as const),
     setResizeSuspended: vi.fn(),

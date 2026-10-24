@@ -493,6 +493,7 @@ const disposeAgentPeerRequests = registerAgentIpcHandlers({
   ipcMain,
   logger: consoleLogger,
   rejectAgentTool: (approvalId) => agentSessionService.rejectTool({ approvalId }),
+  replayAgentToolApprovals: (command) => agentSessionService.replayToolApprovals(command),
   removeWorkspaceAgent: (command) => removeWorkspaceAgentUseCase.execute(command),
   renameWorkspaceAgent: (command) => renameWorkspaceAgentUseCase.execute(command),
   updateAgentSessionMetadata: (command) =>

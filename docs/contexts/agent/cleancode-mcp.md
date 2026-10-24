@@ -263,6 +263,8 @@ OpenCode 的原生插件探测 session SDK 后，以认证 loopback HTTP 接收�
 
 Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏性规则由 `AgentToolApprovalPolicy` 决定，不能依赖某个 CLI 自身的批准设置。
 
+工作区进入时，UI 必须先订阅审批事件，再独立请求主进程重放该项目与工作区仍在等待的审批；这一恢复不得依赖 Agent session attach、终端视图 attach 或 snapshot 重放。`AgentToolApprovalCoordinator` 仍是待审批事实 owner，按原到达顺序投影有效会话中的等待请求，不重放执行中、取消中或已结束的调用。切走前已有审批与隐藏期间新增审批遵守同一规则；热返回保留原 session 和终端视图，UI 按 approvalId 去重并忽略其他工作区的迟到事件。
+
 同一项目工作区内，图工具和协作短调用按完整应用层调用串行进入目标用例；等待 UI 审批和 `wait_agent_message` 不占用执行队列，不同工作区可以并行。该队列避免多个 Agent 同时对同一旧图执行读取—修改—保存而互相覆盖，但不改变 BlockGraph 对图事实和业务规则的所有权。
 
 `tools/call` 的结果同时提供：

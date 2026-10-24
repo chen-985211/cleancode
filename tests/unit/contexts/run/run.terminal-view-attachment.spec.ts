@@ -1,9 +1,37 @@
 import {
   attachTerminalViewWithRetry,
+  releaseTerminalViewAfterRestore,
   restoreTerminalViewWithRetry
 } from '../../../../src/contexts/run/presentation/terminal-surface/terminalViewAttachment'
 
 describe('terminal view attachment', () => {
+  it('waits for in-flight restoration and detach acknowledgement before retaining a view', async () => {
+    const restore = deferred()
+    const acknowledgement = deferred()
+    const release = vi.fn()
+    const detach = vi.fn(() => acknowledgement.promise)
+    releaseTerminalViewAfterRestore({ restored: restore.promise, detach, release })
+    await Promise.resolve()
+    expect(detach).not.toHaveBeenCalled()
+    restore.resolve()
+    await vi.waitFor(() => expect(detach).toHaveBeenCalledOnce())
+    expect(release).not.toHaveBeenCalled()
+    acknowledgement.resolve()
+    await vi.waitFor(() => expect(release).toHaveBeenCalledWith(true))
+  })
+
+  it('releases without retaining after a rejected detach, including failed restoration', async () => {
+    const release = vi.fn()
+    const detach = vi.fn().mockRejectedValue(new Error('renderer detached'))
+    releaseTerminalViewAfterRestore({
+      restored: Promise.reject(new Error('restore failed')),
+      detach,
+      release
+    })
+    await vi.waitFor(() => expect(release).toHaveBeenCalledWith(false))
+    expect(detach).toHaveBeenCalledOnce()
+  })
+
   it('abandons a stale identity without retrying it', async () => {
     const onStale = vi.fn()
     const attach = vi.fn().mockRejectedValue(
@@ -111,3 +139,11 @@ describe('terminal view attachment', () => {
     expect(restore).toHaveBeenCalledTimes(3)
   })
 })
+
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((complete) => {
+    resolve = complete
+  })
+  return { promise, resolve }
+}

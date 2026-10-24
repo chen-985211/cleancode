@@ -1,3 +1,4 @@
+import { TerminalSurfaceRetention } from './terminalSurfaceRetention'
 import type { TerminalSnapshot } from '../../application/dto/TerminalModelSnapshot'
 import type { TerminalRunIdentity } from '../../application/dto/TerminalRunEvent'
 import type {
@@ -23,6 +24,7 @@ import {
  */
 
 export interface TerminalSurfaceAttachment {
+  readonly resume?: boolean
   readonly element: HTMLDivElement
   readonly isResizeSuspended: boolean
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
@@ -69,12 +71,19 @@ export interface TerminalSurfaceRasterTarget {
 
 export type TerminalSurfaceWorkloadTarget = Omit<TerminalWorkloadTarget, 'id'>
 
+export interface TerminalSurfaceRetentionHandlers {
+  readonly onInput: (input: string) => void
+  readonly onRestoreRequired: () => void
+}
+
 export interface TerminalSurface {
   readonly rasterTarget?: TerminalSurfaceRasterTarget
   readonly workloadTarget?: TerminalSurfaceWorkloadTarget
   attach(attachment: TerminalSurfaceAttachment): void
   detach(element: HTMLDivElement): void
   dispose(): void
+  park(): void
+  retain?(handlers: TerminalSurfaceRetentionHandlers): boolean
   clearSearch(): void
   find(query: string, direction: TerminalSearchDirection): void
   focus(): void
@@ -91,16 +100,31 @@ export interface TerminalSurface {
 export interface TerminalSurfaceLease {
   readonly viewId: string
   readonly surface: TerminalSurface
+  readonly retained?: boolean
+}
+
+interface RetainedSurfaceLease {
+  readonly surface: TerminalSurface
+  readonly viewId?: string
+  dispose(): void
+  setScrollbackRows(rows: TerminalScrollbackRows): void
 }
 
 type TerminalSurfaceFactory = () => TerminalSurface
 type TerminalViewIdFactory = () => string
 
 export class TerminalSurfaceRegistry {
+  private readonly retentionListeners = new Set<() => void>()
+  private readonly retention = new TerminalSurfaceRetention<RetainedSurfaceLease>(() => {
+    for (const listener of this.retentionListeners) listener()
+  })
+  private isDisposed = false
   private readonly views = new Map<
     string,
     {
       readonly identityKey: string
+      readonly ownerKey: string
+      retentionAllowed: boolean
       readonly surface: TerminalSurface
       readonly unregisterOutputStateObservers: () => void
       readonly unregisterWorkloadTarget: () => void
@@ -127,8 +151,17 @@ export class TerminalSurfaceRegistry {
   ): TerminalSurfaceLease {
     if (!factory) throw new Error('A terminal surface factory is required for a terminal view.')
 
+    const identityKey = createTerminalSurfaceKey(identity)
+    const ownerKey = [identity.projectId, identity.workspaceId, identity.blockId].join('\0')
+    const retained = this.retention.take(identityKey, ownerKey)
+    if (retained?.viewId && this.views.has(retained.viewId)) {
+      return { viewId: retained.viewId, surface: retained.surface, retained: true }
+    }
     const viewId = this.createUniqueViewId()
-    const surface = factory()
+    for (const view of this.views.values()) {
+      if (view.ownerKey === ownerKey) view.retentionAllowed = false
+    }
+    const surface = retained?.surface ?? factory()
     const unregisterRasterTarget = surface.rasterTarget
       ? (this.rasterCoordinator?.register({ id: viewId, ...surface.rasterTarget }) ??
         (() => undefined))
@@ -142,7 +175,9 @@ export class TerminalSurfaceRegistry {
       surface.rasterTarget?.onRasterPriorityChange?.(() => this.notifyOutputStateChange())
     )
     this.views.set(viewId, {
-      identityKey: createTerminalSurfaceKey(identity),
+      identityKey,
+      ownerKey,
+      retentionAllowed: true,
       surface,
       unregisterOutputStateObservers,
       unregisterWorkloadTarget,
@@ -159,18 +194,84 @@ export class TerminalSurfaceRegistry {
     view.surface.write(event.output)
   }
 
-  release(viewId: string): void {
+  hasRetained(identity: TerminalRunIdentity): boolean {
+    const entry = this.retention.peek(createTerminalSurfaceKey(identity))
+    return Boolean(entry?.viewId && this.views.get(entry.viewId)?.retentionAllowed)
+  }
+
+  onRetentionChange(listener: () => void): () => void {
+    this.retentionListeners.add(listener)
+    return () => this.retentionListeners.delete(listener)
+  }
+
+  /** Keep the exact attached stream; only eviction hands query ownership back to Run. */
+  retain(
+    viewId: string,
+    handlers: {
+      readonly detach: () => Promise<unknown>
+      readonly onInput: (input: string) => void
+    }
+  ): boolean {
+    const view = this.views.get(viewId)
+    if (!view || !view.retentionAllowed || this.isDisposed) return false
+    if (
+      !view.surface.retain?.({
+        onInput: handlers.onInput,
+        onRestoreRequired: () => this.retention.evict(view.identityKey)
+      })
+    )
+      return false
+    this.retention.put(view.identityKey, view.ownerKey, {
+      surface: view.surface,
+      viewId,
+      setScrollbackRows: () => undefined, // Still registered in views, so updated there.
+      dispose: () => {
+        view.retentionAllowed = false
+        // Keep draining and responding until the main process acknowledges the handoff.
+        void handlers.detach().then(
+          () => this.release(viewId),
+          () => this.release(viewId)
+        )
+      }
+    })
+    this.notifyOutputStateChange()
+    return true
+  }
+
+  release(viewId: string, options: { readonly retain?: boolean } = {}): void {
     const view = this.views.get(viewId)
     if (!view) return
     this.views.delete(viewId)
     view.unregisterOutputStateObservers()
     view.unregisterWorkloadTarget()
     view.unregisterRasterTarget()
-    view.surface.dispose()
+    if (
+      options.retain &&
+      view.retentionAllowed &&
+      !this.isDisposed &&
+      view.surface.isOutputSettled()
+    ) {
+      view.surface.park()
+      this.retention.put(view.identityKey, view.ownerKey, {
+        surface: view.surface,
+        dispose: () => view.surface.dispose(),
+        setScrollbackRows: (rows) => view.surface.setScrollbackRows(rows)
+      })
+    } else view.surface.dispose()
     this.notifyOutputStateChange()
   }
 
+  forget(identity: TerminalRunIdentity): void {
+    const identityKey = createTerminalSurfaceKey(identity)
+    this.retention.evict(identityKey)
+    for (const view of this.views.values()) {
+      if (view.identityKey === identityKey) view.retentionAllowed = false
+    }
+  }
+
   disposeAll(): void {
+    this.isDisposed = true
+    this.retention.dispose()
     for (const view of this.views.values()) {
       view.unregisterOutputStateObservers()
       view.unregisterWorkloadTarget()
@@ -198,6 +299,7 @@ export class TerminalSurfaceRegistry {
   }
 
   setScrollbackRows(rows: TerminalScrollbackRows): void {
+    this.retention.setScrollbackRows(rows)
     for (const view of this.views.values()) view.surface.setScrollbackRows(rows)
   }
 

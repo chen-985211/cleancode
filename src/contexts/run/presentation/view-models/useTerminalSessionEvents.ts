@@ -50,6 +50,7 @@ export function useTerminalSessionEvents({
           })
         : () => undefined
     const unsubscribeExit = api.onTerminalExit((event) => {
+      terminalSurfaceRegistry.forget(event.scope)
       const exitedTerminalStateKey = findTerminalStateKeyBySession(
         terminalStatesRef.current,
         event.sessionId

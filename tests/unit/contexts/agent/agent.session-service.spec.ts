@@ -400,55 +400,68 @@ describe('agent session service', () => {
     ).toBe('0290d8a1-8b7d-7d75-9f62-7a663ef87e44')
   })
 
-  it('waits for UI approval before executing destructive MCP tools', async () => {
-    const approvals: AgentToolApprovalRequest[] = []
-    const executeAgentTool = vi
-      .fn<ExecuteAgentTool>()
-      .mockResolvedValueOnce({
-        approval: {
-          summary: '删除终端积木 terminal-1',
-          target: { blockId: 'terminal-1', kind: 'terminal_block' },
-          toolName: 'delete_block'
-        },
-        status: 'awaiting_approval',
-        toolCallId: 'approval-1'
-      })
-      .mockResolvedValueOnce(completedToolResult('approval-1'))
-    const service = createSessionService({ executeAgentTool })
-    const session = await attachMainSession(service, {
-      onToolApprovalRequested: (approval) => approvals.push(approval)
-    })
-
-    const resultPromise = service.executeMcpTool({
-      input: { blockId: 'terminal-1' },
-      sessionId: session.sessionId,
-      toolCallId: 'approval-1',
-      toolName: 'delete_block'
-    })
-    await vi.waitFor(() =>
-      expect(approvals).toEqual([
-        expect.objectContaining({
-          approvalId: 'approval-1',
-          target: { blockId: 'terminal-1', kind: 'terminal_block' }
+  it.each(['attached', 'workspace return'])(
+    'waits for UI approval before executing destructive MCP tools after %s',
+    async (path) => {
+      const approvals: AgentToolApprovalRequest[] = []
+      const executeAgentTool = vi
+        .fn<ExecuteAgentTool>()
+        .mockResolvedValueOnce({
+          approval: {
+            summary: '删除终端积木 terminal-1',
+            target: { blockId: 'terminal-1', kind: 'terminal_block' },
+            toolName: 'delete_block'
+          },
+          status: 'awaiting_approval',
+          toolCallId: 'approval-1'
         })
-      ])
-    )
+        .mockResolvedValueOnce(completedToolResult('approval-1'))
+      const processPort = new RecordingAgentTerminalRuntime()
+      const service = createSessionService({ executeAgentTool, processPort })
+      const session = await attachMainSession(service, {
+        onToolApprovalRequested: (approval) => approvals.push(approval)
+      })
 
-    const approvalResult = service.approveTool({ approvalId: 'approval-1' })
-    await expect(approvalResult).resolves.toEqual({
-      graph: completedToolResult('approval-1').graph,
-      status: 'completed'
-    })
-    await expect(resultPromise).resolves.toEqual(completedToolResult('approval-1'))
-    expect(executeAgentTool).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        approved: true,
+      const resultPromise = service.executeMcpTool({
         input: { blockId: 'terminal-1' },
+        sessionId: session.sessionId,
         toolCallId: 'approval-1',
         toolName: 'delete_block'
       })
-    )
-  })
+      await vi.waitFor(() =>
+        expect(approvals).toEqual([
+          expect.objectContaining({
+            approvalId: 'approval-1',
+            target: { blockId: 'terminal-1', kind: 'terminal_block' }
+          })
+        ])
+      )
+
+      if (path === 'workspace return') {
+        approvals.length = 0
+        service.replayToolApprovals({ projectDirectory: '/repo/app', workspaceId: 'main' })
+        expect(approvals.map((approval) => approval.approvalId)).toEqual(['approval-1'])
+        expect(executeAgentTool).toHaveBeenCalledOnce()
+        expect(processPort.opens).toHaveLength(1)
+        expect(processPort.launches).toHaveLength(1)
+        expect(processPort.resizes).toEqual([])
+      }
+      const approvalResult = service.approveTool({ approvalId: 'approval-1' })
+      await expect(approvalResult).resolves.toEqual({
+        graph: completedToolResult('approval-1').graph,
+        status: 'completed'
+      })
+      await expect(resultPromise).resolves.toEqual(completedToolResult('approval-1'))
+      expect(executeAgentTool).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          approved: true,
+          input: { blockId: 'terminal-1' },
+          toolCallId: 'approval-1',
+          toolName: 'delete_block'
+        })
+      )
+    }
+  )
 
   it('returns a canceled result when a destructive MCP tool is rejected or its session is disposed', async () => {
     const executeAgentTool = vi.fn<ExecuteAgentTool>(async () => ({
