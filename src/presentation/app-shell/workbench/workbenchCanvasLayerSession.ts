@@ -45,14 +45,13 @@ export class WorkbenchCanvasLayerSession {
     // Attach rejection handling immediately, even while an older release is pending.
     const positionSaved = commitLayerPosition(commit)
     const completed = this.queue.then(async () => {
+      const didMove = await positionSaved
       let nodeOrder = this.snapshot.nodeOrder
-      let saved = false
       try {
-        if (await positionSaved) {
+        if (didMove) {
           const nextOrder = project(nodeOrder)
           await save(nextOrder)
           nodeOrder = nextOrder
-          saved = true
         }
       } catch {
         // Position and layer adapters own error feedback. Only roll back this preview.
@@ -61,7 +60,8 @@ export class WorkbenchCanvasLayerSession {
         nodeOrder,
         releases: this.snapshot.releases.filter((entry) => entry !== release)
       })
-      return saved
+      // Callers use this result to restore positions, which a layer failure must not undo.
+      return didMove
     })
     this.queue = completed
     return completed

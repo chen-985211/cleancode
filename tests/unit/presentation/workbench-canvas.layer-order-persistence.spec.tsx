@@ -140,12 +140,12 @@ describe('committed canvas layer ordering', () => {
     }
   )
 
-  it('rolls back the layer preview if the layer write fails after positions are saved', async () => {
+  it('retains position success while rolling back a failed layer write', async () => {
     const s = setup()
     s.save.mockRejectedValueOnce(new Error('disk full'))
     s.begin()
     await act(async () => {
-      expect(await s.drop()).toBe(false)
+      expect(await s.drop()).toBe(true)
     })
     expect(s.order()).toEqual(nodes.map((node) => node.id))
     expect(s.stored.get('main')).toEqual(references)
