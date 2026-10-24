@@ -78,6 +78,10 @@ export interface AgentIpcHandlersInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
   readonly rejectAgentTool: (approvalId: string) => Promise<void>
+  readonly replayAgentToolApprovals: (command: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+  }) => void
   readonly removeWorkspaceAgent: (command: {
     readonly agentId: string
     readonly projectId: string
@@ -421,6 +425,23 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => vo
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'disposeProjectAgentSessions',
+    scope: 'agent'
+  })
+
+  registerIpcHandler<unknown, void>({
+    channel: 'cleancode:replay-agent-tool-approvals',
+    handler: (command) => {
+      if (!isRecord(command)) {
+        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Agent approval scope is required.')
+      }
+      input.replayAgentToolApprovals({
+        projectDirectory: readRequiredString(command.projectDirectory, 'projectDirectory'),
+        workspaceId: readRequiredString(command.workspaceId, 'workspaceId')
+      })
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'replayAgentToolApprovals',
     scope: 'agent'
   })
 

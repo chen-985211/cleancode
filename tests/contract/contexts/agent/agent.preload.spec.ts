@@ -24,6 +24,10 @@ vi.mock('electron', () => ({
 import '../../../../src/platform/electron-preload/preload'
 
 interface AgentActivityBridge {
+  replayAgentToolApprovals(command: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+  }): Promise<void>
   listAgentActivities(): Promise<readonly TerminalAgentActivitySnapshot[]>
   onAgentActivityChanged(listener: (snapshot: TerminalAgentActivitySnapshot) => void): () => void
   onAgentTurnCompleted(listener: (completion: AgentTurnCompletedEvent) => void): () => void
@@ -49,6 +53,31 @@ describe('Agent activity preload contract', () => {
 
     await expect(api.listAgentActivities()).resolves.toBe(snapshots)
     expect(electronMocks.invoke).toHaveBeenCalledWith('cleancode:list-agent-activities', undefined)
+  })
+
+  it('invokes workspace approval replay without attaching a session', async () => {
+    const scope = { projectDirectory: '/repo/app', workspaceId: 'feature' }
+    electronMocks.invoke.mockResolvedValue({ ok: true, value: undefined })
+
+    await expect(api.replayAgentToolApprovals(scope)).resolves.toBeUndefined()
+
+    expect(electronMocks.invoke).toHaveBeenCalledExactlyOnceWith(
+      'cleancode:replay-agent-tool-approvals',
+      scope
+    )
+  })
+
+  it('preserves structured approval replay errors across preload', async () => {
+    const error = {
+      code: 'AGENT_SESSION_NOT_FOUND',
+      message: 'Session unavailable.',
+      isExpected: true
+    }
+    electronMocks.invoke.mockResolvedValue({ ok: false, error })
+
+    await expect(
+      api.replayAgentToolApprovals({ projectDirectory: '/repo/app', workspaceId: 'main' })
+    ).rejects.toEqual(error)
   })
 
   it('invokes the Agent session metadata channel without attaching a new launch', async () => {

@@ -65,6 +65,7 @@ export interface RuntimeApiOverrides {
   readonly disposeProjectAgentSessions?: ReturnType<typeof vi.fn>
   readonly approveAgentTool?: ReturnType<typeof vi.fn>
   readonly rejectAgentTool?: ReturnType<typeof vi.fn>
+  readonly replayAgentToolApprovals?: ReturnType<typeof vi.fn>
   readonly onAgentRuntimeChanged?: ReturnType<typeof vi.fn>
   readonly onAgentGraphUpdated?: ReturnType<typeof vi.fn>
   readonly onAgentToolApprovalRequested?: ReturnType<typeof vi.fn>
@@ -167,6 +168,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     approveAgentTool:
       overrides.approveAgentTool ?? vi.fn(async () => ({ status: 'not_found' as const })),
     rejectAgentTool: overrides.rejectAgentTool ?? vi.fn(async () => undefined),
+    replayAgentToolApprovals: overrides.replayAgentToolApprovals ?? vi.fn(async () => undefined),
     onAgentRuntimeChanged: overrides.onAgentRuntimeChanged ?? vi.fn(() => vi.fn()),
     onAgentGraphUpdated: overrides.onAgentGraphUpdated ?? vi.fn(() => vi.fn()),
     onAgentToolApprovalRequested: overrides.onAgentToolApprovalRequested ?? vi.fn(() => vi.fn()),

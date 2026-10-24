@@ -105,13 +105,25 @@ export class AgentToolApprovalCoordinator {
     return [...this.pendingApprovals.values()].map((approval) => approval.request)
   }
 
-  replayWaiting(session: ManagedAgentSession): void {
+  replayWaiting(scope: {
+    readonly projectDirectory: string
+    readonly workspaceId: string
+    readonly sessionId?: string
+  }): void {
     for (const pending of this.pendingApprovals.values()) {
-      if (pending.sessionId !== session.sessionId || pending.state !== 'waiting') continue
+      if (
+        pending.state !== 'waiting' ||
+        pending.request.projectDirectory !== scope.projectDirectory ||
+        pending.request.workspaceId !== scope.workspaceId ||
+        (scope.sessionId !== undefined && pending.sessionId !== scope.sessionId)
+      )
+        continue
+      const session = this.findSessionById(pending.sessionId)
+      if (!session || !this.isSessionActive(session)) continue
       try {
         session.callbacks.onToolApprovalRequested(pending.request)
       } catch {
-        // Keep the request pending so a later renderer attachment can replay it again.
+        // Keep the request pending so a later workspace return can replay it again.
       }
     }
   }

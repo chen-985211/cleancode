@@ -105,6 +105,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:dispose-project-agent-sessions', command),
   approveAgentTool: (command: unknown) => invokeCleancode('cleancode:approve-agent-tool', command),
   rejectAgentTool: (command: unknown) => invokeCleancode('cleancode:reject-agent-tool', command),
+  replayAgentToolApprovals: (command: unknown) =>
+    invokeCleancode('cleancode:replay-agent-tool-approvals', command),
   onAgentRuntimeChanged: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-runtime-changed', listener),
   onAgentActivityChanged: (listener: (event: unknown) => void) =>
