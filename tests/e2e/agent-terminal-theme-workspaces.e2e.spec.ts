@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile } from 'node:child_process'
-import { access, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -39,6 +39,10 @@ import {
   expectProjectionColorContinuity,
   expectTerminalPresentation
 } from '../support/terminalThemeE2e'
+import {
+  armTerminalWorkspaceMeasurement,
+  readTerminalWorkspaceMeasurement
+} from '../support/terminalWorkspacePresentationE2e'
 
 const execFileAsync = promisify(execFile)
 const featureBranchName = 'feature/agent-theme'
@@ -146,8 +150,13 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectFakeCodexSession(featureSession, canonicalFeatureDirectory, fakeCodex.reportPath)
       await expectTerminalPresentation(page, featureSession.viewport, 'dark', false)
 
-      await projectCard.locator('.default-branch-selector__select').click()
+      const mainWorkspaceButton = projectCard.locator('.default-branch-selector__select')
+      await armTerminalWorkspaceMeasurement(mainWorkspaceButton, [
+        { kind: 'agent', sessionId: mainSession.sessionId }
+      ])
+      await mainWorkspaceButton.click()
       const restoredMainSession = await waitForAgentTerminal(page, 'main', 'light')
+      const mainMeasurement = await readTerminalWorkspaceMeasurement(page)
 
       expect(restoredMainSession.sessionId).toBe(mainSession.sessionId)
       expect(restoredMainSession.terminalProcessId).toBe(mainSession.terminalProcessId)
@@ -155,8 +164,25 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectTerminalPresentation(page, restoredMainSession.viewport, 'dark', true)
 
       await selectTheme(page, 'light')
+      await armTerminalWorkspaceMeasurement(featureWorkspaceButton, [
+        { kind: 'agent', sessionId: featureSession.sessionId }
+      ])
       await featureWorkspaceButton.click()
       const restoredFeatureSession = await waitForAgentTerminal(page, featureBranchName, 'dark')
+      const featureMeasurement = await readTerminalWorkspaceMeasurement(page)
+
+      const output = join(process.cwd(), 'test-results/agent-workspace-presentation')
+      await mkdir(output, { recursive: true })
+      await writeFile(
+        join(output, 'workspace-switch-timing.json'),
+        JSON.stringify({ main: mainMeasurement, feature: featureMeasurement }, null, 2)
+      )
+      for (const measurement of [mainMeasurement, featureMeasurement]) {
+        expect(measurement.blankFrames, JSON.stringify(measurement.blankReasons)).toBe(0)
+        expect(measurement.sampledFrames).toBe(20)
+        expect(measurement.latencyMs).toBeGreaterThanOrEqual(0)
+        expect(measurement.latencyMs).toBeLessThan(1000)
+      }
 
       expect(restoredFeatureSession.sessionId).toBe(featureSession.sessionId)
       expect(restoredFeatureSession.terminalProcessId).toBe(featureSession.terminalProcessId)

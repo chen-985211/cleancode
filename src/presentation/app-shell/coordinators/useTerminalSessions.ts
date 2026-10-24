@@ -285,11 +285,11 @@ export function useTerminalSessions({
       inputWriteQueuesRef.current.clear()
       terminalStartupOutputsRef.current.clear()
       quickLaunchesRef.current.clear()
-      terminalSurfaceRegistry.disposeAll()
       queueMicrotask(() => {
         // React StrictMode immediately replays effects with the same stateful owners. Defer the
         // terminal check by one microtask so only a real unmount disposes the shared coordinator.
         if (!isMountedRef.current) {
+          terminalSurfaceRegistry.disposeAll()
           terminalZoomRasterCoordinator.dispose()
           terminalWorkloadScheduler.dispose()
         }

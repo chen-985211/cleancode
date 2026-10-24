@@ -83,3 +83,18 @@ function isStaleTerminalViewIdentityError(error: unknown): boolean {
     message.includes('Terminal view no longer matches the current runtime scope.')
   )
 }
+
+/** Complete any pending attach before handing response ownership back to Run. */
+export function releaseTerminalViewAfterRestore(input: {
+  readonly restored: Promise<void>
+  readonly detach: () => Promise<unknown>
+  readonly release: (retain: boolean) => void
+}): void {
+  void input.restored
+    .catch(() => undefined)
+    .then(input.detach)
+    .then(
+      () => input.release(true),
+      () => input.release(false)
+    )
+}

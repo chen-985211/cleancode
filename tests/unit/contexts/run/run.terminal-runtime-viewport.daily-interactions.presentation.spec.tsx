@@ -53,6 +53,10 @@ vi.mock('@xterm/xterm', () => ({
     linkProvider: {
       provideLinks(line: number, callback: (links: unknown[]) => void): void
     } | null = null
+    readonly onRender = vi.fn(() => ({ dispose: vi.fn() }))
+    readonly blur = vi.fn()
+    readonly scrollToBottom = vi.fn()
+    readonly scrollToLine = vi.fn()
     readonly focus = vi.fn()
     readonly parser = {
       registerOscHandler: vi.fn(() => ({ dispose: vi.fn() }))

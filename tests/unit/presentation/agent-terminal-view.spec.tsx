@@ -10,7 +10,13 @@ import type {
 import { TerminalSurfaceRegistry } from '../../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { TerminalSurfaceRegistryProvider } from '../../../src/contexts/run/presentation/components/TerminalSurfaceRegistryProvider'
 import { useAgentTerminalView } from '../../../src/presentation/app-shell/coordinators/useAgentTerminalView'
-import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
+import { useAgentSessionAttachment } from '../../../src/presentation/app-shell/coordinators/useAgentSessionAttachment'
+import { AppShellProviders } from '../../../src/presentation/app-shell/shell/AppShellProviders'
+import { ignoreAppNotifications } from '../../../src/presentation/shared/notifications/appNotifications'
+import {
+  createRuntimeApi,
+  createWorkbenchSnapshot
+} from '../../fixtures/presentation/appShellFixtures'
 
 const terminalViewMockState = vi.hoisted(() => ({ surfaces: [] as TerminalSurface[] }))
 
@@ -26,6 +32,7 @@ vi.mock('../../../src/contexts/run/presentation/terminal-surface/terminalXtermSu
       getDiagnostics: vi.fn(() => ({ pendingOutputBytes: 0, rendererState: 'dom' })),
       isBracketedPasteMode: vi.fn(() => false),
       isOutputSettled: vi.fn(() => true),
+      park: vi.fn(),
       onOutputSettled: vi.fn(() => () => undefined),
       restore: vi.fn(async () => 'ready'),
       setResizeSuspended: vi.fn(),
@@ -44,6 +51,87 @@ describe('Agent shared terminal view', () => {
 
   afterEach(() => {
     Reflect.deleteProperty(window, 'cleancode')
+  })
+
+  it('restores the Agent binding before the first returning render without another attach round trip', async () => {
+    const registry = new TerminalSurfaceRegistry()
+    const attachAgentSession = vi
+      .fn()
+      .mockResolvedValueOnce(createSession())
+      .mockImplementation(() => new Promise(() => {}))
+    const attachTerminalView = vi.fn(async (command) => createSnapshot(command.viewId))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi({ attachAgentSession }),
+        attachTerminalView,
+        detachTerminalView: vi.fn(async () => undefined)
+      }
+    })
+    const tree = (visible: boolean) => (
+      <AppShellProviders notifications={ignoreAppNotifications} terminalSurfaceRegistry={registry}>
+        {visible && <AttachmentHarness />}
+      </AppShellProviders>
+    )
+    const view = render(tree(true))
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledOnce())
+    await waitFor(() =>
+      expect(
+        terminalViewMockState.surfaces.some(
+          (surface) => vi.mocked(surface.restore).mock.calls.length > 0
+        )
+      ).toBe(true)
+    )
+    for (const surface of terminalViewMockState.surfaces) surface.retain = vi.fn(() => true)
+    view.rerender(tree(false))
+    view.rerender(tree(true))
+    expect(view.getByTestId('attachment-session').textContent).toBe('agent-session-1')
+    expect(attachAgentSession).toHaveBeenCalledOnce()
+    expect(attachTerminalView).toHaveBeenCalledOnce()
+    view.unmount()
+    registry.disposeAll()
+  })
+
+  it('resumes a retained Agent view without attach or replay and keeps hidden query responses live', async () => {
+    const registry = new TerminalSurfaceRegistry(undefined, () => 'hot-agent-view')
+    const attachTerminalView = vi.fn(async (command) => createSnapshot(command.viewId))
+    const detachTerminalView = vi.fn(async () => undefined)
+    const writeAgentSession = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi({ writeAgentSession }),
+        attachTerminalView,
+        detachTerminalView
+      }
+    })
+    const mount = () =>
+      render(
+        <TerminalSurfaceRegistryProvider registry={registry}>
+          <Harness session={createSession()} />
+        </TerminalSurfaceRegistryProvider>
+      )
+    const first = mount()
+    await waitFor(() => expect(terminalViewMockState.surfaces[0]?.restore).toHaveBeenCalledOnce())
+    const surface = terminalViewMockState.surfaces[0]!
+    surface.retain = vi.fn(() => true)
+    first.unmount()
+    expect(surface.retain).toHaveBeenCalledOnce()
+    const handlers = vi.mocked(surface.retain).mock.calls[0]![0]
+    handlers.onInput('\x1b[1;1R')
+    await waitFor(() =>
+      expect(writeAgentSession).toHaveBeenCalledWith({
+        input: '\x1b[1;1R',
+        sessionId: 'agent-session-1'
+      })
+    )
+    const second = mount()
+    expect(attachTerminalView).toHaveBeenCalledOnce()
+    expect(surface.restore).toHaveBeenCalledOnce()
+    expect(surface.attach).toHaveBeenLastCalledWith(expect.objectContaining({ resume: true }))
+    expect(detachTerminalView).not.toHaveBeenCalled()
+    second.unmount()
+    registry.disposeAll()
   })
 
   it('uses the Run view protocol for restore, sequenced output, input, resize, and cleanup', async () => {
@@ -146,7 +234,9 @@ describe('Agent shared terminal view', () => {
 
     view.unmount()
     await waitFor(() => expect(detachTerminalView).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(surface.dispose).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(surface.park).toHaveBeenCalledTimes(1))
+    expect(surface.dispose).not.toHaveBeenCalled()
+    registry.disposeAll()
   })
 
   it('coalesces high-frequency terminal input inside one rendering frame', async () => {
@@ -191,6 +281,7 @@ describe('Agent shared terminal view', () => {
     } finally {
       vi.useRealTimers()
       view.unmount()
+      registry.disposeAll()
     }
   })
 
@@ -265,6 +356,7 @@ describe('Agent shared terminal view', () => {
     expect(viewport).toHaveAttribute('data-agent-terminal-view-session-id', 'terminal-session-2')
     expect(viewport).toHaveAttribute('data-terminal-attached-session-id', 'terminal-session-2')
     view.unmount()
+    registry.disposeAll()
   })
 
   it('measures the visible grid before an Agent terminal identity exists', () => {
@@ -289,6 +381,7 @@ describe('Agent shared terminal view', () => {
     view.unmount()
     expect(surface.detach).toHaveBeenCalledTimes(1)
     expect(surface.dispose).toHaveBeenCalledTimes(1)
+    registry.disposeAll()
   })
 
   it('replaces the measurement attachment marker with the final Agent session identity', async () => {
@@ -326,6 +419,7 @@ describe('Agent shared terminal view', () => {
 
     view.unmount()
     expect(viewport).not.toHaveAttribute('data-terminal-attached-session-id')
+    registry.disposeAll()
   })
 })
 
@@ -355,6 +449,43 @@ function Harness({
       data-agent-terminal-view-session-id={session?.runtime.terminal.viewIdentity?.sessionId}
       ref={terminalElementRef}
     />
+  )
+}
+
+function AttachmentHarness() {
+  const workbench = createWorkbenchSnapshot('/repo/app', '1')
+  const dimensionsRef = useRef(null)
+  const terminalElementRef = useRef<HTMLDivElement | null>(null)
+  const workspaceKey = 'project-1\0main\0agent\0agent-1'
+  const { session } = useAgentSessionAttachment({
+    activeAgent: {
+      agentId: 'agent-1',
+      name: 'Agent 1',
+      providerId: 'codex',
+      projectId: 'project-1',
+      workspaceId: 'main',
+      cleancodeMcpEnabled: true,
+      layout: { position: { x: 0, y: 0 }, size: { width: 640, height: 360 } }
+    },
+    currentWorkbench: workbench,
+    currentWorkspace: workbench.project.workspaces[0]!,
+    currentWorkspaceKey: workspaceKey,
+    dimensionsRef,
+    measuredTerminalKey: workspaceKey
+  })
+  useAgentTerminalView({
+    dimensionsRef,
+    enabled: true,
+    session,
+    terminalElementRef,
+    workspaceKey,
+    onDimensionsChange: () => {}
+  })
+  return (
+    <>
+      <span data-testid="attachment-session">{session?.sessionId ?? 'empty'}</span>
+      <div ref={terminalElementRef} />
+    </>
   )
 }
 

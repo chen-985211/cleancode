@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile } from 'node:child_process'
-import { access, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -41,6 +41,10 @@ import {
   writeTerminalCommand
 } from '../support/e2eTerminal'
 import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
+import {
+  armTerminalWorkspaceMeasurement,
+  readTerminalWorkspaceMeasurement
+} from '../support/terminalWorkspacePresentationE2e'
 
 const execFileAsync = promisify(execFile)
 const gitLocalEnvironmentVariables = [
@@ -251,8 +255,6 @@ describe('git branch workspaces e2e', () => {
         count: 1,
         backgroundCount: expectedBackgroundCount
       })
-      const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
-      await markTerminalSurface(page, sessionId, terminalSurfaceToken)
 
       const boundedOutputTail = await readTerminalOutputTail(page, sessionId)
       expect(terminalWorkspaceRetentionInvisiblePadding.length).toBeGreaterThan(8192)
@@ -306,11 +308,23 @@ describe('git branch workspaces e2e', () => {
       })
       expect(hiddenQuery.backgroundResponses).toEqual(visibleQuery.backgroundResponses)
 
+      await armTerminalWorkspaceMeasurement(featureWorkspace, [{ kind: 'terminal', sessionId }])
       await featureWorkspace.click()
       await waitForCurrentWorkspace(featureWorkspace)
-      await waitForRecreatedTerminalSurface(page, sessionId, terminalSurfaceToken)
+      await waitForRestoredTerminalSurface(page, sessionId)
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForVisibleXtermText(page, sessionId, hiddenOutputMarker)
+      const measurement = await readTerminalWorkspaceMeasurement(page)
+      const timingsDirectory = join(process.cwd(), 'test-results/terminal-surface-presentation')
+      await mkdir(timingsDirectory, { recursive: true })
+      await writeFile(
+        join(timingsDirectory, 'workspace-switch-timing.json'),
+        JSON.stringify(measurement, null, 2)
+      )
+      expect(measurement.blankFrames).toBe(0)
+      expect(measurement.sampledFrames).toBe(20)
+      expect(measurement.latencyMs).toBeGreaterThanOrEqual(0)
+      expect(measurement.latencyMs).toBeLessThan(1000)
       await scrollTerminalToTop(page, sessionId)
       await waitForVisibleXtermText(page, sessionId, terminalWorkspaceRetentionEarlyMarker)
     },
@@ -361,44 +375,21 @@ async function waitForCurrentWorkspace(workspace: Locator): Promise<void> {
   expect(ariaCurrent).toBe('page')
 }
 
-async function markTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {
-  await page.evaluate(
-    ({ sessionId, token }) => {
-      const outputTail = document.querySelector<HTMLElement>(
-        `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
-      )
-      const surface = outputTail
-        ?.closest('.terminal-output-shell')
-        ?.querySelector<HTMLElement>('.xterm')
-
-      if (!surface) {
-        throw new Error('The terminal surface is not attached to the current session.')
-      }
-
-      surface.dataset.workspaceRetentionToken = token
-    },
-    { sessionId, token }
-  )
-}
-
-async function waitForRecreatedTerminalSurface(
-  page: Page,
-  sessionId: string,
-  previousToken: string
-): Promise<void> {
-  await page.waitForFunction(
-    ({ previousToken, sessionId }) => {
-      const outputTail = document.querySelector<HTMLElement>(
-        `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
-      )
-      const surface = outputTail
-        ?.closest('.terminal-output-shell')
-        ?.querySelector<HTMLElement>('.xterm')
-
-      return Boolean(surface && surface.dataset.workspaceRetentionToken !== previousToken)
-    },
-    { previousToken, sessionId }
-  )
+async function waitForRestoredTerminalSurface(page: Page, sessionId: string): Promise<void> {
+  await page.waitForFunction((targetSessionId) => {
+    const outputTail = document.querySelector<HTMLElement>(
+      `[data-terminal-output-tail][data-terminal-session-id="${targetSessionId}"]`
+    )
+    const viewport = outputTail
+      ?.closest('.terminal-output-shell')
+      ?.querySelector<HTMLElement>('.terminal-viewport')
+    const surface = viewport?.querySelector<HTMLElement>('.xterm')
+    return (
+      viewport?.dataset.terminalContentReady === 'true' &&
+      viewport.dataset.terminalAttachedSessionId === targetSessionId &&
+      Boolean(surface && getComputedStyle(surface).opacity === '1')
+    )
+  }, sessionId)
 }
 
 async function scrollTerminalToTop(page: Page, sessionId: string): Promise<void> {

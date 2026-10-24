@@ -1,9 +1,10 @@
-import { useEffect, useRef, type MutableRefObject } from 'react'
+import { useLayoutEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../../contexts/agent/application/dto/AgentSessionProtocol'
 import { bindTerminalSurfaceAttachmentIdentity } from '../../../contexts/run/presentation/terminal-surface/terminalSurfaceAttachmentIdentity'
 import {
   attachTerminalViewWithRetry,
+  releaseTerminalViewAfterRestore,
   restoreTerminalViewWithRetry
 } from '../../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
 import { createTerminalXtermSurface } from '../../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
@@ -38,7 +39,7 @@ export function useAgentTerminalView({
     ? [identity.sessionId, identity.runId, identity.generation].join('\0')
     : null
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = terminalElementRef.current
     const api = window.cleancode
     if (!enabled || !element || !workspaceKey) {
@@ -75,6 +76,7 @@ export function useAgentTerminalView({
     )
     const surface = lease.surface
     let isReleased = false
+    let hasAttachedView = Boolean(lease.retained)
     let restoreTail = Promise.resolve()
     let pendingInput = ''
     let inputTimer: number | null = null
@@ -98,11 +100,12 @@ export function useAgentTerminalView({
       inputTimer ??= window.setTimeout(flushInput, terminalInputBatchWindowMs)
     }
     const requestRestore = (): void => {
+      hasAttachedView = false
       restoreTail = restoreTail
         .catch(() => undefined)
         .then(async () => {
           if (isReleased) return
-          await restoreTerminalViewWithRetry({
+          const result = await restoreTerminalViewWithRetry({
             isCancelled: () => isReleased,
             loadSnapshot: async () => {
               const snapshot = await attachTerminalViewWithRetry({
@@ -113,12 +116,14 @@ export function useAgentTerminalView({
             },
             restore: (snapshot) => surface.restore(snapshot)
           })
+          if (!isReleased) hasAttachedView = result === 'ready'
         })
       void restoreTail.catch(() => undefined)
     }
 
     surface.attach({
       element,
+      resume: lease.retained,
       isResizeSuspended: false,
       onDimensionsChange: (dimensions) => {
         dimensionsRef.current = { dimensions, workspaceKey }
@@ -140,18 +145,31 @@ export function useAgentTerminalView({
       element,
       identity.sessionId
     )
-    requestRestore()
+    if (!lease.retained) requestRestore()
 
     return () => {
       isReleased = true
       if (inputTimer !== null) window.clearTimeout(inputTimer)
       pendingInput = ''
       releaseAttachmentIdentity()
+      if (
+        hasAttachedView &&
+        surfaceRegistry.retain(lease.viewId, {
+          detach: () => api.detachTerminalView({ ...identity, viewId: lease.viewId }),
+          onInput: (input) => {
+            void api
+              .writeAgentSession({ input, sessionId: runtimeSessionId })
+              .catch(() => undefined)
+          }
+        })
+      )
+        return
       surface.detach(element)
-      void api
-        .detachTerminalView?.({ ...identity, viewId: lease.viewId })
-        .catch(() => undefined)
-        .finally(() => surfaceRegistry.release(lease.viewId))
+      releaseTerminalViewAfterRestore({
+        restored: restoreTail,
+        detach: () => api.detachTerminalView({ ...identity, viewId: lease.viewId }),
+        release: (retain) => surfaceRegistry.release(lease.viewId, { retain })
+      })
     }
   }, [
     dimensionsRef,

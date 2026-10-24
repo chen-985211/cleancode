@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from 'react'
+import { AgentSessionBindingProvider } from './AgentSessionBindingProvider'
 
 import type { AgentTurnCompletedEvent } from '../../../contexts/agent/application/dto/AgentActivityProtocol'
 import { AgentActivityObserver } from '../../../contexts/agent/presentation/components/AgentActivityObserver'
@@ -28,13 +29,15 @@ export function AppShellProviders({
   return (
     <AgentProviderStateProvider>
       <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-        <AgentActivityObserver
-          notifications={notifications}
-          onNavigate={onAgentActivityNavigate}
-          waitForCompletionPresentation={waitForCompletionPresentation}
-        >
-          {children}
-        </AgentActivityObserver>
+        <AgentSessionBindingProvider registry={terminalSurfaceRegistry}>
+          <AgentActivityObserver
+            notifications={notifications}
+            onNavigate={onAgentActivityNavigate}
+            waitForCompletionPresentation={waitForCompletionPresentation}
+          >
+            {children}
+          </AgentActivityObserver>
+        </AgentSessionBindingProvider>
       </TerminalSurfaceRegistryProvider>
     </AgentProviderStateProvider>
   )

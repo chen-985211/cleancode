@@ -171,6 +171,8 @@ terminal 停止原因是与状态并列的独立事实，不能从状态反推�
 
 renderer 只按完整 runtime identity、generation 和 revision 对账。attach 响应、迟到事件、旧 launch 退出或旧 registration 回调都不得覆盖更高 revision 或更新 generation。
 
+App Shell 在窗口内为活动 Agent 控制台及 Run 热保留视图保留易失 session binding 投影。工作区返回时，只有 Agent、Provider、项目、工作区和完整 terminal identity 全部匹配且原视图租约仍有效，才在首次 render 同步提供该 binding，直接认领已有 surface；不得先创建空测量终端再等待一次 `attachAgentSession`。窗口级 runtime 订阅继续按 revision 对账隐藏 Agent，terminal 退出、挂起、失败或 identity 替换立即撤销旧视图资格；后台视图被容量或 TTL 淘汰后同时清理无消费者的 binding，下次进入走权威 attach。该投影不持久化、不成为运行时事实来源，也不改变显式重试、新对话和重启语义。
+
 ## 管理动作
 
 - 发现：刷新共享检测环境并从注册 catalog 中只返回当前 `installed` Provider；加载、空结果和重试是选择器的易失状态。

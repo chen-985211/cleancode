@@ -3,6 +3,7 @@ import { createTerminalXtermSurface } from '../../../../src/contexts/run/present
 
 const xtermState = vi.hoisted(() => ({
   fitDimensions: [] as Array<{ readonly columns: number; readonly rows: number }>,
+  render: null as ((event: { start: number; end: number }) => void) | null,
   terminals: [] as Array<{
     readonly loadAddon: ReturnType<typeof vi.fn>
     readonly processOsc: (code: number, data: string) => boolean
@@ -47,6 +48,17 @@ vi.mock('@xterm/xterm', () => ({
       }
       return handled
     }
+    readonly onRender = vi.fn((listener: (event: { start: number; end: number }) => void) => {
+      xtermState.render = listener
+      return {
+        dispose: vi.fn(() => {
+          xtermState.render = null
+        })
+      }
+    })
+    readonly blur = vi.fn()
+    readonly scrollToBottom = vi.fn()
+    readonly scrollToLine = vi.fn()
     readonly refresh = vi.fn()
     readonly registerLinkProvider = vi.fn(() => ({ dispose: vi.fn() }))
     readonly reset = vi.fn()
@@ -137,6 +149,211 @@ describe('terminal xterm workload target', () => {
     surface.dispose()
     first.remove()
     second.remove()
+  })
+
+  it('retains a connected terminal and resumes its stream without replay or an empty frame', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    const next = document.createElement('div')
+    document.body.append(element, next)
+    const attachment = {
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    }
+    surface.attach(attachment)
+    await surface.restore(createSnapshot())
+    await surface.workloadTarget?.runInitialization?.()
+    for (const callback of frames.splice(0)) callback(performance.now())
+    xtermState.render?.({ start: 0, end: 23 })
+    for (const callback of frames.splice(0)) callback(performance.now())
+    const terminalElement = element.firstElementChild as HTMLElement
+    const respond = vi.fn()
+    expect(surface.retain?.({ onInput: respond, onRestoreRequired: vi.fn() })).toBe(true)
+    element.remove()
+    expect(terminalElement.isConnected).toBe(true)
+    expect(terminalElement.closest('[inert]')).not.toBeNull()
+    surface.write({ sequence: 1, data: 'background output' })
+    await surface.workloadTarget?.drainOutput(null)
+    xtermState.terminals[0]!.processOsc(12, '?')
+    expect(respond).toHaveBeenCalledOnce()
+    const writes = xtermState.terminals[0]!.write.mock.calls.length
+    surface.attach({ ...attachment, element: next, resume: true })
+    expect(next.firstElementChild).toBe(terminalElement)
+    expect(next.dataset.terminalContentReady).toBe('true')
+    expect(terminalElement.style.opacity).toBe('')
+    expect(xtermState.terminals[0]!.write).toHaveBeenCalledTimes(writes)
+    expect(terminalElement.closest('[inert]')).toBeNull()
+    surface.dispose()
+    next.remove()
+  })
+
+  it('keeps restored content concealed until the final renderer paints the fitted viewport', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    expect((element.firstElementChild as HTMLElement).style.opacity).toBe('0')
+    await surface.restore(createSnapshot())
+    expect(element.dataset.terminalContentReady).toBe('false')
+    await surface.workloadTarget?.runInitialization?.()
+    for (const callback of frames.splice(0)) callback(performance.now())
+    expect(element.dataset.terminalContentReady).toBe('false')
+    xtermState.render?.({ start: 0, end: 23 })
+    for (const callback of frames.splice(0)) callback(performance.now())
+    expect(element.dataset.terminalContentReady).toBe('true')
+    expect((element.firstElementChild as HTMLElement).style.opacity).toBe('')
+    surface.dispose()
+  })
+
+  it('does not reveal a detached or newly restoring surface from an earlier render callback', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    await surface.restore(createSnapshot())
+    await surface.workloadTarget?.runInitialization?.()
+    for (const callback of frames.splice(0)) callback(performance.now())
+    xtermState.render?.({ start: 0, end: 23 })
+    surface.detach(element)
+    for (const callback of frames.splice(0)) callback(performance.now())
+    expect(element.dataset.terminalContentReady).not.toBe('true')
+    surface.dispose()
+  })
+
+  it('catches up to the restore watermark before revealing, without waiting for all future output', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    surface.write({ sequence: 1, data: 'accepted during attach' })
+    await surface.restore(createSnapshot())
+    await surface.workloadTarget?.runInitialization?.()
+    for (const callback of frames.splice(0)) callback(performance.now())
+    xtermState.render?.({ start: 0, end: 23 })
+    for (const callback of frames.splice(0)) callback(performance.now())
+    expect(element.dataset.terminalContentReady).toBe('false')
+    await surface.workloadTarget?.drainOutput(Number.POSITIVE_INFINITY)
+    surface.write({ sequence: 2, data: 'future output' })
+    xtermState.render?.({ start: 0, end: 23 })
+    for (const callback of frames.splice(0)) callback(performance.now())
+    expect(element.dataset.terminalContentReady).toBe('true')
+    surface.dispose()
+  })
+
+  it('does not postpone an already painted first frame when further output keeps arriving', async () => {
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrame = 0
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.set(++nextFrame, callback)
+      return nextFrame
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+      frames.delete(id)
+    })
+    const flushFrames = () => {
+      const pending = [...frames.values()]
+      frames.clear()
+      for (const callback of pending) callback(performance.now())
+    }
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    await surface.restore(createSnapshot())
+    await surface.workloadTarget?.runInitialization?.()
+    flushFrames()
+    xtermState.render?.({ start: 0, end: 23 })
+    surface.write({ sequence: 1, data: 'future output' })
+    await surface.workloadTarget?.drainOutput(null)
+    flushFrames()
+    expect(element.dataset.terminalContentReady).toBe('true')
+    surface.dispose()
+  })
+
+  it('reconciles a changed authoritative screen even when output sequence and dimensions match', async () => {
+    const surface = createTerminalXtermSurface('dark')
+    await surface.restore(createSnapshot())
+    xtermState.terminals[0]!.write.mockClear()
+    await surface.restore({ ...createSnapshot(), content: 'screen changed by resize' })
+    expect(xtermState.terminals[0]!.write).toHaveBeenCalledWith(
+      'screen changed by resize',
+      expect.any(Function)
+    )
+    surface.dispose()
+  })
+
+  it('keeps the parsed buffer on an unchanged authoritative snapshot after reuse', async () => {
+    const surface = createTerminalXtermSurface('dark')
+    await surface.restore(createSnapshot())
+    const terminal = xtermState.terminals[0]!
+    terminal.write.mockClear()
+    await surface.restore(createSnapshot())
+    expect(terminal.write).not.toHaveBeenCalled()
+    await surface.restore({ ...createSnapshot(), sequence: 1, content: 'new output' })
+    expect(terminal.write).toHaveBeenCalledWith('new output', expect.any(Function))
+    surface.dispose()
   })
 
   it('coalesces ordered output and leaves WebGL activation to non-critical scheduling', async () => {

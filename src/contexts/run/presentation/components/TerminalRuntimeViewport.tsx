@@ -29,6 +29,7 @@ import {
 import { readTerminalSourceTheme } from '../terminal-surface/terminalTheme'
 import {
   attachTerminalViewWithRetry,
+  releaseTerminalViewAfterRestore,
   restoreTerminalViewWithRetry
 } from '../terminal-surface/terminalViewAttachment'
 import { createTerminalXtermSurface } from '../terminal-surface/terminalXtermSurface'
@@ -272,7 +273,7 @@ export function TerminalRuntimeViewport({
     [focusTerminal]
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isTestRuntime() || !terminalElementRef.current) {
       return undefined
     }
@@ -287,8 +288,10 @@ export function TerminalRuntimeViewport({
     const lease =
       runIdentity && surfaceRegistry ? surfaceRegistry.create(runIdentity, createSurface) : null
     const surface = lease?.surface ?? createSurface()
+    if (reusable && surface !== reusable.surface) reusable.surface.dispose()
     const api = window.cleancode
     let isReleased = false
+    let hasAttachedView = Boolean(lease?.retained)
     let restoreTail = Promise.resolve()
     const pendingSurface =
       !runIdentity && !attachedSessionId ? { surface, theme: terminalSourceTheme } : null
@@ -297,6 +300,7 @@ export function TerminalRuntimeViewport({
     surfaceRef.current = surface
     surface.attach({
       element,
+      resume: lease?.retained,
       isResizeSuspended: isResizeSuspendedRef.current,
       onDimensionsChange: (dimensions) => onDimensionsChangeRef.current(dimensions),
       onInput: (input) => {
@@ -322,6 +326,7 @@ export function TerminalRuntimeViewport({
       // Measurement has no run snapshot. Preserve its fitted grid until the first
       // authoritative attach instead of resetting it to a synthetic 80-by-24 screen.
       if (pendingSurface) return
+      hasAttachedView = false
       setRestoreStatus('restoring')
       restoreTail = restoreTail
         .catch(() => undefined)
@@ -364,7 +369,10 @@ export function TerminalRuntimeViewport({
                 return restoreResult
               }
             })
-            if (!isReleased) setRestoreStatus(result === 'ready' ? 'ready' : 'failed')
+            if (!isReleased) {
+              hasAttachedView = result === 'ready'
+              setRestoreStatus(result === 'ready' ? 'ready' : 'failed')
+            }
           } catch {
             if (!isReleased) setRestoreStatus('failed')
           }
@@ -373,7 +381,8 @@ export function TerminalRuntimeViewport({
     }
 
     requestRestoreRef.current = requestRestore
-    requestRestore()
+    if (lease?.retained) setRestoreStatus('ready')
+    else requestRestore()
 
     return () => {
       isReleased = true
@@ -381,17 +390,32 @@ export function TerminalRuntimeViewport({
         requestRestoreRef.current = () => undefined
       }
       releaseAttachmentIdentity()
+      if (surfaceRef.current === surface) surfaceRef.current = null
+      if (
+        hasAttachedView &&
+        runIdentity &&
+        lease &&
+        api?.detachTerminalView &&
+        api.writeTerminal &&
+        surfaceRegistry?.retain(lease.viewId, {
+          detach: () => api.detachTerminalView({ ...runIdentity, viewId: lease.viewId }),
+          onInput: (input) => {
+            void api
+              .writeTerminal({ sessionId: runIdentity.sessionId, input })
+              .catch(() => undefined)
+          }
+        })
+      )
+        return
       surface.detach(element)
       if (runIdentity && lease && api?.detachTerminalView) {
-        void api
-          .detachTerminalView({ ...runIdentity, viewId: lease.viewId })
-          .catch(() => undefined)
-          .finally(() => surfaceRegistry?.release(lease.viewId))
+        releaseTerminalViewAfterRestore({
+          restored: restoreTail,
+          detach: () => api.detachTerminalView({ ...runIdentity, viewId: lease.viewId }),
+          release: (retain) => surfaceRegistry?.release(lease.viewId, { retain })
+        })
       } else if (lease) surfaceRegistry?.release(lease.viewId)
       else if (!pendingSurface) surface.dispose()
-      if (surfaceRef.current === surface) {
-        surfaceRef.current = null
-      }
     }
   }, [attachedSessionId, openSearch, surfaceIdentityKey, surfaceRegistry, terminalSourceTheme])
 

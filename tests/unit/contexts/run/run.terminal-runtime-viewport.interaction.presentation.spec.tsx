@@ -81,6 +81,10 @@ vi.mock('@xterm/xterm', () => ({
     readonly attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
       this.customKeyEventHandler = handler
     })
+    readonly onRender = vi.fn(() => ({ dispose: vi.fn() }))
+    readonly blur = vi.fn()
+    readonly scrollToBottom = vi.fn()
+    readonly scrollToLine = vi.fn()
     readonly focus = vi.fn(() => {
       this.textarea?.focus()
     })
@@ -252,6 +256,7 @@ describe('terminal viewport interaction', () => {
   })
 
   afterEach(() => {
+    terminalSurfaceRegistry.disposeAll()
     Reflect.deleteProperty(navigator, 'clipboard')
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
@@ -335,21 +340,22 @@ describe('terminal viewport interaction', () => {
     expect(xtermMockState.terminals).toHaveLength(1)
   })
 
-  it('disposes the detached xterm after main acknowledges detach and creates a fresh view', async () => {
+  it('reuses the detached xterm after main acknowledges detach with a fresh view lease', async () => {
     const firstWorkspace = renderTerminalViewport()
     const terminal = await waitForInstalledTerminal()
     await waitForAttachedViewId()
 
     firstWorkspace.unmount()
 
-    await waitFor(() => expect(terminal.dispose).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(terminal.options).toHaveProperty('cursorBlink', false))
+    expect(terminal.dispose).not.toHaveBeenCalled()
     expect(detachTerminalView).toHaveBeenCalledTimes(1)
 
     renderTerminalViewport()
 
-    await waitFor(() => expect(xtermMockState.terminals).toHaveLength(2))
-    expect(xtermMockState.terminals[1]).not.toBe(terminal)
-    expect(xtermMockState.terminals[1]?.open).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
+    expect(xtermMockState.terminals).toHaveLength(1)
+    expect(terminal.open).toHaveBeenCalledTimes(1)
   })
 
   it('keeps a detached xterm alive until query ownership handoff is acknowledged', async () => {
@@ -364,8 +370,10 @@ describe('terminal viewport interaction', () => {
     workspace.unmount()
 
     expect(terminal.dispose).not.toHaveBeenCalled()
+    await waitFor(() => expect(detachTerminalView).toHaveBeenCalledTimes(1))
     finishDetach()
-    await waitFor(() => expect(terminal.dispose).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(terminal.options).toHaveProperty('cursorBlink', false))
+    expect(terminal.dispose).not.toHaveBeenCalled()
   })
 
   it('replays a snapshot before applying later sequenced output', async () => {

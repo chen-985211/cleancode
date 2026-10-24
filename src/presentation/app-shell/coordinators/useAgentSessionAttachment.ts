@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -25,12 +26,8 @@ import { isTestRuntime } from '../workbench/nodes/agent/agentConsoleModel'
 import { readTerminalSourceTheme } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
 import { defaultTerminalDimensions } from '../types/terminalFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
-
-interface AgentSessionBinding {
-  readonly agentName: string
-  readonly session: AgentSessionSnapshot
-  readonly workspaceKey: string
-}
+import { AgentSessionBindingContext } from './agentSessionBindingContext'
+import type { AgentSessionBinding } from './agentSessionBindingStore'
 
 interface UseAgentSessionAttachmentInput {
   readonly activeAgent: WorkspaceAgentSnapshot
@@ -49,9 +46,15 @@ export function useAgentSessionAttachment({
   dimensionsRef,
   measuredTerminalKey
 }: UseAgentSessionAttachmentInput) {
+  const bindingStore = useContext(AgentSessionBindingContext)
+  const retainedBinding = currentWorkspaceKey
+    ? (bindingStore?.read(currentWorkspaceKey, activeAgent) ?? null)
+    : null
   const [attachAttempt, setAttachAttempt] = useState(0)
   const [operation, setOperationState] = useState<AgentAttachOperation>({ status: 'idle' })
-  const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
+  const [session, setSession] = useState<AgentSessionSnapshot | null>(
+    retainedBinding?.session ?? null
+  )
   const inFlightRef = useRef<{ readonly requestId: number; readonly workspaceKey: string } | null>(
     null
   )
@@ -65,7 +68,18 @@ export function useAgentSessionAttachment({
     readonly workspaceKey: string
   } | null>(null)
   const scopeGenerationRef = useRef(0)
-  const sessionBindingRef = useRef<AgentSessionBinding | null>(null)
+  const sessionBindingRef = useRef<AgentSessionBinding | null>(retainedBinding)
+  const retainedBindingRef = useRef(retainedBinding)
+  retainedBindingRef.current = retainedBinding
+
+  const commitBinding = useCallback(
+    (binding: AgentSessionBinding) => {
+      sessionBindingRef.current = binding
+      bindingStore?.remember(binding)
+      setSession(binding.session)
+    },
+    [bindingStore]
+  )
 
   const setOperation = useCallback((nextOperation: AgentAttachOperation) => {
     operationRef.current = nextOperation
@@ -80,11 +94,16 @@ export function useAgentSessionAttachment({
     pendingRuntimeEventsRef.current.clear()
     restartRequestRef.current = null
     if (sessionBindingRef.current?.workspaceKey !== currentWorkspaceKey) {
-      sessionBindingRef.current = null
-      setSession(null)
+      sessionBindingRef.current = retainedBindingRef.current
+      setSession(retainedBindingRef.current?.session ?? null)
     }
-    setOperation(currentWorkspaceKey ? { status: 'measuring' } : { status: 'idle' })
-  }, [currentWorkspaceKey, setOperation])
+    setOperation(
+      currentWorkspaceKey && !sessionBindingRef.current
+        ? { status: 'measuring' }
+        : { status: 'idle' }
+    )
+    return currentWorkspaceKey ? bindingStore?.acquire(currentWorkspaceKey) : undefined
+  }, [bindingStore, currentWorkspaceKey, setOperation])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -167,12 +186,11 @@ export function useAgentSessionAttachment({
           ? applyAgentRuntimeEvent(nextSession, pendingRuntimeEvent)
           : nextSession
         pendingRuntimeEventsRef.current.delete(nextSession.sessionId)
-        sessionBindingRef.current = {
+        commitBinding({
           agentName: activeAgent.name,
           session: committedSession,
           workspaceKey: currentWorkspaceKey
-        }
-        setSession(committedSession)
+        })
         setOperation({ status: 'idle' })
 
         const latestMeasurement = dimensionsRef.current
@@ -208,6 +226,7 @@ export function useAgentSessionAttachment({
     activeAgent.name,
     activeAgent.providerId,
     attachAttempt,
+    commitBinding,
     currentWorkspaceKey,
     dimensionsRef,
     gitBranch,
@@ -255,12 +274,18 @@ export function useAgentSessionAttachment({
         ) {
           return
         }
-        sessionBindingRef.current = { ...currentBinding, agentName: activeAgent.name }
+        commitBinding({ ...currentBinding, agentName: activeAgent.name })
       })
       .catch(() => undefined)
 
     return undefined
-  }, [activeAgent.agentId, activeAgent.name, currentWorkspaceKey, session?.sessionId])
+  }, [
+    activeAgent.agentId,
+    activeAgent.name,
+    commitBinding,
+    currentWorkspaceKey,
+    session?.sessionId
+  ])
 
   const requestAttach = useCallback(
     (mode: AgentAttachMode) => {
@@ -277,17 +302,19 @@ export function useAgentSessionAttachment({
     requestAttach(currentOperation.status === 'failed' ? currentOperation.mode : 'initial')
   }, [requestAttach])
 
-  const applyRuntimeChange = useCallback((event: AgentRuntimeChangedEvent) => {
-    const activeBinding = sessionBindingRef.current
-    if (activeBinding?.session.sessionId !== event.sessionId) {
-      rememberLatestAgentRuntimeEvent(pendingRuntimeEventsRef.current, event)
-      return
-    }
-    const nextSession = applyAgentRuntimeEvent(activeBinding.session, event)
-    if (nextSession === activeBinding.session) return
-    sessionBindingRef.current = { ...activeBinding, session: nextSession }
-    setSession(nextSession)
-  }, [])
+  const applyRuntimeChange = useCallback(
+    (event: AgentRuntimeChangedEvent) => {
+      const activeBinding = sessionBindingRef.current
+      if (activeBinding?.session.sessionId !== event.sessionId) {
+        rememberLatestAgentRuntimeEvent(pendingRuntimeEventsRef.current, event)
+        return
+      }
+      const nextSession = applyAgentRuntimeEvent(activeBinding.session, event)
+      if (nextSession === activeBinding.session) return
+      commitBinding({ ...activeBinding, session: nextSession })
+    },
+    [commitBinding]
+  )
 
   const replaceSession = useCallback(
     (nextSession: AgentSessionSnapshot) => {
@@ -297,15 +324,14 @@ export function useAgentSessionAttachment({
         ? applyAgentRuntimeEvent(nextSession, pendingRuntimeEvent)
         : nextSession
       pendingRuntimeEventsRef.current.delete(nextSession.sessionId)
-      sessionBindingRef.current = {
+      commitBinding({
         agentName: activeAgent.name,
         session: committedSession,
         workspaceKey: currentWorkspaceKey
-      }
-      setSession(committedSession)
+      })
       setOperation({ status: 'idle' })
     },
-    [activeAgent.name, currentWorkspaceKey, setOperation]
+    [activeAgent.name, commitBinding, currentWorkspaceKey, setOperation]
   )
 
   const writeInput = useCallback((input: string) => {
@@ -324,7 +350,10 @@ export function useAgentSessionAttachment({
     requestRestart: requestAttach,
     retryAttachment,
     scopeGenerationRef,
-    session,
+    session:
+      sessionBindingRef.current?.workspaceKey === currentWorkspaceKey
+        ? session
+        : (retainedBinding?.session ?? null),
     writeInput
   }
 }
