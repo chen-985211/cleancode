@@ -6,6 +6,7 @@ import {
   type TerminalSurfaceLease
 } from '../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from '../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
+import { TerminalWorkloadScheduler } from '../../src/contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
 
 const identity = {
   projectId: 'project',
@@ -19,10 +20,18 @@ const identity = {
   gitBranch: 'main'
 }
 let constructions = 0
-const registry = new TerminalSurfaceRegistry(() => {
-  constructions += 1
-  return createTerminalXtermSurface('dark')
-})
+const scheduler = new TerminalWorkloadScheduler()
+const registry = new TerminalSurfaceRegistry(
+  () => {
+    constructions += 1
+    return createTerminalXtermSurface('dark')
+  },
+  undefined,
+  undefined,
+  scheduler
+)
+let stopContinuousOutput: (() => void) | null = null
+let continuousOutputBatches = 0
 let current: {
   lease: TerminalSurfaceLease
   host: HTMLDivElement
@@ -182,6 +191,23 @@ async function restore(color: 'green' | 'blue' | 'unchanged') {
 
 const fixture = {
   mount,
+  startContinuousOutput: (priority: 'focused' | 'visible') => {
+    stopContinuousOutput?.()
+    continuousOutputBatches = 0
+    // Model a producer that always has another batch, without making the result CPU-speed dependent.
+    stopContinuousOutput = scheduler.register({
+      id: 'continuous-output',
+      getOutputPriority: () => priority,
+      hasPendingOutput: () => true,
+      drainOutput: async () => {
+        continuousOutputBatches += 1
+        return { bytesWritten: 4096, durationMs: 1 }
+      },
+      onOutputPendingChange: () => () => undefined,
+      onOutputPriorityChange: () => () => undefined,
+      onTerminalInput: () => () => undefined
+    })
+  },
   readHistory: () => {
     current?.lease.surface.find('old history marker', 'incremental')
     current?.lease.surface.clearSearch()
@@ -251,13 +277,19 @@ const fixture = {
     constructions,
     responses,
     detachCalls,
+    continuousOutputBatches,
+    isContinuousOutputPending: stopContinuousOutput !== null,
+    retainedPriority: hiddenLease?.surface.workloadTarget?.getOutputPriority(),
     colors: current ? readRowColors(current.host) : [],
     ready: current?.host.dataset.terminalContentReady,
-    opacity: current?.host.querySelector<HTMLElement>('.xterm')?.style.opacity
+    opacity: current ? getComputedStyle(current.host.querySelector('.xterm')!).opacity : undefined
   }),
   dispose: () => {
     unmount()
     registry.disposeAll()
+    stopContinuousOutput?.()
+    stopContinuousOutput = null
+    scheduler.dispose()
   }
 }
 

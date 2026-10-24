@@ -179,6 +179,8 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 Agent 路径还必须覆盖 session binding 在 surface 之前的生命周期：仅向 surface 测试预先传入 session，会漏掉真实 AgentConsole 重挂载时先等待测量和异步 attach 的空白窗口。`tests/integration/contexts/agent/agent.workspace-presentation.spec.ts` 使用生产 AgentConsole、AppShellProviders 和 CSS，在 StrictMode 下对两个各含 6 个 Agent 的工作区反复切换，连续检查 20 帧的全部终端、原 DOM 身份、无新增 attach/snapshot，以及 WebGL 逐行像素和 DOM 降级正文。`agent-terminal-theme-workspaces.e2e.spec.ts` 再验证真实应用、IPC 与 Agent PTY 的返回路径；普通终端和 Agent 共用 20 帧观测，不能首帧 ready 后就停止检测。Agent 计时与截图写入 `test-results/agent-workspace-presentation/`，首次帧延迟和整段观测时长分别记录。
 
+持续输出排障必须同时观察首帧初始化和隐藏 parser 的进展。共享 workload 调度器常态保留焦点优先；后台输出与初始化等待 250 ms 后按各自等待起点进入到期队列，一次仅处理一个片段或任务。新通知不得后移绝对截止点或反复取消已到期的回调，输出执行后重置自己的等待年龄，不能让一直有输出的目标永久占据到期队列。直接交互期间不强制初始化 WebGL，结束后继续累计等待；隐藏查询解析仍可到期推进。`run.terminal-workload-scheduler.spec.ts` 覆盖各输出优先级、6 个隐藏响应者、交互期、混合任务和每毫秒到达的输出通知；`run.terminal-surface-presentation.spec.ts` 在真实 Electron 中注入持续积压的竞争目标，检查 WebGL/DOM 首帧完整，以及隐藏 CSI 查询唯一响应、输出可见和原租约复用。竞争目标保持有输出，不以停止生产者作为通过条件。
+
 ## 普通终端的 worktree 重挂载
 
 普通终端的 PTY 和权威屏幕模型由 Run 上下文按完整运行身份持有，React 画布只负责当前工作区的可见投影。工作区切换可以卸载 `TerminalViewport` 并最终销毁 renderer xterm；隐藏期间的 ANSI 解析、滚动历史、终端模式和输出序号继续由主进程模型维护。

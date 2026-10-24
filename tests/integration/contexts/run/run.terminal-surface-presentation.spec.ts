@@ -213,6 +213,88 @@ async function expectHidden() {
   })
 }
 
+it.each([
+  ['focused', 'webgl'],
+  ['visible', 'webgl'],
+  ['focused', 'dom'],
+  ['visible', 'dom']
+] as const)(
+  'reveals a complete viewport under continuously backlogged %s output with the %s renderer',
+  async (priority, renderer) => {
+    await page.goto(
+      `${server!.resolvedUrls!.local[0]}tests/fixtures/terminalSurfacePresentation.html?renderer=${renderer}`
+    )
+    try {
+      await page.evaluate((value) => {
+        window.terminalPresentationFixture.startContinuousOutput(value)
+        window.terminalPresentationFixture.mount()
+      }, priority)
+      await page.evaluate(() => window.terminalPresentationFixture.restore('green'))
+      await page.waitForFunction(
+        () => window.terminalPresentationFixture.state().firstFrame !== null,
+        undefined,
+        { timeout: 5000 }
+      )
+      const state = await page.evaluate(() => window.terminalPresentationFixture.state())
+      expect(state.isContinuousOutputPending).toBe(true)
+      expect(state.continuousOutputBatches).toBeGreaterThan(0)
+      expect(state).toMatchObject({ ready: 'true', opacity: '1' })
+      expect(state.firstFrame).toMatchObject({ renderer, hiddenBeforeReady: true })
+      if (renderer === 'webgl') {
+        expect(state.firstFrame!.colors).toHaveLength(state.dimensions.rows)
+        for (const color of state.firstFrame!.colors) expect(color).toEqual([0, 128, 0, 255])
+      } else {
+        expect(state.firstFrame!.text).toContain('green latest 1')
+        expect(state.firstFrame!.text).toContain(`green latest ${state.dimensions.rows}`)
+        expect(state.firstFrame!.text).not.toContain('old history')
+      }
+    } finally {
+      await page.evaluate(() => window.terminalPresentationFixture.dispose())
+    }
+  },
+  15_000
+)
+
+it.each(['focused', 'visible'] as const)(
+  'answers a retained terminal query while %s output stays continuously backlogged',
+  async (priority) => {
+    await page.goto(
+      `${server!.resolvedUrls!.local[0]}tests/fixtures/terminalSurfacePresentation.html`
+    )
+    try {
+      await page.evaluate(() => window.terminalPresentationFixture.mount())
+      await restoreAndCheck('green', [0, 128, 0, 255])
+      await page.evaluate((value) => {
+        window.terminalPresentationFixture.hide()
+        window.terminalPresentationFixture.startContinuousOutput(value)
+        window.terminalPresentationFixture.writeHidden()
+      }, priority)
+      await page.waitForFunction(
+        () => window.terminalPresentationFixture.state().responses.length > 0,
+        undefined,
+        { timeout: 5000 }
+      )
+      const hidden = await page.evaluate(() => window.terminalPresentationFixture.state())
+      expect(hidden.retainedPriority).toBe('hidden')
+      expect(hidden.isContinuousOutputPending).toBe(true)
+      expect(hidden.continuousOutputBatches).toBeGreaterThan(0)
+      expect(hidden.responses).toHaveLength(1)
+      expect(hidden.responses[0]?.startsWith('\x1b[')).toBe(true)
+      expect(hidden.responses[0]?.slice(2)).toMatch(/^\d+;\d+R$/)
+      expect(hidden.detachCalls).toBe(0)
+      const restored = await page.evaluate(() => window.terminalPresentationFixture.switchHot())
+      expect(restored).toMatchObject({ retained: true, sameViewId: true, restoreCalls: 0 })
+      for (const color of restored.firstColors!) expect(color).toEqual([0, 0, 192, 255])
+      const output = join(process.cwd(), 'test-results/terminal-workload-starvation')
+      await mkdir(output, { recursive: true })
+      await page.screenshot({ path: join(output, `${priority}-retained-query.png`) })
+    } finally {
+      await page.evaluate(() => window.terminalPresentationFixture.dispose())
+    }
+  },
+  15_000
+)
+
 async function restoreAndCheck(color: 'green' | 'blue' | 'unchanged', expected: number[]) {
   await page.evaluate((value) => window.terminalPresentationFixture.restore(value), color)
   await page.waitForFunction(

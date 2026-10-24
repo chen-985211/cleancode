@@ -40,12 +40,20 @@ interface RegisteredTarget {
   readonly target: TerminalWorkloadTarget
   readonly unsubscribe: () => void
   bytesPerMillisecond: number | null
+  initializationPendingSince: number | null
+  lastOutputServedAt: number | null
   lastServedOrder: number
   pendingSince: number | null
 }
 
+interface PendingIdleWork {
+  readonly kind: 'initialization' | 'output'
+  readonly registered: RegisteredTarget
+  readonly waitingSince: number
+}
+
 const frameOutputBudgetRatio = 0.25
-const interactionStarvationTimeoutMs = 250
+const idleWorkStarvationTimeoutMs = 250
 const throughputSmoothingRatio = 0.25
 
 export class TerminalWorkloadScheduler {
@@ -55,6 +63,7 @@ export class TerminalWorkloadScheduler {
   private readonly pendingInputAtByTarget = new Map<string, number>()
   private frameHandle: number | null = null
   private idleHandle: number | null = null
+  private idleDeadline: number | null = null
   private inputFrameHandle: number | null = null
   private lastFrameTimestamp: number | null = null
   private isDisposed = false
@@ -82,6 +91,8 @@ export class TerminalWorkloadScheduler {
     const unsubscribeNonCritical = target.onNonCriticalWorkChange?.(handleStateChange)
     const registered: RegisteredTarget = {
       bytesPerMillisecond: null,
+      initializationPendingSince: target.hasPendingInitialization?.() ? this.host.now() : null,
+      lastOutputServedAt: null,
       lastServedOrder: 0,
       pendingSince: target.hasPendingOutput() ? this.host.now() : null,
       target,
@@ -164,15 +175,14 @@ export class TerminalWorkloadScheduler {
     this.inputFrameHandle = this.host.requestFrame(() => {
       this.inputFrameHandle = null
       this.isInputActive = false
-      if (this.idleHandle !== null) this.host.cancelIdle(this.idleHandle)
-      this.idleHandle = null
       this.scheduleWork()
     })
     this.rescheduleWork()
   }
 
   private rescheduleWork(): void {
-    this.cancelScheduledWork()
+    if (this.frameHandle !== null) this.host.cancelFrame(this.frameHandle)
+    this.frameHandle = null
     this.scheduleWork()
   }
 
@@ -199,17 +209,25 @@ export class TerminalWorkloadScheduler {
 
     const isInteractionActive = this.isInteractionActive()
     const shouldScheduleIdle = hasBackgroundOutput || (hasInitialization && !isInteractionActive)
-    if (shouldScheduleIdle && this.idleHandle === null) {
-      this.lastDeferReason = isInteractionActive ? 'interaction' : 'background-idle'
-      this.idleHandle = this.host.requestIdle(
-        (deadline) => {
-          this.idleHandle = null
-          void this.drainIdleWork(deadline)
-        },
-        isInteractionActive && hasBackgroundOutput ? interactionStarvationTimeoutMs : 0
-      )
-    } else if (hasInitialization && isInteractionActive) {
-      this.lastDeferReason = 'interaction'
+    if (shouldScheduleIdle) {
+      const deadline = this.idleWorkDeadline()
+      if (this.idleDeadline !== null && deadline < this.idleDeadline) this.cancelIdleWork()
+      // Keep an already queued turn: frequent notifications must not postpone expired work.
+      if (this.idleHandle === null) {
+        this.lastDeferReason = isInteractionActive ? 'interaction' : 'background-idle'
+        this.idleDeadline = deadline
+        this.idleHandle = this.host.requestIdle(
+          (idleDeadline) => {
+            this.idleHandle = null
+            this.idleDeadline = null
+            void this.drainIdleWork(idleDeadline)
+          },
+          Math.max(1, deadline - this.host.now())
+        )
+      }
+    } else {
+      this.cancelIdleWork()
+      if (hasInitialization && isInteractionActive) this.lastDeferReason = 'interaction'
     }
 
     if (!hasFocusedOutput && !hasBackgroundOutput && !hasInitialization) {
@@ -235,6 +253,19 @@ export class TerminalWorkloadScheduler {
 
   private async drainIdleWork(deadline: IdleDeadline): Promise<void> {
     if (this.isDisposed || this.isDraining) return
+    const overdue = this.pendingIdleWork()
+      .filter(({ waitingSince }) => this.host.now() - waitingSince >= idleWorkStarvationTimeoutMs)
+      .sort(
+        (left, right) =>
+          left.waitingSince - right.waitingSince ||
+          left.registered.lastServedOrder - right.registered.lastServedOrder
+      )[0]
+    if (overdue) {
+      // One bounded batch/task gets a turn even when higher-priority output never empties.
+      if (overdue.kind === 'output') await this.drainOutput(overdue.registered, null)
+      else await this.runInitialization(overdue.registered)
+      return
+    }
     if (this.selectOutputTarget('focused')) {
       this.scheduleWork()
       return
@@ -265,7 +296,16 @@ export class TerminalWorkloadScheduler {
     }
 
     const initialization = this.selectInitializationTarget()
-    if (!initialization?.target.runInitialization) {
+    if (!initialization) {
+      this.scheduleWork()
+      return
+    }
+
+    await this.runInitialization(initialization)
+  }
+
+  private async runInitialization(initialization: RegisteredTarget): Promise<void> {
+    if (!initialization.target.runInitialization) {
       this.scheduleWork()
       return
     }
@@ -286,6 +326,7 @@ export class TerminalWorkloadScheduler {
     durationBudgetMs: number | null
   ): Promise<void> {
     this.isDraining = true
+    registered.lastOutputServedAt = this.host.now()
     registered.lastServedOrder = ++this.servedOrder
     const maximumBatchBytes = deriveMaximumBatchBytes(
       registered.bytesPerMillisecond,
@@ -348,7 +389,41 @@ export class TerminalWorkloadScheduler {
     for (const registered of this.targets.values()) {
       if (registered.target.hasPendingOutput()) registered.pendingSince ??= now
       else registered.pendingSince = null
+      if (registered.target.hasPendingInitialization?.())
+        registered.initializationPendingSince ??= now
+      else registered.initializationPendingSince = null
     }
+  }
+
+  private pendingIdleWork(): PendingIdleWork[] {
+    const work: PendingIdleWork[] = []
+    for (const registered of this.targets.values()) {
+      if (registered.pendingSince !== null && registered.target.getOutputPriority() !== 'focused') {
+        work.push({
+          kind: 'output',
+          registered,
+          waitingSince: Math.max(registered.pendingSince, registered.lastOutputServedAt ?? 0)
+        })
+      }
+      if (registered.initializationPendingSince !== null && !this.isInteractionActive()) {
+        work.push({
+          kind: 'initialization',
+          registered,
+          waitingSince: registered.initializationPendingSince
+        })
+      }
+    }
+    return work
+  }
+
+  private idleWorkDeadline(): number {
+    const now = this.host.now()
+    const deadline = this.pendingIdleWork().reduce(
+      (earliest, { waitingSince }) =>
+        Math.min(earliest, waitingSince + idleWorkStarvationTimeoutMs),
+      now + idleWorkStarvationTimeoutMs
+    )
+    return Math.max(now + 1, deadline)
   }
 
   private isInteractionActive(): boolean {
@@ -365,9 +440,14 @@ export class TerminalWorkloadScheduler {
 
   private cancelScheduledWork(): void {
     if (this.frameHandle !== null) this.host.cancelFrame(this.frameHandle)
-    if (this.idleHandle !== null) this.host.cancelIdle(this.idleHandle)
     this.frameHandle = null
+    this.cancelIdleWork()
+  }
+
+  private cancelIdleWork(): void {
+    if (this.idleHandle !== null) this.host.cancelIdle(this.idleHandle)
     this.idleHandle = null
+    this.idleDeadline = null
   }
 }
 

@@ -163,6 +163,156 @@ describe('terminal output scheduler', () => {
     expect(host.drainOrder).toEqual(['initialize:visible', 'initialize:hidden'])
   })
 
+  it.each(['focused', 'visible', 'hidden'] as const)(
+    'initializes a returning viewport while %s output remains continuously backlogged',
+    async (priority) => {
+      const host = createHost()
+      const scheduler = new TerminalWorkloadScheduler({ host })
+      const streaming = createTarget('streaming', priority, undefined, host.drainOrder)
+      const returning = createTarget('returning', 'visible', undefined, host.drainOrder)
+      scheduler.register(streaming.target)
+      scheduler.register(returning.target)
+      streaming.enqueue(100)
+      returning.enqueueInitialization()
+
+      for (let turn = 0; turn < 20; turn += 1) {
+        streaming.enqueue()
+        await host.flushFrame(16)
+        await host.flushIdle({ didTimeout: false, timeRemaining: () => 8 })
+      }
+
+      expect(streaming.target.hasPendingOutput()).toBe(true)
+      expect(host.drainOrder).toContain('streaming')
+      expect(host.drainOrder.filter((id) => id === 'initialize:returning')).toHaveLength(1)
+      scheduler.dispose()
+    }
+  )
+
+  it.each([
+    ['focused', false],
+    ['visible', false],
+    ['focused', true],
+    ['visible', true]
+  ] as const)(
+    'services every hidden response owner under continuous %s output, interacting=%s',
+    async (priority, interacting) => {
+      const host = createHost()
+      const scheduler = new TerminalWorkloadScheduler({ host })
+      const streaming = createTarget('streaming', priority, undefined, host.drainOrder)
+      scheduler.register(streaming.target)
+      streaming.enqueue(100)
+      const hidden = Array.from({ length: 6 }, (_, index) =>
+        createTarget(`hidden-${index}`, 'hidden', undefined, host.drainOrder)
+      )
+      for (const target of hidden) {
+        scheduler.register(target.target)
+        target.enqueue(2)
+      }
+      if (interacting) scheduler.beginInteraction('canvas')
+
+      for (let turn = 0; turn < 50; turn += 1) {
+        streaming.enqueue()
+        await host.flushFrame(16)
+        await host.flushIdle({ didTimeout: interacting, timeRemaining: () => 8 })
+      }
+
+      expect(streaming.target.hasPendingOutput()).toBe(true)
+      for (const target of hidden) {
+        expect(host.drainOrder.filter((id) => id === target.target.id)).toHaveLength(2)
+      }
+      scheduler.dispose()
+    }
+  )
+
+  it('keeps the deadline for deferred work when incoming output reschedules the idle callback', () => {
+    const host = createHost()
+    const scheduler = new TerminalWorkloadScheduler({ host })
+    const streaming = createTarget('streaming', 'focused')
+    const hidden = createTarget('hidden', 'hidden')
+    scheduler.register(streaming.target)
+    scheduler.register(hidden.target)
+    scheduler.beginInteraction('canvas')
+    hidden.enqueue()
+    const initialTimeout = host.idleTimeouts()[0]!
+    expect(initialTimeout).toBeGreaterThan(0)
+    host.advanceNow(initialTimeout - 1)
+
+    streaming.enqueue()
+
+    expect(host.idleTimeouts()).toEqual([1])
+    scheduler.dispose()
+  })
+
+  it('services an expired hidden stream even when output notifications arrive every millisecond', async () => {
+    const host = createHost()
+    const scheduler = new TerminalWorkloadScheduler({ host })
+    const streaming = createTarget('streaming', 'focused', undefined, host.drainOrder)
+    const hidden = createTarget('hidden', 'hidden', undefined, host.drainOrder)
+    scheduler.register(streaming.target)
+    scheduler.register(hidden.target)
+    hidden.enqueue()
+    for (let turn = 0; turn < 300; turn += 1) {
+      host.advanceNow(1)
+      streaming.enqueue()
+      if (host.idleTimeouts().some((timeout) => timeout === 0)) {
+        await host.flushIdle({ didTimeout: true, timeRemaining: () => 0 })
+      }
+    }
+    expect(streaming.target.hasPendingOutput()).toBe(true)
+    expect(host.drainOrder).toContain('hidden')
+    scheduler.dispose()
+  })
+
+  it('keeps overdue initialization out of a gesture, then runs it without waiting for output to stop', async () => {
+    const host = createHost()
+    const scheduler = new TerminalWorkloadScheduler({ host })
+    const streaming = createTarget('streaming', 'focused', undefined, host.drainOrder)
+    const returning = createTarget('returning', 'visible', undefined, host.drainOrder)
+    scheduler.register(streaming.target)
+    scheduler.register(returning.target)
+    streaming.enqueue(100)
+    scheduler.beginInteraction('canvas')
+    returning.enqueueInitialization()
+
+    for (let turn = 0; turn < 20; turn += 1) {
+      await host.flushFrame(16)
+      await host.flushIdle({ didTimeout: true, timeRemaining: () => 0 })
+    }
+    expect(host.drainOrder).not.toContain('initialize:returning')
+
+    scheduler.endInteraction('canvas')
+    await host.flushIdle({ didTimeout: true, timeRemaining: () => 0 })
+
+    expect(host.drainOrder.filter((id) => id === 'initialize:returning')).toHaveLength(1)
+    expect(streaming.target.hasPendingOutput()).toBe(true)
+    scheduler.dispose()
+  })
+
+  it('shares overdue turns between first-frame initialization and hidden output', async () => {
+    const host = createHost()
+    const scheduler = new TerminalWorkloadScheduler({ host })
+    const streaming = createTarget('streaming', 'focused', undefined, host.drainOrder)
+    const returning = createTarget('returning', 'visible', undefined, host.drainOrder)
+    const hidden = createTarget('hidden', 'hidden', undefined, host.drainOrder)
+    scheduler.register(streaming.target)
+    scheduler.register(returning.target)
+    scheduler.register(hidden.target)
+    streaming.enqueue(100)
+    hidden.enqueue(100)
+    returning.enqueueInitialization()
+
+    for (let turn = 0; turn < 40; turn += 1) {
+      await host.flushFrame(16)
+      await host.flushIdle({ didTimeout: false, timeRemaining: () => 8 })
+    }
+
+    expect(streaming.target.hasPendingOutput()).toBe(true)
+    expect(hidden.target.hasPendingOutput()).toBe(true)
+    expect(host.drainOrder).toContain('hidden')
+    expect(host.drainOrder.filter((id) => id === 'initialize:returning')).toHaveLength(1)
+    scheduler.dispose()
+  })
+
   it('reports bounded scheduling diagnostics without terminal output content', async () => {
     const host = createHost()
     const scheduler = new TerminalWorkloadScheduler({ host })
@@ -357,11 +507,13 @@ function createHost(): TerminalWorkloadSchedulerHost & {
   readonly flushIdle: (deadline: IdleDeadline) => Promise<void>
   readonly pendingFrames: () => number
   readonly pendingIdleCallbacks: () => number
+  readonly idleTimeouts: () => number[]
 } {
   let now = 0
   let nextHandle = 1
   const frameCallbacks = new Map<number, FrameRequestCallback>()
   const idleCallbacks = new Map<number, IdleRequestCallback>()
+  const idleTimeouts = new Map<number, number>()
   const drainOrder: string[] = []
 
   return {
@@ -369,7 +521,10 @@ function createHost(): TerminalWorkloadSchedulerHost & {
       now += milliseconds
     },
     cancelFrame: (handle) => frameCallbacks.delete(handle),
-    cancelIdle: (handle) => idleCallbacks.delete(handle),
+    cancelIdle: (handle) => {
+      idleCallbacks.delete(handle)
+      idleTimeouts.delete(handle)
+    },
     drainOrder,
     flushFrame: async (milliseconds) => {
       now += milliseconds
@@ -382,6 +537,7 @@ function createHost(): TerminalWorkloadSchedulerHost & {
     flushIdle: async (deadline) => {
       const callbacks = [...idleCallbacks.values()]
       idleCallbacks.clear()
+      idleTimeouts.clear()
       callbacks.forEach((callback) => callback(deadline))
       await Promise.resolve()
       await Promise.resolve()
@@ -389,14 +545,16 @@ function createHost(): TerminalWorkloadSchedulerHost & {
     now: () => now,
     pendingFrames: () => frameCallbacks.size,
     pendingIdleCallbacks: () => idleCallbacks.size,
+    idleTimeouts: () => [...idleTimeouts.values()].map((deadline) => Math.max(0, deadline - now)),
     requestFrame: (callback) => {
       const handle = nextHandle++
       frameCallbacks.set(handle, callback)
       return handle
     },
-    requestIdle: (callback) => {
+    requestIdle: (callback, timeout) => {
       const handle = nextHandle++
       idleCallbacks.set(handle, callback)
+      idleTimeouts.set(handle, now + timeout)
       return handle
     }
   }
