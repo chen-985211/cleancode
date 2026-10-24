@@ -2,6 +2,7 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot,
+  CanvasLayerItemReference,
   CanvasStackSnapshot
 } from '../../application/dto/CanvasArrangementSnapshot'
 import { CanvasArrangement } from '../../domain/aggregates/CanvasArrangement'
@@ -22,7 +23,12 @@ export function parseCanvasArrangementStore(
   if (!isRecord(parsed) || !hasExactKeys(parsed, ['version', 'arrangement'])) {
     corrupted(path)
   }
-  if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
+  if (
+    parsed.version !== 1 &&
+    parsed.version !== 2 &&
+    parsed.version !== 3 &&
+    parsed.version !== 4
+  ) {
     throw createExpectedAppError(
       'CANVAS_ARRANGEMENT_VERSION_UNSUPPORTED',
       'Unsupported canvas arrangement store version.',
@@ -47,16 +53,22 @@ export function parseCanvasArrangementStore(
 }
 
 export function serializeCanvasArrangementStore(snapshot: CanvasArrangementSnapshot): string {
-  return `${JSON.stringify({ version: 3, arrangement: snapshot }, null, 2)}\n`
+  return `${JSON.stringify({ version: 4, arrangement: { ...snapshot, layerOrder: snapshot.layerOrder ?? [] } }, null, 2)}\n`
 }
 
-function validateArrangement(value: unknown, version: 1 | 2 | 3): CanvasArrangementSnapshot {
+function validateArrangement(value: unknown, version: 1 | 2 | 3 | 4): CanvasArrangementSnapshot {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['projectId', 'workspaceId', 'stacks']) ||
+    !hasExactKeys(
+      value,
+      version === 4
+        ? ['projectId', 'workspaceId', 'stacks', 'layerOrder']
+        : ['projectId', 'workspaceId', 'stacks']
+    ) ||
     !isNonEmptyString(value.projectId) ||
     !isNonEmptyString(value.workspaceId) ||
-    !Array.isArray(value.stacks)
+    !Array.isArray(value.stacks) ||
+    (version === 4 && !Array.isArray(value.layerOrder))
   ) {
     throw new TypeError('Invalid canvas arrangement snapshot.')
   }
@@ -64,13 +76,14 @@ function validateArrangement(value: unknown, version: 1 | 2 | 3): CanvasArrangem
   return {
     projectId: value.projectId,
     workspaceId: value.workspaceId,
+    layerOrder: version === 4 ? (value.layerOrder as unknown[]).map(validateLayerItem) : [],
     stacks: value.stacks
       .map((stack) => validateStack(stack, version))
       .filter((stack): stack is CanvasStackSnapshot => stack !== null)
   }
 }
 
-function validateStack(value: unknown, version: 1 | 2 | 3): CanvasStackSnapshot | null {
+function validateStack(value: unknown, version: 1 | 2 | 3 | 4): CanvasStackSnapshot | null {
   const keys = version === 2 ? ['id', 'anchor', 'items', 'presentation'] : ['id', 'anchor', 'items']
   if (
     !isRecord(value) ||
@@ -88,6 +101,12 @@ function validateStack(value: unknown, version: 1 | 2 | 3): CanvasStackSnapshot 
     items: value.items.map(validateItem)
   }
   return version === 2 && value.presentation === 'spread' ? null : stack
+}
+
+function validateLayerItem(value: unknown): CanvasLayerItemReference {
+  const item = validateItem(value)
+  if (item.kind === 'workflow') throw new TypeError('Invalid canvas layer identity.')
+  return item
 }
 
 function validateItem(value: unknown): CanvasArrangementItemReference {

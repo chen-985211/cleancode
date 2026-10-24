@@ -644,6 +644,7 @@ export function AppShell({
           onArrangeCanvasSelection={canvasArrangement.arrange}
           onOrganizeCanvas={canvasArrangement.organize}
           onMoveCanvasStack={canvasArrangement.moveStack}
+          onSaveCanvasLayerOrder={canvasArrangement.saveLayerOrder}
           onDeleteTerminalScope={blockActions.deleteTerminalScope}
           onAddQuickExecutionTarget={quickExecution.addTarget}
           onClearQuickExecutionSlot={quickExecution.clearSlot}

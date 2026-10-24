@@ -106,6 +106,7 @@ export function WorkbenchCanvas({
   onArrangeCanvasSelection,
   onOrganizeCanvas,
   onMoveCanvasStack,
+  onSaveCanvasLayerOrder,
   onDeleteTerminalScope,
   onAddQuickExecutionTarget,
   onClearQuickExecutionSlot,
@@ -162,7 +163,8 @@ export function WorkbenchCanvas({
     onNodeDragStart,
     onNodeDragStop,
     onCancelNodeDrag,
-    onMoveCanvasStack
+    onMoveCanvasStack,
+    onSaveCanvasLayerOrder
   })
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
   const canvasArrangement = useWorkbenchCanvasArrangement({

@@ -13,7 +13,8 @@ describe('canvas arrangement IPC contract', () => {
       ipcMain,
       logger: silentLogger,
       moveStack,
-      removeStack
+      removeStack,
+      saveLayerOrder: vi.fn(async () => snapshot())
     })
     await expect(ipcMain.invoke('cleancode:set-canvas-stack-presentation', {})).rejects.toThrow(
       'Missing handler: cleancode:set-canvas-stack-presentation'
@@ -69,7 +70,8 @@ describe('canvas arrangement IPC contract', () => {
       ipcMain,
       logger: silentLogger,
       moveStack: vi.fn(async () => snapshot()),
-      removeStack: vi.fn(async () => snapshot())
+      removeStack: vi.fn(async () => snapshot()),
+      saveLayerOrder: vi.fn(async () => snapshot())
     })
 
     for (const command of [
@@ -127,6 +129,51 @@ describe('canvas arrangement IPC contract', () => {
       )
     }
     expect(createStack).not.toHaveBeenCalled()
+  })
+
+  it('validates stable layer identities and forwards the exact workspace order', async () => {
+    const ipcMain = new FakeIpcMain()
+    const saveLayerOrder = vi.fn(async () => snapshot())
+    registerCanvasArrangementIpcHandlers({
+      createStack: vi.fn(),
+      moveStack: vi.fn(),
+      removeStack: vi.fn(),
+      ipcMain,
+      logger: silentLogger,
+      saveLayerOrder
+    })
+    const command = {
+      projectDirectory: '/project',
+      projectId: 'project-1',
+      workspaceId: 'main',
+      items: [
+        { kind: 'agent', agentId: 'same' },
+        { kind: 'combination', terminalGroupId: 'group' },
+        { kind: 'terminal', terminalId: 'same' }
+      ]
+    }
+    await expect(ipcMain.invoke('cleancode:save-canvas-layer-order', command)).resolves.toEqual({
+      ok: true,
+      value: snapshot()
+    })
+    expect(saveLayerOrder).toHaveBeenCalledWith(command)
+    saveLayerOrder.mockClear()
+    for (const invalid of [
+      { ...command, extra: true },
+      { ...command, workspaceId: '' },
+      { ...command, items: 'invalid' },
+      { ...command, items: [{ kind: 'workflow', terminalIds: ['a', 'b'] }] },
+      { ...command, items: [{ kind: 'terminal', terminalId: 'a', zIndex: 10 }] },
+      { ...command, items: [command.items[0], command.items[0]] }
+    ]) {
+      await expect(
+        ipcMain.invoke('cleancode:save-canvas-layer-order', invalid)
+      ).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_IPC_COMMAND' }
+      })
+    }
+    expect(saveLayerOrder).not.toHaveBeenCalled()
   })
 })
 

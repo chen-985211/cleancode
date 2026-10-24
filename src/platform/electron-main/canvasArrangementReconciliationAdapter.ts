@@ -4,6 +4,21 @@ import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangemen
 import { CanvasArrangement } from '../../contexts/canvas-arrangement/domain/aggregates/CanvasArrangement'
 import { analyzeCanvasExecutionSelection } from '../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 
+export function resolveValidCanvasLayerItemKeys(
+  graph: BlockGraphSnapshot,
+  agents: readonly WorkspaceAgentSnapshot[]
+): string[] {
+  return [
+    ...graph.blocks.map((block) =>
+      CanvasArrangement.itemKey({ kind: 'terminal', terminalId: block.id })
+    ),
+    ...graph.terminalGroups.map((group) =>
+      CanvasArrangement.itemKey({ kind: 'combination', terminalGroupId: group.id })
+    ),
+    ...agents.map((agent) => CanvasArrangement.itemKey({ kind: 'agent', agentId: agent.agentId }))
+  ]
+}
+
 export function resolveValidCanvasArrangementItemKeys(
   arrangement: CanvasArrangementSnapshot,
   graph: BlockGraphSnapshot,

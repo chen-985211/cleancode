@@ -5,6 +5,7 @@ import type {
 import type { CreateCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/CreateCanvasStackUseCase'
 import type { RemoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/RemoveCanvasStackUseCase'
 import type { MoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/MoveCanvasStackUseCase'
+import type { SaveCanvasLayerOrderCommand } from '../../contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -16,11 +17,22 @@ export interface CanvasArrangementIpcHandlersInput {
   readonly logger: Logger
   readonly moveStack: (command: MoveCanvasStackCommand) => Promise<CanvasArrangementSnapshot>
   readonly removeStack: (command: RemoveCanvasStackCommand) => Promise<CanvasArrangementSnapshot>
+  readonly saveLayerOrder: (
+    command: SaveCanvasLayerOrderCommand
+  ) => Promise<CanvasArrangementSnapshot>
 }
 
 export function registerCanvasArrangementIpcHandlers(
   input: CanvasArrangementIpcHandlersInput
 ): void {
+  registerIpcHandler<unknown, CanvasArrangementSnapshot>({
+    channel: 'cleancode:save-canvas-layer-order',
+    handler: (command) => input.saveLayerOrder(readSaveLayerOrderCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'saveCanvasLayerOrder',
+    scope: 'canvas.arrangement'
+  })
   registerIpcHandler<unknown, CanvasArrangementSnapshot>({
     channel: 'cleancode:move-canvas-stack',
     handler: (command) => input.moveStack(readMoveStackCommand(command)),
@@ -47,6 +59,31 @@ export function registerCanvasArrangementIpcHandlers(
     scope: 'canvas.arrangement',
     successLogLevel: 'info'
   })
+}
+
+function readSaveLayerOrderCommand(command: unknown): SaveCanvasLayerOrderCommand {
+  if (
+    !isRecord(command) ||
+    !hasExactKeys(command, ['items', 'projectDirectory', 'projectId', 'workspaceId']) ||
+    !isNonEmptyString(command.projectDirectory) ||
+    !isNonEmptyString(command.projectId) ||
+    !isNonEmptyString(command.workspaceId) ||
+    !Array.isArray(command.items)
+  )
+    invalidCommand()
+  const items = command.items.map((value) => {
+    const item = readItem(value)
+    if (item.kind === 'workflow') invalidCommand()
+    return item
+  })
+  const keys = items.map((item) => JSON.stringify(item))
+  if (new Set(keys).size !== keys.length) invalidCommand()
+  return {
+    projectDirectory: command.projectDirectory,
+    projectId: command.projectId,
+    workspaceId: command.workspaceId,
+    items
+  }
 }
 
 function readMoveStackCommand(command: unknown): MoveCanvasStackCommand {

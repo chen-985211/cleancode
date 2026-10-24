@@ -148,14 +148,15 @@ describe('workbench canvas layer gesture ownership', () => {
     expect(order(result.current)).toEqual(['outside', 'last', 'a', 'b'])
   })
 
-  it('ignores late results across workspace changes even when node IDs are reused', async () => {
+  it('keeps late successful releases in their original workspace when node IDs are reused', async () => {
     const pending = deferred()
     const { result, rerender, begin, drop } = setup(vi.fn(() => pending.promise))
     begin()
     drop()
     rerender({ workspaceId: 'other', selected: false })
+    expect(order(result.current)).toEqual(['a', 'b', 'outside', 'last'])
     rerender({ workspaceId: 'main', selected: false })
     await act(async () => pending.resolve(true))
-    expect(order(result.current)).toEqual(['a', 'b', 'outside', 'last'])
+    expect(order(result.current)).toEqual(['outside', 'last', 'a', 'b'])
   })
 })
