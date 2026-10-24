@@ -10,6 +10,10 @@ const selectionStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/workbench/nodes/workbench-node-selection.css'),
   'utf8'
 )
+const themeStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/theme.css'),
+  'utf8'
+)
 const canvasStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/workbench/workbench-canvas.css'),
   'utf8'
@@ -27,11 +31,24 @@ function readRule(styles: string, selector: string): string {
 }
 
 describe('Agent node selection visual boundary', () => {
+  it.each([
+    { theme: ":root[data-theme='light']", nodeColor: '#9fb3c8', edgeColor: '#9fb3c8' },
+    { theme: ":root[data-theme='dark']", nodeColor: '#adb5bd', edgeColor: '#95c9ff' }
+  ])(
+    'keeps theme-specific node selection separate from selected edges in $theme',
+    ({ theme, nodeColor, edgeColor }) => {
+      const themeRule = readRule(themeStyles, theme)
+
+      expect(themeRule).toContain(`--cc-workbench-node-selection: ${nodeColor};`)
+      expect(themeRule).toContain(`--cc-workbench-edge-selection: ${edgeColor};`)
+    }
+  )
+
   it('uses one strong solid boundary without tinting node content', () => {
     const selectedRule = readRule(agentConsoleStyles, '.agent-console-node--selected')
     const selectionVeilRule = readRule(selectionStyles, '.workbench-node-selection-veil')
 
-    expect(selectionVeilRule).toContain('border: 2px solid var(--cc-workbench-selection);')
+    expect(selectionVeilRule).toContain('border: 2px solid var(--cc-workbench-node-selection);')
     expect(selectionVeilRule).toContain('background: transparent;')
     expect(selectionVeilRule).toContain('box-shadow: var(--cc-shadow-node);')
     expect(selectionVeilRule).not.toContain('dashed')
@@ -49,7 +66,7 @@ describe('Agent node selection visual boundary', () => {
     )
 
     for (const rule of [selectedEdgeRule, contextEdgeRule]) {
-      expect(rule).toContain('stroke: var(--cc-workbench-selection);')
+      expect(rule).toContain('stroke: var(--cc-workbench-edge-selection);')
       expect(rule).toContain('stroke-width: 3;')
       expect(rule).toContain('stroke-dasharray: none;')
     }

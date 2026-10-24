@@ -234,7 +234,7 @@
 }
 
 .react-flow__edge.selected path.react-flow__edge-path {
-  stroke: var(--cc-workbench-selection);
+  stroke: var(--cc-workbench-edge-selection);
   stroke-width: 3;
   stroke-dasharray: none;
 }
