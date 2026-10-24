@@ -14,7 +14,7 @@
   --terminal-shell-raised: var(--cc-terminal-shell);
   --terminal-shell-muted: var(--cc-surface-subtle);
   --terminal-border: var(--cc-terminal-border);
-  --terminal-border-strong: var(--cc-workbench-selection);
+  --terminal-border-strong: var(--cc-workbench-node-selection);
   --terminal-foreground: var(--cc-foreground);
   --terminal-muted: var(--cc-muted);
   --terminal-soft-control: var(--cc-terminal-control);
@@ -42,20 +42,20 @@
 
 .terminal-node.terminal-node--selected,
 .terminal-node.terminal-node--context-selected {
-  border-color: var(--cc-workbench-selection);
+  border-color: var(--cc-workbench-node-selection);
 }
 
 .terminal-node--group-selection-mode {
-  border-color: var(--cc-workbench-selection);
+  border-color: var(--cc-workbench-node-selection);
 }
 
 .terminal-node--group-candidate-selected {
-  border-color: var(--cc-workbench-selection);
+  border-color: var(--cc-workbench-node-selection);
   box-shadow: var(--cc-shadow-sm);
 }
 
 .terminal-node--navigation-highlighted {
-  outline: 2px solid var(--cc-workbench-selection);
+  outline: 2px solid var(--cc-workbench-node-selection);
   outline-offset: 4px;
 }
 
@@ -127,13 +127,13 @@
 }
 
 .terminal-node__group-select:hover:not(:disabled) {
-  border-color: var(--cc-workbench-selection);
+  border-color: var(--cc-workbench-node-selection);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
 }
 
 .terminal-node__group-select--selected {
-  border-color: var(--cc-workbench-selection);
+  border-color: var(--cc-workbench-node-selection);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
   box-shadow:
@@ -555,7 +555,7 @@
 .terminal-node-anchor:hover .terminal-node__handle,
 .terminal-node-anchor--selected .terminal-node__handle {
   opacity: 1;
-  background: var(--cc-workbench-selection);
+  background: var(--cc-workbench-node-selection);
 }
 
 .terminal-node__body {
