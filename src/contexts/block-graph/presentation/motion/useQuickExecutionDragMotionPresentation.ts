@@ -51,16 +51,24 @@ export function useQuickExecutionDragMotionPresentation(
       surface.style.setProperty('--workbench-object-motion-y', `${round(yAxis.value)}px`)
       surface.style.setProperty('--workbench-object-motion-opacity', '1')
       surface.style.setProperty('--workbench-object-motion-scale', `${round(scaleAxis.value)}`)
+      surface.style.setProperty(
+        '--quick-execution-return-chrome-opacity',
+        `${round(Math.min(1, Math.hypot(xAxis.value, yAxis.value) / 24))}`
+      )
     }
     const complete = (): void => {
-      onCompleteRef.current(motion.id)
-    }
-
-    if (reducedMotion) {
       xAxis = { value: 0, velocity: 0 }
       yAxis = { value: 0, velocity: 0 }
       scaleAxis = { value: scaleTarget, velocity: 0 }
       present()
+      onCompleteRef.current(motion.id)
+    }
+    const settled = (): boolean =>
+      isSpringAxisSettled(xAxis, 0, settlementThresholds) &&
+      isSpringAxisSettled(yAxis, 0, settlementThresholds) &&
+      isSpringAxisSettled(scaleAxis, scaleTarget, settlementThresholds)
+
+    if (reducedMotion || (motion.kind === 'move' && settled())) {
       complete()
       return undefined
     }
@@ -75,11 +83,7 @@ export function useQuickExecutionDragMotionPresentation(
       scaleAxis = advanceSpringAxis(scaleAxis, scaleTarget, deleteScaleDynamics, elapsedSeconds)
       present()
 
-      if (
-        isSpringAxisSettled(xAxis, 0, settlementThresholds) &&
-        isSpringAxisSettled(yAxis, 0, settlementThresholds) &&
-        isSpringAxisSettled(scaleAxis, scaleTarget, settlementThresholds)
-      ) {
+      if (settled()) {
         complete()
         return
       }

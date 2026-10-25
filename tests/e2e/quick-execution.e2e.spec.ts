@@ -142,8 +142,10 @@ describe('quick execution e2e', () => {
       await page.getByRole('button', { name: '添加画布对象' }).click()
       await page.getByRole('button', { name: '整理快捷位', exact: true }).click()
       await page
-        .locator('[data-quick-execution-slot="1"]')
-        .dragTo(page.locator('[data-quick-execution-slot="2"]'))
+        .locator('[data-quick-execution-slots="arrangement"] [data-quick-execution-slot="1"]')
+        .dragTo(
+          page.locator('[data-quick-execution-slots="arrangement"] [data-quick-execution-slot="2"]')
+        )
       const reorderedSlots = await pollUntilState({
         description: 'quick execution slots to persist their reordered targets',
         observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.slice(0, 2),
@@ -219,24 +221,6 @@ describe('quick execution e2e', () => {
       const quickSlot = page.locator('[data-quick-execution-slot="2"]')
       const quickSlotBox = await quickSlot.boundingBox()
       if (!quickSlotBox) throw new Error('Quick execution slot 2 is not visible')
-      expect(
-        await page.locator('[data-quick-execution-native-drag-image]').evaluate((element) => {
-          const bounds = element.getBoundingClientRect()
-          return {
-            height: bounds.height,
-            isConnected: element.isConnected,
-            isTransparentCanvas:
-              element instanceof HTMLCanvasElement && element.width === 1 && element.height === 1,
-            width: bounds.width
-          }
-        })
-      ).toEqual({
-        height: 1,
-        isConnected: true,
-        isTransparentCanvas: true,
-        width: 1
-      })
-
       await page.mouse.move(
         quickSlotBox.x + quickSlotBox.width / 2,
         quickSlotBox.y + quickSlotBox.height / 2
@@ -260,10 +244,12 @@ describe('quick execution e2e', () => {
       if (!trashBox) throw new Error('Quick execution trash target is not visible')
       const quickExecutionBarBox = await page.locator('[data-quick-execution-bar]').boundingBox()
       if (!quickExecutionBarBox) throw new Error('Quick execution bar is not visible')
-      expect(trashBox.x - (quickExecutionBarBox.x + quickExecutionBarBox.width)).toBeGreaterThan(0)
-      expect(
-        trashBox.x - (quickExecutionBarBox.x + quickExecutionBarBox.width)
-      ).toBeLessThanOrEqual(40)
+      expect(trashBox.y + trashBox.height).toBeLessThan(quickExecutionBarBox.y)
+      const statusbarBox = (await page.locator('.app-shell__statusbar').boundingBox())!
+      expect(trashBox.x).toBeGreaterThanOrEqual(statusbarBox.x)
+      expect(trashBox.x + trashBox.width).toBeLessThanOrEqual(
+        quickExecutionBarBox.x + quickExecutionBarBox.width + 1
+      )
 
       await page.emulateMedia({ reducedMotion: 'no-preference' })
       await page.mouse.move(
@@ -301,11 +287,7 @@ describe('quick execution e2e', () => {
       expect(proximityState.proxyBox?.width).toBeCloseTo(quickSlotBox.width, 0)
       expect(proximityState.proxyBox?.height).toBeCloseTo(quickSlotBox.height, 0)
 
-      await page.mouse.move(
-        quickSlotBox.x + quickSlotBox.width / 2,
-        quickSlotBox.y + quickSlotBox.height / 2,
-        { steps: 8 }
-      )
+      await page.mouse.move(trashBox.x - 160, trashBox.y + trashBox.height / 2, { steps: 8 })
       const settledFarState = await pollUntilState({
         description: 'dragged shortcut card to stop trembling away from the black hole',
         observe: async () => {

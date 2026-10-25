@@ -9,6 +9,28 @@ import {
 } from '../../../../src/presentation/shared/components/Tooltip'
 
 describe('tooltip', () => {
+  it('dismisses a suspended pointer tooltip and requires fresh hover after the gesture', async () => {
+    const content = (disabled: boolean) => (
+      <TooltipProvider delayDuration={0}>
+        <TooltipLabel content="快捷位" disabled={disabled}>
+          <button type="button">快捷位</button>
+        </TooltipLabel>
+      </TooltipProvider>
+    )
+    const { rerender } = render(content(false))
+    const trigger = screen.getByRole('button', { name: '快捷位' })
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' })
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument()
+    rerender(content(true))
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' })
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    rerender(content(false))
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    fireEvent.pointerLeave(trigger)
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' })
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument()
+  })
+
   it('portals a non-interactive label while preserving the trigger semantics', async () => {
     const onClick = vi.fn()
     const { container } = render(

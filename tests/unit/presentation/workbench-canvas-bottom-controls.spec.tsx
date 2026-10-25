@@ -8,6 +8,7 @@ import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFix
 describe('workbench canvas bottom controls', () => {
   it('moves the current bottom control down before the requested control rises', () => {
     const motion = installAnimationFrameController()
+    const statusbar = render(<footer />).getByRole('contentinfo')
     const workbench = createWorkbenchSnapshot('/project', 'project')
     const arrangement: CanvasArrangementSnapshot = {
       projectId: workbench.project.id,
@@ -32,6 +33,7 @@ describe('workbench canvas bottom controls', () => {
       onArrange: vi.fn(),
       onClearQuickExecutionSlot: vi.fn(),
       onReorderQuickExecutionSlots: vi.fn(),
+      quickExecutionContainer: statusbar,
       reactFlowInstanceRef: { current: null },
       shortcutPlatform: 'mac' as const,
       shortcutTooltips: {}
@@ -41,6 +43,7 @@ describe('workbench canvas bottom controls', () => {
     let quickExecution = document.querySelector<HTMLElement>('[data-quick-execution-bar]')!
 
     expect(quickExecution).not.toHaveAttribute('inert')
+    expect(statusbar).toContainElement(quickExecution)
     expect(document.querySelector('[data-canvas-arrangement-toolbar]')).toBeNull()
 
     rerender(<WorkbenchCanvasBottomControls {...props} selection={emptyMarqueeSelection()} />)
@@ -123,6 +126,7 @@ describe('workbench canvas bottom controls', () => {
 
     expect(document.querySelector('[data-canvas-arrangement-toolbar]')).toBeNull()
     expect(document.querySelector('[data-quick-execution-bar]')).not.toHaveAttribute('inert')
+    expect(statusbar).toContainElement(document.querySelector('[data-quick-execution-bar]'))
   })
 })
 

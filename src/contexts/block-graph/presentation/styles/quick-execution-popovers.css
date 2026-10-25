@@ -1,0 +1,275 @@
+.quick-execution {
+  --quick-execution-arrangement-height: min(294px, calc(100vh - 160px));
+}
+
+.quick-execution__popover {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 28px));
+  max-height: min(360px, calc(100vh - 100px));
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  background: var(--cc-canvas-node-menu-surface);
+  padding: 6px;
+  box-shadow: var(--cc-shadow-floating);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: 100% 100%;
+  transition:
+    opacity var(--cc-motion-duration-surface) var(--cc-easing-enter),
+    transform var(--cc-motion-duration-surface) var(--cc-easing-enter);
+}
+
+.quick-execution__popover[data-surface-motion-state='closing'] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  transition-timing-function: var(--cc-easing-exit);
+}
+
+.quick-execution__popover-heading {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.quick-execution__popover-heading h3 {
+  margin: 0;
+  color: var(--cc-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.quick-execution__done {
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 26px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 7px;
+  cursor: pointer;
+}
+
+.quick-execution__picker-list,
+.quick-execution__arrangement-slots {
+  display: grid;
+  min-height: 0;
+  gap: 2px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--cc-scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.quick-execution__picker-list button,
+.quick-execution__action-list button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-execution__picker-list button {
+  height: 44px;
+}
+
+.quick-execution__picker-list button:hover,
+.quick-execution__action-list button:hover {
+  background: var(--cc-canvas-node-menu-hover);
+}
+
+.quick-execution__candidate-glyph {
+  display: grid;
+  flex: 0 0 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--cc-neutral-overlay);
+}
+
+.quick-execution__candidate-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  line-height: 16px;
+}
+
+.quick-execution__candidate-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-execution__candidate-copy small {
+  color: var(--cc-muted);
+  font-size: 10px;
+  line-height: 13px;
+}
+
+.quick-execution__candidate-add {
+  flex: 0 0 auto;
+  color: var(--cc-muted);
+  opacity: 0;
+}
+
+.quick-execution__picker-list button:hover .quick-execution__candidate-add,
+.quick-execution__picker-list button:focus-visible .quick-execution__candidate-add {
+  opacity: 1;
+}
+
+.quick-execution__arrange-action {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--cc-border);
+}
+
+.quick-execution__action-list button {
+  height: 32px;
+  color: var(--cc-muted-strong);
+}
+
+.quick-execution__empty-list {
+  margin: 0;
+  padding: 16px 8px;
+  color: var(--cc-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.quick-execution__arrangement {
+  height: var(--quick-execution-arrangement-height);
+}
+
+.quick-execution__arrangement-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 8px 8px;
+  color: var(--cc-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.quick-execution__arrangement-slots {
+  grid-auto-rows: 42px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__slot {
+  min-width: 0;
+  height: 42px;
+  border-color: transparent;
+  border-radius: 7px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__slot--filled {
+  background: var(--cc-neutral-overlay);
+}
+
+.quick-execution__arrangement-slots .quick-execution__slot--empty {
+  color: var(--cc-muted);
+}
+
+.quick-execution__arrangement-slots .quick-execution__slot--unavailable {
+  border-color: var(--cc-warning-border);
+}
+
+.quick-execution__arrangement-slots .quick-execution__slot--reorder-target {
+  border-color: var(--cc-primary);
+  background: var(--cc-primary-soft);
+}
+
+.quick-execution__arrangement-slots .quick-execution__content {
+  gap: 9px;
+  padding: 0 7px;
+  cursor: inherit;
+}
+
+.quick-execution__arrangement-slots .quick-execution__content kbd {
+  width: 22px;
+  height: 24px;
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__binding {
+  flex: 1;
+  min-width: 0;
+  gap: 9px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__copy strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__details {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__copy small {
+  font-size: 10px;
+  line-height: 13px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__copy .quick-execution__kind {
+  color: var(--cc-muted);
+}
+
+.quick-execution__arrangement-slots .quick-execution__content--empty {
+  color: var(--cc-muted);
+}
+
+.quick-execution__grip {
+  flex: 0 0 auto;
+  color: var(--cc-muted);
+}
+
+.quick-execution__arrangement-slots .quick-execution__swap-preview {
+  left: 38px;
+}
+
+.quick-execution__arrangement-slots .quick-execution__swap-preview .quick-execution__copy {
+  display: none;
+}
+
+.quick-execution[data-quick-execution-arranging] .quick-execution__black-hole {
+  bottom: calc(100% + 19px + var(--quick-execution-arrangement-height));
+}

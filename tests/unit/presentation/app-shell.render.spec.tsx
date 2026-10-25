@@ -135,6 +135,25 @@ describe('app shell', () => {
     expect(runtimeApi.attachAgentSession).not.toHaveBeenCalled()
   })
 
+  it('keeps quick execution inside the workspace statusbar beside the directory', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/dock-project', 'dock-project')
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    })
+
+    render(<AppShell />)
+    const add = await screen.findByRole('button', { name: '添加画布对象' })
+    const statusbar = document.querySelector<HTMLElement>('.app-shell__statusbar')!
+
+    expect(statusbar).toContainElement(add)
+    expect(within(statusbar).getByText('/tmp/dock-project')).toBeInTheDocument()
+    fireEvent.click(add)
+    expect(screen.getByRole('dialog', { name: '选择要绑定的画布对象' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(add).toHaveFocus()
+  })
+
   it('creates an empty drop target without entering a membership editing mode', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({

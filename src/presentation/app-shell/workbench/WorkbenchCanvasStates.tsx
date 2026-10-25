@@ -124,6 +124,7 @@ interface CanvasStatusbarProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly motionRef?: Ref<HTMLElement>
+  readonly quickExecutionRef?: Ref<HTMLDivElement>
   readonly notifications: AppNotificationController
 }
 
@@ -134,6 +135,7 @@ export function CanvasStatusbar({
   currentWorkbench,
   currentWorkspace,
   motionRef,
+  quickExecutionRef,
   notifications
 }: CanvasStatusbarProps) {
   const { t } = useI18n()
@@ -175,6 +177,7 @@ export function CanvasStatusbar({
         </>
       ) : null}
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
+      <div ref={quickExecutionRef} className="app-shell__statusbar-quick-execution" />
       <CanvasStatusbarGlass />
     </footer>
   )

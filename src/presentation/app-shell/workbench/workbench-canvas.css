@@ -604,6 +604,20 @@
   white-space: nowrap;
 }
 
+.app-shell__statusbar-quick-execution {
+  display: flex;
+  flex: 0 0 auto;
+  height: 100%;
+  align-items: center;
+  margin-left: auto;
+  border-left: 1px solid var(--cc-divider);
+  padding-left: 8px;
+}
+
+.app-shell__statusbar-quick-execution:empty {
+  display: none;
+}
+
 .status-path {
   overflow: hidden;
   min-width: 0;

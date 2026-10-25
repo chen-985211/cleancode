@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export function useQuickExecutionArrangement(open: boolean, popoverOpen: boolean) {
+export function useQuickExecutionArrangement(
+  open: boolean,
+  popoverOpen: boolean,
+  scopeKey: string
+) {
   const [isArranging, setIsArranging] = useState(false)
   const entryRef = useRef<HTMLButtonElement | null>(null)
   const doneRef = useRef<HTMLButtonElement | null>(null)
@@ -8,6 +12,7 @@ export function useQuickExecutionArrangement(open: boolean, popoverOpen: boolean
     setIsArranging(false)
     entryRef.current?.focus({ preventScroll: true })
   }, [])
+  useEffect(() => setIsArranging(false), [scopeKey])
 
   useEffect(() => {
     if (isArranging && open) doneRef.current?.focus({ preventScroll: true })
@@ -16,7 +21,7 @@ export function useQuickExecutionArrangement(open: boolean, popoverOpen: boolean
   useEffect(() => {
     if (!isArranging || !open) return undefined
     const finishOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !popoverOpen) finishArranging()
+      if (event.key === 'Escape' && !popoverOpen && !event.defaultPrevented) finishArranging()
     }
     document.addEventListener('keydown', finishOnEscape)
     return () => document.removeEventListener('keydown', finishOnEscape)

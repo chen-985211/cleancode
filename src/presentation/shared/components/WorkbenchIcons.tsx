@@ -11,6 +11,7 @@ import { CornersOutIcon } from '@phosphor-icons/react/dist/csr/CornersOut'
 import { CrosshairIcon } from '@phosphor-icons/react/dist/csr/Crosshair'
 import { DesktopTowerIcon } from '@phosphor-icons/react/dist/csr/DesktopTower'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree'
+import { DotsSixVerticalIcon } from '@phosphor-icons/react/dist/csr/DotsSixVertical'
 import { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple'
 import { FlowArrowIcon } from '@phosphor-icons/react/dist/csr/FlowArrow'
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen'
@@ -26,6 +27,7 @@ import { PushPinIcon } from '@phosphor-icons/react/dist/csr/PushPin'
 import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 import { RocketLaunchIcon } from '@phosphor-icons/react/dist/csr/RocketLaunch'
 import { ShieldWarningIcon } from '@phosphor-icons/react/dist/csr/ShieldWarning'
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal'
 import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour'
 import { StackIcon } from '@phosphor-icons/react/dist/csr/Stack'
 import { StackMinusIcon } from '@phosphor-icons/react/dist/csr/StackMinus'
@@ -73,6 +75,7 @@ const workbenchIconDefinitions = {
   disclosure: [CaretDownIcon, 'caret-down', 'bold'],
   disconnect: [LinkBreakIcon, 'link-break', 'bold'],
   download: [DownloadSimpleIcon, 'download-simple', 'bold'],
+  'drag-handle': [DotsSixVerticalIcon, 'dots-six-vertical', 'regular'],
   edit: [PencilSimpleIcon, 'pencil-simple', 'bold'],
   error: [WarningCircleIcon, 'warning-circle', 'fill'],
   'expand-object': [ArrowsOutSimpleIcon, 'arrows-out-simple', 'bold'],
@@ -89,6 +92,7 @@ const workbenchIconDefinitions = {
   'open-project': [FolderOpenIcon, 'folder-open', 'bold'],
   paused: [PauseCircleIcon, 'pause-circle', 'fill'],
   'quick-execution-add': [RocketLaunchIcon, 'rocket-launch', 'bold'],
+  'quick-execution-arrange': [SlidersHorizontalIcon, 'sliders-horizontal', 'regular'],
   remove: [MinusIcon, 'minus', 'bold'],
   restart: [ArrowClockwiseIcon, 'arrow-clockwise', 'bold'],
   retention: [PushPinIcon, 'push-pin', 'bold', 'fill'],

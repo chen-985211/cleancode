@@ -190,11 +190,11 @@ describe('quick execution bar', () => {
     fireEvent.pointerMove(source, { pointerType: 'mouse' })
     expect(await screen.findByRole('tooltip')).toBeInTheDocument()
 
-    fireEvent.dragStart(source)
+    await startReorder(source)
 
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
 
-    fireEvent.dragEnd(source)
+    fireEvent.pointerCancel(window, { pointerId: 1 })
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
@@ -208,7 +208,7 @@ describe('quick execution bar', () => {
     )
   )(
     'reorders a $target.type shortcut without moving or focusing its $group target',
-    ({ target, group }) => {
+    async ({ target, group }) => {
       const onReorder = vi.fn()
       const onFocus = vi.fn()
       const baseGraph = createGraph()
@@ -236,11 +236,18 @@ describe('quick execution bar', () => {
         />
       )
 
-      const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-      fireEvent.dragStart(source)
+      fireEvent.click(screen.getByRole('button', { name: '添加画布对象' }))
+      fireEvent.click(screen.getByRole('button', { name: '整理快捷位' }))
+      const source = screen
+        .getByRole('dialog', { name: '整理快捷位' })
+        .querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+      await startReorder(source)
       const destination = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
-      fireEvent.dragOver(destination)
-      fireEvent.drop(destination)
+      vi.spyOn(destination, 'getBoundingClientRect').mockReturnValue(
+        createDomRect({ left: 100, top: 100, width: 38, height: 24 })
+      )
+      fireEvent.pointerMove(window, { pointerId: 1, clientX: 110, clientY: 110 })
+      fireEvent.pointerUp(window, { pointerId: 1, clientX: 110, clientY: 110 })
 
       expect(onReorder).toHaveBeenCalledWith(2, 1)
       expect(onFocus).not.toHaveBeenCalled()
@@ -298,38 +305,21 @@ describe('quick execution bar', () => {
       createDomRect({ height: 36, left: 190, top: 180, width: 85 })
     )
     vi.spyOn(hiddenBlackHole, 'getBoundingClientRect').mockReturnValue(
-      createDomRect({ height: 58, left: 568, top: 169, width: 112 })
+      createDomRect({ height: 58, left: 568, top: 80, width: 112 })
     )
-    const dataTransfer = {
-      dropEffect: 'none',
-      effectAllowed: 'none',
-      setData: vi.fn(),
-      setDragImage: vi.fn()
-    }
-    fireEvent.dragStart(source, { clientX: 230, clientY: 198, dataTransfer })
+    await startReorder(source, { clientX: 230, clientY: 198 })
     const blackHole = screen.getByRole('region', { name: '拖到此处清空快捷位 2' })
     const dragProxy = document.querySelector<HTMLElement>('[data-quick-execution-drag-proxy]')!
-    const nativeDragImage = document.querySelector<HTMLCanvasElement>(
-      '[data-quick-execution-native-drag-image]'
-    )!
     expect(source).toHaveClass('quick-execution__slot--dragging')
     expect(dragProxy).toBeInTheDocument()
     expect(dragProxy).toHaveStyle({
-      height: '36px',
+      height: '24px',
       transform: 'translate3d(90px, 0px, 0)',
-      width: '85px'
+      width: '38px'
     })
-    expect(dragProxy).toHaveTextContent('Worker2')
+    expect(dragProxy).toHaveTextContent('Worker')
+    expect(dragProxy.querySelector('kbd')).toBeNull()
     expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
-    expect(dataTransfer.setData).toHaveBeenCalledWith(
-      'application/x-cleancode-quick-execution-slot',
-      '2'
-    )
-    expect(nativeDragImage).toBeInstanceOf(HTMLCanvasElement)
-    expect(nativeDragImage).toHaveAttribute('width', '1')
-    expect(nativeDragImage).toHaveAttribute('height', '1')
-    expect(nativeDragImage).toBe(dataTransfer.setDragImage.mock.calls[0]?.[0])
-    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(nativeDragImage, 0, 0)
     expect(blackHole).toHaveAttribute('data-quick-execution-clear-target', 'black-hole')
     expect(blackHole.querySelector('[data-quick-execution-black-hole]')).toBeInTheDocument()
     const blackHoleMotion = blackHole.querySelector('[data-quick-execution-black-hole-motion]')
@@ -339,28 +329,26 @@ describe('quick execution bar', () => {
     expect(blackHoleMotion).toHaveProperty('muted', true)
     expect(blackHole.querySelector('[data-icon-role="delete"]')).not.toBeInTheDocument()
 
-    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 520, clientY: 198 }))
-    expect(dragProxy).toHaveStyle({ transform: 'translate3d(377.5px, 0px, 0)' })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 532, clientY: 109 })
+    expect(dragProxy).toHaveStyle({ transform: 'translate3d(392px, -89px, 0)' })
     expect(dragProxy).toHaveClass('quick-execution__drag-proxy--near-black-hole')
 
-    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 340, clientY: 198 }))
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 340, clientY: 198 })
     expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
 
-    fireEvent.dragEnter(blackHole, { clientX: 576, clientY: 198 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 576, clientY: 109 })
     expect(blackHole).toHaveClass('quick-execution__black-hole--target')
     expect(dragProxy).toHaveClass('quick-execution__drag-proxy--near-black-hole')
     expect(screen.getByText('松开以清空 2 号快捷位')).toBeInTheDocument()
 
-    fireEvent.dragLeave(blackHole)
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 340, clientY: 198 })
     expect(blackHole).not.toHaveClass('quick-execution__black-hole--target')
     expect(screen.queryByText('松开以清空 2 号快捷位')).not.toBeInTheDocument()
 
-    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 340, clientY: 198 }))
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 340, clientY: 198 })
     expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
 
-    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 576, clientY: 198 }))
-    fireEvent.dragEnter(blackHole)
-    fireEvent.drop(blackHole)
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 576, clientY: 109 })
 
     expect(onClear).toHaveBeenCalledWith(2)
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
@@ -374,21 +362,22 @@ describe('quick execution bar', () => {
       'workbench-object-motion--spatial'
     )
     expect(clearAnimation).toHaveStyle({
-      height: '36px',
-      left: '481.5px',
-      top: '0px',
-      width: '85px'
+      height: '24px',
+      left: '505px',
+      top: '-83px',
+      width: '38px'
     })
-    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-48px')
-    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-69px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('-6px')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-scale')).toBe('1')
-    expect(clearAnimation).toHaveTextContent('Worker2')
+    expect(clearAnimation).toHaveTextContent('Worker')
+    expect(clearAnimation.querySelector('kbd')).toBeNull()
     expect(blackHole).toHaveClass(
       'quick-execution__black-hole--visible',
       'quick-execution__black-hole--target',
       'quick-execution__black-hole--clearing'
     )
-    fireEvent.dragEnd(source)
+    fireEvent.pointerCancel(window, { pointerId: 1 })
     expect(blackHole.querySelector('[data-quick-execution-black-hole-motion]')).toBe(
       blackHoleMotion
     )
@@ -397,7 +386,7 @@ describe('quick execution bar', () => {
     expectBlackHoleMediaAbsent()
   })
 
-  it('starts returning the source slot when a black-hole drag is cancelled', () => {
+  it('starts returning the source slot when a black-hole drag is cancelled', async () => {
     render(
       <QuickExecutionBar
         graph={createGraph()}
@@ -409,23 +398,24 @@ describe('quick execution bar', () => {
     )
 
     const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-    fireEvent.dragStart(source)
+    await startReorder(source)
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 80, clientY: -40 })
     expect(source).toHaveClass('quick-execution__slot--dragging')
     expect(screen.getByRole('region', { name: '拖到此处清空快捷位 2' })).toBeInTheDocument()
 
-    fireEvent.dragEnd(source)
+    fireEvent.pointerCancel(window, { pointerId: 1 })
 
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
     expect(source).toHaveClass('quick-execution__slot--dragging')
     expect(document.querySelector('[data-quick-execution-return-animation]')).toBeInTheDocument()
     expectBlackHoleMediaAbsent()
 
-    fireEvent.dragStart(source)
+    await startReorder(source)
     expect(document.querySelector('[data-quick-execution-black-hole]')).toBeInTheDocument()
     expect(document.querySelector('[data-quick-execution-black-hole-motion]')).toBeInTheDocument()
   })
 
-  it('returns a cancelled drag proxy to its source without changing the binding', () => {
+  it('returns a cancelled drag proxy to its source without changing the binding', async () => {
     const onClear = vi.fn()
     const onReorder = vi.fn()
     render(
@@ -446,18 +436,9 @@ describe('quick execution bar', () => {
     vi.spyOn(source, 'getBoundingClientRect').mockReturnValue(
       createDomRect({ height: 36, left: 190, top: 180, width: 85 })
     )
-    const dataTransfer = {
-      dropEffect: 'none',
-      effectAllowed: 'none',
-      setData: vi.fn(),
-      setDragImage: vi.fn()
-    }
-
-    fireEvent.dragStart(source, { clientX: 230, clientY: 198, dataTransfer })
-    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 430, clientY: 198 }))
-
-    expect(fireEvent.dragOver(document.body, { dataTransfer })).toBe(false)
-    fireEvent.drop(document.body, { dataTransfer })
+    await startReorder(source, { clientX: 230, clientY: 198 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 430, clientY: 198 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 430, clientY: 198 })
 
     expect(onClear).not.toHaveBeenCalled()
     expect(onReorder).not.toHaveBeenCalled()
@@ -473,14 +454,19 @@ describe('quick execution bar', () => {
     )!
     expect(returnAnimation).toBeInTheDocument()
     expect(returnAnimation).toHaveClass('workbench-object-motion--move')
-    expect(returnAnimation).toHaveStyle({ height: '36px', left: '90px', top: '0px', width: '85px' })
+    expect(returnAnimation).toHaveStyle({
+      height: '24px',
+      left: '113.5px',
+      top: '6px',
+      width: '38px'
+    })
     expect(
       Number.parseFloat(returnAnimation.style.getPropertyValue('--workbench-object-motion-x'))
     ).toBeGreaterThan(0)
-    expect(returnAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
+    expect(returnAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('-6px')
   })
 
-  it('restores a cancelled drag immediately when motion is reduced', () => {
+  it('restores a cancelled drag immediately when motion is reduced', async () => {
     const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue(createMediaQueryList(true))
     try {
       render(
@@ -494,8 +480,8 @@ describe('quick execution bar', () => {
       )
 
       const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-      fireEvent.dragStart(source)
-      fireEvent.dragEnd(source)
+      await startReorder(source)
+      fireEvent.pointerCancel(window, { pointerId: 1 })
 
       expect(source).not.toHaveClass('quick-execution__slot--dragging')
       expect(
@@ -506,6 +492,25 @@ describe('quick execution bar', () => {
     }
   })
 })
+
+async function startReorder(
+  source: HTMLElement,
+  properties: { clientX?: number; clientY?: number } = {}
+): Promise<void> {
+  const bounds = source.getBoundingClientRect()
+  const point = {
+    pointerId: 1,
+    button: 0,
+    clientX: properties.clientX ?? bounds.left + bounds.width / 2,
+    clientY: properties.clientY ?? bounds.top + bounds.height / 2
+  }
+  fireEvent.pointerDown(source, point)
+  fireEvent.pointerMove(window, { ...point, clientX: point.clientX + 5 })
+  fireEvent.pointerMove(window, point)
+  await waitFor(() =>
+    expect(document.querySelector('[data-quick-execution-drag-proxy]')).toBeInTheDocument()
+  )
+}
 
 function expectBlackHoleMediaAbsent(): void {
   const blackHole = document.querySelector<HTMLElement>('[data-quick-execution-trash]')!
