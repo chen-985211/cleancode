@@ -1,5 +1,6 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useCallback, useState, type MutableRefObject } from 'react'
+import { createPortal } from 'react-dom'
 
 import type {
   QuickExecutionSlotNumber,
@@ -41,6 +42,7 @@ export function WorkbenchCanvasBottomControls({
   onArrange,
   onClearQuickExecutionSlot,
   onReorderQuickExecutionSlots,
+  quickExecutionContainer,
   reactFlowInstanceRef,
   selection,
   showArrangementSelection = true,
@@ -61,6 +63,7 @@ export function WorkbenchCanvasBottomControls({
     destinationNumber: QuickExecutionSlotNumber
   ) => Promise<void> | void
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
+  readonly quickExecutionContainer: HTMLElement | null
   readonly selection: CanvasArrangementSelection | null
   readonly showArrangementSelection?: boolean
   readonly shortcutPlatform: ShortcutPlatform
@@ -69,6 +72,7 @@ export function WorkbenchCanvasBottomControls({
   const { t } = useI18n()
   const hasCanvasSelection = (selection?.items.length ?? 0) > 0
   const canRenderQuickExecution =
+    quickExecutionContainer &&
     currentWorkbench &&
     onAddQuickExecutionTarget &&
     onClearQuickExecutionSlot &&
@@ -85,26 +89,29 @@ export function WorkbenchCanvasBottomControls({
 
   return (
     <>
-      {canRenderQuickExecution ? (
-        <QuickExecutionBar
-          isExternalDropTarget={isQuickExecutionDropTarget}
-          graph={currentWorkbench.graph}
-          onExitComplete={() => bottomControlHandoff.completeExit('quick-execution')}
-          open={bottomControlHandoff.quickExecutionOpen}
-          onAdd={onAddQuickExecutionTarget}
-          onClear={onClearQuickExecutionSlot}
-          onFocus={(target) =>
-            focusQuickExecutionTargetInCanvas({
-              instance: reactFlowInstanceRef.current,
-              target,
-              terminalGroups: currentWorkbench.graph.terminalGroups
-            })
-          }
-          onReorder={onReorderQuickExecutionSlots}
-          shortcutPlatform={shortcutPlatform}
-          shortcutTooltips={shortcutTooltips}
-        />
-      ) : null}
+      {canRenderQuickExecution
+        ? createPortal(
+            <QuickExecutionBar
+              isExternalDropTarget={isQuickExecutionDropTarget}
+              graph={currentWorkbench.graph}
+              onExitComplete={() => bottomControlHandoff.completeExit('quick-execution')}
+              open={bottomControlHandoff.quickExecutionOpen}
+              onAdd={onAddQuickExecutionTarget}
+              onClear={onClearQuickExecutionSlot}
+              onFocus={(target) =>
+                focusQuickExecutionTargetInCanvas({
+                  instance: reactFlowInstanceRef.current,
+                  target,
+                  terminalGroups: currentWorkbench.graph.terminalGroups
+                })
+              }
+              onReorder={onReorderQuickExecutionSlots}
+              shortcutPlatform={shortcutPlatform}
+              shortcutTooltips={shortcutTooltips}
+            />,
+            quickExecutionContainer
+          )
+        : null}
       <CanvasArrangementOverlay
         arrangement={arrangement}
         isPending={isArrangementPending}

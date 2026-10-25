@@ -9,6 +9,22 @@ const canvasStyles = readStyle('workbench/workbench-canvas.css')
 const taskStyles = readStyle('shell/project-sidebar/task-surface.css')
 
 describe('project sidebar motion styles', () => {
+  it('anchors both statusbar edges so its frame, glass and contents share the same visible width', () => {
+    const statusbar = readRule(canvasStyles, '.app-shell__statusbar')
+    const expanded = readRule(
+      canvasStyles,
+      ".app-shell__statusbar[data-project-sidebar-motion-state='expanded']"
+    )
+    expect(statusbar).toContain('left: 6px;')
+    expect(statusbar).toContain('right: 6px;')
+    expect(statusbar).not.toMatch(/\bwidth:/)
+    expect(expanded).toContain('margin-left: var(--cc-sidebar-expanded-width);')
+    expect(expanded).not.toMatch(/\bwidth:/)
+    expect(readRule(canvasStyles, '.canvas-statusbar-glass')).toContain('inset: 0;')
+    expect(readRule(canvasStyles, '.app-shell__statusbar::after')).toContain('inset: -1px;')
+    expect(canvasStyles).not.toContain('margin-right: var(--cc-sidebar-expanded-width);')
+  })
+
   it('keeps the sidebar and its stationary toggle above the task area throughout motion', () => {
     const sidebarColumn = readRule(sidebarLayoutStyles, '.project-sidebar-column')
     const taskArea = readRule(taskStyles, '.task-surface-host')

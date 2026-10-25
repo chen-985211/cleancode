@@ -167,6 +167,9 @@ export function WorkbenchCanvas({
     onSaveCanvasLayerOrder
   })
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
+  const [quickExecutionContainer, setQuickExecutionContainer] = useState<HTMLDivElement | null>(
+    null
+  )
   const canvasArrangement = useWorkbenchCanvasArrangement({
     currentWorkbench,
     currentWorkspace,
@@ -525,7 +528,7 @@ export function WorkbenchCanvas({
                   node
                 )
                 const isDropTarget = Boolean(
-                  target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
+                  target && resolveQuickExecutionDropTarget(quickExecutionContainer, event)
                 )
                 setIsQuickExecutionDropTarget(isDropTarget)
                 if (isDropTarget) {
@@ -547,7 +550,7 @@ export function WorkbenchCanvas({
                     node
                   )
                   const isDropTarget = Boolean(
-                    target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
+                    target && resolveQuickExecutionDropTarget(quickExecutionContainer, event)
                   )
                   setIsQuickExecutionDropTarget(false)
                   if (isDropTarget && target && onQuickExecutionNodeDrop) {
@@ -610,7 +613,7 @@ export function WorkbenchCanvas({
               proOptions={{ hideAttribution: true }}
             >
               <Background color="var(--cc-border-strong)" gap={24} size={1} />
-              <Panel className="canvas-minimap-panel" position="top-left">
+              <Panel className="canvas-minimap-panel" position="bottom-right">
                 <CanvasMinimap
                   isCollapsed={isMinimapCollapsed}
                   nodes={minimapNodes}
@@ -646,6 +649,7 @@ export function WorkbenchCanvas({
           </div>
           <div ref={centerMotionRef} className="workbench-canvas__center-motion-surface">
             <WorkbenchCanvasBottomControls
+              quickExecutionContainer={quickExecutionContainer}
               arrangement={canvasArrangement.arrangement}
               currentWorkbench={currentWorkbench}
               isArrangementPending={isCanvasArrangementPending}
@@ -674,6 +678,7 @@ export function WorkbenchCanvas({
           {connectionInteraction.menu}
         </div>
         <CanvasStatusbar
+          quickExecutionRef={setQuickExecutionContainer}
           motionRef={statusbarMotionRef}
           isDesktopRuntime={isDesktopRuntime}
           terminalRuntimeAvailability={terminalRuntimeAvailability}

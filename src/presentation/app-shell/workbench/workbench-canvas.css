@@ -538,9 +538,9 @@
   z-index: 7;
   bottom: var(--cc-statusbar-bottom);
   left: 6px;
+  right: 6px;
   isolation: isolate;
   display: flex;
-  width: calc(100% - 12px);
   height: var(--cc-statusbar-height);
   align-items: center;
   gap: 7px;
@@ -563,7 +563,6 @@
 }
 
 .app-shell__statusbar[data-project-sidebar-motion-state='expanded'] {
-  width: calc(100% - var(--cc-sidebar-expanded-width) - 12px);
   margin-left: var(--cc-sidebar-expanded-width);
 }
 
@@ -602,6 +601,19 @@
 .app-shell__statusbar > span:not(.status-dot):not(.status-path) {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.app-shell__statusbar-quick-execution {
+  display: flex;
+  flex: 0 0 auto;
+  height: 100%;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.app-shell__statusbar-quick-execution:empty {
+  display: none;
 }
 
 .status-path {

@@ -27,11 +27,11 @@ export function getTerminalMiniMapNodeStrokeColor({
   hoveredTerminalBlockId
 }: TerminalMinimapAppearanceInput): string {
   if (node.selected || selectedTerminalBlockId === node.id) {
-    return 'var(--cc-primary)'
+    return 'var(--cc-workbench-node-selection)'
   }
 
   if (node.type === 'terminal' && hoveredTerminalBlockId === node.id) {
-    return 'var(--cc-primary)'
+    return 'var(--cc-muted-strong)'
   }
 
   return 'var(--cc-border-strong)'

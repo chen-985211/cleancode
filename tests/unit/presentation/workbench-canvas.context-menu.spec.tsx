@@ -229,6 +229,7 @@ describe('workbench canvas object context menu', () => {
       onQuickExecutionNodeDrop
     })
     const bar = document.querySelector<HTMLElement>('[data-quick-execution-bar]')!
+    expect(document.querySelector('.app-shell__statusbar')).toContainElement(bar)
     vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue({
       bottom: 90,
       height: 50,

@@ -60,6 +60,22 @@ describe('terminal workflows e2e', () => {
     { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       const initialSessions = await createTwoRunningTerminals(page)
+      await page.getByRole('button', { name: '展开小地图' }).click()
+      // Keep title actions reachable regardless of the minimap's initial footprint.
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+F' : 'Control+Shift+F')
+      await page.waitForFunction(() => {
+        const nodes = Array.from(document.querySelectorAll('[data-terminal-block-id]'))
+        if (nodes.length !== 2) return false
+        const [first, second] = nodes.map((node) => node.getBoundingClientRect())
+        return (
+          first.right <= second.left ||
+          second.right <= first.left ||
+          first.bottom <= second.top ||
+          second.bottom <= first.top
+        )
+      })
+      await waitForTerminalViewportGeometry(page, initialSessions.first)
+      await waitForTerminalViewportGeometry(page, initialSessions.second)
 
       await configureLaunchCommand(
         page,
@@ -71,6 +87,8 @@ describe('terminal workflows e2e', () => {
         'Terminal 2',
         createE2ePrintCommand('workflow-build-complete')
       )
+      await page.getByRole('button', { name: '收起小地图' }).click()
+      await page.locator('.canvas-minimap__panel').waitFor({ state: 'detached' })
       await page.getByRole('button', { name: '适应画布' }).click()
       await waitForTerminalViewportGeometry(page, initialSessions.first)
       await waitForTerminalViewportGeometry(page, initialSessions.second)

@@ -50,7 +50,7 @@ export function useApplicationShortcutNavigation({
   selectWorkbenchNode,
   workbenches
 }: UseApplicationShortcutNavigationInput) {
-  const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
+  const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(true)
   const [projectSidebarIntent, setProjectSidebarIntent] = useState<ProjectSidebarIntent | null>(
     null
   )

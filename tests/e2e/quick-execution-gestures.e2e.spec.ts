@@ -23,7 +23,7 @@ import {
 // Representative native gestures only. Target/state/zoom matrices live in
 // quick-execution-focus.spec.ts, quick-execution-actions.spec.tsx and
 // block-graph.quick-execution-bar.presentation.spec.tsx.
-// Real pointer capture/native drag ordering and screen geometry require Electron.
+// Real pointer capture, gesture ownership and screen geometry require Electron.
 // Each case owns its process/profile/project. Graph IDs survive reload; visible
 // target bounds and persisted graph facts are the oracles, not animation timing.
 describe('quick execution gesture ownership', () => {
@@ -142,6 +142,58 @@ describe('quick execution gesture ownership', () => {
   }
 
   it(
+    'binds a canvas terminal dropped into the statusbar without moving the object',
+    async () => {
+      await prepare(cases[0])
+      const graph = await page.evaluate(async () => {
+        const api = window.cleancode!
+        const entry = (await api.listWorkbenches())[0]!
+        return api.createTerminalBlock({
+          projectDirectory: entry.project.directory,
+          workspaceId: entry.graph.workspaceId,
+          name: 'Drag into Dock',
+          description: '',
+          position: { x: 600, y: 300 }
+        })
+      })
+      const terminal = graph.blocks.at(-1)!
+      await page.reload()
+      const header = page.locator(
+        `[data-terminal-block-id="${terminal.id}"] .terminal-node__header`
+      )
+      await header.waitFor()
+      await waitForQuickExecutionVisualToSettle(page)
+      const source = (await header.boundingBox())!
+      const dock = page.locator('[data-quick-execution-bar]')
+      const destination = (await dock.boundingBox())!
+      await page.mouse.move(source.x + 100, source.y + source.height / 2)
+      await page.mouse.down()
+      try {
+        await page.mouse.move(
+          destination.x + destination.width - 12,
+          destination.y + destination.height / 2,
+          { steps: 20 }
+        )
+        await page.locator('.quick-execution--drop-target').waitFor()
+      } finally {
+        await page.mouse.up()
+      }
+      const bound = await pollUntilState({
+        description: 'canvas terminal binding persisted from statusbar drop',
+        observe: () => readE2eBlockGraph(workbench),
+        accept: (next) => {
+          const target = next.quickExecutionSlots?.[3]?.target
+          return target?.type === 'terminal' && target.terminalBlockId === terminal.id
+        },
+        timeoutMs: 5000
+      })
+      expect(bound.blocks).toEqual(graph.blocks)
+      expect(bound.terminalGroups).toEqual(graph.terminalGroups)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'preserves readable zoom while retargeting compact slots during flight',
     async () => {
       const graph = await prepare(cases[2], true)
@@ -219,6 +271,23 @@ describe('quick execution gesture ownership', () => {
         try {
           await page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2, { steps: 4 })
           await page.locator('[data-quick-execution-drag-proxy]').waitFor({ timeout: 2500 })
+          expect(await slot.boundingBox()).toEqual(box)
+          const proxy = (await page.locator('[data-quick-execution-drag-proxy]').boundingBox())!
+          expect(proxy.width).toBeCloseTo(38, 2)
+          expect(proxy.height).toBeCloseTo(24, 2)
+          await page.mouse.move(box.x + box.width / 2 + 22, box.y + box.height / 2 - 7)
+          const moved = (await page.locator('[data-quick-execution-drag-proxy]').boundingBox())!
+          expect(Math.abs(moved.x - proxy.x - 12)).toBeLessThan(1)
+          expect(Math.abs(moved.y - proxy.y + 7)).toBeLessThan(1)
+          expect(await page.locator('[data-quick-execution-drag-proxy] kbd').count()).toBe(0)
+          expect(
+            await page
+              .locator('[data-quick-execution-slots="dock"] [data-quick-execution-slot]')
+              .count()
+          ).toBe(3)
+          expect(await page.locator('.quick-execution__drag-proxy--near-black-hole').count()).toBe(
+            0
+          )
           const canvas = (await page.locator('.react-flow').boundingBox())!
           await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2, {
             steps: 12
@@ -238,9 +307,30 @@ describe('quick execution gesture ownership', () => {
         expect(after.terminalGroups).toEqual(graph.terminalGroups)
         expect(after.quickExecutionSlots).toEqual(graph.quickExecutionSlots)
       }
-      await page
-        .locator('[data-quick-execution-slot="1"]')
-        .dragTo(page.locator('[data-quick-execution-slot="2"]'))
+      const source = (await page.locator('[data-quick-execution-slot="1"]').boundingBox())!
+      await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+      await page.mouse.down()
+      try {
+        await page.mouse.move(source.x + source.width / 2 + 10, source.y + source.height / 2, {
+          steps: 4
+        })
+        await page.locator('[data-quick-execution-drag-proxy]').waitFor({ timeout: 2500 })
+        // Compact sorting exchanges occupied entries without revealing empty positions.
+        const destination = (await page.locator('[data-quick-execution-slot="2"]').boundingBox())!
+        await page.mouse.move(
+          destination.x + destination.width / 2,
+          destination.y + destination.height / 2,
+          { steps: 8 }
+        )
+        expect(
+          await page
+            .locator('[data-quick-execution-slot="2"] [data-quick-execution-swap-preview]')
+            .count()
+        ).toBe(1)
+        expect(await readCanvasTransforms(page)).toEqual(initial)
+      } finally {
+        await page.mouse.up()
+      }
       const reordered = await pollUntilState({
         description: 'workflow and combination slot exchange persisted',
         observe: () => readE2eBlockGraph(workbench),

@@ -291,8 +291,8 @@ function MinimapGroupPreview({
         width={width + ringInset * 2}
         height={height + ringInset * 2}
         rx={borderRadius + ringInset * 0.65}
-        fill="var(--cc-primary-soft)"
-        stroke={selected ? 'var(--cc-primary)' : 'transparent'}
+        fill="var(--cc-neutral-overlay)"
+        stroke={selected ? 'var(--cc-workbench-node-selection)' : 'transparent'}
         strokeWidth={Math.max(1.3, strokeWidth + 0.2)}
         opacity={selected ? 0.72 : 0}
       />

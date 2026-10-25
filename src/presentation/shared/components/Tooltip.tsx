@@ -91,11 +91,13 @@ export function TooltipLabel({
   children,
   content,
   dismissOnDragStart = false,
+  disabled = false,
   ...contentProps
 }: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
   readonly dismissOnDragStart?: boolean
+  readonly disabled?: boolean
 }) {
   const inputModeRef = useContext(TooltipInputModeContext)
 
@@ -105,6 +107,7 @@ export function TooltipLabel({
         <TooltipLabelWithInputMode
           content={content}
           dismissOnDragStart={dismissOnDragStart}
+          disabled={disabled}
           {...contentProps}
         >
           {children}
@@ -118,6 +121,7 @@ export function TooltipLabel({
       inputModeRef={inputModeRef}
       content={content}
       dismissOnDragStart={dismissOnDragStart}
+      disabled={disabled}
       {...contentProps}
     >
       {children}
@@ -129,12 +133,14 @@ function TooltipLabelWithInputMode({
   children,
   content,
   dismissOnDragStart,
+  disabled,
   inputModeRef,
   ...contentProps
 }: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
   readonly dismissOnDragStart: boolean
+  readonly disabled: boolean
   readonly inputModeRef?: MutableRefObject<TooltipInputMode>
 }) {
   const contextInputModeRef = useContext(TooltipInputModeContext)
@@ -143,14 +149,22 @@ function TooltipLabelWithInputMode({
   const pointerInsideRef = useRef(false)
   const [isOpen, setIsOpen] = useState(false)
 
+  useEffect(() => {
+    if (!disabled) return
+    pointerInsideRef.current = false
+    dragInProgressRef.current = false
+  }, [disabled])
+  if (disabled && isOpen) setIsOpen(false)
   if (!resolvedInputModeRef) return null
 
   return (
     <Tooltip
-      open={isOpen}
+      open={!disabled && isOpen}
       onOpenChange={(nextOpen) => {
         setIsOpen(
-          nextOpen && (pointerInsideRef.current || resolvedInputModeRef.current === 'keyboard')
+          !disabled &&
+            nextOpen &&
+            (pointerInsideRef.current || resolvedInputModeRef.current === 'keyboard')
         )
       }}
     >
@@ -166,7 +180,7 @@ function TooltipLabelWithInputMode({
           dragInProgressRef.current = false
         }}
         onPointerMove={() => {
-          if (dragInProgressRef.current) return
+          if (disabled || dragInProgressRef.current) return
           pointerInsideRef.current = true
         }}
         onPointerLeave={() => {

@@ -56,6 +56,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private readonly rendererController = new TerminalRendererController({
     onStateChange: (state) => {
       if (this.element) this.element.dataset.terminalRenderer = state
+      this.requestFitAndReportDimensions()
     }
   })
   private readonly xtermRasterTarget = new TerminalXtermRasterTarget(

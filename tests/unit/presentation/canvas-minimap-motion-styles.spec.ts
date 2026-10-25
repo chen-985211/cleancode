@@ -18,7 +18,7 @@ describe('canvas minimap motion styles', () => {
     expect(panelRule).toContain('0 0 0 1px var(--cc-border) inset')
     expect(panelRule).not.toContain('border: 1px solid')
     expect(panelRule).not.toContain('transition:')
-    expect(toggleRule).toContain('rotate(var(--canvas-minimap-toggle-rotation))')
+    expect(toggleRule).toContain('rotate(calc(180deg + var(--canvas-minimap-toggle-rotation)))')
     expect(styles).not.toContain('.canvas-minimap__panel.anchored-surface-motion')
   })
 })

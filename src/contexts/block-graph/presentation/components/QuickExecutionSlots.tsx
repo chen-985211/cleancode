@@ -1,4 +1,5 @@
-import type { DragEvent } from 'react'
+import type { PointerEvent } from 'react'
+import type { DragPreview } from '../view-models/quickExecutionDrag'
 
 import type {
   QuickExecutionSlotNumber,
@@ -10,6 +11,7 @@ import type {
 } from '../view-models/quickExecutionProjection'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
+import { WorkbenchIcon } from '../../../../presentation/shared/components/WorkbenchIcons'
 import { TypeIcon } from './quickExecutionDragPresentation'
 
 interface QuickExecutionSlotsProps {
@@ -23,89 +25,137 @@ interface QuickExecutionSlotsProps {
   readonly shortcutPlatform: 'mac' | 'other'
   readonly shortcutTooltips?: Partial<Record<`quickExecution${QuickExecutionSlotNumber}`, string>>
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
-  readonly onDragStart: (
-    event: DragEvent<HTMLDivElement>,
+  readonly pending: boolean
+  readonly preview: DragPreview | null
+  readonly swapOffset: { readonly x: number; readonly y: number }
+  readonly onPointerDown: (
+    event: PointerEvent<HTMLDivElement>,
     number: QuickExecutionSlotNumber,
     projection: QuickExecutionBindingProjection
   ) => void
-  readonly onDrag: (event: DragEvent<HTMLDivElement>) => void
-  readonly onDragEnd: () => void
-  readonly onDragOver: (event: DragEvent<HTMLDivElement>, number: QuickExecutionSlotNumber) => void
-  readonly onDragLeave: (number: QuickExecutionSlotNumber) => void
-  readonly onDrop: (event: DragEvent<HTMLDivElement>, number: QuickExecutionSlotNumber) => void
 }
 
 export function QuickExecutionSlots(props: QuickExecutionSlotsProps) {
   const { t } = useI18n()
-  return props.slots
-    .filter((slot) => props.expanded || slot.projection)
-    .map((slot) => {
-      const projection = slot.projection
-      const isUnavailable = Boolean(projection && !projection.isAvailable)
-      const shortcutHint =
-        props.shortcutTooltips?.[`quickExecution${slot.number}`] ??
-        t('quickExecution.tooltip.executeShortcut', {
-          shortcut: `${props.shortcutPlatform === 'mac' ? '⌘' : 'Ctrl+'}${slot.number}`
+  return props.slots.map((slot) => {
+    if (!props.expanded && !slot.projection) return null
+    const projection = slot.projection
+    const swapping =
+      props.preview &&
+      props.reorderTargetNumber !== null &&
+      props.reorderTargetNumber !== props.preview.number
+    const isDestination = swapping && props.reorderTargetNumber === slot.number
+    const isSource = props.draggedNumber === slot.number
+    const isUnavailable = Boolean(projection && !projection.isAvailable)
+    const shortcutHint =
+      props.shortcutTooltips?.[`quickExecution${slot.number}`] ??
+      t('quickExecution.tooltip.executeShortcut', {
+        shortcut: `${props.shortcutPlatform === 'mac' ? '⌘' : 'Ctrl+'}${slot.number}`
+      })
+    const tooltipContent = projection
+      ? t('quickExecution.tooltip.bound', {
+          name: projection.name,
+          shortcutHint,
+          type: t(`quickExecution.type.${projection.type}`)
         })
-      const tooltipContent = projection
-        ? t('quickExecution.tooltip.bound', {
-            name: projection.name,
-            shortcutHint,
-            type: t(`quickExecution.type.${projection.type}`)
-          })
-        : t('quickExecution.tooltip.empty', { number: slot.number })
+      : t('quickExecution.tooltip.empty', { number: slot.number })
 
-      return (
-        <TooltipLabel key={slot.number} content={tooltipContent} dismissOnDragStart>
-          <div
-            className={[
-              'quick-execution__slot',
-              projection ? 'quick-execution__slot--filled' : 'quick-execution__slot--empty',
-              props.draggedNumber === slot.number ? 'quick-execution__slot--dragging' : '',
-              props.reorderTargetNumber === slot.number
-                ? 'quick-execution__slot--reorder-target'
-                : '',
-              isUnavailable ? 'quick-execution__slot--unavailable' : ''
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            data-quick-execution-slot={slot.number}
-            draggable={Boolean(projection)}
-            onDragStart={
-              projection ? (event) => props.onDragStart(event, slot.number, projection) : undefined
-            }
-            onDrag={projection ? props.onDrag : undefined}
-            onDragEnd={projection ? props.onDragEnd : undefined}
-            onDragOver={(event) => props.onDragOver(event, slot.number)}
-            onDragLeave={() => props.onDragLeave(slot.number)}
-            onDrop={(event) => props.onDrop(event, slot.number)}
-          >
-            {projection ? (
-              <button
-                className="quick-execution__content"
-                type="button"
-                aria-label={t('quickExecution.boundSlot', {
-                  name: projection.name,
-                  number: slot.number
-                })}
-                onClick={() => props.onFocus(projection.target)}
+    return (
+      <TooltipLabel
+        key={slot.number}
+        content={tooltipContent}
+        disabled={props.draggedNumber !== null || props.pending}
+        dismissOnDragStart
+      >
+        <div
+          className={[
+            'quick-execution__slot',
+            projection ? 'quick-execution__slot--filled' : 'quick-execution__slot--empty',
+            props.draggedNumber === slot.number ? 'quick-execution__slot--dragging' : '',
+            props.reorderTargetNumber === slot.number
+              ? 'quick-execution__slot--reorder-target'
+              : '',
+            isUnavailable ? 'quick-execution__slot--unavailable' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          data-quick-execution-slot={slot.number}
+          draggable={false}
+          onDragStart={(event) => event.preventDefault()}
+          onPointerDown={
+            projection ? (event) => props.onPointerDown(event, slot.number, projection) : undefined
+          }
+        >
+          {projection ? (
+            <button
+              className="quick-execution__content"
+              type="button"
+              aria-label={t('quickExecution.boundSlot', {
+                name: projection.name,
+                number: slot.number
+              })}
+              onClick={() => {
+                if (!props.pending && !props.preview) props.onFocus(projection.target)
+              }}
+            >
+              <kbd>{slot.number}</kbd>
+              <span
+                className="quick-execution__binding"
+                style={{
+                  transform: isDestination
+                    ? `translate3d(${props.swapOffset.x}px, ${props.swapOffset.y}px, 0)`
+                    : undefined,
+                  visibility: isSource ? 'hidden' : undefined
+                }}
               >
-                <TypeIcon type={projection.type} />
+                <span className="quick-execution__glyph">
+                  <TypeIcon type={projection.type} />
+                </span>
                 <span className="quick-execution__copy">
                   <strong>{projection.name}</strong>
-                  {isUnavailable ? <small>{t('quickExecution.unavailable')}</small> : null}
+                  {props.expanded ? (
+                    <span className="quick-execution__details">
+                      <small className="quick-execution__kind">
+                        {t(`quickExecution.type.${projection.type}`)}
+                      </small>
+                      {isUnavailable ? <small>{t('quickExecution.unavailable')}</small> : null}
+                    </span>
+                  ) : isUnavailable ? (
+                    <small>{t('quickExecution.unavailable')}</small>
+                  ) : null}
                 </span>
-                <kbd>{slot.number}</kbd>
-              </button>
-            ) : (
-              <div className="quick-execution__content quick-execution__content--empty">
-                <kbd>{slot.number}</kbd>
-              </div>
-            )}
-          </div>
-        </TooltipLabel>
-      )
-    })
+              </span>
+              {props.expanded ? (
+                <WorkbenchIcon className="quick-execution__grip" role="drag-handle" size={14} />
+              ) : null}
+            </button>
+          ) : (
+            <div className="quick-execution__content quick-execution__content--empty">
+              <kbd>{slot.number}</kbd>
+              <span className="quick-execution__binding">
+                <span className="quick-execution__glyph" />
+                <span className="quick-execution__copy">
+                  <strong>{t('quickExecution.empty')}</strong>
+                </span>
+              </span>
+            </div>
+          )}
+          {isDestination && props.preview ? (
+            <span
+              className="quick-execution__swap-preview"
+              data-quick-execution-swap-preview
+              aria-hidden="true"
+            >
+              <TypeIcon type={props.preview.projection.type} />
+              <span className="quick-execution__copy">
+                <strong>{props.preview.projection.name}</strong>
+              </span>
+            </span>
+          ) : null}
+        </div>
+      </TooltipLabel>
+    )
+  })
 }
 
 export function QuickExecutionCandidatePicker({
@@ -122,11 +172,18 @@ export function QuickExecutionCandidatePicker({
   return (
     <div className="quick-execution__picker-list">
       {candidates.map((candidate) => (
-        <button key={candidate.key} type="button" onClick={() => onSelect(candidate.target)}>
-          <TypeIcon type={candidate.type} />
-          <span title={candidate.name}>{candidate.name}</span>
-          <small>{t(`quickExecution.type.${candidate.type}`)}</small>
-        </button>
+        <TooltipLabel key={candidate.key} content={candidate.name}>
+          <button type="button" onClick={() => onSelect(candidate.target)}>
+            <span className="quick-execution__candidate-glyph">
+              <TypeIcon type={candidate.type} />
+            </span>
+            <span className="quick-execution__candidate-copy">
+              <span>{candidate.name}</span>
+              <small>{t(`quickExecution.type.${candidate.type}`)}</small>
+            </span>
+            <WorkbenchIcon className="quick-execution__candidate-add" role="add" size={13} />
+          </button>
+        </TooltipLabel>
       ))}
     </div>
   )

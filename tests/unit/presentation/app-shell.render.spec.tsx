@@ -58,8 +58,8 @@ describe('app shell', () => {
     expect(screen.getByRole('menuitem', { name: '新建组合' })).toBeDisabled()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByLabelText('积木画布')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: '积木导航小地图' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
     expect(screen.queryByText('小地图')).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: 'Agent 面板' })).not.toBeInTheDocument()
     expect(
@@ -133,6 +133,25 @@ describe('app shell', () => {
       screen.getByLabelText('积木画布').querySelector('[data-agent-console-node]')
     ).not.toBeInTheDocument()
     expect(runtimeApi.attachAgentSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps quick execution inside the workspace statusbar beside the directory', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/dock-project', 'dock-project')
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    })
+
+    render(<AppShell />)
+    const add = await screen.findByRole('button', { name: '添加画布对象' })
+    const statusbar = document.querySelector<HTMLElement>('.app-shell__statusbar')!
+
+    expect(statusbar).toContainElement(add)
+    expect(within(statusbar).getByText('/tmp/dock-project')).toBeInTheDocument()
+    fireEvent.click(add)
+    expect(screen.getByRole('dialog', { name: '选择要绑定的画布对象' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(add).toHaveFocus()
   })
 
   it('creates an empty drop target without entering a membership editing mode', async () => {

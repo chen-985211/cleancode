@@ -8,7 +8,7 @@ export interface QuickExecutionDragMotion {
   readonly scale?: { readonly from: number; readonly to: number }
 }
 
-export interface DragPreviewGeometry {
+interface DragPreviewGeometry {
   readonly grabOffsetX: number
   readonly grabOffsetY: number
   readonly height: number
@@ -16,6 +16,7 @@ export interface DragPreviewGeometry {
 }
 
 export interface DragPreview extends DragPreviewGeometry {
+  readonly surface: 'dock' | 'arrangement'
   readonly isUnavailable: boolean
   readonly left: number
   readonly number: QuickExecutionSlotNumber
@@ -50,13 +51,6 @@ export function createQuickExecutionReturnAnimation(
     targetLeft: preview.originLeft,
     targetTop: preview.originTop
   }
-}
-
-export function isQuickExecutionDropTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest('[data-quick-execution-slot], [data-quick-execution-trash]') !== null
-  )
 }
 
 export function distanceBetweenRectangles(

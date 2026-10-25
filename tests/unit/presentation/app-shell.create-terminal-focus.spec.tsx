@@ -263,7 +263,7 @@ describe('app shell create terminal focus', () => {
     render(<AppShell />)
 
     await screen.findByTestId('mock-react-flow')
-    await waitFor(() => expect(screen.getByRole('button', { name: '收起小地图' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: '展开小地图' })).toBeEnabled())
     await screen.findByTestId('mock-node-right-terminal')
     const navigationModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
       ? { metaKey: true }
@@ -288,6 +288,10 @@ describe('app shell create terminal focus', () => {
     await waitFor(() =>
       expect(screen.getByTestId('mock-node-left-terminal')).toHaveAttribute('data-selected', 'true')
     )
+
+    fireEvent.keyDown(document, { key: 'm', shiftKey: true, ...primaryModifier })
+
+    expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'm', shiftKey: true, ...primaryModifier })
 

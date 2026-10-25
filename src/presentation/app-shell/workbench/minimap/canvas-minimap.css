@@ -1,6 +1,7 @@
 .canvas-minimap-panel {
   z-index: 5;
   margin: 12px;
+  margin-bottom: calc(var(--cc-statusbar-height) + var(--cc-statusbar-bottom) + 12px);
   pointer-events: auto;
 }
 
@@ -11,7 +12,7 @@
   --canvas-minimap-toggle-rotation: 0deg;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 0;
 }
 
@@ -137,7 +138,7 @@
 .canvas-minimap__node:hover .canvas-minimap__node-shell,
 .canvas-minimap__node--highlighted .canvas-minimap__node-shell,
 .canvas-minimap__node:focus-visible .canvas-minimap__node-shell {
-  stroke: var(--cc-primary);
+  stroke: var(--cc-muted-strong);
   stroke-width: 1.5;
 }
 
@@ -153,16 +154,20 @@
   opacity: 0.9;
 }
 
-.canvas-minimap__node--selected .canvas-minimap__node-shell {
-  stroke: var(--cc-primary);
+.canvas-minimap__node.canvas-minimap__node--selected .canvas-minimap__node-shell {
+  stroke: var(--cc-workbench-node-selection);
   stroke-width: 1.85;
 }
 
 .canvas-minimap__node--terminal-group:hover .canvas-minimap__group-ring,
-.canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring,
+.canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring {
+  opacity: 0.72;
+  stroke: var(--cc-muted-strong);
+}
+
 .canvas-minimap__node--terminal-group.canvas-minimap__node--selected .canvas-minimap__group-ring {
   opacity: 0.72;
-  stroke: var(--cc-primary);
+  stroke: var(--cc-workbench-node-selection);
 }
 
 .canvas-minimap__map-controls {
@@ -212,12 +217,17 @@
 .canvas-minimap__viewport-controls .icon-button--small:hover:not(:disabled) {
   border-color: transparent;
   background: var(--cc-neutral-overlay);
-  color: var(--cc-primary);
+  color: var(--cc-foreground);
   box-shadow: none;
 }
 
+.canvas-minimap__map-controls .icon-button--small:focus-visible,
+.canvas-minimap__viewport-controls .icon-button--small:focus-visible {
+  outline-color: var(--cc-muted-strong);
+}
+
 .canvas-minimap__toggle svg {
-  transform: rotate(var(--canvas-minimap-toggle-rotation));
+  transform: rotate(calc(180deg + var(--canvas-minimap-toggle-rotation)));
   transform-origin: center;
 }
 

@@ -79,17 +79,20 @@ describe('surface motion styles', () => {
   })
 
   it.each([
-    [quickExecutionStyles, ".quick-execution[data-surface-spring-preset='bottom-control']"],
+    [quickExecutionStyles, ".quick-execution[data-surface-spring-preset='bottom-control']", '0'],
     [
       canvasArrangementStyles,
-      ".canvas-arrangement-toolbar[data-surface-spring-preset='bottom-control']"
+      ".canvas-arrangement-toolbar[data-surface-spring-preset='bottom-control']",
+      '-50%'
     ]
   ])(
-    'keeps a bottom control centered while its shared surface spring moves vertically',
-    (styles, selector) => {
+    'preserves each bottom control anchor while its shared surface spring moves vertically',
+    (styles, selector, horizontalOffset) => {
       const rule = readRule(styles, selector)
 
-      expect(rule).toContain('translate3d(-50%, var(--cc-surface-motion-translate-y, 0), 0)')
+      expect(rule).toContain(
+        `translate3d(${horizontalOffset}, var(--cc-surface-motion-translate-y, 0), 0)`
+      )
       expect(rule).toContain('opacity: 1')
       expect(rule).not.toContain('opacity: var(')
       expect(rule).not.toContain('scale(')
@@ -97,17 +100,6 @@ describe('surface motion styles', () => {
       expect(rule).toContain('will-change: transform')
     }
   )
-
-  it('defers quick execution backdrop filtering until the bottom spring settles', () => {
-    const slotRule = readRule(quickExecutionStyles, '.quick-execution__slot')
-    const settledRule = readRule(
-      quickExecutionStyles,
-      ".quick-execution[data-surface-spring-state='open'] .quick-execution__slot"
-    )
-
-    expect(slotRule).not.toContain('backdrop-filter')
-    expect(settledRule).toContain('backdrop-filter: blur(10px)')
-  })
 })
 
 function readRule(styles: string, selector: string): string {

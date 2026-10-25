@@ -99,8 +99,9 @@ export async function selectExactXtermText(
     }
 
     return {
-      endX: targetBounds.right - 0.25 * cellWidth,
-      startX: targetBounds.left + 0.25 * cellWidth,
+      // Avoid browser flooring across a half-cell boundary at small canvas scales.
+      endX: Math.round(targetBounds.right - 0.25 * cellWidth),
+      startX: Math.round(targetBounds.left + 0.25 * cellWidth),
       y: rowBounds.top + rowBounds.height / 2
     }
   }, targetText)
