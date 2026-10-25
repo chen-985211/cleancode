@@ -106,20 +106,56 @@ describe('quick execution pointer sorting', () => {
   )
 
   it.each([false, true])(
-    'keeps the proxy compact even when its source is larger (arranging: %s)',
+    'uses a full row only in the arrangement panel (arranging: %s)',
     (arranging) => {
       mount()
       if (arranging) openArrangement()
       const source = slot(2)
-      vi.spyOn(source, 'getBoundingClientRect').mockReturnValue(new DOMRect(140, 200, 86, 66))
+      Object.defineProperty(source, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => new DOMRect(140, 200, 86, 66)
+      })
       fireEvent.pointerDown(source, pointer(155, 210))
       fireEvent.pointerMove(window, pointer(175, 210))
       expect(document.querySelector('[data-quick-execution-drag-proxy]')).toHaveStyle({
-        width: '38px',
-        height: '24px'
+        width: arranging ? '86px' : '38px',
+        height: arranging ? '66px' : '24px'
       })
+      const proxy = document.querySelector('[data-quick-execution-drag-proxy]')!
+      if (arranging) {
+        expect(within(proxy).getByText('终端')).toBeInTheDocument()
+        expect(proxy.querySelector('kbd')).toHaveTextContent('2')
+      } else expect(proxy.querySelector('kbd')).toBeNull()
     }
   )
+
+  it.each([
+    { target: 2, x: 500, y: 100, top: '-40px' },
+    { target: 4, x: 280, y: 260, top: '48px' },
+    { target: 1, x: 120, y: 130, top: '-84px' }
+  ])('lands the whole arranged row at fixed position $target', ({ target, x, y, top }) => {
+    const view = mount()
+    openArrangement()
+    for (const [number, rowY] of [
+      [1, 116],
+      [2, 160],
+      [4, 248]
+    ] as const) {
+      Object.defineProperty(slot(number), 'getBoundingClientRect', {
+        configurable: true,
+        value: () => new DOMRect(100, rowY, 308, 42)
+      })
+    }
+    fireEvent.pointerDown(slot(2), pointer(170, 180))
+    fireEvent.pointerMove(window, pointer(x, y))
+    fireEvent.pointerUp(window, pointer(x, y))
+    const returning = document.querySelector('[data-quick-execution-return-animation]')!
+    expect(returning).toHaveStyle({ left: '0px', top, width: '308px', height: '42px' })
+    expect(returning.querySelector('kbd')).toHaveTextContent(String(target))
+    if (target === 2) expect(view.onReorder).not.toHaveBeenCalled()
+    else expect(view.onReorder).toHaveBeenCalledExactlyOnceWith(2, target)
+    expect(view.onFocus).not.toHaveBeenCalled()
+  })
 
   it('lands at the target glyph layout position while its binding is displaced by the preview', () => {
     mount()

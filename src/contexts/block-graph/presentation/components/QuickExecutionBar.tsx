@@ -142,7 +142,16 @@ export function QuickExecutionBar({
     const destinationElement = rootRef.current?.querySelector<HTMLElement>(
       `[data-quick-execution-slots="${preview.surface}"] [data-quick-execution-slot="${destination ?? preview.number}"]`
     )
-    const destinationCenter = destinationElement ? readSlotGlyphCenter(destinationElement) : null
+    const destinationBounds = destinationElement?.getBoundingClientRect()
+    const destinationCenter =
+      preview.surface === 'arrangement' && destinationBounds
+        ? {
+            x: destinationBounds.left + preview.width / 2,
+            y: destinationBounds.top + preview.height / 2
+          }
+        : destinationElement
+          ? readSlotGlyphCenter(destinationElement)
+          : null
     const rootBounds = rootRef.current?.getBoundingClientRect()
     returnAnimationIdRef.current += 1
     setReturnAnimation(
@@ -391,7 +400,6 @@ export function QuickExecutionBar({
             {t('quickExecution.doneArranging')}
           </button>
         </div>
-        <p className="quick-execution__arrangement-hint">{t('quickExecution.arrangeHint')}</p>
         <div
           className="quick-execution__arrangement-slots"
           data-quick-execution-slots="arrangement"

@@ -610,7 +610,6 @@
   height: 100%;
   align-items: center;
   margin-left: auto;
-  border-left: 1px solid var(--cc-divider);
   padding-left: 8px;
 }
 

@@ -36,7 +36,6 @@ export const zhCNCanvasMessages = {
   'quickExecution.chooseSlot': '选择快捷位',
   'quickExecution.addObject': '添加画布对象',
   'quickExecution.arrange': '整理快捷位',
-  'quickExecution.arrangeHint': '拖动交换位置，或移入空位',
   'quickExecution.doneArranging': '完成整理',
   'quickExecution.addFavorites': '添加常用对象',
   'quickExecution.boundSlot': '快捷位 {number}：{name}，点击定位，仅支持快捷键执行',

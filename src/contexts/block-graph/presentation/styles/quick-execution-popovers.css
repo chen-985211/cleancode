@@ -1,5 +1,5 @@
 .quick-execution {
-  --quick-execution-arrangement-height: min(294px, calc(100vh - 160px));
+  --quick-execution-arrangement-height: min(272px, calc(100vh - 160px));
 }
 
 .quick-execution__popover {
@@ -49,21 +49,31 @@
   line-height: 18px;
 }
 
+.quick-execution__arrangement .quick-execution__popover-heading {
+  min-height: 40px;
+  padding: 6px 8px;
+}
+
 .quick-execution__done {
   display: inline-flex;
   flex: 0 0 auto;
-  height: 26px;
+  height: 28px;
   align-items: center;
   gap: 4px;
   border: 0;
   border-radius: 5px;
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-foreground);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  padding: 0 7px;
+  line-height: 18px;
+  padding: 0 8px;
   cursor: pointer;
+}
+
+.quick-execution__done:hover {
+  background: var(--cc-canvas-node-menu-hover);
 }
 
 .quick-execution__picker-list,
@@ -168,15 +178,6 @@
   height: var(--quick-execution-arrangement-height);
 }
 
-.quick-execution__arrangement-hint {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0 8px 8px;
-  color: var(--cc-muted);
-  font-size: 11px;
-  line-height: 16px;
-}
-
 .quick-execution__arrangement-slots {
   grid-auto-rows: 42px;
 }
@@ -201,17 +202,58 @@
 }
 
 .quick-execution__arrangement-slots .quick-execution__slot--reorder-target {
-  border-color: var(--cc-primary);
-  background: var(--cc-primary-soft);
+  border-color: var(--cc-muted-strong);
+  background: var(--cc-neutral-overlay);
 }
 
-.quick-execution__arrangement-slots .quick-execution__content {
+.quick-execution__arrangement-slots .quick-execution__slot--dragging .quick-execution__content {
+  visibility: hidden;
+}
+
+.quick-execution__drag-proxy-card.quick-execution__drag-proxy-card--row {
+  border-radius: 7px;
+  background:
+    linear-gradient(var(--cc-neutral-overlay), var(--cc-neutral-overlay)),
+    var(--cc-canvas-node-menu-surface);
+}
+
+.quick-execution__return-animation .quick-execution__drag-proxy-card--row {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.quick-execution__return-animation .quick-execution__drag-proxy-card--row::before {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: inherit;
+  box-shadow: var(--cc-shadow-floating);
+  content: '';
+  opacity: var(--quick-execution-return-chrome-opacity, 1);
+}
+
+.quick-execution__return-animation
+  .quick-execution__drag-proxy-card--row.quick-execution__drag-proxy-card--unavailable::before {
+  border-color: var(--cc-warning-border);
+}
+
+.quick-execution__drag-proxy--near-black-hole .quick-execution__drag-proxy-card--row {
+  animation: none;
+}
+
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__content {
   gap: 9px;
   padding: 0 7px;
   cursor: inherit;
 }
 
-.quick-execution__arrangement-slots .quick-execution__content kbd {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__content
+  kbd {
   width: 22px;
   height: 24px;
   border: 1px solid var(--cc-border);
@@ -220,36 +262,45 @@
   font-size: 11px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__binding {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__binding {
   flex: 1;
   min-width: 0;
   gap: 9px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__copy {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__copy {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__copy strong {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__copy
+  strong {
   display: block;
   font-size: 12px;
   font-weight: 400;
   line-height: 16px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__details {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__details {
   display: flex;
   gap: 6px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__copy small {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__copy
+  small {
   font-size: 10px;
   line-height: 13px;
 }
 
-.quick-execution__arrangement-slots .quick-execution__copy .quick-execution__kind {
+:is(.quick-execution__arrangement-slots, .quick-execution__drag-proxy-card--row)
+  .quick-execution__copy
+  .quick-execution__kind {
   color: var(--cc-muted);
 }
 

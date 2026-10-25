@@ -235,15 +235,17 @@ export function useQuickExecutionPointerDrag({
     projection: QuickExecutionBindingProjection
   ): void => {
     if (!enabled || event.button !== 0 || sessionRef.current) return
+    const container = event.currentTarget.closest<HTMLElement>('[data-quick-execution-slots]')
+    const root = rootRef.current?.getBoundingClientRect()
+    if (!root || !container) return
+    const surface = container.dataset.quickExecutionSlots === 'arrangement' ? 'arrangement' : 'dock'
     const bounds = event.currentTarget.getBoundingClientRect()
     const glyph = event.currentTarget
       .querySelector('.quick-execution__glyph')
       ?.getBoundingClientRect()
-    const left = glyph?.width ? glyph.left + glyph.width / 2 - 19 : bounds.left
-    const top = glyph?.height ? glyph.top + glyph.height / 2 - 12 : bounds.top
-    const container = event.currentTarget.closest<HTMLElement>('[data-quick-execution-slots]')
-    const root = rootRef.current?.getBoundingClientRect()
-    if (!root || !container) return
+    const left =
+      surface === 'dock' && glyph?.width ? glyph.left + glyph.width / 2 - 19 : bounds.left
+    const top = surface === 'dock' && glyph?.height ? glyph.top + glyph.height / 2 - 12 : bounds.top
     event.stopPropagation()
     sessionRef.current = {
       pointerId: event.pointerId,
@@ -253,11 +255,11 @@ export function useQuickExecutionPointerDrag({
       startY: event.clientY,
       active: false,
       preview: {
-        surface: container.dataset.quickExecutionSlots === 'arrangement' ? 'arrangement' : 'dock',
+        surface,
         grabOffsetX: event.clientX - left,
         grabOffsetY: event.clientY - top,
-        width: 38,
-        height: 24,
+        width: surface === 'arrangement' ? bounds.width : 38,
+        height: surface === 'arrangement' ? bounds.height : 24,
         left: left - root.left,
         top: top - root.top,
         originLeft: left - root.left,
