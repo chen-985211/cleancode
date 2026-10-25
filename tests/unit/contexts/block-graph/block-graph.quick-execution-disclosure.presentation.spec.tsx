@@ -96,7 +96,9 @@ describe('quick execution disclosure', () => {
     const arrangement = screen.getByRole('dialog', { name: '整理快捷位' })
     expect(within(arrangement).getByRole('heading', { name: '整理快捷位' })).toBeInTheDocument()
     for (const number of [1, 2, 3, 4, 5]) {
-      const slot = arrangement.querySelector(`[data-quick-execution-slot="${number}"]`)!
+      const slot = arrangement.querySelector<HTMLElement>(
+        `[data-quick-execution-slot="${number}"]`
+      )!
       if (number === 2 || number === 4) {
         expect(within(slot).getByText('Worker')).toBeInTheDocument()
         expect(within(slot).getByText('终端')).toBeInTheDocument()

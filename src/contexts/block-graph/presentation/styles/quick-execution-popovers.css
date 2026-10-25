@@ -106,7 +106,8 @@
 }
 
 .quick-execution__picker-list button {
-  height: 44px;
+  height: 32px;
+  gap: 8px;
 }
 
 .quick-execution__picker-list button:hover,
@@ -116,31 +117,36 @@
 
 .quick-execution__candidate-glyph {
   display: grid;
-  flex: 0 0 28px;
-  height: 28px;
+  flex: 0 0 22px;
+  height: 22px;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 5px;
   background: var(--cc-neutral-overlay);
 }
 
 .quick-execution__candidate-copy {
-  display: grid;
+  display: flex;
   flex: 1;
   min-width: 0;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   line-height: 16px;
 }
 
 .quick-execution__candidate-copy > span {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .quick-execution__candidate-copy small {
+  flex: 0 0 auto;
   color: var(--cc-muted);
   font-size: 10px;
   line-height: 13px;
+  white-space: nowrap;
 }
 
 .quick-execution__candidate-add {

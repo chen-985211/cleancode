@@ -158,7 +158,7 @@ describe('quick execution pointer sorting', () => {
         width: arranging ? '86px' : '38px',
         height: arranging ? '66px' : '24px'
       })
-      const proxy = document.querySelector('[data-quick-execution-drag-proxy]')!
+      const proxy = document.querySelector<HTMLElement>('[data-quick-execution-drag-proxy]')!
       if (arranging) {
         expect(within(proxy).getByText('终端')).toBeInTheDocument()
         expect(proxy.querySelector('kbd')).toHaveTextContent('2')
