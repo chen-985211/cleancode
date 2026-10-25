@@ -112,8 +112,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
-      await waitForAgentProviderInstalled(page, 'codex')
-      await createCodexAgent(page)
+      await createCodexAgent(page, workbench.projectDirectory)
       await waitForPersistedAgent(page)
 
       const projectCard = page.getByRole('group', {
@@ -210,7 +209,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
-      await createCodexAgent(page)
+      await createCodexAgent(page, workbench.projectDirectory)
       await waitForPersistedAgent(page)
       await selectBlankCanvasAction(page, '新建终端')
 
@@ -251,7 +250,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
-      await createCodexAgent(page)
+      await createCodexAgent(page, workbench.projectDirectory)
       await waitForPersistedAgent(page)
       await selectBlankCanvasAction(page, '新建终端')
       await waitForTerminalShellReady(page, 'Terminal 1')
@@ -470,7 +469,10 @@ async function waitForPersistedAgent(page: Page): Promise<void> {
   })
 }
 
-async function createCodexAgent(page: Page): Promise<void> {
+async function createCodexAgent(page: Page, projectDirectory: string): Promise<void> {
+  // Let workspace loading reset canvas menus before opening the provider menu.
+  await page.locator('.status-path', { hasText: projectDirectory }).waitFor({ state: 'visible' })
+  await waitForAgentProviderInstalled(page, 'codex')
   await selectAgentProviderFromCreateMenu(page, 'Codex')
 }
 
