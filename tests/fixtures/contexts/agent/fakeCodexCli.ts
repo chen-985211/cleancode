@@ -17,10 +17,12 @@ export interface FakeCodexCliFixture {
 
 export interface FakeCodexCliReport {
   readonly args: readonly string[]
+  readonly cursor?: string | null
   readonly cwd: string
   readonly exitReason?: 'interrupt' | 'quit' | 'signal'
   readonly kind:
     | 'app-server'
+    | 'app-server-request'
     | 'color-query-response'
     | 'color-query-timeout'
     | 'draw'
@@ -32,6 +34,7 @@ export interface FakeCodexCliReport {
     | 'session-end-hook'
     | 'unexpected-color-response-input'
   readonly pid: number
+  readonly method?: string
   readonly sessionEndHookTrusted?: boolean
   readonly sessionId?: string
   readonly sourceTheme?: 'dark' | 'light'
@@ -226,6 +229,10 @@ function handleAppServerRequest(line) {
   } catch {
     return
   }
+  report('app-server-request', {
+    method: request.method,
+    cursor: request.params?.cursor ?? null
+  })
   if (request.method === 'initialize') {
     writeProtocolResponse(request.id, { userAgent: 'codex-cli fake-e2e' })
     return

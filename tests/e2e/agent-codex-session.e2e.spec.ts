@@ -242,17 +242,33 @@ describe('Codex Agent session e2e', () => {
       await enterCodexResumeCommand(electronApp, page)
       await page.keyboard.press('Enter')
       await waitForCodexResumeSelection(fakeCodex.reportPath, fakeCodex.switchSessionId)
-      await waitForCodexReport(
-        fakeCodex.reportPath,
-        (reports) => reports.find((report) => report.kind === 'app-server'),
-        'Codex app-server thread resolution'
-      )
       expect(
         (await readFakeCodexCliReports(fakeCodex.reportPath)).filter(
           (report) => report.kind === 'session-end-hook'
         )
       ).toHaveLength(0)
-      await waitForCodexConversationBinding(workbench, fakeCodex.switchSessionId)
+      try {
+        await waitForCodexConversationBinding(workbench, fakeCodex.switchSessionId)
+      } catch (cause) {
+        const protocolReports = (await readFakeCodexCliReports(fakeCodex.reportPath))
+          .filter((report) => ['app-server', 'app-server-request', 'resume'].includes(report.kind))
+          .map(({ kind, pid, method, cursor, sessionId }) => ({
+            kind,
+            pid,
+            method,
+            cursor,
+            sessionId
+          }))
+        throw new Error(`Codex /resume protocol: ${JSON.stringify(protocolReports)}`, { cause })
+      }
+      expect(
+        (await readFakeCodexCliReports(fakeCodex.reportPath)).some(
+          (report) =>
+            report.kind === 'app-server-request' &&
+            report.method === 'thread/list' &&
+            report.cursor === 'switch-session'
+        )
+      ).toBe(true)
 
       await closeElectronApp(electronApp)
       resources.electronApp = undefined

@@ -98,14 +98,14 @@ describe('quick execution e2e', () => {
       })
 
       const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；点击仅用于定位视图。`
+      const quickSlotTooltip = page.getByRole('tooltip', {
+        name: quickExecutionTooltip,
+        exact: true
+      })
       await page.locator('[data-quick-execution-slot="1"]').hover()
-      await waitForLocatorText(
-        page.getByRole('tooltip'),
-        quickExecutionTooltip,
-        'quick slot tooltip'
-      )
+      await waitForLocatorText(quickSlotTooltip, quickExecutionTooltip, 'quick slot tooltip')
       await page.mouse.move(0, 0)
-      await page.getByRole('tooltip').waitFor({ state: 'detached' })
+      await quickSlotTooltip.waitFor({ state: 'detached' })
 
       if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
         const resultDirectory = join(process.cwd(), 'test-results')
@@ -115,7 +115,7 @@ describe('quick execution e2e', () => {
         await page.screenshot({ path: join(resultDirectory, 'quick-execution-light.png') })
         await page.locator('[data-quick-execution-slot="1"]').hover()
         await waitForLocatorText(
-          page.getByRole('tooltip'),
+          quickSlotTooltip,
           quickExecutionTooltip,
           'quick slot tooltip in light theme'
         )

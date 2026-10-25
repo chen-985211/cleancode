@@ -266,6 +266,13 @@ describe('terminal runtime recovery e2e', () => {
       expect(metadata).not.toBeNull()
       process.kill(metadata!.processId, 'SIGKILL')
       await waitForProcessIdExit(metadata!.processId)
+      const unavailableNotification = page
+        .getByRole('alert')
+        .filter({ hasText: '终端运行时启动失败' })
+      await unavailableNotification
+        .getByRole('button', { name: '关闭“终端运行时启动失败”通知', exact: true })
+        .click()
+      await unavailableNotification.waitFor({ state: 'detached' })
       await waitForTerminalStopActionDisabled(page)
 
       await restartApplication()
