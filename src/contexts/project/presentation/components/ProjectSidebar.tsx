@@ -18,6 +18,8 @@ import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hoo
 import type { ProjectWorkbenchViewModel } from '../view-models/ProjectWorkbenchViewModel'
 import { useProjectSidebarBranchWorkspaceForm } from '../view-models/useProjectSidebarBranchWorkspaceForm'
 import { useProjectSidebarReorder } from '../view-models/useProjectSidebarReorder'
+import { useProjectDisclosureMotion } from '../motion/useProjectDisclosureMotion'
+import { useProjectSidebarHoverMotion } from '../motion/useProjectSidebarHoverMotion'
 
 export interface ProjectSidebarIntent {
   readonly id: number
@@ -87,6 +89,14 @@ export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
     onReorderProject,
     workbenches
   })
+  const {
+    indicatorRef: hoverIndicatorRef,
+    onPointerMove: onHoverPointerMove,
+    onPointerLeave: onHoverPointerLeave
+  } = useProjectSidebarHoverMotion(
+    projectListRef,
+    isCollapsed || projectReorder.draggingProjectId !== null
+  )
   return (
     <aside
       id="project-sidebar"
@@ -123,7 +133,14 @@ export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
               : 'project-list'
           }
           ref={projectListRef}
+          onPointerMove={onHoverPointerMove}
+          onPointerLeave={onHoverPointerLeave}
         >
+          <span
+            ref={hoverIndicatorRef}
+            className="selection-motion-indicator project-list__hover"
+            aria-hidden="true"
+          />
           {projectReorder.dropIndicatorY !== null ? (
             <div
               className="project-list__drop-indicator"
@@ -212,6 +229,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     useSelectionIndicatorMotion(currentWorkspaceId ?? '')
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
+  const disclosureMotionRef = useProjectDisclosureMotion(isExpanded)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null)
   const [archivePresentation, setArchivePresentation] =
@@ -312,6 +330,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
 
   return (
     <section
+      ref={disclosureMotionRef}
       className={isDragging ? 'project-card project-card--dragging' : 'project-card'}
       data-project-card-id={workbench.project.id}
       role="group"
