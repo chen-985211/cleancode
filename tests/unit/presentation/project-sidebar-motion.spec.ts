@@ -6,6 +6,62 @@ import {
 } from '../../../src/presentation/app-shell/shell/project-sidebar/projectSidebarMotion'
 
 describe('project sidebar motion', () => {
+  it.each(
+    [280, 360].flatMap((expandedWidth) =>
+      [900, 1280].flatMap((viewportWidth) =>
+        [false, true].map((reducedMotion) => ({ expandedWidth, viewportWidth, reducedMotion }))
+      )
+    )
+  )(
+    'keeps the complete statusbar and right-hand controls inside the window ($expandedWidth / $viewportWidth, reduce: $reducedMotion)',
+    ({ expandedWidth, viewportWidth, reducedMotion }) => {
+      const scheduler = createFrameScheduler()
+      const minimap = createSurface()
+      const elements = { ...createElements(), minimap }
+      const controller = createProjectSidebarMotionController({ scheduler })
+      const intent = (isCollapsed: boolean) =>
+        controller.intentChanged(elements, { expandedWidth, isCollapsed, reducedMotion })
+      const expectAnchored = () => {
+        // At rest the narrowed layout ends at the window edge. In flight the
+        // full-width parent and its right-hand control must cancel their offsets.
+        expect(readTranslation(elements.spatial) + readTranslation(minimap)).toBeCloseTo(0, 4)
+        const isExpanded =
+          elements.statusbar.attributes.get('data-project-sidebar-motion-state') === 'expanded'
+        const inset = Number.parseFloat(
+          elements.statusbar.properties.get('margin-left') ??
+            (isExpanded ? `${expandedWidth}` : '0')
+        )
+        const translation = readTranslation(elements.statusbar)
+        const left = 6 + inset + translation
+        const right = viewportWidth - 6 + translation
+        expect(right).toBe(viewportWidth - 6)
+        expect(left).toBeCloseTo(
+          6 + expandedWidth + readSidebarPresentation(elements.sidebar, expandedWidth),
+          4
+        )
+        expect(left).toBeLessThan(right)
+      }
+      intent(false)
+      for (const collapsed of [true, false, true]) {
+        intent(collapsed)
+        expectAnchored()
+        for (let frame = 0; frame < 12; frame++) {
+          scheduler.advanceNextFrame()
+          expectAnchored()
+        }
+      }
+      scheduler.advanceUntilIdle()
+      expectAnchored()
+      intent(false)
+      scheduler.advanceUntilIdle()
+      expectAnchored()
+      controller.dispose()
+      expect(minimap.properties.size).toBe(0)
+      expect(elements.statusbar.properties.size).toBe(0)
+      expect(scheduler.pendingFrames()).toBe(0)
+    }
+  )
+
   it.each([
     [280, false, false],
     [280, true, false],
@@ -133,7 +189,7 @@ describe('project sidebar motion', () => {
     expect(scheduler.pendingFrames()).toBe(0)
   })
 
-  it('only writes compositor transforms while the spring is running', () => {
+  it('keeps canvas and sidebar surfaces on the compositor and limits reflow to the statusbar', () => {
     const scheduler = createFrameScheduler()
     const elements = createElements()
     const controller = createProjectSidebarMotionController({ scheduler })
@@ -154,12 +210,12 @@ describe('project sidebar motion', () => {
       elements.sidebar,
       elements.titlebar,
       elements.spatial,
-      elements.center,
-      elements.statusbar
+      elements.center
     ]) {
       expect([...surface.properties.keys()]).toEqual(['transform'])
       expect(surface.properties.get('transform')).toContain('translate3d(')
     }
+    expect([...elements.statusbar.properties.keys()]).toEqual(['margin-left'])
   })
 
   it('reverses from the current presentation without resetting its position', () => {
@@ -201,6 +257,7 @@ describe('project sidebar motion', () => {
     expect(elements.spatial.properties.has('transform')).toBe(false)
     expect(elements.center.properties.has('transform')).toBe(false)
     expect(elements.statusbar.properties.has('transform')).toBe(false)
+    expect(elements.statusbar.properties.has('margin-left')).toBe(false)
     expect(elements.sidebar.properties.has('transform')).toBe(false)
     expect(elements.titlebar.properties.has('transform')).toBe(false)
     expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')

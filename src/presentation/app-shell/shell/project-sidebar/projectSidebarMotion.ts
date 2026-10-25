@@ -17,6 +17,7 @@ export interface ProjectSidebarMotionElements {
   readonly spatial: ProjectSidebarMotionSurface | null
   readonly center: ProjectSidebarMotionSurface | null
   readonly statusbar?: ProjectSidebarMotionSurface | null
+  readonly minimap?: ProjectSidebarMotionSurface | null
   readonly taskArea?: ProjectSidebarMotionSurface | null
 }
 
@@ -93,16 +94,20 @@ export function createProjectSidebarMotionController({
     if (!elements) return
     const layoutProgress = clamp(axis.value, 0, 1)
     const spatialOffset = expandedWidth * layoutProgress
-    // Only the lightweight task view reflows; canvas/terminal surfaces keep compositor motion.
+    // Only lightweight overlays reflow; canvas/terminal surfaces keep compositor motion.
     elements.taskArea?.style.setProperty('left', `${round(spatialOffset)}px`)
     if (state === 'collapsed' || state === 'expanded') {
-      clearTranslations(elements)
+      clearMotionStyles(elements)
     } else {
       setTranslation(elements.sidebar, expandedWidth * (layoutProgress - 1))
       setTranslation(elements.titlebar, expandedWidth * (layoutProgress - 1))
       setTranslation(elements.spatial, spatialOffset)
       setTranslation(elements.center, spatialOffset / 2)
-      setTranslation(elements.statusbar ?? null, spatialOffset)
+      // Keep the statusbar's actual right boundary fixed, including its glass
+      // and outline. Its local flex layout handles the path and dock together.
+      elements.statusbar?.style.setProperty('margin-left', `${round(spatialOffset)}px`)
+      // The minimap stays anchored inside the translated full-width canvas.
+      setTranslation(elements.minimap ?? null, -spatialOffset)
     }
     if (presentationState !== state) {
       setPresentationState(elements, state)
@@ -135,7 +140,7 @@ export function createProjectSidebarMotionController({
 
   const clearElements = (): void => {
     if (!elements) return
-    clearTranslations(elements)
+    clearMotionStyles(elements)
     elements.taskArea?.style.removeProperty('left')
     elements.sidebar?.removeAttribute(stateAttribute)
     elements.titlebar?.removeAttribute(stateAttribute)
@@ -200,6 +205,7 @@ function hasSameElements(
     current.spatial === next.spatial &&
     current.center === next.center &&
     current.statusbar === next.statusbar &&
+    current.minimap === next.minimap &&
     current.taskArea === next.taskArea
   )
 }
@@ -208,12 +214,13 @@ function setTranslation(element: ProjectSidebarMotionSurface | null, offset: num
   element?.style.setProperty(transformProperty, `translate3d(${round(offset)}px, 0, 0)`)
 }
 
-function clearTranslations(elements: ProjectSidebarMotionElements): void {
+function clearMotionStyles(elements: ProjectSidebarMotionElements): void {
   elements.sidebar?.style.removeProperty(transformProperty)
   elements.titlebar?.style.removeProperty(transformProperty)
   elements.spatial?.style.removeProperty(transformProperty)
   elements.center?.style.removeProperty(transformProperty)
-  elements.statusbar?.style.removeProperty(transformProperty)
+  elements.statusbar?.style.removeProperty('margin-left')
+  elements.minimap?.style.removeProperty(transformProperty)
 }
 
 function setPresentationState(

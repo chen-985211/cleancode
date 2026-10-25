@@ -363,10 +363,16 @@ describe('quick execution bar', () => {
     )
     expect(clearAnimation).toHaveStyle({
       height: '24px',
-      left: '505px',
       top: '-83px',
       width: '38px'
     })
+    const holeBounds = hiddenBlackHole.getBoundingClientRect()
+    const proxyCenter =
+      bar.getBoundingClientRect().right -
+      Number.parseFloat(clearAnimation.style.right) -
+      Number.parseFloat(clearAnimation.style.width) / 2
+    expect(proxyCenter).toBe(holeBounds.left + holeBounds.width / 2)
+    expect(bar.style.width).toBe('')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-69px')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('-6px')
     expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-scale')).toBe('1')

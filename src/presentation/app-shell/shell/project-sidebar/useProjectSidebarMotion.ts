@@ -45,6 +45,7 @@ export function useProjectSidebarMotion(
         sidebar: sidebarRef.current,
         spatial: spatialRef.current,
         statusbar: statusbarRef.current,
+        minimap: spatialRef.current?.querySelector<HTMLElement>('.canvas-minimap-panel') ?? null,
         titlebar: titlebarRef.current,
         taskArea: taskAreaRef.current
       },

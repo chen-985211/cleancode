@@ -25,6 +25,7 @@ import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip
 import { WorkbenchIcon } from '../../../../presentation/shared/components/WorkbenchIcons'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { useQuickExecutionDragMotionPresentation } from '../motion/useQuickExecutionDragMotionPresentation'
+import { useQuickExecutionLayoutMotion } from '../motion/useQuickExecutionLayoutMotion'
 import { QuickExecutionIcon } from './QuickExecutionIcons'
 import { useQuickExecutionArrangement } from './useQuickExecutionArrangement'
 import { useQuickExecutionPointerDrag } from './useQuickExecutionPointerDrag'
@@ -213,6 +214,7 @@ export function QuickExecutionBar({
       blackHoleMotionRef.current.playbackRate = isClearTarget || clearAnimation ? 1.75 : 1
   }, [isClearTarget, clearAnimation])
   const animationScope = `${scopeKey}:${open}`
+  useQuickExecutionLayoutMotion(rootRef, animationScope, open && !dragPreview && !returnAnimation)
   const [renderedAnimationScope, setRenderedAnimationScope] = useState(animationScope)
   if (animationScope !== renderedAnimationScope) {
     setRenderedAnimationScope(animationScope)
@@ -326,7 +328,7 @@ export function QuickExecutionBar({
         .filter(Boolean)
         .join(' ')}
       data-quick-execution-bar
-      style={{ width: dragPreview || returnAnimation || clearAnimation ? dragRowWidth : undefined }}
+      style={{ width: dragPreview || returnAnimation ? dragRowWidth : undefined }}
       data-quick-execution-arranging={isArranging || undefined}
       data-quick-execution-dragging={draggedNumber !== null || undefined}
       data-quick-execution-settling={returnAnimation !== null || undefined}
@@ -448,7 +450,7 @@ export function QuickExecutionBar({
           onAnimationEnd={onClearMotionAnimationEnd}
           style={{
             height: clearAnimation.height,
-            left: clearAnimation.targetLeft,
+            right: (dragRowWidth ?? 0) - clearAnimation.targetLeft - clearAnimation.width,
             top: clearAnimation.targetTop,
             width: clearAnimation.width
           }}
