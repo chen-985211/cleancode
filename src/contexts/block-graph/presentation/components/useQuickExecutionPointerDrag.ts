@@ -53,7 +53,7 @@ export function useQuickExecutionPointerDrag({
   const [nearClear, setNearClear] = useState(false)
   const [swapOffset, setSwapOffset] = useState({ x: 0, y: 0 })
 
-  const move = (event: PointerEvent): void => {
+  const move = (event: PointerEvent, stopPropagation = true): void => {
     const session = sessionRef.current
     if (!session || event.pointerId !== session.pointerId) return
     const root = rootRef.current
@@ -72,7 +72,7 @@ export function useQuickExecutionPointerDrag({
       })
     }
     event.preventDefault()
-    event.stopPropagation()
+    if (stopPropagation) event.stopPropagation()
     const bounds = root.getBoundingClientRect()
     const next = {
       ...session.preview,
@@ -178,9 +178,9 @@ export function useQuickExecutionPointerDrag({
     const pointerUp = (event: PointerEvent): void => {
       if (event.pointerId !== sessionRef.current?.pointerId) return
       if (sessionRef.current.active) {
-        moveFromWindow(event)
+        // Shared triggers need the release to clear their pointer-down state.
+        moveFromWindow(event, false)
         event.preventDefault()
-        event.stopPropagation()
       }
       finishFromWindow(true)
     }

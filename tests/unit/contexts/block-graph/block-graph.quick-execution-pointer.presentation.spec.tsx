@@ -54,6 +54,43 @@ describe('quick execution pointer sorting', () => {
       expect(root).not.toHaveAttribute('data-quick-execution-quiet-hover')
     }
   )
+  it.each(
+    [false, true].flatMap((arranging) =>
+      [
+        { release: 'source', x: 155, y: 210, target: null },
+        { release: 'outside', x: 500, y: 100, target: null },
+        { release: 'swap', x: 245, y: 210, target: 4 }
+      ].map((scenario) => ({ ...scenario, arranging }))
+    )
+  )(
+    'restores keyboard tooltips after a $release release (arranging: $arranging)',
+    async ({ arranging, x, y, target }) => {
+      const { onFocus, onReorder } = mount()
+      if (arranging) openArrangement()
+      const source = slot(2)
+      const button = source.querySelector('button')!
+      fireEvent.pointerDown(button, pointer(155, 210))
+      act(() => button.focus())
+      fireEvent.pointerMove(window, pointer(175, 190))
+      // Pointer capture delivers the release to the source even outside its bounds.
+      fireEvent.pointerUp(source, pointer(x, y))
+      fireEvent.click(button, { detail: 1 })
+      expect(onFocus).not.toHaveBeenCalled()
+      if (target === null) expect(onReorder).not.toHaveBeenCalled()
+      else expect(onReorder).toHaveBeenCalledExactlyOnceWith(2, target)
+      await waitFor(() =>
+        expect(document.querySelector('[data-quick-execution-return-animation]')).toBeNull()
+      )
+
+      act(() => button.blur())
+      fireEvent.keyDown(document, { key: 'Tab' })
+      act(() => button.focus())
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(
+        '已绑定终端「Worker」。按 ⌘2 执行此快捷位；点击仅用于定位视图。'
+      )
+      expect(onFocus).not.toHaveBeenCalled()
+    }
+  )
   it('keeps clicks below the drag threshold and follows the original grab point directly', () => {
     const { onFocus, onReorder } = mount()
     const source = slot(2)
