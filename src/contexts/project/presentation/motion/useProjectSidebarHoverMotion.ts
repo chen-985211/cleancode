@@ -18,6 +18,7 @@ export function useProjectSidebarHoverMotion(
 ) {
   const indicatorRef = useRef<HTMLSpanElement>(null)
   const targetRef = useRef<HTMLElement | null>(null)
+  const pointerPositionRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   // These rows share a right edge. Project x as a left inset so the indent and
   // width follow one spring; a compositor translation would move the right edge.
   const controller = useMemo(
@@ -66,14 +67,29 @@ export function useProjectSidebarHoverMotion(
   )
 
   useLayoutEffect(() => {
-    if (disabled) hide()
-    else project()
+    if (disabled) {
+      pointerPositionRef.current = null
+      hide()
+    } else project()
   }, [disabled, hide, project])
 
   useLayoutEffect(() => {
     const list = listRef.current
     if (!list) return
     const update = () => project(true)
+    const updateAfterScroll = () => {
+      const pointer = pointerPositionRef.current
+      if (!pointer) return
+      const target = document
+        .elementFromPoint(pointer.x, pointer.y)
+        ?.closest<HTMLElement>(rowSelector)
+      if (!target || !list.contains(target)) {
+        hide()
+        return
+      }
+      targetRef.current = target
+      project(true)
+    }
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
     const observeCards = () => {
       observer?.disconnect()
@@ -84,22 +100,24 @@ export function useProjectSidebarHoverMotion(
     observeCards()
     const mutations = new MutationObserver(observeCards)
     mutations.observe(list, { childList: true, subtree: true })
-    list.addEventListener('scroll', update, { passive: true })
+    list.addEventListener('scroll', updateAfterScroll, { passive: true })
     window.addEventListener('resize', update)
     return () => {
       observer?.disconnect()
       mutations.disconnect()
-      list.removeEventListener('scroll', update)
+      list.removeEventListener('scroll', updateAfterScroll)
       window.removeEventListener('resize', update)
       controller.dispose()
     }
-  }, [controller, listRef, project])
+  }, [controller, hide, listRef, project])
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch' || event.buttons > 0 || disabled) {
+      pointerPositionRef.current = null
       hide()
       return
     }
+    pointerPositionRef.current = { x: event.clientX, y: event.clientY }
     const target =
       event.target instanceof Element ? event.target.closest<HTMLElement>(rowSelector) : null
     if (!target) {
@@ -115,5 +133,10 @@ export function useProjectSidebarHoverMotion(
     project()
   }
 
-  return { indicatorRef, onPointerMove, onPointerLeave: hide }
+  const onPointerLeave = () => {
+    pointerPositionRef.current = null
+    hide()
+  }
+
+  return { indicatorRef, onPointerMove, onPointerLeave }
 }

@@ -228,6 +228,80 @@ describe('project sidebar hover and disclosure motion', () => {
     unmount()
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  describe('stationary pointer while scrolling', () => {
+    let previousHitTest: PropertyDescriptor | undefined
+    let hitTest = vi.fn<(x: number, y: number) => Element | null>()
+
+    beforeEach(() => {
+      previousHitTest = Object.getOwnPropertyDescriptor(document, 'elementFromPoint')
+      hitTest = vi.fn<(x: number, y: number) => Element | null>().mockReturnValue(null)
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: hitTest
+      })
+    })
+
+    afterEach(() => {
+      if (previousHitTest) Object.defineProperty(document, 'elementFromPoint', previousHitTest)
+      else Reflect.deleteProperty(document, 'elementFromPoint')
+    })
+
+    it('moves the highlight to the row now under the stationary pointer', () => {
+      const props = createProps()
+      render(<ProjectSidebar {...props} />)
+      const list = document.querySelector<HTMLElement>('.project-list')!
+      const [from, to] = list.querySelectorAll<HTMLElement>('.workspace-row')
+      const highlight = list.querySelector<HTMLElement>('.project-list__hover')!
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 250, 200))
+      const fromBounds = vi
+        .spyOn(from, 'getBoundingClientRect')
+        .mockReturnValue(rect(23, 34, 223, 32))
+      vi.spyOn(to, 'getBoundingClientRect').mockReturnValue(rect(23, 34, 223, 32))
+      fireEvent(from, new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 50 }))
+
+      fromBounds.mockReturnValue(rect(23, 0, 223, 32))
+      list.scrollTop = 34
+      hitTest.mockReturnValue(to.querySelector('button'))
+      fireEvent.scroll(list)
+
+      expect(hitTest).toHaveBeenCalledWith(80, 50)
+      expect(list).toHaveAttribute('data-sidebar-hover-visible', 'true')
+      expect(highlight.style.getPropertyValue('--cc-selection-motion-y')).toBe('68px')
+      expect(props.onSelectWorkspace).not.toHaveBeenCalled()
+    })
+
+    it('hides over empty space and resumes when scrolling a row back under the pointer', () => {
+      render(<ProjectSidebar {...createProps()} />)
+      const list = document.querySelector<HTMLElement>('.project-list')!
+      const row = list.querySelector<HTMLElement>('.workspace-row')!
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 250, 200))
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rect(23, 34, 223, 32))
+      fireEvent(row, new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 50 }))
+
+      hitTest.mockReturnValue(list)
+      fireEvent.scroll(list)
+      expect(list).not.toHaveAttribute('data-sidebar-hover-visible')
+
+      hitTest.mockReturnValue(row)
+      fireEvent.scroll(list)
+      expect(list).toHaveAttribute('data-sidebar-hover-visible', 'true')
+    })
+
+    it('does not reactivate a stale pointer after leaving the sidebar', () => {
+      render(<ProjectSidebar {...createProps()} />)
+      const list = document.querySelector<HTMLElement>('.project-list')!
+      const row = list.querySelector<HTMLElement>('.workspace-row')!
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 250, 200))
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rect(23, 34, 223, 32))
+      fireEvent(row, new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 50 }))
+      fireEvent.pointerLeave(list)
+      hitTest.mockReturnValue(row)
+      fireEvent.scroll(list)
+      expect(list).not.toHaveAttribute('data-sidebar-hover-visible')
+      expect(hitTest).not.toHaveBeenCalled()
+    })
+  })
 })
 
 function progress(card: HTMLElement): number {
