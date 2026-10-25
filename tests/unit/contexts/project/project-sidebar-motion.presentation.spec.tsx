@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 import { ProjectSidebar } from '../../../../src/contexts/project/presentation/components/ProjectSidebar'
@@ -173,6 +175,43 @@ describe('project sidebar hover and disclosure motion', () => {
     act(() => vi.advanceTimersByTime(48))
     unmount()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('removes hidden hover geometry from layout after collapse and restores it on re-entry', () => {
+    const styles = document.createElement('style')
+    styles.textContent = [
+      'src/presentation/shared/styles/selection-motion.css',
+      'src/contexts/project/presentation/styles/project-sidebar.css'
+    ]
+      .map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'))
+      .join('\n')
+    document.head.append(styles)
+    try {
+      render(<ProjectSidebar {...createProps()} />)
+      const list = document.querySelector<HTMLElement>('.project-list')!
+      const header = list.querySelector<HTMLElement>('.project-card__header')!
+      const workspace = list.querySelector<HTMLElement>('.workspace-row')!
+      const highlight = list.querySelector<HTMLElement>('.project-list__hover')!
+      vi.spyOn(list, 'clientWidth', 'get').mockReturnValue(250)
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 250, 400))
+      vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(rect(4, 0, 242, 34))
+      vi.spyOn(workspace, 'getBoundingClientRect').mockReturnValue(rect(23, 600, 223, 32))
+
+      expect(getComputedStyle(highlight).display).toBe('none')
+      fireEvent.pointerMove(workspace)
+      expect(getComputedStyle(highlight).display).toBe('block')
+      fireEvent.pointerLeave(list)
+      fireEvent.click(screen.getByRole('button', { name: 'motion-alpha' }))
+      act(() => vi.advanceTimersByTime(1000))
+      expect(getComputedStyle(highlight).display).toBe('none')
+
+      fireEvent.pointerMove(header)
+      expect(getComputedStyle(highlight).display).toBe('block')
+      expect(highlight.style.getPropertyValue('--cc-selection-motion-y')).toBe('0px')
+      expect(list).toHaveAttribute('data-sidebar-hover-visible', 'true')
+    } finally {
+      styles.remove()
+    }
   })
 
   it('settles immediately under reduced motion and cancels frames on unmount', () => {

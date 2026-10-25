@@ -107,6 +107,7 @@
 }
 
 .project-list > .project-list__hover {
+  display: none;
   right: var(--cc-sidebar-hover-right, 4px);
   left: var(--cc-selection-motion-x, 0px);
   z-index: 0;
@@ -115,11 +116,20 @@
   background: var(--cc-sidebar-hover);
   opacity: 0;
   transform: translate3d(0, var(--cc-selection-motion-y, 0px), 0);
-  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+  transition:
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    display var(--cc-motion-duration-feedback) var(--cc-easing-standard) allow-discrete;
 }
 
 .project-list[data-sidebar-hover-visible] > .project-list__hover {
+  display: block;
   opacity: 1;
+}
+
+@starting-style {
+  .project-list[data-sidebar-hover-visible] > .project-list__hover {
+    opacity: 0;
+  }
 }
 
 .project-list[data-sidebar-hover-visible] .project-card__header:hover,
