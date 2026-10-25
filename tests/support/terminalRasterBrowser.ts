@@ -7,6 +7,7 @@ export function renderTerminalRasterFixture(
   options: {
     readonly addonSource: string
     readonly entry: 'esm' | 'cjs'
+    readonly font: 'fixture' | 'surface'
     readonly columns: number
     readonly theme: 'light' | 'dark'
     readonly xtermSource: string
@@ -16,7 +17,7 @@ export function renderTerminalRasterFixture(
 ) {
   return page.evaluate(async (input) => {
     const startedAt = performance.now()
-    const { addonSource, entry, columns, theme, xtermSource, zoom, rasterScale } = input
+    const { addonSource, entry, font, columns, theme, xtermSource, zoom, rasterScale } = input
     const fixtureWindow = window as Window & { rasterFixtureTerminal?: Terminal }
     fixtureWindow.rasterFixtureTerminal?.dispose()
     document.body.replaceChildren()
@@ -50,9 +51,12 @@ export function renderTerminalRasterFixture(
       cols: columns,
       rows: 10,
       cursorBlink: false,
-      fontFamily: 'Consolas, Liberation Mono, Menlo, monospace',
-      fontSize: 12,
-      fontWeight: 500,
+      fontFamily:
+        font === 'surface'
+          ? 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace'
+          : 'Consolas, Liberation Mono, Menlo, monospace',
+      fontSize: font === 'surface' ? 13 : 12,
+      fontWeight: font === 'surface' ? 530 : 500,
       lineHeight: 1.32,
       theme:
         theme === 'light'
@@ -63,9 +67,19 @@ export function renderTerminalRasterFixture(
     terminal.open(container)
     const addon = new addonModule.WebglAddon(true)
     terminal.loadAddon(addon)
+    const orange = '\x1b[38;2;215;119;87m'
+    const blackBackground = '\x1b[48;2;0;0;0m'
+    const defaultBackground = '\x1b[49m'
+    const blockRows = [
+      ` ▐${blackBackground}██████${defaultBackground}▌`,
+      ` █${blackBackground}▛▜${defaultBackground}█`,
+      ` █${blackBackground}▙▟${defaultBackground}█`,
+      ` █${blackBackground}█\x1b[48;2;255;255;255m█\x1b[48;2;0;68;102m█${defaultBackground}█`,
+      ` ▐${blackBackground}▛███▛█${defaultBackground}`
+    ]
     await new Promise<void>((resolve) =>
       terminal.write(
-        `\x1b[?25l${'M '.repeat(25)}\r\n${'中文，清晰度。'.repeat(4)}\r\n0123456789 abcdef ABCDEF\r\n\x1b[1mBold text\x1b[0m  e\u0301  \u{1f642}\r\n\x1b[4mUnderline\x1b[0m`,
+        `\x1b[?25l${'M '.repeat(25)}\r\n${'中文，清晰度。'.repeat(4)}\r\n0123456789 abcdef ABCDEF\r\n\x1b[1mBold text\x1b[0m  e\u0301  \u{1f642}\r\n\x1b[4mUnderline\x1b[0m\r\n${orange}${blockRows.join('\r\n')}\x1b[0m`,
         resolve
       )
     )
@@ -91,6 +105,33 @@ export function renderTerminalRasterFixture(
     const pixels = new Uint8Array(canvas.width * canvas.height * 4)
     gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
     const pixelsReadAt = performance.now()
+    // These scanlines pass through solid foreground, including the mascot's
+    // forehead. Changing only cell backgrounds must not punch holes in it.
+    const blockGlyphs = [
+      { name: 'half blocks', row: 5, left: 1.5, right: 8.5, height: 0.5 },
+      { name: 'upper quadrants', row: 6, left: 1, right: 5, height: 0.25 },
+      { name: 'lower quadrants', row: 7, left: 1, right: 5, height: 0.75 },
+      { name: 'full blocks across background colors', row: 8, left: 1, right: 6, height: 0.5 },
+      { name: 'Claude mascot forehead', row: 9, left: 1.5, right: 8, height: 0.25 }
+    ].map((span) => {
+      const left = Math.ceil((span.left * canvas.width) / terminal.cols) + 1
+      const right = Math.floor((span.right * canvas.width) / terminal.cols) - 1
+      const y = Math.floor(((span.row + span.height) * canvas.height) / terminal.rows)
+      let maximumDifference = 0
+      const unexpectedPixels: { x: number; y: number; color: number[] }[] = []
+      for (let x = left; x < right; x += 1) {
+        const pixel = ((canvas.height - 1 - y) * canvas.width + x) * 4
+        let difference = 0
+        for (const [channel, expected] of [215, 119, 87, 255].entries()) {
+          difference = Math.max(difference, Math.abs(pixels[pixel + channel]! - expected))
+        }
+        maximumDifference = Math.max(maximumDifference, difference)
+        if (difference > 2 && unexpectedPixels.length < 3) {
+          unexpectedPixels.push({ x, y, color: Array.from(pixels.subarray(pixel, pixel + 4)) })
+        }
+      }
+      return { name: span.name, maximumDifference, unexpectedPixels }
+    })
     const glyphs = new Set<string>()
     let referenceGlyph: number[] | undefined
     let glyphMaximumDifference = 0
@@ -144,6 +185,7 @@ export function renderTerminalRasterFixture(
       return { scale, inkPixels }
     })
     return {
+      blockGlyphs,
       rasterTransitions,
       timings: {
         moduleLoadMs: modulesLoadedAt - startedAt,

@@ -229,6 +229,8 @@ React Flow 缩放节点时，不能长期把分辨率不足的 WebGL backing sto
 
 额外 raster scale 只能影响绘制投影，xterm screen 的 CSS 尺寸、CSS cell、FitAddon 与 PTY 行列仍由真实 browser DPR 决定。完整 backing bitmap 只取整一次，字符网格按该位图分配间距，WebGL 把每个字形起点及背景、光标边界对齐到整数像素，避免逐 cell 取整后的累计拉伸。glyph atlas 的像素尺寸必须另行取整，不能把小数网格宽高用作字形缓存的像素扫描步长。绘制 canvas 的位置与显示边缘允许在半个物理像素内修正，但不得反向改变 screen、节点布局或鼠标坐标系；在完整质量下直接复用已提交位图尺寸，避免小数 zoom 和 DOM 测量在半像素边界上向相反方向取整。平移视口或拖动节点结束后，即使 zoom 未变，也通过同一 idle 调度入口重新对齐，且不重建位图。
 
+方块字符还需要检查跨背景色的像素连续性。Claude 吉祥物等 TUI 会用同色的整块、半块和象限字符覆盖不同背景；若 atlas 使用向上取整后的 cell 宽度，而 `GlyphRenderer` 仍用小数宽度计算左侧 padding，背景切换时就会误裁一列，露出黑色或默认背景。裁剪必须与 atlas 使用同一整数宽度。象限字符的多个矩形也必须合成一条路径后一次填充；在奇数像素宽高下分别填充会让共享边缘的抗锯齿叠加成半透明接缝。源码与 ESM/CJS 入口同步修补，真实 Electron raster 测试使用同一前景色连续性断言，覆盖生产字体、原测试字体、各 DPR/倍率和跨背景色的方块与象限字符，不按 Provider 分支改写输出。
+
 倍率切换会清空 WebGL canvas 和 render model，因此 resize 后必须无条件请求完整 viewport redraw，不能等待下一段 PTY 输出、光标闪烁或 ResizeObserver 偶然触发恢复。倍率提交是事务式的：重建失败时恢复上一倍率并允许有界重试；连续失败后释放大于 `1x` 的额外位图，小于 `1x` 的已有位图不因失败而升采样，不能让失败倍率成为同值重试的 no-op。
 
 这项能力通过 `pnpm-workspace.yaml` 中的精确版本 `patchedDependencies` 修补 `@xterm/addon-webgl`。补丁内 `src/RasterGeometry.ts` 拥有尺寸与对齐算法，CommonJS main、ESM module 内嵌对应实现，类型声明同时暴露 `setRasterScale` 与 `refreshRasterAlignment`。入口契约测试负责防止构建器切换入口后静默退回未修补实现；真实 Electron 的 [`run.terminal-webgl-raster.spec.ts`](../../tests/integration/contexts/run/run.terminal-webgl-raster.spec.ts) 使用两个实际入口，在 DPR 1、1.25、1.5、2 下覆盖缩小、原始大小、最大放大、中间档位、暂留高清底图、不同列数与浅深主题，统一验证基础网格不变、位图按所选档位分配、像素落点、重复字形一致性及重对齐幂等性；仅在 raster scale 等于 zoom 时要求绘制位图与显示物理像素一一匹配。策略和调度 unit 测试覆盖低倍浏览、跨档放大、边界往返、延迟降档取消、独立对齐和预算回收。这是独立 xterm 适配器的 integration，不启动项目或 PTY；完整会话协作仍由 E2E 证明。它运行于当前宿主，模拟 DPR 不等于覆盖其他系统的字体和 GPU 驱动，三平台最终观感仍需对应实机检查。升级 addon 时应先确认上游能力和实际 bundle 入口，再重建或删除本地补丁。

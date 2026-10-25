@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@xterm/addon-webgl@0.19.0':
-    hash: fc04580011b10dac721fb170f6993d9d0627c8db361d371aa3dfc90723e7e580
+    hash: da7ba5b0f6c49d164d3a7ba3b868169c37e4842090d5d52c617fb96687ce3133
     path: patches/@xterm__addon-webgl@0.19.0.patch
   '@xterm/xterm@6.0.0':
     hash: 9f9d05ea1df8c5ed387f0bd9e80f84cc97a31e2d4b60d5c182f1e7c13c7a9f06
@@ -42,7 +42,7 @@ importers:
         version: 0.12.0
       '@xterm/addon-webgl':
         specifier: 0.19.0
-        version: 0.19.0(patch_hash=fc04580011b10dac721fb170f6993d9d0627c8db361d371aa3dfc90723e7e580)
+        version: 0.19.0(patch_hash=da7ba5b0f6c49d164d3a7ba3b868169c37e4842090d5d52c617fb96687ce3133)
       '@xterm/headless':
         specifier: 6.0.0
         version: 6.0.0
@@ -5502,7 +5502,7 @@ snapshots:
 
   '@xterm/addon-web-links@0.12.0': {}
 
-  '@xterm/addon-webgl@0.19.0(patch_hash=fc04580011b10dac721fb170f6993d9d0627c8db361d371aa3dfc90723e7e580)': {}
+  '@xterm/addon-webgl@0.19.0(patch_hash=da7ba5b0f6c49d164d3a7ba3b868169c37e4842090d5d52c617fb96687ce3133)': {}
 
   '@xterm/headless@6.0.0': {}
 
