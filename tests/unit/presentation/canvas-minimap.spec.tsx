@@ -368,7 +368,7 @@ describe('canvas minimap', () => {
     expect(container.querySelector('.canvas-minimap__group-ring')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
       'stroke',
-      'var(--cc-primary)'
+      'var(--cc-workbench-node-selection)'
     )
     expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
       'opacity',

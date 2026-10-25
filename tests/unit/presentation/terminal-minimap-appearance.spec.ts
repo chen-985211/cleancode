@@ -34,7 +34,7 @@ describe('terminal minimap appearance', () => {
     ).not.toContain('canvas-minimap__node--selected')
   })
 
-  it('uses an accent border only for selected or hovered terminals', () => {
+  it('shares the canvas selection color while keeping hover neutral', () => {
     const node = createTerminalNode({ selected: false })
 
     expect(
@@ -44,7 +44,7 @@ describe('terminal minimap appearance', () => {
         selectedTerminalBlockId: null,
         hoveredTerminalBlockId: null
       })
-    ).toBe('var(--cc-primary)')
+    ).toBe('var(--cc-workbench-node-selection)')
     expect(
       getTerminalMiniMapNodeStrokeColor({
         node,
@@ -52,7 +52,7 @@ describe('terminal minimap appearance', () => {
         selectedTerminalBlockId: null,
         hoveredTerminalBlockId: 'terminal-1'
       })
-    ).toBe('var(--cc-primary)')
+    ).toBe('var(--cc-muted-strong)')
   })
 
   it('reserves semantic colors for terminal run states', () => {
