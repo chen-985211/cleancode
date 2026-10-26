@@ -42,7 +42,7 @@
 
 .application-diagnostics-pane__privacy svg {
   flex: 0 0 auto;
-  color: var(--cc-primary);
+  color: var(--cc-success-strong);
 }
 
 .application-diagnostics-actions {

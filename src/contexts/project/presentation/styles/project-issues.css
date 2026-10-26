@@ -519,8 +519,11 @@
   margin-top: 0;
 }
 .project-issues__body a {
-  color: var(--cc-primary);
+  color: var(--cc-link);
   text-decoration: underline;
+}
+.project-issues__body a:hover {
+  color: var(--cc-link-hover);
 }
 .project-issues__body pre {
   padding: 16px;

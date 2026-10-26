@@ -536,9 +536,9 @@
   position: fixed;
   z-index: 200;
   width: min(300px, calc(100vw - 32px));
-  border: 1px solid var(--cc-border);
+  border: 1px solid var(--cc-divider);
   border-radius: 11px;
-  background: var(--cc-surface-raised);
+  background: var(--cc-chrome);
   padding: 8px;
   box-shadow: var(--cc-shadow-floating);
 }
@@ -550,14 +550,13 @@
   gap: 8px;
   border: 1px solid var(--cc-border);
   border-radius: 8px;
-  background: var(--cc-surface-subtle);
+  background: var(--cc-chrome);
   padding: 0 9px;
   color: var(--cc-muted);
 }
 
 .branch-selector-search:focus-within {
   border-color: var(--cc-sidebar-focus-ring);
-  background: var(--cc-surface);
 }
 
 .branch-selector-search input {
@@ -627,18 +626,19 @@
   padding: 5px 8px;
 }
 
-.branch-selector-option:hover:not(:disabled) {
-  background: var(--cc-branch-selector-hover);
-  color: var(--cc-foreground);
+.branch-selector-option:hover:not(:disabled),
+.branch-selector-option:focus-visible:not(:disabled) {
+  background: var(--cc-sidebar-hover);
+  color: var(--cc-sidebar-selection-foreground);
 }
 
 .branch-selector-option--current {
-  background: var(--cc-branch-selector-selection);
+  background: var(--cc-sidebar-selection);
   color: var(--cc-sidebar-selection-foreground);
 }
 
 .branch-selector-option--current:hover:not(:disabled) {
-  background: var(--cc-branch-selector-selection-hover);
+  background: var(--cc-sidebar-selection-hover);
   color: var(--cc-sidebar-selection-foreground);
 }
 

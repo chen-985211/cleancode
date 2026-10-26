@@ -43,16 +43,6 @@
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
   --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
   --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
-  --cc-branch-selector-selection: color-mix(
-    in srgb,
-    var(--cc-foreground) 6%,
-    var(--cc-surface-raised)
-  );
-  --cc-branch-selector-selection-hover: color-mix(
-    in srgb,
-    var(--cc-foreground) 8%,
-    var(--cc-surface-raised)
-  );
   --cc-surface: #ffffff;
   --cc-surface-subtle: #f0f2f5;
   --cc-surface-raised: #ffffff;
@@ -78,6 +68,8 @@
   --cc-divider: rgb(198 205 216 / 78%);
   --cc-primary: #2f67d8;
   --cc-primary-hover: #2458bd;
+  --cc-link: #2b60cc;
+  --cc-link-hover: #2458bd;
   --cc-primary-soft: #e9f0ff;
   --cc-primary-contrast: #ffffff;
   --cc-primary-border: rgb(47 103 216 / 46%);
@@ -169,16 +161,6 @@
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
   --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
   --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
-  --cc-branch-selector-selection: color-mix(
-    in srgb,
-    var(--cc-background) 22%,
-    var(--cc-surface-raised)
-  );
-  --cc-branch-selector-selection-hover: color-mix(
-    in srgb,
-    var(--cc-background) 30%,
-    var(--cc-surface-raised)
-  );
   --cc-surface: #1b2028;
   --cc-surface-subtle: #222831;
   --cc-surface-raised: #252c36;
@@ -204,6 +186,8 @@
   --cc-divider: rgb(70 80 94 / 82%);
   --cc-primary: #75a0f5;
   --cc-primary-hover: #91b3f8;
+  --cc-link: #75a0f5;
+  --cc-link-hover: #91b3f8;
   --cc-primary-soft: #1c3156;
   --cc-primary-contrast: #0d1522;
   --cc-primary-border: rgb(117 160 245 / 54%);
@@ -245,11 +229,191 @@
   --cc-shadow-node: 0 12px 32px rgb(0 0 0 / 38%);
 }
 
+/* Shell surfaces, canvas controls and their portals own local neutral palettes. */
+:root:not([data-theme='dark'])
+  :is(
+    .app-shell__settings,
+    .task-navigation-owner,
+    .project-sidebar-column,
+    .application-settings-surface,
+    .theme-settings-backdrop,
+    .block-template-library-backdrop,
+    .block-template-save-backdrop,
+    .project-sidebar-confirmation-dialog__backdrop,
+    .branch-selector-popover,
+    .workspace-row-menu,
+    .workspace-defaults-project-menu,
+    .workspace-defaults-picker,
+    .workspace-external-open-menu,
+    .project-issues-menu,
+    .notification-viewport,
+    .app-shell__toolbar-group--agent,
+    .agent-create-menu,
+    .canvas-minimap,
+    .agent-mcp-capability
+  ) {
+  --cc-primary: #3a3a3a;
+  --cc-primary-hover: #2a2a2a;
+  --cc-primary-soft: #eeeeee;
+  --cc-primary-contrast: #ffffff;
+  --cc-primary-border: rgb(58 58 58 / 46%);
+  --cc-primary-ring: rgb(58 58 58 / 18%);
+  --cc-primary-wash: rgb(58 58 58 / 10%);
+  --cc-selection-overlay: rgb(58 58 58 / 5%);
+  --cc-border-strong: #c9c9c9;
+  --cc-settings-switch-on: #606060;
+  --cc-settings-switch-thumb: #ffffff;
+}
+
+:root[data-theme='dark']
+  :is(
+    .app-shell__settings,
+    .task-navigation-owner,
+    .project-sidebar-column,
+    .application-settings-surface,
+    .theme-settings-backdrop,
+    .block-template-library-backdrop,
+    .block-template-save-backdrop,
+    .project-sidebar-confirmation-dialog__backdrop,
+    .branch-selector-popover,
+    .workspace-row-menu,
+    .workspace-defaults-project-menu,
+    .workspace-defaults-picker,
+    .workspace-external-open-menu,
+    .project-issues-menu,
+    .notification-viewport,
+    .app-shell__toolbar-group--agent,
+    .agent-create-menu,
+    .canvas-minimap,
+    .agent-mcp-capability
+  ) {
+  --cc-background: #191919;
+  --cc-canvas: #191919;
+  --cc-chrome: #191919;
+  --cc-chrome-raised: #222222;
+  --cc-chrome-translucent: rgb(25 25 25 / 82%);
+  --cc-surface: #222222;
+  --cc-surface-subtle: #2a2a2a;
+  --cc-surface-raised: #2a2a2a;
+  --cc-surface-translucent: rgb(34 34 34 / 92%);
+  --cc-surface-overlay: rgb(34 34 34 / 98%);
+  --cc-foreground: #eeeeee;
+  --cc-muted: #b4b4b4;
+  --cc-muted-strong: #b4b4b4;
+  --cc-disabled: #7b7b7b;
+  --cc-border: #3a3a3a;
+  --cc-border-strong: #606060;
+  --cc-divider: rgb(72 72 72 / 82%);
+  --cc-primary: #eeeeee;
+  --cc-primary-hover: #ffffff;
+  --cc-primary-soft: #313131;
+  --cc-primary-contrast: #191919;
+  --cc-primary-border: rgb(238 238 238 / 54%);
+  --cc-primary-ring: rgb(238 238 238 / 24%);
+  --cc-primary-wash: rgb(238 238 238 / 13%);
+  --cc-selection-overlay: rgb(238 238 238 / 7%);
+  --cc-settings-selection-surface: #313131;
+  --cc-settings-selection-foreground: #eeeeee;
+  --cc-settings-selection-border: #606060;
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
+  --cc-settings-switch-on: #7b7b7b;
+  --cc-settings-switch-thumb: #eeeeee;
+  --cc-scrollbar: rgb(180 180 180 / 48%);
+  --cc-directional-menu-hover: #3a3a3a;
+  --cc-preview-dark-surface: #2a2a2a;
+  --cc-preview-dark-muted: #7b7b7b;
+
+  color: var(--cc-foreground);
+}
+
+:root:not([data-theme='dark'])
+  :is(
+    .app-shell__toolbar-group--agent,
+    .agent-create-menu,
+    .canvas-minimap,
+    .agent-mcp-capability
+  ) {
+  --cc-canvas: #ebebeb;
+  --cc-chrome: #f3f3f3;
+  --cc-chrome-raised: #f6f6f6;
+  --cc-chrome-translucent: rgb(243 243 243 / 78%);
+  --cc-surface: #ffffff;
+  --cc-surface-subtle: #f0f0f0;
+  --cc-surface-raised: #ffffff;
+  --cc-surface-overlay: rgb(255 255 255 / 98%);
+  --cc-foreground: #202020;
+  --cc-muted: #6e6e6e;
+  --cc-muted-strong: #505050;
+  --cc-border: #dfdfdf;
+  --cc-divider: rgb(198 198 198 / 78%);
+  --cc-directional-menu-hover: #e2e2e2;
+}
+
+.app-shell__toolbar-group--agent {
+  --cc-agent-create-surface: var(--cc-chrome-raised);
+}
+
+.canvas-minimap {
+  --cc-workbench-node-selection: var(--cc-muted-strong);
+}
+
+.agent-mcp-capability {
+  --cc-terminal-control-hover: var(--cc-surface-subtle);
+  --cc-terminal-control-foreground: var(--cc-muted-strong);
+}
+
+:root[data-theme='dark'] :is(.task-surface, .project-issues-menu) {
+  --cc-canvas: #2c2c2c;
+  --cc-surface: #333333;
+  --cc-surface-subtle: #333333;
+  --cc-surface-raised: #333333;
+  --cc-surface-overlay: #333333;
+  --cc-surface-hover: #3a3a3a;
+  --cc-foreground: #e2e2e2;
+  --cc-muted: #aaaaaa;
+  --cc-muted-strong: #aaaaaa;
+  --cc-border: #424242;
+  --cc-divider: var(--cc-border);
+}
+
+:root[data-theme='dark'] .project-sidebar-column,
+:root[data-theme='dark'] .branch-selector-popover {
+  --cc-chrome: #2a2a2a;
+  --cc-foreground: #eeeeee;
+  --cc-muted: #b4b4b4;
+  --cc-muted-strong: #b4b4b4;
+  --cc-surface-subtle: #313131;
+  --cc-border: #484848;
+  --cc-border-strong: #606060;
+  --cc-divider: var(--cc-border);
+  --cc-scrollbar: rgb(180 180 180 / 48%);
+  --cc-sidebar-hover: #3a3a3a;
+  --cc-sidebar-selection: var(--cc-sidebar-hover);
+  --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
+  --cc-sidebar-foreground: var(--cc-muted-strong);
+  --cc-sidebar-selection-foreground: var(--cc-foreground);
+  --cc-sidebar-branch-badge-surface: var(--cc-surface-subtle);
+  --cc-sidebar-branch-badge-foreground: var(--cc-muted-strong);
+  --cc-sidebar-branch-badge-border: var(--cc-border);
+  --cc-sidebar-drag-surface: var(--cc-surface-subtle);
+}
+
+:root[data-theme='dark'] .project-sidebar-column {
+  --cc-chrome: #242424;
+  --cc-foreground: #e2e2e2;
+  --cc-muted: #aaaaaa;
+  --cc-muted-strong: #aaaaaa;
+  --cc-surface-subtle: #333333;
+  --cc-border: #424242;
+  --cc-scrollbar: rgb(170 170 170 / 48%);
+}
+
 :root {
   --cc-statusbar-height: 26px;
   --cc-statusbar-bottom: 4px;
   --cc-statusbar-radius: 22px;
-  --cc-branch-selector-hover: color-mix(in srgb, var(--cc-foreground) 2%, var(--cc-surface-raised));
   --cc-terminal-control: var(--cc-terminal-shell);
   --cc-terminal-control-hover: color-mix(
     in srgb,
