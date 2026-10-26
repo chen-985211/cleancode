@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import {
   Tooltip,
@@ -9,6 +9,95 @@ import {
 } from '../../../../src/presentation/shared/components/Tooltip'
 
 describe('tooltip', () => {
+  it.each(['pointerup', 'pointercancel', 'lostpointercapture', 'blur'])(
+    'suppresses pointer gestures until fresh hover after %s',
+    async (finish) => {
+      render(
+        <TooltipProvider delayDuration={0}>
+          <TooltipLabel content="节点名称">
+            <button type="button">节点名称</button>
+          </TooltipLabel>
+          <TooltipLabel content="另一个节点">
+            <button type="button">另一个节点</button>
+          </TooltipLabel>
+        </TooltipProvider>
+      )
+      const trigger = screen.getByRole('button', { name: '节点名称' })
+      const otherTrigger = screen.getByRole('button', { name: '另一个节点' })
+      fireEvent.pointerMove(trigger, { pointerType: 'mouse', buttons: 0 })
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('节点名称')
+
+      fireEvent.pointerDown(document.body, { pointerType: 'mouse', buttons: 1 })
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+      fireEvent.pointerLeave(trigger)
+      fireEvent.pointerMove(otherTrigger, { pointerType: 'mouse', buttons: 1 })
+      fireEvent.focus(otherTrigger)
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      if (finish === 'blur') fireEvent.blur(window)
+      else if (finish === 'pointerup') fireEvent.pointerUp(document.body)
+      else if (finish === 'pointercancel') fireEvent.pointerCancel(document.body)
+      else fireEvent.lostPointerCapture(document.body)
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      fireEvent.pointerLeave(otherTrigger)
+      fireEvent.pointerMove(otherTrigger, { pointerType: 'mouse', buttons: 0 })
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('另一个节点')
+    }
+  )
+
+  it('discards pending hover when a pointer gesture starts', async () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <TooltipProvider delayDuration={400}>
+          <TooltipLabel content="节点名称">
+            <button type="button">节点名称</button>
+          </TooltipLabel>
+        </TooltipProvider>
+      )
+      const trigger = screen.getByRole('button', { name: '节点名称' })
+      fireEvent.pointerMove(trigger, { pointerType: 'mouse', buttons: 0 })
+      await act(async () => vi.advanceTimersByTimeAsync(200))
+      fireEvent.pointerDown(document.body, { pointerType: 'mouse', buttons: 1 })
+      fireEvent.pointerMove(trigger, { pointerType: 'mouse', buttons: 1 })
+      await act(async () => vi.advanceTimersByTimeAsync(500))
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      fireEvent.pointerUp(document.body, { pointerType: 'mouse', buttons: 0 })
+      await act(async () => vi.advanceTimersByTimeAsync(500))
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      fireEvent.pointerLeave(trigger)
+      fireEvent.pointerMove(trigger, { pointerType: 'mouse', buttons: 0 })
+      await act(async () => vi.advanceTimersByTimeAsync(500))
+      expect(screen.getByRole('tooltip')).toHaveTextContent('节点名称')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('restores keyboard tooltips after releasing a pointer gesture', async () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <TooltipLabel content="节点名称">
+          <button type="button">节点名称</button>
+        </TooltipLabel>
+      </TooltipProvider>
+    )
+    const trigger = screen.getByRole('button', { name: '节点名称' })
+    fireEvent.pointerDown(document.body, { pointerType: 'mouse', buttons: 1 })
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(trigger)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    fireEvent.blur(trigger)
+    fireEvent.pointerUp(document.body, { pointerType: 'mouse', buttons: 0 })
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(trigger)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('节点名称')
+  })
+
   it('dismisses a suspended pointer tooltip and requires fresh hover after the gesture', async () => {
     const content = (disabled: boolean) => (
       <TooltipProvider delayDuration={0}>

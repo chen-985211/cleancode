@@ -166,11 +166,6 @@
   background: var(--cc-canvas);
 }
 
-.react-flow__background {
-  opacity: 0.52;
-  pointer-events: none;
-}
-
 .react-flow__pane {
   z-index: 0;
 }

@@ -11,9 +11,10 @@ import {
   type ReactNode
 } from 'react'
 
-type TooltipInputMode = 'keyboard' | 'pointer' | 'programmatic'
+type TooltipInputMode = 'keyboard' | 'pointer' | 'pointer-gesture' | 'programmatic'
 
 const TooltipInputModeContext = createContext<MutableRefObject<TooltipInputMode> | null>(null)
+const TooltipPointerSuspendedContext = createContext(false)
 
 export function TooltipProvider({
   children,
@@ -22,35 +23,60 @@ export function TooltipProvider({
   ...props
 }: ComponentProps<typeof TooltipPrimitive.Provider>) {
   const inputModeRef = useRef<TooltipInputMode>('programmatic')
+  const pointerPressedRef = useRef(false)
+  const [isPointerSuspended, setIsPointerSuspended] = useState(false)
 
   useEffect(() => {
     const recordKeyboardNavigation = (event: KeyboardEvent): void => {
-      if (isKeyboardNavigationKey(event.key)) inputModeRef.current = 'keyboard'
+      if (pointerPressedRef.current || !isKeyboardNavigationKey(event.key)) return
+      inputModeRef.current = 'keyboard'
+      setIsPointerSuspended(false)
     }
-    const recordPointerInput = (): void => {
-      inputModeRef.current = 'pointer'
+    const recordPointerDown = (): void => {
+      pointerPressedRef.current = true
+      inputModeRef.current = 'pointer-gesture'
+      setIsPointerSuspended(true)
+    }
+    const recordPointerMove = (event: PointerEvent): void => {
+      pointerPressedRef.current = event.buttons > 0
+      inputModeRef.current = pointerPressedRef.current ? 'pointer-gesture' : 'pointer'
+      setIsPointerSuspended(pointerPressedRef.current)
+    }
+    const finishPointerGesture = (): void => {
+      // Release alone must not revive the hover that preceded the gesture.
+      pointerPressedRef.current = false
     }
 
     document.addEventListener('keydown', recordKeyboardNavigation, true)
-    document.addEventListener('pointerdown', recordPointerInput, true)
-    document.addEventListener('pointermove', recordPointerInput, true)
+    document.addEventListener('pointerdown', recordPointerDown, true)
+    document.addEventListener('pointermove', recordPointerMove, true)
+    document.addEventListener('pointerup', finishPointerGesture, true)
+    document.addEventListener('pointercancel', finishPointerGesture, true)
+    document.addEventListener('lostpointercapture', finishPointerGesture, true)
+    window.addEventListener('blur', finishPointerGesture)
 
     return () => {
       document.removeEventListener('keydown', recordKeyboardNavigation, true)
-      document.removeEventListener('pointerdown', recordPointerInput, true)
-      document.removeEventListener('pointermove', recordPointerInput, true)
+      document.removeEventListener('pointerdown', recordPointerDown, true)
+      document.removeEventListener('pointermove', recordPointerMove, true)
+      document.removeEventListener('pointerup', finishPointerGesture, true)
+      document.removeEventListener('pointercancel', finishPointerGesture, true)
+      document.removeEventListener('lostpointercapture', finishPointerGesture, true)
+      window.removeEventListener('blur', finishPointerGesture)
     }
   }, [])
 
   return (
     <TooltipInputModeContext.Provider value={inputModeRef}>
-      <TooltipPrimitive.Provider
-        delayDuration={delayDuration}
-        disableHoverableContent={disableHoverableContent}
-        {...props}
-      >
-        {children}
-      </TooltipPrimitive.Provider>
+      <TooltipPointerSuspendedContext.Provider value={isPointerSuspended}>
+        <TooltipPrimitive.Provider
+          delayDuration={delayDuration}
+          disableHoverableContent={disableHoverableContent}
+          {...props}
+        >
+          {children}
+        </TooltipPrimitive.Provider>
+      </TooltipPointerSuspendedContext.Provider>
     </TooltipInputModeContext.Provider>
   )
 }
@@ -144,26 +170,28 @@ function TooltipLabelWithInputMode({
   readonly inputModeRef?: MutableRefObject<TooltipInputMode>
 }) {
   const contextInputModeRef = useContext(TooltipInputModeContext)
+  const isPointerSuspended = useContext(TooltipPointerSuspendedContext)
   const resolvedInputModeRef = inputModeRef ?? contextInputModeRef
   const dragInProgressRef = useRef(false)
   const pointerInsideRef = useRef(false)
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
-    if (!disabled) return
+    if (!disabled && !isPointerSuspended) return
     pointerInsideRef.current = false
     dragInProgressRef.current = false
-  }, [disabled])
-  if (disabled && isOpen) setIsOpen(false)
+  }, [disabled, isPointerSuspended])
+  if ((disabled || isPointerSuspended) && isOpen) setIsOpen(false)
   if (!resolvedInputModeRef) return null
 
   return (
     <Tooltip
-      open={!disabled && isOpen}
+      open={!disabled && !isPointerSuspended && isOpen}
       onOpenChange={(nextOpen) => {
         setIsOpen(
           !disabled &&
             nextOpen &&
+            resolvedInputModeRef.current !== 'pointer-gesture' &&
             (pointerInsideRef.current || resolvedInputModeRef.current === 'keyboard')
         )
       }}
@@ -179,8 +207,8 @@ function TooltipLabelWithInputMode({
         onDragEnd={() => {
           dragInProgressRef.current = false
         }}
-        onPointerMove={() => {
-          if (disabled || dragInProgressRef.current) return
+        onPointerMove={(event) => {
+          if (disabled || dragInProgressRef.current || event.buttons > 0) return
           pointerInsideRef.current = true
         }}
         onPointerLeave={() => {
