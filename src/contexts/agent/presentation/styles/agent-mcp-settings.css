@@ -70,8 +70,8 @@
 }
 
 .mcp-settings-category__disclosure:focus-visible {
-  outline: 2px solid var(--cc-primary);
-  outline-offset: 2px;
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
 }
 
 .mcp-settings-category__disclosure svg {

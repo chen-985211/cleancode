@@ -238,7 +238,7 @@
 
 .terminal-node__action:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .terminal-node__action:disabled,
@@ -365,10 +365,13 @@
   color: var(--cc-foreground);
 }
 
-.terminal-search button:focus-visible,
-.terminal-search input:focus-visible {
+.terminal-search:focus-within {
+  border-color: var(--cc-ring);
+}
+
+.terminal-search button:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .terminal-link-feedback {
@@ -427,7 +430,7 @@
 
 .terminal-restore-failure:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .terminal-paste-confirmation,
@@ -645,6 +648,6 @@
   cursor: grabbing;
 }
 .terminal-workflow-drag-handle:focus-visible {
-  outline: 2px solid var(--cc-primary-border);
-  outline-offset: 2px;
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
 }

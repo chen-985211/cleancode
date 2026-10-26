@@ -79,10 +79,9 @@
   font: inherit;
   font-size: 12px;
 }
-.project-issues select:focus-visible,
 .project-issues a:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 .project-issues__source-control {
   display: flex;
@@ -120,8 +119,7 @@
   background: transparent;
 }
 .project-issues__repository:focus-within {
-  outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  border-color: var(--cc-ring);
 }
 .project-issues__repository input:focus-visible {
   outline: none;
@@ -576,9 +574,9 @@
   background: var(--cc-surface-subtle);
 }
 .project-issues .project-issues__filter[aria-pressed='true'] {
-  color: var(--cc-primary);
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
+  color: var(--cc-settings-selection-foreground);
+  border-color: var(--cc-settings-selection-border);
+  background: var(--cc-settings-selection-surface);
 }
 .project-issues__source:hover {
   background: var(--cc-directional-menu-hover);

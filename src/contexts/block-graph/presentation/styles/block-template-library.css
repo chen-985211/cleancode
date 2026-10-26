@@ -158,11 +158,9 @@
 }
 
 .block-template-library-search:focus-within {
-  border-color: var(--cc-primary);
-  color: var(--cc-primary);
-  box-shadow:
-    inset 0 1px 0 var(--cc-highlight-inset),
-    0 0 0 3px var(--cc-primary-ring);
+  border-color: var(--cc-ring);
+  color: var(--cc-muted-strong);
+  box-shadow: none;
 }
 
 .block-template-library-search input {
@@ -402,6 +400,7 @@
 
 .block-template-card-actions button:last-child,
 .block-template-card-edit button[type='submit'] {
+  --cc-ring: var(--cc-primary-contrast);
   border-color: var(--cc-primary);
   background: var(--cc-primary);
   color: var(--cc-primary-contrast);
@@ -450,8 +449,7 @@
 
 .block-template-card-edit input:focus,
 .block-template-card-edit textarea:focus {
-  border-color: var(--cc-primary);
-  box-shadow: 0 0 0 3px var(--cc-primary-ring);
+  border-color: var(--cc-ring);
 }
 
 .block-template-card-edit textarea {
@@ -578,6 +576,7 @@
 }
 
 .block-template-save-dialog footer button[type='submit'] {
+  --cc-ring: var(--cc-primary-contrast);
   border-color: var(--cc-primary);
   background: var(--cc-primary);
   color: var(--cc-primary-contrast);

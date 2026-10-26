@@ -85,5 +85,5 @@
 
 .terminal-service-runtime__action:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }

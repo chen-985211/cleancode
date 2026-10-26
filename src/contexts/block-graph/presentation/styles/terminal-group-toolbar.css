@@ -129,7 +129,7 @@
 .terminal-group-node__action:focus-visible,
 .terminal-group-node__disclosure:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .terminal-group-node__membership-actions {

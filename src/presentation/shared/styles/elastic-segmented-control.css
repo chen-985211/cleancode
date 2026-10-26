@@ -29,6 +29,7 @@
 }
 
 .elastic-segment button {
+  position: relative;
   border-radius: 8px;
   background: transparent;
   color: var(--cc-segment-text);
@@ -41,12 +42,21 @@
 }
 
 .elastic-segment:not([data-input-method='pointer']) button:focus-visible {
-  outline: 2px solid var(--cc-settings-selection-accent);
-  outline-offset: 5px;
+  outline: none;
+}
+
+.elastic-segment:not([data-input-method='pointer']) button:focus-visible::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 2px solid var(--cc-ring);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
 }
 
 .elastic-segment button:active {
-  opacity: 0.78;
+  -webkit-text-fill-color: color-mix(in srgb, currentColor 78%, transparent);
 }
 
 .elastic-segment[data-motion-state='pressed'],

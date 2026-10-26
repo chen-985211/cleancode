@@ -122,9 +122,8 @@
 }
 
 .canvas-object-context-menu__rename input:focus-visible {
-  border-color: var(--cc-primary-border);
-  outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  border-color: var(--cc-ring);
+  outline: none;
 }
 
 .canvas-object-context-menu__rename-actions {

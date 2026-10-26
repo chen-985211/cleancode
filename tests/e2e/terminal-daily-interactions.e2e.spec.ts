@@ -156,6 +156,8 @@ describe('terminal daily interactions e2e', () => {
             new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData })
           )
       }, clipboardText)
+      // Wait for the closing bracketed-paste write before confirming the command.
+      await page.locator('.terminal-paste-progress').waitFor({ state: 'hidden' })
       // zsh keeps a bracketed paste editable until the user confirms it.
       await page.keyboard.press('Enter')
       await waitForTerminalOutput(page, 'Terminal 1', '__PASTE_AFTER_RENDERER_FALLBACK__')

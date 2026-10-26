@@ -64,7 +64,7 @@
 
 .project-sidebar__task-navigation:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .project-sidebar__task-navigation:disabled {
@@ -431,7 +431,7 @@
 .workspace-row button:focus-visible,
 .branch-selector-popover button:focus-visible {
   outline: 2px solid var(--cc-sidebar-focus-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .workspace-list[data-selection-motion-ready='true'] .workspace-row--active,
@@ -558,7 +558,6 @@
 .branch-selector-search:focus-within {
   border-color: var(--cc-sidebar-focus-ring);
   background: var(--cc-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-sidebar-focus-ring) 18%, transparent);
 }
 
 .branch-selector-search input {

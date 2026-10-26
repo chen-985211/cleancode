@@ -329,8 +329,7 @@
 
 .agent-settings-launch-editor input:focus,
 .agent-settings-launch-editor textarea:focus {
-  border-color: var(--cc-primary);
-  box-shadow: 0 0 0 2px var(--cc-primary-wash);
+  border-color: var(--cc-ring);
 }
 
 .agent-settings-launch-editor > p {
@@ -354,6 +353,7 @@
 }
 
 .agent-settings-launch-editor .agent-settings-launch-editor__save {
+  --cc-ring: var(--cc-primary-contrast);
   border-color: var(--cc-primary);
   background: var(--cc-primary);
   color: var(--cc-primary-contrast);
