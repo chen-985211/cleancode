@@ -364,12 +364,17 @@
   --cc-terminal-control-foreground: var(--cc-muted-strong);
 }
 
-:root[data-theme='dark'] .task-surface {
-  --cc-canvas: #222222;
-  --cc-surface: #2a2a2a;
-  --cc-surface-subtle: #313131;
-  --cc-surface-raised: #313131;
-  --cc-border: #484848;
+:root[data-theme='dark'] :is(.task-surface, .project-issues-menu) {
+  --cc-canvas: #2c2c2c;
+  --cc-surface: #333333;
+  --cc-surface-subtle: #333333;
+  --cc-surface-raised: #333333;
+  --cc-surface-overlay: #333333;
+  --cc-surface-hover: #3a3a3a;
+  --cc-foreground: #e2e2e2;
+  --cc-muted: #aaaaaa;
+  --cc-muted-strong: #aaaaaa;
+  --cc-border: #424242;
   --cc-divider: var(--cc-border);
 }
 
@@ -393,6 +398,16 @@
   --cc-sidebar-branch-badge-foreground: var(--cc-muted-strong);
   --cc-sidebar-branch-badge-border: var(--cc-border);
   --cc-sidebar-drag-surface: var(--cc-surface-subtle);
+}
+
+:root[data-theme='dark'] .project-sidebar-column {
+  --cc-chrome: #242424;
+  --cc-foreground: #e2e2e2;
+  --cc-muted: #aaaaaa;
+  --cc-muted-strong: #aaaaaa;
+  --cc-surface-subtle: #333333;
+  --cc-border: #424242;
+  --cc-scrollbar: rgb(170 170 170 / 48%);
 }
 
 :root {
