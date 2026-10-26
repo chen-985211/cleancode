@@ -1,14 +1,7 @@
 import { useWorkbenchNodeDragSession } from './nodes/useWorkbenchNodeDragSession'
 import { useTerminalObjectMotionWorkload } from '../context-adapters/run/useTerminalObjectMotionWorkload'
 import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
-import {
-  Background,
-  Panel,
-  ReactFlow,
-  type Edge,
-  type Connection,
-  type ReactFlowInstance
-} from '@xyflow/react'
+import { Panel, ReactFlow, type Edge, type Connection, type ReactFlowInstance } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import {
@@ -612,7 +605,6 @@ export function WorkbenchCanvas({
               zoomOnScroll={false}
               proOptions={{ hideAttribution: true }}
             >
-              <Background color="var(--cc-border-strong)" gap={24} size={1} />
               <Panel className="canvas-minimap-panel" position="bottom-right">
                 <CanvasMinimap
                   isCollapsed={isMinimapCollapsed}
