@@ -16,9 +16,9 @@
     rgb(255 255 255 / 6%)
   );
   --cc-chrome-translucent: rgb(243 245 248 / 78%);
-  --cc-sidebar-hover: #eef0f3;
-  --cc-sidebar-selection: #e9ebee;
-  --cc-sidebar-selection-hover: #e3e6ea;
+  --cc-sidebar-hover: #dcdde0;
+  --cc-sidebar-selection: var(--cc-sidebar-hover);
+  --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
   --cc-sidebar-foreground: var(--cc-muted-strong);
   --cc-sidebar-selection-foreground: #43474c;
   --cc-sidebar-focus-ring: #7a7a7a;
@@ -142,9 +142,9 @@
     rgb(255 255 255 / 3%)
   );
   --cc-chrome-translucent: rgb(23 27 34 / 82%);
-  --cc-sidebar-hover: #1d2128;
-  --cc-sidebar-selection: #22262d;
-  --cc-sidebar-selection-hover: #272b32;
+  --cc-sidebar-hover: #2a2e35;
+  --cc-sidebar-selection: var(--cc-sidebar-hover);
+  --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
   --cc-sidebar-foreground: #d0d5dc;
   --cc-sidebar-selection-foreground: #eceff3;
   --cc-sidebar-focus-ring: #8c8c8c;
