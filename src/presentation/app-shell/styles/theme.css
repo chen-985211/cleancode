@@ -43,16 +43,6 @@
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
   --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
   --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
-  --cc-branch-selector-selection: color-mix(
-    in srgb,
-    var(--cc-foreground) 6%,
-    var(--cc-surface-raised)
-  );
-  --cc-branch-selector-selection-hover: color-mix(
-    in srgb,
-    var(--cc-foreground) 8%,
-    var(--cc-surface-raised)
-  );
   --cc-surface: #ffffff;
   --cc-surface-subtle: #f0f2f5;
   --cc-surface-raised: #ffffff;
@@ -169,16 +159,6 @@
   --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
   --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
   --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
-  --cc-branch-selector-selection: color-mix(
-    in srgb,
-    var(--cc-background) 22%,
-    var(--cc-surface-raised)
-  );
-  --cc-branch-selector-selection-hover: color-mix(
-    in srgb,
-    var(--cc-background) 30%,
-    var(--cc-surface-raised)
-  );
   --cc-surface: #1b2028;
   --cc-surface-subtle: #222831;
   --cc-surface-raised: #252c36;
@@ -245,11 +225,32 @@
   --cc-shadow-node: 0 12px 32px rgb(0 0 0 / 38%);
 }
 
+:root[data-theme='dark'] .project-sidebar-column,
+:root[data-theme='dark'] .branch-selector-popover {
+  --cc-chrome: #2a2a2a;
+  --cc-foreground: #eeeeee;
+  --cc-muted: #b4b4b4;
+  --cc-muted-strong: #b4b4b4;
+  --cc-surface-subtle: #313131;
+  --cc-border: #484848;
+  --cc-border-strong: #606060;
+  --cc-divider: var(--cc-border);
+  --cc-scrollbar: rgb(180 180 180 / 48%);
+  --cc-sidebar-hover: #3a3a3a;
+  --cc-sidebar-selection: var(--cc-sidebar-hover);
+  --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
+  --cc-sidebar-foreground: var(--cc-muted-strong);
+  --cc-sidebar-selection-foreground: var(--cc-foreground);
+  --cc-sidebar-branch-badge-surface: var(--cc-surface-subtle);
+  --cc-sidebar-branch-badge-foreground: var(--cc-muted-strong);
+  --cc-sidebar-branch-badge-border: var(--cc-border);
+  --cc-sidebar-drag-surface: var(--cc-surface-subtle);
+}
+
 :root {
   --cc-statusbar-height: 26px;
   --cc-statusbar-bottom: 4px;
   --cc-statusbar-radius: 22px;
-  --cc-branch-selector-hover: color-mix(in srgb, var(--cc-foreground) 2%, var(--cc-surface-raised));
   --cc-terminal-control: var(--cc-terminal-shell);
   --cc-terminal-control-hover: color-mix(
     in srgb,
