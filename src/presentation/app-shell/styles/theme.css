@@ -364,6 +364,15 @@
   --cc-terminal-control-foreground: var(--cc-muted-strong);
 }
 
+:root[data-theme='dark'] .task-surface {
+  --cc-canvas: #222222;
+  --cc-surface: #2a2a2a;
+  --cc-surface-subtle: #313131;
+  --cc-surface-raised: #313131;
+  --cc-border: #484848;
+  --cc-divider: var(--cc-border);
+}
+
 :root[data-theme='dark'] .project-sidebar-column,
 :root[data-theme='dark'] .branch-selector-popover {
   --cc-chrome: #2a2a2a;
