@@ -65,9 +65,14 @@ describe.each([1, 1.25, 1.5, 2])(
       }
     })
 
-    it.each(['esm', 'cjs'] as const)(
-      '%s entry preserves grid and glyph alignment with matched or retained bitmap resolution',
-      async (entry) => {
+    it.each([
+      ['esm', 'fixture'],
+      ['esm', 'surface'],
+      ['cjs', 'fixture'],
+      ['cjs', 'surface']
+    ] as const)(
+      '%s entry preserves grid and glyph alignment using the %s font',
+      async (entry, font) => {
         const page = await application!.firstWindow()
         const xtermSource = await readFile(
           join(xtermDirectory, entry === 'esm' ? 'xterm.mjs' : 'xterm.js'),
@@ -87,6 +92,7 @@ describe.each([1, 1.25, 1.5, 2])(
           { zoom: 0.77, rasterScale: 1, columns: 60, theme: 'light' },
           { zoom: 1, rasterScale: 1, columns: 60, theme: 'dark' },
           { zoom: 1.15, rasterScale: 1.15, columns: 79, theme: 'dark' },
+          { zoom: 1.15, rasterScale: 1.15, columns: 85, theme: 'light' },
           { zoom: 1.1, rasterScale: 1.15, columns: 60, theme: 'light' },
           { zoom: 1.3, rasterScale: 1.3, columns: 60, theme: 'light' },
           { zoom: 1.2, rasterScale: 1.3, columns: 79, theme: 'dark' },
@@ -99,13 +105,21 @@ describe.each([1, 1.25, 1.5, 2])(
           const projection = await renderTerminalRasterFixture(page, {
             addonSource,
             entry,
+            font,
             columns,
             theme,
             xtermSource,
             zoom,
             rasterScale
           })
-          rasterTimings.push({ deviceScaleFactor, entry, zoom, rasterScale, ...projection.timings })
+          rasterTimings.push({
+            deviceScaleFactor,
+            entry,
+            font,
+            zoom,
+            rasterScale,
+            ...projection.timings
+          })
           const capture = process.env.CLEANCODE_CAPTURE_RASTER
           if (capture) {
             const output = join(process.cwd(), 'test-results', 'terminal-raster', capture)
@@ -113,7 +127,7 @@ describe.each([1, 1.25, 1.5, 2])(
             await page.screenshot({
               path: join(
                 output,
-                `${entry}-dpr-${deviceScaleFactor}-zoom-${zoom}-raster-${rasterScale}-${theme}.png`
+                `${entry}-${font}-dpr-${deviceScaleFactor}-zoom-${zoom}-raster-${rasterScale}-${theme}.png`
               )
             })
           }
@@ -164,6 +178,12 @@ describe.each([1, 1.25, 1.5, 2])(
             JSON.stringify({ zoom, ...projection })
           ).toBeLessThanOrEqual(2)
           expect(projection.hasInk).toBe(true)
+          for (const glyph of projection.blockGlyphs) {
+            expect(
+              glyph.maximumDifference,
+              JSON.stringify({ deviceScaleFactor, entry, font, zoom, rasterScale, theme, ...glyph })
+            ).toBeLessThanOrEqual(2)
+          }
           for (const transition of projection.rasterTransitions) {
             expect(
               transition.inkPixels,
