@@ -225,6 +225,66 @@
   --cc-shadow-node: 0 12px 32px rgb(0 0 0 / 38%);
 }
 
+/* Shell surfaces and their portals share a palette without changing canvas descendants. */
+:root[data-theme='dark']
+  :is(
+    .app-shell__settings,
+    .task-navigation-owner,
+    .project-sidebar-column,
+    .application-settings-surface,
+    .theme-settings-backdrop,
+    .block-template-library-backdrop,
+    .block-template-save-backdrop,
+    .project-sidebar-confirmation-dialog__backdrop,
+    .branch-selector-popover,
+    .workspace-row-menu,
+    .workspace-defaults-project-menu,
+    .workspace-defaults-picker,
+    .workspace-external-open-menu,
+    .project-issues-menu,
+    .notification-viewport
+  ) {
+  --cc-background: #191919;
+  --cc-canvas: #191919;
+  --cc-chrome: #191919;
+  --cc-chrome-raised: #222222;
+  --cc-chrome-translucent: rgb(25 25 25 / 82%);
+  --cc-surface: #222222;
+  --cc-surface-subtle: #2a2a2a;
+  --cc-surface-raised: #2a2a2a;
+  --cc-surface-translucent: rgb(34 34 34 / 92%);
+  --cc-surface-overlay: rgb(34 34 34 / 98%);
+  --cc-foreground: #eeeeee;
+  --cc-muted: #b4b4b4;
+  --cc-muted-strong: #b4b4b4;
+  --cc-disabled: #7b7b7b;
+  --cc-border: #3a3a3a;
+  --cc-border-strong: #606060;
+  --cc-divider: rgb(72 72 72 / 82%);
+  --cc-primary: #eeeeee;
+  --cc-primary-hover: #ffffff;
+  --cc-primary-soft: #313131;
+  --cc-primary-contrast: #191919;
+  --cc-primary-border: rgb(238 238 238 / 54%);
+  --cc-primary-ring: rgb(238 238 238 / 24%);
+  --cc-primary-wash: rgb(238 238 238 / 13%);
+  --cc-selection-overlay: rgb(238 238 238 / 7%);
+  --cc-settings-selection-surface: #313131;
+  --cc-settings-selection-foreground: #eeeeee;
+  --cc-settings-selection-border: #606060;
+  --cc-settings-navigation-selection: var(--cc-settings-selection-surface);
+  --cc-settings-navigation-foreground: var(--cc-settings-selection-foreground);
+  --cc-settings-navigation-accent: var(--cc-settings-selection-accent);
+  --cc-settings-switch-on: #7b7b7b;
+  --cc-settings-switch-thumb: #eeeeee;
+  --cc-scrollbar: rgb(180 180 180 / 48%);
+  --cc-directional-menu-hover: #3a3a3a;
+  --cc-preview-dark-surface: #2a2a2a;
+  --cc-preview-dark-muted: #7b7b7b;
+
+  color: var(--cc-foreground);
+}
+
 :root[data-theme='dark'] .project-sidebar-column,
 :root[data-theme='dark'] .branch-selector-popover {
   --cc-chrome: #2a2a2a;
