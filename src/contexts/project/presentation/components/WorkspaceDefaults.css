@@ -121,8 +121,8 @@
 .workspace-defaults-button:focus-visible,
 .workspace-defaults-picker button:focus-visible,
 .workspace-defaults-quantity:focus-within {
-  outline: 2px solid var(--cc-primary);
-  outline-offset: 2px;
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
 }
 .workspace-defaults-button:disabled {
   opacity: 0.35;
@@ -369,7 +369,7 @@
 }
 .workspace-defaults-project-trigger:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 .workspace-defaults-project-menu {
   --cc-menu-option-highlight-inset: 5px;

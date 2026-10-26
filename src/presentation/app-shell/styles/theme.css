@@ -21,7 +21,7 @@
   --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
   --cc-sidebar-foreground: var(--cc-muted-strong);
   --cc-sidebar-selection-foreground: #43474c;
-  --cc-sidebar-focus-ring: #7a7a7a;
+  --cc-sidebar-focus-ring: var(--cc-ring);
   --cc-sidebar-current-marker: #737373;
   --cc-sidebar-branch-badge-surface: #e7eaf0;
   --cc-sidebar-branch-badge-foreground: #545d6b;
@@ -102,7 +102,7 @@
   --cc-danger-strong: #a53745;
   --cc-danger-soft: #fff0f1;
   --cc-danger-border: rgb(194 65 79 / 25%);
-  --cc-ring: rgb(47 103 216 / 34%);
+  --cc-ring: #7a7a7a;
   --cc-backdrop: rgb(15 23 42 / 38%);
   --cc-tooltip: #0a0a0a;
   --cc-tooltip-foreground: #f8fafc;
@@ -147,7 +147,7 @@
   --cc-sidebar-selection-hover: var(--cc-sidebar-hover);
   --cc-sidebar-foreground: #d0d5dc;
   --cc-sidebar-selection-foreground: #eceff3;
-  --cc-sidebar-focus-ring: #8c8c8c;
+  --cc-sidebar-focus-ring: var(--cc-ring);
   --cc-sidebar-current-marker: #a3a3a3;
   --cc-sidebar-branch-badge-surface: #2a3039;
   --cc-sidebar-branch-badge-foreground: #c4cad3;
@@ -228,7 +228,7 @@
   --cc-danger-strong: #f38d98;
   --cc-danger-soft: #3c1d23;
   --cc-danger-border: rgb(238 113 128 / 38%);
-  --cc-ring: rgb(117 160 245 / 42%);
+  --cc-ring: #8c8c8c;
   --cc-backdrop: rgb(0 0 0 / 56%);
   --cc-tooltip: #edf1f7;
   --cc-tooltip-foreground: #101318;

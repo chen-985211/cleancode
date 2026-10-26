@@ -74,6 +74,7 @@
 }
 
 .toolbar-button--primary {
+  --cc-ring: var(--cc-primary-contrast);
   border-color: transparent;
   background: var(--cc-primary);
   color: var(--cc-surface);
@@ -423,6 +424,7 @@
 }
 
 .canvas-empty__action {
+  --cc-ring: var(--cc-primary-contrast);
   display: inline-flex;
   height: 34px;
   margin-top: 18px;

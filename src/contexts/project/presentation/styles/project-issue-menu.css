@@ -61,7 +61,7 @@
 }
 .project-issues-menu button svg {
   flex-shrink: 0;
-  color: var(--cc-primary);
+  color: var(--cc-settings-selection-foreground);
 }
 .project-issues-menu button:focus-visible {
   outline-offset: -2px;

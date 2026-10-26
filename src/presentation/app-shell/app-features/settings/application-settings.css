@@ -161,7 +161,7 @@
 
 .application-settings-navigation button:focus-visible {
   outline: 2px solid var(--cc-settings-navigation-accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .application-settings-content {
@@ -392,7 +392,7 @@
 
 .shortcut-settings-row:hover,
 .shortcut-settings-row:focus-within {
-  background: var(--cc-primary-wash);
+  background: var(--cc-surface-subtle);
 }
 
 .shortcut-settings-row__label {

@@ -46,7 +46,7 @@ img.agent-provider-icon {
 
 .agent-provider-status-control__trigger:focus-visible {
   outline: 2px solid var(--cc-muted-strong);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .agent-provider-status-control__count {
@@ -194,12 +194,12 @@ img.agent-provider-icon {
 
 .agent-provider-status-panel button:focus-visible {
   outline: 2px solid var(--cc-muted-strong);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .agent-provider-empty-state button:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .agent-provider-empty-state {

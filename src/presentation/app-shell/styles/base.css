@@ -33,10 +33,16 @@ input:disabled {
 }
 
 button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
+input:is([type='checkbox'], [type='radio']):focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+
+input:not([type='checkbox']):not([type='radio']):focus,
+textarea:focus,
+select:focus-visible {
+  border-color: var(--cc-ring);
+  outline: none;
 }
 
 .toolbar-button,
@@ -96,6 +102,7 @@ textarea:focus-visible {
 }
 
 .icon-button--send {
+  --cc-ring: var(--cc-primary-contrast);
   color: var(--cc-primary-contrast);
   background: var(--cc-primary);
 }

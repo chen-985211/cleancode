@@ -349,7 +349,7 @@
 .agent-tool-approval-card__button:focus-visible,
 .agent-tool-approval-card__locate:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .agent-tool-approval-card__button:disabled {

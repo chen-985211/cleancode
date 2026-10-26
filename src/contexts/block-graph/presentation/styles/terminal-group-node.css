@@ -128,7 +128,7 @@
 
 .terminal-group-node__empty-state--action:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .terminal-group-node__header {
@@ -149,7 +149,7 @@
 }
 
 .terminal-group-node__header--editing {
-  box-shadow: 0 -2px 0 var(--cc-primary-border) inset;
+  box-shadow: 0 -2px 0 var(--cc-ring) inset;
 }
 
 .terminal-group-node--collapsed .terminal-group-node__header {
@@ -209,7 +209,7 @@
 
 .terminal-group-node__launcher:focus-visible .terminal-group-node__expand-icon {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .terminal-group-node__identity-icon {
@@ -432,7 +432,7 @@
 
 .terminal-group-node__member-remove:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .terminal-group-name-form {
@@ -468,10 +468,7 @@
 
 .terminal-group-name-form input:focus {
   background: var(--cc-surface-raised);
-  box-shadow:
-    0 0 0 2px var(--cc-primary-ring),
-    0 0 0 1px var(--cc-primary-border) inset,
-    0 1px 2px var(--cc-shadow-color);
+  box-shadow: 0 0 0 1px var(--cc-ring) inset;
 }
 
 .terminal-group-node--drop-join > .terminal-group-node__material::before,

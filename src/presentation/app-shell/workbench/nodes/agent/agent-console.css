@@ -114,10 +114,14 @@
 }
 
 .agent-console-actions__title:focus-visible,
-.agent-console-actions__more:focus-visible,
-.agent-console-actions__editor input:focus-visible {
+.agent-console-actions__more:focus-visible {
   outline: 2px solid var(--cc-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
+}
+
+.agent-console-actions__editor input:focus-visible {
+  border-color: var(--cc-ring);
+  outline: none;
 }
 
 .agent-console-actions__editor {

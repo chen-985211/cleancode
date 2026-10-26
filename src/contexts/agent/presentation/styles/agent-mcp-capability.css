@@ -31,7 +31,7 @@
 
 .agent-mcp-capability__switch:focus-visible {
   outline: 2px solid var(--cc-terminal-control-foreground);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .agent-mcp-capability__switch:disabled {
@@ -56,8 +56,8 @@
 }
 
 .agent-mcp-capability__reconnect:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--cc-primary) 62%, transparent);
-  outline-offset: 1px;
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
 }
 
 .agent-mcp-capability__reconnect:disabled {

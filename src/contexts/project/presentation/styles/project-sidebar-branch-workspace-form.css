@@ -51,7 +51,7 @@
   border: 1px solid var(--cc-border);
   border-radius: 6px;
   background: var(--cc-surface);
-  color: var(--cc-primary-hover);
+  color: var(--cc-sidebar-foreground);
   font: inherit;
   font-size: 11px;
   font-weight: 650;
@@ -60,4 +60,10 @@
 .branch-workspace-form button:hover {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
+}
+
+.branch-workspace-form input:focus-visible,
+.branch-workspace-form button:focus-visible {
+  border-color: var(--cc-sidebar-focus-ring);
+  outline: none;
 }
