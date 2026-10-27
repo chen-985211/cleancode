@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type AppNotificationKind = 'info' | 'success' | 'warning' | 'error'
+type AppNotificationKind = 'info' | 'success' | 'warning' | 'error'
 
 export interface AppNotificationIdentity {
   readonly key: string
