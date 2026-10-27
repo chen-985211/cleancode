@@ -180,6 +180,31 @@ describe('compact notification stack', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it.each(['画布操作', '侧栏操作'])(
+    'expands new notifications from keyboard after the last dismissal returns focus to %s',
+    (returnTarget) => {
+      setup(errors)
+      publish(1)
+      const previousControl = screen.getByRole('button', { name: returnTarget })
+      act(() => previousControl.focus())
+      const dismiss = screen.getByRole('button', { name: '关闭“第一条”通知' })
+      act(() => dismiss.focus())
+      fireEvent.click(dismiss)
+      expect(previousControl).toHaveFocus()
+      expect(screen.queryByRole('alert')).toBeNull()
+
+      publish(1)
+      publish(2)
+      const toggle = screen.getByRole('button', { name: '展开全部 2 条通知' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      fireEvent.keyDown(previousControl, { key: 'Tab' })
+      act(() => toggle.focus())
+      expect(toggle).toHaveFocus()
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getAllByRole('alert')).toHaveLength(2)
+    }
+  )
+
   it('keeps focus in the front card when the count button disappears after another message closes', () => {
     setup(errors)
     publish(1)
@@ -299,6 +324,51 @@ describe('compact notification stack', () => {
     expect(screen.getAllByRole('status')).toHaveLength(1)
     expect(canvasInput).toHaveFocus()
   })
+
+  it.each(['Escape', 'ArrowDown', 'Shift'])(
+    'preserves delayed notification navigation through %s inside the notification',
+    async (key) => {
+      let finishNavigation!: () => void
+      const navigation = new Promise<void>((resolve) => {
+        finishNavigation = resolve
+      })
+      setup([
+        { kind: 'info', title: '普通消息' },
+        {
+          kind: 'info',
+          title: 'Agent 1',
+          activation: {
+            label: '定位 Agent 1',
+            onClick: async () => {
+              await navigation
+              screen.getByRole('textbox', { name: '画布终端输入' }).focus()
+            }
+          }
+        }
+      ])
+      publish(1)
+      publish(2)
+      const activate = screen.getByRole('button', { name: '定位 Agent 1' })
+      act(() => activate.focus())
+      fireEvent.click(activate)
+      fireEvent.keyDown(activate, { key })
+      fireEvent.pointerLeave(notifications())
+      expect(notifications()).toHaveAttribute('data-expanded', 'true')
+
+      await act(async () => {
+        finishNavigation()
+        await navigation
+      })
+      const canvasInput = screen.getByRole('textbox', { name: '画布终端输入' })
+      expect(canvasInput).toHaveFocus()
+      expect(notifications()).toHaveAttribute('data-expanded', 'true')
+      expect(screen.getAllByRole('status')).toHaveLength(2)
+
+      fireEvent.keyDown(canvasInput, { key: 'a' })
+      expect(notifications()).toHaveAttribute('data-expanded', 'false')
+      expect(canvasInput).toHaveFocus()
+    }
+  )
 
   it('cleans up a concealed message without waiting for an invisible exit transition', () => {
     setup(errors)

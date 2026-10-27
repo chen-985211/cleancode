@@ -47,7 +47,8 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
       inputOriginRef.current = notificationInput ? 'notification' : 'other'
       if (inspectingRef.current && !notificationInput && isCanvas(event.target)) collapse()
     }
-    const onKeyboardInput = (event: Event): void => {
+    const onKeyboardInput = (event: KeyboardEvent): void => {
+      if (isNotification(event.target) && event.key !== 'Tab') return
       inputOriginRef.current = 'other'
       if (inspectingRef.current && !isNotification(event.target) && isCanvas(event.target))
         collapse()
@@ -90,11 +91,13 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
       ) ??
       returnFocusRef.current
     if (!next?.isConnected) return
-    suppressNextFocusRef.current = !expanded
-    if (!expanded) setInteraction((current) => ({ ...current, suppressed: true }))
+    const returningInside = viewportRef.current?.contains(next) === true
+    suppressNextFocusRef.current = returningInside && !expanded
+    if (suppressNextFocusRef.current)
+      setInteraction((current) => ({ ...current, suppressed: true }))
     next.focus({ preventScroll: true })
-    if (viewportRef.current?.contains(next))
-      next.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    suppressNextFocusRef.current = false
+    if (returningInside) next.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [expanded, openIds])
 
   const onFocusCapture = (event: FocusEvent<HTMLDivElement>): void => {
