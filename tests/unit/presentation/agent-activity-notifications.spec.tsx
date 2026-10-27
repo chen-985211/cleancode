@@ -59,7 +59,8 @@ describe('Agent activity notifications', () => {
       )
     )
 
-    await waitFor(() => expect(screen.getAllByRole('status')).toHaveLength(2))
+    fireEvent.click(await screen.findByRole('button', { name: '展开全部 2 条通知' }))
+    expect(screen.getAllByRole('status')).toHaveLength(2)
     const completionNotification = screen.getByLabelText('本轮已完成').closest('[role="status"]')
     expect(completionNotification).not.toBeNull()
     expect(completionNotification).not.toBe(attentionNotification)

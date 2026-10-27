@@ -253,6 +253,7 @@ describe('app notifications', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '发送错误通知' }))
     fireEvent.click(screen.getByRole('button', { name: '发送错误通知' }))
+    fireEvent.click(screen.getByRole('button', { name: '展开全部 2 条通知' }))
 
     const alerts = screen.getAllByRole('alert')
 
@@ -356,31 +357,13 @@ describe('app notifications', () => {
 
     expect(screen.getAllByRole('status')).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('流程运行成功')
-    const outgoingTitle = screen.getByText('流程运行中')
-    const outgoingTitleLayer = outgoingTitle.closest('.notification-card__title-layer')
     const currentTitleLayer = screen
       .getByText('流程运行成功')
       .closest('.notification-card__title-layer')
     const notification = screen.getByRole('status')
-    const outgoingIconLayer = notification.querySelector(
-      '.notification-card__icon-layer[data-notification-status-motion-state="outgoing"]'
-    )
-    const currentIconLayer = notification.querySelector(
-      '.notification-card__icon-layer[data-notification-status-motion-state="current"]'
-    )
-
-    expect(outgoingTitleLayer).toHaveAttribute('data-notification-status-motion-state', 'outgoing')
-    expect(outgoingTitleLayer).toHaveAttribute('aria-hidden', 'true')
+    expect(notification).toBe(activeNotification)
     expect(currentTitleLayer).toHaveAttribute('data-notification-status-motion-state', 'current')
-    expect(outgoingIconLayer?.querySelector('.notification-card__spinner')).toBeInTheDocument()
-    expect(currentIconLayer?.querySelector('.notification-card__spinner')).not.toBeInTheDocument()
-    expect(outgoingIconLayer).toHaveAttribute('data-notification-icon-spring-state', 'closing')
-    expect(currentIconLayer).toHaveAttribute('data-notification-icon-spring-state', 'opening')
-    expect(currentIconLayer).toHaveStyle({
-      '--notification-icon-motion-opacity': '0',
-      '--notification-icon-motion-scale': '0.76',
-      '--notification-icon-motion-y': '6px'
-    })
+    expect(notification.querySelector('.notification-card__spinner')).toBeNull()
 
     await waitFor(() => expect(screen.queryByText('流程运行中')).not.toBeInTheDocument())
 
@@ -417,9 +400,7 @@ describe('app notifications', () => {
     const pendingStopButton = screen.getByRole('button', { name: '正在停止…' })
     expect(pendingStopButton).not.toHaveTextContent(/\S/)
     expect(pendingStopButton).toHaveAttribute('data-notification-action-icon', 'loading')
-    expect(
-      pendingStopButton.querySelector('.notification-card__action-spinner')
-    ).toBeInTheDocument()
+    expect(pendingStopButton.querySelector('.notification-card__action-spinner')).toBeNull()
     expect(pendingStopButton).toHaveAttribute('aria-busy', 'true')
     expect(pendingStopButton).toHaveAttribute('aria-disabled', 'true')
 

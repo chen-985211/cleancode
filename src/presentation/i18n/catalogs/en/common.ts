@@ -14,5 +14,7 @@ export const enCommonMessages = {
   'language.english': 'English',
   'notifications.label': 'Notifications',
   'notifications.dismiss': 'Dismiss “{title}” notification',
-  'notifications.dismissTitle': 'Dismiss notification'
+  'notifications.dismissTitle': 'Dismiss notification',
+  'notifications.expand': 'Expand all {count} notifications',
+  'notifications.more': '+{count}'
 } as const satisfies { readonly [Key in keyof typeof zhCNCommonMessages]: string }

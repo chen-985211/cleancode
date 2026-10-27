@@ -6,7 +6,7 @@ import {
 } from '../../../src/presentation/app-shell/app-features/notifications/notificationStatusMotion'
 
 describe('notification status motion', () => {
-  it('keeps the previous status visual until its icon spring settles', () => {
+  it('keeps the previous status visual until its exit transition completes', () => {
     const running = createNotification('running', {
       isActivity: true,
       kind: 'info',

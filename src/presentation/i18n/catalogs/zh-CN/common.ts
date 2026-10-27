@@ -12,5 +12,7 @@ export const zhCNCommonMessages = {
   'language.english': 'English',
   'notifications.label': '通知',
   'notifications.dismiss': '关闭“{title}”通知',
-  'notifications.dismissTitle': '关闭通知'
+  'notifications.dismissTitle': '关闭通知',
+  'notifications.expand': '展开全部 {count} 条通知',
+  'notifications.more': '+{count}'
 } as const

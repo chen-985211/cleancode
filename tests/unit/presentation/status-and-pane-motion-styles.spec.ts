@@ -10,51 +10,56 @@ describe('status and pane motion styles', () => {
   it('keeps every notification on one fixed card geometry and surface', () => {
     const cardRule = readRule(notificationStyles, '.notification-card')
     const bodyRule = readRule(notificationStyles, '.notification-card__body')
-    const iconRule = readRule(notificationStyles, '.notification-card__icon')
-    const dismissRule = readRule(notificationStyles, '.notification-card__dismiss')
-    const actionRule = readRule(notificationStyles, '.notification-card__action')
+    const identityRule = readRule(notificationStyles, '.notification-card__identity')
+    const controlRule = readRule(notificationStyles, '.notification-card__expand')
     const controlsRule = readRule(notificationStyles, '.notification-card__controls')
+    const viewportRule = readRule(notificationStyles, '.notification-viewport')
+    const cardHeight = readDeclaration(cardRule, 'height')
 
-    expect(notificationStyles).toContain('width: min(300px, calc(100vw - 82px));')
-    expect(notificationStyles).toContain(
-      'width: min(300px, calc(100vw - var(--cc-shell-control-inset) * 2 - 2px));'
+    expect(readDeclaration(readRule(notificationStyles, '.notification-stack'), 'width')).toMatch(
+      /^min\(.+, calc\(100vw - /
     )
+    expect(readDeclaration(viewportRule, 'max-height')).toContain(
+      'calc(100vh - var(--notification-viewport-top)'
+    )
+    expect(viewportRule).toContain('background: transparent;')
+    expect(viewportRule).toContain('overflow-y: auto;')
     expect(notificationStyles).not.toContain('.notification-card--compact')
-    expect(cardRule).toContain('flex: 0 0 62px;')
-    expect(cardRule).toContain('height: 62px;')
-    expect(cardRule).toContain('min-height: 62px;')
-    expect(cardRule).toContain('max-height: 62px;')
+    expect(cardHeight).toBe('var(--notification-card-height)')
+    expect(readDeclaration(viewportRule, '--notification-card-height')).toMatch(/^\d+px$/)
+    expect(readDeclaration(cardRule, 'min-height')).toBe(cardHeight)
+    expect(readDeclaration(cardRule, 'max-height')).toBe(cardHeight)
+    expect(cardRule).toContain('border: 1px solid var(--cc-border);')
     expect(cardRule).toContain('background: var(--cc-surface);')
     expect(cardRule).toContain('box-shadow: var(--cc-shadow-xs);')
     expect(cardRule).not.toContain('backdrop-filter')
-    expect(bodyRule).toContain('grid-template-columns: 24px minmax(0, 1fr);')
     expect(bodyRule).toContain('background: transparent;')
     expect(bodyRule).toContain('height: 100%;')
-    expect(iconRule).toContain('width: 24px;')
-    expect(iconRule).toContain('height: 24px;')
-    expect(dismissRule).toContain('width: 24px;')
-    expect(dismissRule).toContain('height: 24px;')
-    expect(actionRule).toContain('width: 24px;')
-    expect(actionRule).toContain('height: 24px;')
-    expect(controlsRule).toContain('gap: 4px;')
-    expect(notificationStyles).toContain(
-      'max-height: calc(100vh - var(--notification-viewport-top) - 12px);'
-    )
+    expect(bodyRule).toContain('min-width: 0;')
+    expect(Number.parseFloat(readDeclaration(controlRule, 'min-width'))).toBeGreaterThanOrEqual(24)
+    expect(readDeclaration(identityRule, 'width')).toBe(readDeclaration(identityRule, 'height'))
+    expect(controlsRule).toContain('flex: 0 0 auto;')
+    for (const [, variantRule] of notificationStyles.matchAll(
+      /\.notification-card--[\w-]+ \{([^}]+)\}/g
+    )) {
+      expect(variantRule).not.toMatch(
+        /\n\s*(?:[\w-]*height|width|padding|background|border|box-shadow):/
+      )
+    }
   })
 
-  it('uses spring-owned spatial properties while titles crossfade independently', () => {
-    const iconLayerRule = readRule(notificationStyles, '.notification-card__icon-layer')
+  it('uses finite stack and title transitions without continuous notification animation', () => {
+    const stackRule = readRule(notificationStyles, '.notification-stack-item')
     const outgoingRule = readRule(
       notificationStyles,
       ".notification-card__title-layer[data-notification-status-motion-state='outgoing']"
     )
 
-    expect(iconLayerRule).toContain('var(--notification-icon-motion-opacity, 1)')
-    expect(iconLayerRule).toContain('var(--notification-icon-motion-y, 0px)')
-    expect(iconLayerRule).toContain('var(--notification-icon-motion-scale, 1)')
-    expect(iconLayerRule).not.toContain('transition:')
+    expect(stackRule).toContain('var(--notification-index)')
+    expect(stackRule).toContain('var(--cc-motion-duration-surface)')
+    expect(notificationStyles).not.toMatch(/\binfinite\b/)
     expect(outgoingRule).toContain('opacity: 0;')
-    expect(outgoingRule).toContain('translate3d(0, -6px, 0)')
+    expect(outgoingRule).toContain('translate3d(')
     expect(notificationStyles).toContain(
       ".notification-card__title-layer[data-notification-status-motion-state='current']"
     )
@@ -120,5 +125,9 @@ function readProjectStyles(fileName: string): string {
 }
 
 function readRule(styles: string, selector: string): string {
-  return styles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+  return `\n${styles}`.split(`\n${selector} {`)[1]?.split('\n}')[0] ?? ''
+}
+
+function readDeclaration(rule: string, property: string): string {
+  return rule.match(new RegExp(`(?:^|\\n)\\s*${property}: ([^;]+);`))?.[1] ?? ''
 }
