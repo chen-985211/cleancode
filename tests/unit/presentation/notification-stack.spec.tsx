@@ -325,9 +325,23 @@ describe('compact notification stack', () => {
     expect(canvasInput).toHaveFocus()
   })
 
-  it.each(['Escape', 'ArrowDown', 'Shift'])(
-    'preserves delayed notification navigation through %s inside the notification',
-    async (key) => {
+  it.each(
+    [
+      'Escape',
+      'ArrowDown',
+      'Shift',
+      'notification Tab',
+      'notification Tab released',
+      'sidebar pointer',
+      'sidebar keyboard',
+      'sidebar wheel'
+    ].flatMap((input) => [
+      { input, returnsPromise: false },
+      { input, returnsPromise: true }
+    ])
+  )(
+    'preserves delayed notification navigation through $input (promise: $returnsPromise)',
+    async ({ input, returnsPromise }) => {
       let finishNavigation!: () => void
       const navigation = new Promise<void>((resolve) => {
         finishNavigation = resolve
@@ -339,9 +353,11 @@ describe('compact notification stack', () => {
           title: 'Agent 1',
           activation: {
             label: '定位 Agent 1',
-            onClick: async () => {
-              await navigation
-              screen.getByRole('textbox', { name: '画布终端输入' }).focus()
+            onClick: () => {
+              const pending = navigation.then(() => {
+                screen.getByRole('textbox', { name: '画布终端输入' }).focus()
+              })
+              return returnsPromise ? pending : undefined
             }
           }
         }
@@ -351,7 +367,25 @@ describe('compact notification stack', () => {
       const activate = screen.getByRole('button', { name: '定位 Agent 1' })
       act(() => activate.focus())
       fireEvent.click(activate)
-      fireEvent.keyDown(activate, { key })
+      const sidebar = screen.getByRole('button', { name: '侧栏操作' })
+      if (input === 'notification Tab released') {
+        fireEvent.keyDown(activate, { key: 'Tab' })
+        fireEvent.keyUp(activate, { key: 'Tab' })
+      } else if (input === 'notification Tab' || input === 'sidebar keyboard') {
+        fireEvent.keyDown(activate, { key: 'Tab' })
+        const next =
+          input === 'notification Tab'
+            ? screen.getByRole('button', { name: '展开全部 2 条通知' })
+            : sidebar
+        act(() => next.focus())
+        fireEvent.keyUp(next, { key: 'Tab' })
+        if (input === 'sidebar keyboard') fireEvent.keyDown(next, { key: 'Enter' })
+      } else if (input === 'sidebar pointer') {
+        fireEvent.pointerDown(sidebar)
+        act(() => sidebar.focus())
+        fireEvent.click(sidebar)
+      } else if (input === 'sidebar wheel') fireEvent.wheel(sidebar, { deltaY: 20 })
+      else fireEvent.keyDown(activate, { key: input })
       fireEvent.pointerLeave(notifications())
       expect(notifications()).toHaveAttribute('data-expanded', 'true')
 
@@ -367,6 +401,57 @@ describe('compact notification stack', () => {
       fireEvent.keyDown(canvasInput, { key: 'a' })
       expect(notifications()).toHaveAttribute('data-expanded', 'false')
       expect(canvasInput).toHaveFocus()
+    }
+  )
+
+  it.each(['pointer', 'touch', 'wheel', 'keyboard focus', 'keyboard input'] as const)(
+    'keeps the stack collapsed after canvas %s interrupts delayed notification navigation',
+    async (input) => {
+      let finishNavigation!: () => void
+      const navigation = new Promise<void>((resolve) => {
+        finishNavigation = resolve
+      })
+      setup([
+        { kind: 'info', title: '普通消息' },
+        {
+          kind: 'info',
+          title: 'Agent 1',
+          activation: {
+            label: '定位 Agent 1',
+            onClick: () => {
+              void navigation.then(() => {
+                screen.getByRole('textbox', { name: '画布终端输入' }).focus()
+              })
+            }
+          }
+        }
+      ])
+      publish(1)
+      publish(2)
+      const activate = screen.getByRole('button', { name: '定位 Agent 1' })
+      act(() => activate.focus())
+      fireEvent.click(activate)
+      const canvas = screen.getByTestId('canvas-surface')
+      const canvasInput = screen.getByRole('textbox', { name: '画布终端输入' })
+      if (input === 'pointer') fireEvent.pointerDown(canvas)
+      else if (input === 'touch') fireEvent.touchStart(canvas)
+      else if (input === 'wheel') fireEvent.wheel(canvas, { deltaY: 20 })
+      else if (input === 'keyboard focus') {
+        fireEvent.keyDown(activate, { key: 'Tab' })
+        act(() => canvasInput.focus())
+        fireEvent.keyUp(canvasInput, { key: 'Tab' })
+      } else {
+        act(() => canvasInput.focus())
+        fireEvent.keyDown(canvasInput, { key: 'a' })
+      }
+      expect(notifications()).toHaveAttribute('data-expanded', 'false')
+      await act(async () => {
+        finishNavigation()
+        await navigation
+      })
+      expect(canvasInput).toHaveFocus()
+      expect(notifications()).toHaveAttribute('data-expanded', 'false')
+      expect(screen.getAllByRole('status')).toHaveLength(1)
     }
   )
 

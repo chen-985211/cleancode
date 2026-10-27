@@ -17,7 +17,8 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
   const focusedElementRef = useRef<HTMLElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const suppressNextFocusRef = useRef(false)
-  const inputOriginRef = useRef<'notification' | 'other'>('other')
+  const pinnedRef = useRef(false)
+  const keyboardNavigationRef = useRef(false)
   const inspectingRef = useRef(false)
   const [interaction, setInteraction] = useState(restingInteraction)
   const hidden = useSyncExternalStore(subscribeVisibility, documentHidden, () => false)
@@ -27,7 +28,9 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
 
   useLayoutEffect(() => {
     inspectingRef.current = inspecting
-  }, [inspecting])
+    pinnedRef.current = interaction.pinned
+    if (!inspecting) keyboardNavigationRef.current = false
+  }, [inspecting, interaction.pinned])
 
   useEffect(() => {
     const isNotification = (target: EventTarget | null): boolean =>
@@ -36,6 +39,8 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
       target instanceof Element && target.closest('.canvas-surface, .app-shell__workspace') !== null
     const collapse = (): void => {
       inspectingRef.current = false
+      pinnedRef.current = false
+      keyboardNavigationRef.current = false
       focusedMessageRef.current = null
       focusedElementRef.current = null
       suppressNextFocusRef.current = false
@@ -43,22 +48,29 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
       viewportRef.current?.scrollTo?.({ top: 0 })
     }
     const onPointerInput = (event: Event): void => {
-      const notificationInput = isNotification(event.target)
-      inputOriginRef.current = notificationInput ? 'notification' : 'other'
-      if (inspectingRef.current && !notificationInput && isCanvas(event.target)) collapse()
-    }
-    const onKeyboardInput = (event: KeyboardEvent): void => {
-      if (isNotification(event.target) && event.key !== 'Tab') return
-      inputOriginRef.current = 'other'
+      keyboardNavigationRef.current = false
       if (inspectingRef.current && !isNotification(event.target) && isCanvas(event.target))
         collapse()
     }
+    const onKeyboardInput = (event: KeyboardEvent): void => {
+      keyboardNavigationRef.current = event.key === 'Tab'
+      if (inspectingRef.current && !isNotification(event.target) && isCanvas(event.target))
+        collapse()
+    }
+    const clearKeyboardNavigation = (): void => {
+      keyboardNavigationRef.current = false
+    }
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (event.key === 'Tab') clearKeyboardNavigation()
+    }
     const onFocus = (event: Event): void => {
-      // Notification navigation can focus an Agent asynchronously. Only new canvas input
-      // ends the inspection; the focus transfer belonging to that navigation does not.
+      // A Tab belongs to the next focus move, even when it stays in notifications or
+      // the sidebar. Later programmatic navigation must not inherit that input.
+      const keyboardNavigation = keyboardNavigationRef.current
+      clearKeyboardNavigation()
       if (
         inspectingRef.current &&
-        inputOriginRef.current !== 'notification' &&
+        (!pinnedRef.current || keyboardNavigation) &&
         !isNotification(event.target) &&
         isCanvas(event.target)
       )
@@ -68,11 +80,15 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
     for (const type of pointerEvents)
       document.addEventListener(type, onPointerInput, { capture: true, passive: true })
     document.addEventListener('keydown', onKeyboardInput, true)
+    document.addEventListener('keyup', onKeyUp, true)
     document.addEventListener('focusin', onFocus, true)
+    window.addEventListener('blur', clearKeyboardNavigation)
     return () => {
       for (const type of pointerEvents) document.removeEventListener(type, onPointerInput, true)
       document.removeEventListener('keydown', onKeyboardInput, true)
+      document.removeEventListener('keyup', onKeyUp, true)
       document.removeEventListener('focusin', onFocus, true)
+      window.removeEventListener('blur', clearKeyboardNavigation)
     }
   }, [])
 
@@ -143,7 +159,8 @@ export function useNotificationStackInteraction(openIds: readonly string[]) {
     }))
   }
   const onExpand = (): void => {
-    inputOriginRef.current = 'notification'
+    pinnedRef.current = true
+    keyboardNavigationRef.current = false
     inspectingRef.current = true
     setInteraction((current) =>
       current.pinned && !current.suppressed
