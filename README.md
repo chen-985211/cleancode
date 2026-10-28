@@ -3,16 +3,20 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/github/v/release/chen-985211/cleancode?include_prereleases&amp;sort=semver&amp;display_name=tag&amp;style=flat-square&amp;label=version&amp;labelColor=555555&amp;color=CB3837" alt="Latest release version" /></a>
-  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-2563EB.svg?style=flat-square&amp;labelColor=555555&amp;logo=github&amp;logoColor=white" alt="Download Preview" /></a>
-  <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-64748B.svg?style=flat-square&amp;labelColor=555555" alt="macOS, Windows and Linux" /></a>
-  <a href="./docs/contexts/agent/cleancode-mcp.md"><img src="https://img.shields.io/badge/MCP-native%20tools-6366D8.svg?style=flat-square&amp;labelColor=555555" alt="Native CleanCode MCP tools" /></a>
-  <a href="#core-features"><img src="https://img.shields.io/badge/workflow-automation-238636.svg?style=flat-square&amp;labelColor=555555" alt="Workflow automation" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-F4C430.svg?style=flat-square&amp;labelColor=555555" alt="MIT License" /></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/github/v/release/chen-985211/cleancode?include_prereleases&amp;sort=semver&amp;display_name=tag&amp;style=flat&amp;label=download&amp;labelColor=555555&amp;color=CB3837&amp;logo=github&amp;logoColor=white" alt="Download latest release" /></a>
+  <a href="./docs/contexts/agent/cleancode-mcp.md"><img src="https://img.shields.io/badge/MCP-native%20tools-6366D8.svg?style=flat&amp;labelColor=555555" alt="Native CleanCode MCP tools" /></a>
+  <a href="#core-features"><img src="https://img.shields.io/badge/workflow-automation-238636.svg?style=flat&amp;labelColor=555555" alt="Workflow automation" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-F4C430.svg?style=flat&amp;labelColor=555555" alt="MIT License" /></a>
 </p>
 
 <p align="center">
-  <sub><a href="./README_ZH.md">简体中文</a> · <strong>English</strong></sub>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/macOS-000000?style=flat&amp;logo=apple&amp;logoColor=white" alt="macOS" /></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Windows-0078D6?style=flat" alt="Windows" /></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Linux-FCC624?style=flat&amp;logo=linux&amp;logoColor=black" alt="Linux" /></a>
+</p>
+
+<p align="center">
+  <sub><a href="./README_ZH.md">简体中文</a> · <a href="./README_ZH_TW.md">繁體中文</a> · <strong>English</strong> · <a href="./README_KO.md">한국어</a> · <a href="./README_JA.md">日本語</a></sub>
 </p>
 
 <p align="center">
@@ -28,7 +32,7 @@
   <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the CleanCode canvas" width="960" />
 </p>
 
-<p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
+<p align="center"><sub>Multiple Agents and connected terminal tasks in a branch workspace.</sub></p>
 
 <p align="center"><strong>▶ Multi-Agent Collaboration Demo (0:39)</strong></p>
 
