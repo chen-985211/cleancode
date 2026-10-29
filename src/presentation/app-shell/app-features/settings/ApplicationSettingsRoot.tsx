@@ -45,6 +45,7 @@ import { AgentSettingsPane } from '../../../../contexts/agent/presentation/compo
 import type { UpdateAgentProviderPreferencesCommand } from '../../../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type { AgentProviderPreferencesSnapshot } from '../../../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
+import type { CanvasNodeFocusMode } from './canvasNodeFocusPreference'
 import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
 import { ApplicationDiagnosticsPane } from './ApplicationDiagnosticsPane'
@@ -60,6 +61,8 @@ import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarU
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 
 interface ApplicationSettingsRootProps {
+  readonly nodeFocusMode: CanvasNodeFocusMode
+  readonly onNodeFocusModeChange: (mode: CanvasNodeFocusMode) => void
   readonly workspaceDefaultsSettings?: ReactNode
   readonly agentProviderPreferences?: AgentProviderPreferencesSnapshot
   readonly agentProviderPreferencesStatus?: 'loading' | 'ready' | 'unavailable'
@@ -275,6 +278,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             <ApplicationSettingsPaneTransition activePane={activePane}>
               {activePane === 'canvas' ? (
                 <CanvasSettingsPane
+                  nodeFocusMode={props.nodeFocusMode}
+                  onNodeFocusModeChange={props.onNodeFocusModeChange}
                   followQuickExecutionTarget={props.followQuickExecutionTarget}
                   onFollowQuickExecutionTargetChange={props.onFollowQuickExecutionTargetChange}
                   reduceVisualNoise={props.reduceVisualNoise}

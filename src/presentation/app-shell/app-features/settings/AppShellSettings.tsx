@@ -14,8 +14,11 @@ import type { useApplicationShortcutPreference } from '../shortcuts/useApplicati
 import type { useBlockTemplateActions } from '../../coordinators/useBlockTemplateActions'
 import { useI18n } from '../../../i18n/useI18n'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
+import type { CanvasNodeFocusMode } from './canvasNodeFocusPreference'
 
 export function AppShellSettings({
+  nodeFocusMode,
+  changeNodeFocusMode,
   workspaceDefaultsSettings,
   agentCreation,
   applicationSettings,
@@ -35,6 +38,8 @@ export function AppShellSettings({
   terminalScrollbackRows,
   terminalWorkflowBuildMode
 }: {
+  readonly nodeFocusMode: CanvasNodeFocusMode
+  readonly changeNodeFocusMode: (mode: CanvasNodeFocusMode) => void
   readonly workspaceDefaultsSettings: ReactNode
   readonly agentCreation: ReturnType<typeof useAgentCreationProviders>
   readonly applicationSettings: ReturnType<typeof useApplicationSettingsNavigation>
@@ -68,6 +73,8 @@ export function AppShellSettings({
       <LanguageSettingsRoot />
       <ThemeSettingsRoot />
       <ApplicationSettingsRoot
+        nodeFocusMode={nodeFocusMode}
+        onNodeFocusModeChange={changeNodeFocusMode}
         workspaceDefaultsSettings={workspaceDefaultsSettings}
         agentProviderPreferences={agentCreation.agentProviderPreferences.state.preferences}
         agentProviderPreferencesStatus={agentCreation.agentProviderPreferences.state.status}

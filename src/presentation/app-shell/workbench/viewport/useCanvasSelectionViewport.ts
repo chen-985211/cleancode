@@ -7,12 +7,12 @@ import {
 } from '../../app-features/shortcuts/applicationShortcutNavigation'
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
 import {
-  resolveWorkbenchNodeFocusZoom,
-  resolveWorkbenchNodeSize
-} from './workbenchNodeFocusViewport'
+  defaultCanvasNodeFocusMode,
+  type CanvasNodeFocusMode
+} from '../../app-features/settings/canvasNodeFocusPreference'
+import { focusSelectedWorkbenchNodeInCanvas } from './focusSelectedWorkbenchNodeInCanvas'
 import {
   readWorkbenchViewportPresentation,
-  readWorkbenchViewportTargetZoom,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
@@ -21,12 +21,14 @@ import { useSelectedWorkbenchNodeInput } from '../nodes/useSelectedWorkbenchNode
 const globalCanvasViewZoom = 0.5
 
 interface UseCanvasSelectionViewportInput {
+  readonly nodeFocusMode?: CanvasNodeFocusMode
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly onUserAction: () => void
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
 }
 
 export function useCanvasSelectionViewport({
+  nodeFocusMode = defaultCanvasNodeFocusMode,
   canvasSizeRef,
   onUserAction,
   reactFlowInstanceRef
@@ -43,24 +45,21 @@ export function useCanvasSelectionViewport({
       const node = instance?.getNode(nodeId)
       if (!instance || !node || isWorkbenchNodePresentationHidden(node)) return
 
-      const zoom = resolveWorkbenchNodeFocusZoom({
-        canvasSize: canvasSizeRef.current,
-        currentZoom: readWorkbenchViewportTargetZoom(instance),
-        nodeSize: resolveWorkbenchNodeSize(node)
-      })
-
-      const transitionCompletion = transitionWorkbenchViewport(instance, {
-        center: resolveWorkbenchNodeCenter(node),
-        intent: {
-          canvasSize: canvasSizeRef.current,
-          type: 'adaptive-focus'
-        },
-        type: 'center',
-        zoom
-      })
+      const transitionCompletion = focusSelectedWorkbenchNodeInCanvas(
+        instance,
+        node,
+        canvasSizeRef.current,
+        nodeFocusMode
+      )
       activateSelectedWorkbenchNodeInput(nodeId, transitionCompletion)
     },
-    [activateSelectedWorkbenchNodeInput, canvasSizeRef, onUserAction, reactFlowInstanceRef]
+    [
+      activateSelectedWorkbenchNodeInput,
+      canvasSizeRef,
+      nodeFocusMode,
+      onUserAction,
+      reactFlowInstanceRef
+    ]
   )
 
   const returnToGlobalCanvasView = useCallback(

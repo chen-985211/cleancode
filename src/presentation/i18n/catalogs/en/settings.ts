@@ -53,6 +53,13 @@ export const enSettingsMessages = {
   'settings.shortcuts.command.quickExecution4': 'Run quick slot 4',
   'settings.shortcuts.command.quickExecution5': 'Run quick slot 5',
   'settings.canvas.title': 'Canvas',
+  'settings.canvas.nodeFocus': 'Node positioning',
+  'settings.canvas.nodeFocus.center': 'Center node',
+  'settings.canvas.nodeFocus.preserve-view': 'Preserve view',
+  'settings.canvas.nodeFocus.centerDescription':
+    'Center the selected node on the canvas and adjust to a suitable zoom level.',
+  'settings.canvas.nodeFocus.preserve-viewDescription':
+    'Keep the current view where possible. Pan or zoom out only when the node is not fully visible.',
   'settings.canvas.reduceVisualNoise': 'Reduce visual noise',
   'settings.canvas.reduceVisualNoiseDescription':
     'When zoomed out, hide secondary actions until hover, focus, or selection.',
