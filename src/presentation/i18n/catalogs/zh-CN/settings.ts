@@ -53,11 +53,11 @@ export const zhCNSettingsMessages = {
   'settings.canvas.title': '画布',
   'settings.canvas.nodeFocus': '节点定位方式',
   'settings.canvas.nodeFocus.center': '居中显示',
-  'settings.canvas.nodeFocus.preserve-view': '保留视野',
+  'settings.canvas.nodeFocus.preserve-view': '移入视野',
   'settings.canvas.nodeFocus.centerDescription':
     '将选中的节点移到画布中央，并调整到合适的缩放比例。',
   'settings.canvas.nodeFocus.preserve-viewDescription':
-    '尽量保持当前视野，仅在节点显示不完整时移动或缩小画布。',
+    '调整到合适的缩放比例，并将节点就近移入画布可见区域。',
   'settings.canvas.reduceVisualNoise': '减少视觉噪声',
   'settings.canvas.reduceVisualNoiseDescription':
     '缩小画布时隐藏次要操作，悬停、聚焦或选中时重新显示。',

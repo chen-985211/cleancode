@@ -27,23 +27,6 @@ export function CanvasSettingsPane({
       <header className="canvas-settings-pane__header">
         <h2>{t('settings.canvas.title')}</h2>
       </header>
-      <section className="canvas-settings-positioning" aria-labelledby="canvas-node-focus-title">
-        <h3 id="canvas-node-focus-title">{t('settings.canvas.nodeFocus')}</h3>
-        <ElasticSegmentedControl
-          labelledBy="canvas-node-focus-title"
-          describedBy="canvas-node-focus-description"
-          value={nodeFocusMode}
-          onChange={onNodeFocusModeChange}
-          options={(['center', 'preserve-view'] as const).map((mode) => ({
-            value: mode,
-            label: t(`settings.canvas.nodeFocus.${mode}`),
-            description: t(`settings.canvas.nodeFocus.${mode}Description`)
-          }))}
-        />
-        <p id="canvas-node-focus-description" className="canvas-settings-positioning__description">
-          {t(`settings.canvas.nodeFocus.${nodeFocusMode}Description`)}
-        </p>
-      </section>
       <section className="canvas-settings-group" aria-label={t('settings.canvas.title')}>
         <div className="canvas-settings-row">
           <span className="canvas-settings-row__copy">
@@ -73,6 +56,23 @@ export function CanvasSettingsPane({
             onClick={() => onFollowQuickExecutionTargetChange(!followQuickExecutionTarget)}
           />
         </div>
+      </section>
+      <section className="canvas-settings-positioning" aria-labelledby="canvas-node-focus-title">
+        <h3 id="canvas-node-focus-title">{t('settings.canvas.nodeFocus')}</h3>
+        <ElasticSegmentedControl
+          labelledBy="canvas-node-focus-title"
+          describedBy="canvas-node-focus-description"
+          value={nodeFocusMode}
+          onChange={onNodeFocusModeChange}
+          options={(['center', 'preserve-view'] as const).map((mode) => ({
+            value: mode,
+            label: t(`settings.canvas.nodeFocus.${mode}`),
+            description: t(`settings.canvas.nodeFocus.${mode}Description`)
+          }))}
+        />
+        <p id="canvas-node-focus-description" className="canvas-settings-positioning__description">
+          {t(`settings.canvas.nodeFocus.${nodeFocusMode}Description`)}
+        </p>
       </section>
     </div>
   )

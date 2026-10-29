@@ -16,6 +16,8 @@ const cases = [
   { name: 'below', x: 200, y: 800, width: 200, height: 160, zoom: 1 },
   { name: 'above', x: 200, y: -600, width: 200, height: 160, zoom: 1 },
   { name: 'distant', x: 2000, y: 1800, width: 200, height: 160, zoom: 0.5 },
+  { name: 'readable', x: 200, y: 180, width: 200, height: 160, zoom: 1 },
+  { name: 'magnified', x: 850, y: 180, width: 200, height: 160, zoom: 1.25 },
   { name: 'oversized', x: 1200, y: 800, width: 1400, height: 1000, zoom: 1 }
 ]
 
@@ -38,12 +40,12 @@ describe('canvas node positioning mode', () => {
   })
 
   it.each(['selection', 'shortcut'] as const)(
-    '%s preserves an already visible target and current zoom',
+    '%s restores readable zoom even when the target is already visible',
     async (entry) => {
       const target = nodeAt(cases[0])
       const hook = renderFocus(target, { x: 0, y: 0, zoom: 0.5 })
       await act(async () => hook.focus(entry))
-      expect(hook.instance.getViewport()).toEqual({ x: 0, y: 0, zoom: 0.5 })
+      expect(hook.instance.getViewport()).toEqual({ x: -176, y: -156, zoom: 1 })
       if (entry === 'shortcut') {
         expect(hook.select).toHaveBeenCalledWith(target)
         expect(hook.activate).toHaveBeenCalledWith(target)
@@ -62,12 +64,12 @@ describe('canvas node positioning mode', () => {
           await act(async () => hook.focus(entry))
           const after = hook.instance.getViewport()
           expectContained(target, after, safeViewport)
-          expect(after.zoom).toBeLessThanOrEqual(before.zoom)
-          if (
-            scenario.width * before.zoom <= safeViewport.width &&
-            scenario.height * before.zoom <= safeViewport.height
-          ) {
-            expect(after.zoom).toBe(before.zoom)
+          const centered = renderFocus(target, before)
+          centered.rerender({ mode: 'center' })
+          await act(async () => centered.focus(entry))
+          expect(after.zoom).toBe(centered.instance.getViewport().zoom)
+          centered.unmount()
+          if (after.zoom === before.zoom) {
             // No axis moves farther than necessary to reveal the target.
             for (const [axis, size] of [
               ['x', 'width'],
@@ -89,7 +91,7 @@ describe('canvas node positioning mode', () => {
   )
 
   it('preserves fractional camera coordinates exactly for a fully visible target', async () => {
-    const before = { x: 0.1, y: 0.3, zoom: 0.73 }
+    const before = { x: 0.1, y: 0.3, zoom: 1.25 }
     const hook = renderFocus(nodeAt(cases[0]), before)
     await act(async () => hook.focus('selection'))
     expect(hook.instance.getViewport()).toEqual(before)
@@ -155,14 +157,14 @@ describe('canvas node positioning mode', () => {
     render(<Settings />)
     const group = screen.getByRole('radiogroup', { name: '节点定位方式' })
     const center = within(group).getByRole('radio', { name: '居中显示' })
-    const preserve = within(group).getByRole('radio', { name: '保留视野' })
+    const preserve = within(group).getByRole('radio', { name: '移入视野' })
     expect(center).toBeChecked()
     expect(group).toHaveAccessibleDescription('将选中的节点移到画布中央，并调整到合适的缩放比例。')
     fireEvent.keyDown(center, { key: 'ArrowRight' })
     expect(preserve).toBeChecked()
     expect(preserve).toHaveFocus()
     expect(group).toHaveAccessibleDescription(
-      '尽量保持当前视野，仅在节点显示不完整时移动或缩小画布。'
+      '调整到合适的缩放比例，并将节点就近移入画布可见区域。'
     )
     fireEvent.click(center)
     expect(center).toBeChecked()

@@ -27,13 +27,18 @@ export function focusSelectedWorkbenchNodeInCanvas(
   mode: CanvasNodeFocusMode
 ): Promise<boolean> {
   const size = resolveWorkbenchNodeSize(node)
-  const targetZoom = readWorkbenchViewportTargetZoom(instance)
+  const zoom = resolveWorkbenchNodeFocusZoom({
+    canvasSize,
+    currentZoom: readWorkbenchViewportTargetZoom(instance),
+    nodeSize: size
+  })
+  const intent = { type: 'adaptive-focus' as const, canvasSize }
   if (mode === 'center') {
     return transitionWorkbenchViewport(instance, {
       type: 'center',
       center: resolveWorkbenchNodeCenter(node),
-      intent: { type: 'adaptive-focus', canvasSize },
-      zoom: resolveWorkbenchNodeFocusZoom({ canvasSize, currentZoom: targetZoom, nodeSize: size })
+      intent,
+      zoom
     })
   }
 
@@ -44,18 +49,17 @@ export function focusSelectedWorkbenchNodeInCanvas(
     ...geometry,
     bounds: { ...node.position, ...size },
     currentViewport,
-    targetZoom
+    targetZoom: zoom
   })
   const unchanged =
     viewport.x === currentViewport.x &&
     viewport.y === currentViewport.y &&
     viewport.zoom === currentViewport.zoom
   // A no-motion completion also replaces any older request and commits its final view.
-  // Revealing uses the shared spring without the centering flight's temporary zoom-out.
   return transitionWorkbenchViewport(instance, {
     type: 'set-viewport',
     viewport,
-    intent: { type: unchanged ? 'instant' : 'spatial' }
+    intent: unchanged ? { type: 'instant' } : intent
   })
 }
 

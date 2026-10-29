@@ -1,7 +1,6 @@
 import type { Rect, Viewport } from '@xyflow/react'
-import { minimumCanvasZoom } from '../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 
-// Preserve the current view, translating each axis only as far as containment requires.
+// Use the shared focus zoom, translating each axis only as far as containment requires.
 export function resolveWorkbenchNodeRevealViewport({
   bounds,
   currentViewport,
@@ -15,11 +14,8 @@ export function resolveWorkbenchNodeRevealViewport({
   readonly canvasSize: { readonly width: number; readonly height: number }
   readonly safeViewport: Rect
 }): Viewport {
-  const zoom = Math.max(
-    minimumCanvasZoom,
-    Math.min(targetZoom, safeViewport.width / bounds.width, safeViewport.height / bounds.height)
-  )
-  // Shrink around the current view center before applying the minimum translation.
+  const zoom = targetZoom
+  // Zoom around the current view center before applying the minimum translation.
   const ratio = zoom / currentViewport.zoom
   const x =
     ratio === 1
@@ -43,7 +39,7 @@ function revealAxis(
   start: number,
   available: number
 ): number {
-  // At the minimum zoom, an uncontainable axis shows the middle of the target.
+  // An axis that cannot fit at the shared focus zoom shows the middle of the target.
   if (size > available) return start + available / 2 - position - size / 2
   return Math.max(start - position, Math.min(start + available - position - size, offset))
 }

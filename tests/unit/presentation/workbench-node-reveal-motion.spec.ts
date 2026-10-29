@@ -23,11 +23,11 @@ describe('preserve-view navigation motion', () => {
     vi.useRealTimers()
   })
 
-  it('pans a distant node into view without temporary flight zoom', async () => {
+  it('uses the existing adaptive flight to bring a distant node into view', async () => {
     const instance = canvas()
     const completion = focus(instance, node(2000))
     await vi.advanceTimersByTimeAsync(150)
-    expect(instance.getViewport().zoom).toBe(1)
+    expect(instance.getViewport().zoom).toBeLessThan(1)
     expect(instance.getViewport().x).toBeLessThan(0)
     await vi.advanceTimersByTimeAsync(1500)
     expect(await completion).toBe(true)
@@ -36,7 +36,7 @@ describe('preserve-view navigation motion', () => {
 
   it('cancels an old pan when the new target is already visible', async () => {
     const instance = canvas()
-    const first = focus(instance, node(2000))
+    const first = focus(instance, node(900))
     await vi.advanceTimersByTimeAsync(100)
     const presented = { ...instance.getViewport() }
     const visible = node(100 - presented.x)
@@ -47,17 +47,17 @@ describe('preserve-view navigation motion', () => {
     expect(instance.getViewport()).toEqual(presented)
   })
 
-  it('inherits the intended scale when a new target interrupts a shrinking view', async () => {
+  it('restores readable zoom when a compact target interrupts an oversized target', async () => {
     const instance = canvas()
     const first = focus(instance, node(2000, { width: 1400, height: 1000 }))
     await vi.advanceTimersByTimeAsync(100)
-    expect(instance.getViewport().zoom).toBeGreaterThan(0.592)
+    expect(instance.getViewport().zoom).toBeGreaterThan(0.4352)
     const second = focus(instance, node(-2000))
     await vi.advanceTimersByTimeAsync(1500)
     expect(await first).toBe(false)
     expect(await second).toBe(true)
-    expect(instance.getViewport().zoom).toBe(0.592)
-    expect(-2000 * 0.592 + instance.getViewport().x).toBeCloseTo(24)
+    expect(instance.getViewport().zoom).toBe(1)
+    expect(-2000 + instance.getViewport().x).toBeCloseTo(24)
   })
 
   it('respects the minimum zoom and centers only an axis that cannot fit', () => {
