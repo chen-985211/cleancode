@@ -10,6 +10,10 @@ interface WorkbenchCanvasSizeIntent {
   readonly type: string
 }
 
+export function areWorkbenchViewportsEqual(current: Viewport, target: Viewport): boolean {
+  return current.x === target.x && current.y === target.y && current.zoom === target.zoom
+}
+
 export function resolveWorkbenchCommandCanvasSize(
   intent: WorkbenchCanvasSizeIntent,
   fallback: { readonly height: number; readonly width: number }

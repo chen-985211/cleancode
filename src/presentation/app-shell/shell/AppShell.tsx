@@ -42,6 +42,7 @@ import { useWindowFullScreenState } from './lifecycle/useWindowFullScreenState'
 import { useTerminalRuntimePreference } from '../../../contexts/run/presentation/view-models/useTerminalRuntimePreference'
 import { useTerminalWorkflowBuildPreference } from '../app-features/settings/useTerminalWorkflowBuildPreference'
 import { useCanvasVisualNoisePreference } from '../app-features/settings/useCanvasVisualNoisePreference'
+import { useCanvasNodeFocusPreference } from '../app-features/settings/useCanvasNodeFocusPreference'
 import { useTerminalRuntimeAvailability } from '../../../contexts/run/presentation/view-models/useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from '../projections/agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
@@ -190,6 +191,7 @@ export function AppShell({
   const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
     useTerminalWorkflowBuildPreference()
   const { changeReduceVisualNoise, reduceVisualNoise } = useCanvasVisualNoisePreference()
+  const { nodeFocusMode, changeNodeFocusMode } = useCanvasNodeFocusPreference()
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates: terminalStateProjection.states,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -356,6 +358,7 @@ export function AppShell({
     workspaceInitialization.cancelFocus()
   }
   const selectionViewport = useCanvasSelectionViewport({
+    nodeFocusMode,
     canvasSizeRef,
     onUserAction: cancelAllLayoutFocus,
     reactFlowInstanceRef
@@ -378,6 +381,7 @@ export function AppShell({
     ? toAgentFlowNodeId(selectedAgentId)
     : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
   const shortcutNavigation = useApplicationShortcutNavigation({
+    nodeFocusMode,
     activateWorkbenchNodeInput: activateWorkbenchNodeInputFromShortcut,
     canvasSizeRef,
     currentWorkbench,
@@ -583,6 +587,7 @@ export function AppShell({
           changeBinding={changeBinding}
           changeFollowQuickExecutionTarget={quickExecution.changeFollowQuickExecutionTarget}
           changeReduceVisualNoise={changeReduceVisualNoise}
+          {...{ nodeFocusMode, changeNodeFocusMode }}
           changeTerminalScrollback={changeTerminalScrollback}
           changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
           {...{ currentWorkbench, isDesktopRuntime }}

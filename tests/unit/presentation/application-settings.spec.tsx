@@ -392,6 +392,8 @@ function SettingsHarness({
 
   return (
     <ApplicationSettingsRoot
+      nodeFocusMode="center"
+      onNodeFocusModeChange={vi.fn()}
       workspaceDefaultsSettings={workspaceDefaultsSettings}
       bindings={bindings}
       isOpen={isOpen}

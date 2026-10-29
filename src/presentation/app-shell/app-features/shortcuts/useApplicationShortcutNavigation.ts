@@ -4,7 +4,6 @@ import { useCallback, useRef, useState, type MutableRefObject } from 'react'
 import {
   resolveAdjacentWorkspaceTarget,
   resolveDirectionalWorkbenchNode,
-  resolveWorkbenchNodeCenter,
   type CanvasNavigationDirection,
   type CanvasSize,
   type WorkspaceNavigationDirection
@@ -13,16 +12,14 @@ import type { ProjectSidebarIntent } from '../../../../contexts/project/presenta
 import type { WorkbenchFlowNode } from '../../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../../types/workbenchSnapshot'
 import {
-  resolveWorkbenchNodeFocusZoom,
-  resolveWorkbenchNodeSize
-} from '../../workbench/viewport/workbenchNodeFocusViewport'
-import {
-  readWorkbenchViewportPresentation,
-  readWorkbenchViewportTargetZoom,
-  transitionWorkbenchViewport
-} from '../../workbench/viewport/workbenchViewportMotion'
+  defaultCanvasNodeFocusMode,
+  type CanvasNodeFocusMode
+} from '../settings/canvasNodeFocusPreference'
+import { focusSelectedWorkbenchNodeInCanvas } from '../../workbench/viewport/focusSelectedWorkbenchNodeInCanvas'
+import { readWorkbenchViewportPresentation } from '../../workbench/viewport/workbenchViewportMotion'
 
 interface UseApplicationShortcutNavigationInput {
+  readonly nodeFocusMode?: CanvasNodeFocusMode
   readonly activateWorkbenchNodeInput: (node: WorkbenchFlowNode) => void
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -39,6 +36,7 @@ interface UseApplicationShortcutNavigationInput {
 }
 
 export function useApplicationShortcutNavigation({
+  nodeFocusMode = defaultCanvasNodeFocusMode,
   activateWorkbenchNodeInput,
   canvasSizeRef,
   currentWorkbench,
@@ -104,21 +102,12 @@ export function useApplicationShortcutNavigation({
       previousShortcutSelectedNodeIdRef.current = currentSelectedNodeId
       previousShortcutDirectionRef.current = direction
       selectedNodeIdRef.current = target.id
-      const center = resolveWorkbenchNodeCenter(target)
-      const zoom = resolveWorkbenchNodeFocusZoom({
-        canvasSize: canvasSizeRef.current,
-        currentZoom: readWorkbenchViewportTargetZoom(instance),
-        nodeSize: resolveWorkbenchNodeSize(target)
-      })
-      const transitionCompletion = transitionWorkbenchViewport(instance, {
-        center,
-        intent: {
-          canvasSize: canvasSizeRef.current,
-          type: 'adaptive-focus'
-        },
-        type: 'center',
-        zoom
-      })
+      const transitionCompletion = focusSelectedWorkbenchNodeInCanvas(
+        instance,
+        target,
+        canvasSizeRef.current,
+        nodeFocusMode
+      )
       activateWorkbenchNodeInputRef.current(target)
       void transitionCompletion.then((completed) => {
         if (completed && selectedNodeIdRef.current === target.id) {
@@ -126,7 +115,7 @@ export function useApplicationShortcutNavigation({
         }
       })
     },
-    [canvasSizeRef, getNodes, reactFlowInstanceRef]
+    [canvasSizeRef, getNodes, nodeFocusMode, reactFlowInstanceRef]
   )
 
   const navigateWorkspace = useCallback(

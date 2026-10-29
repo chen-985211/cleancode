@@ -10,6 +10,31 @@
   line-height: 1.2;
 }
 
+.canvas-settings-positioning {
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 36px;
+  margin-bottom: 36px;
+}
+
+.canvas-settings-positioning h3 {
+  margin: 0 0 12px;
+  color: var(--cc-foreground);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.canvas-settings-positioning__description {
+  margin: 12px 0 0;
+  max-width: 48ch;
+  min-height: 3.2em;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
 .canvas-settings-group {
   overflow: hidden;
   margin-top: 20px;

@@ -1,12 +1,18 @@
 import { useI18n } from '../../../i18n/useI18n'
 import { ApplicationSettingsSwitch } from '../../../shared/components/ApplicationSettingsSwitch'
+import { ElasticSegmentedControl } from '../../../shared/components/ElasticSegmentedControl'
+import type { CanvasNodeFocusMode } from './canvasNodeFocusPreference'
 
 export function CanvasSettingsPane({
+  nodeFocusMode,
+  onNodeFocusModeChange,
   followQuickExecutionTarget,
   onFollowQuickExecutionTargetChange,
   reduceVisualNoise,
   onReduceVisualNoiseChange
 }: {
+  readonly nodeFocusMode: CanvasNodeFocusMode
+  readonly onNodeFocusModeChange: (mode: CanvasNodeFocusMode) => void
   readonly followQuickExecutionTarget: boolean
   readonly onFollowQuickExecutionTargetChange: (followQuickExecutionTarget: boolean) => void
   readonly reduceVisualNoise: boolean
@@ -50,6 +56,23 @@ export function CanvasSettingsPane({
             onClick={() => onFollowQuickExecutionTargetChange(!followQuickExecutionTarget)}
           />
         </div>
+      </section>
+      <section className="canvas-settings-positioning" aria-labelledby="canvas-node-focus-title">
+        <h3 id="canvas-node-focus-title">{t('settings.canvas.nodeFocus')}</h3>
+        <ElasticSegmentedControl
+          labelledBy="canvas-node-focus-title"
+          describedBy="canvas-node-focus-description"
+          value={nodeFocusMode}
+          onChange={onNodeFocusModeChange}
+          options={(['center', 'preserve-view'] as const).map((mode) => ({
+            value: mode,
+            label: t(`settings.canvas.nodeFocus.${mode}`),
+            description: t(`settings.canvas.nodeFocus.${mode}Description`)
+          }))}
+        />
+        <p id="canvas-node-focus-description" className="canvas-settings-positioning__description">
+          {t(`settings.canvas.nodeFocus.${nodeFocusMode}Description`)}
+        </p>
       </section>
     </div>
   )
