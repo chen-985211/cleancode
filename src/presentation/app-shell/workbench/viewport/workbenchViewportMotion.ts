@@ -40,6 +40,7 @@ import {
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 import { applyWorkbenchViewport } from './workbenchViewportAdapter'
 import {
+  areWorkbenchViewportsEqual,
   resolveWorkbenchCommandCanvasSize,
   resolveWorkbenchZoomTarget
 } from './workbenchViewportMotionTarget'
@@ -152,11 +153,7 @@ export function resolveWorkbenchViewportTransition(
   input: ResolveWorkbenchViewportTransitionInput
 ): WorkbenchViewportTransition {
   const { currentViewport, intent, reducedMotion, targetViewport } = input
-  if (intent.type === 'instant') {
-    return {}
-  }
-
-  if (reducedMotion) {
+  if (intent.type === 'instant' || reducedMotion) {
     return {}
   }
 
@@ -496,7 +493,10 @@ export function createWorkbenchViewportMotionController(
     const requestId = nextRequestId
     nextRequestId += 1
 
-    if (transitionOptions.response === undefined) {
+    if (
+      transitionOptions.response === undefined ||
+      areWorkbenchViewportsEqual(currentViewport, target)
+    ) {
       cancelActiveMotion()
       latestRequest = { instance, requestId, targetZoom: target.zoom }
       return applyPresentedViewport(instance, target).then((applied) =>

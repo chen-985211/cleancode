@@ -51,15 +51,10 @@ export function focusSelectedWorkbenchNodeInCanvas(
     currentViewport,
     targetZoom: zoom
   })
-  const unchanged =
-    viewport.x === currentViewport.x &&
-    viewport.y === currentViewport.y &&
-    viewport.zoom === currentViewport.zoom
-  // A no-motion completion also replaces any older request and commits its final view.
   return transitionWorkbenchViewport(instance, {
     type: 'set-viewport',
     viewport,
-    intent: unchanged ? { type: 'instant' } : intent
+    intent
   })
 }
 

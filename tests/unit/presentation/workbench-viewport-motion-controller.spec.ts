@@ -7,6 +7,36 @@ import {
 } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
+  it.each(['quick', 'spatial', 'adaptive-focus'] as const)(
+    'immediately completes a stationary %s target without inheriting the interrupted velocity',
+    async (type) => {
+      const frames = new TestFrameScheduler()
+      const controller = createWorkbenchViewportMotionController(frames)
+      const instance = createViewportInstance()
+      const completed = vi.fn()
+      controller.subscribe(instance.value, completed)
+      const first = controller.transition(instance.value, centerCommand(1_480))
+      frames.step()
+      const presented = { ...instance.viewport }
+      const intent = { type, canvasSize: { width: 960, height: 640 } }
+
+      const second = controller.transition(instance.value, {
+        type: 'set-viewport',
+        viewport: presented,
+        intent
+      })
+
+      expect(frames.pendingCount).toBe(0)
+      expect(frames.pendingTimeoutCount).toBe(0)
+      await expect(first).resolves.toBe(false)
+      await expect(second).resolves.toBe(true)
+      expect(completed).toHaveBeenCalledExactlyOnceWith({ intent, viewport: presented })
+      frames.finish()
+      expect(instance.viewport).toEqual(presented)
+      expect(completed).toHaveBeenCalledTimes(1)
+    }
+  )
+
   it.each([
     { type: 'zoom-out', zooms: [1.6, 1.3, 1, 0.7, 0.4, 0.35] },
     { type: 'zoom-in', zooms: [1, 1.3, 1.6] }
