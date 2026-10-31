@@ -15,7 +15,8 @@ describe('GitHub CLI process fixture', () => {
   })
 
   afterEach(async () => {
-    await rm(directory, { recursive: true, force: true })
+    // Windows may briefly retain a lock on gh.exe after the process exits.
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it.each([undefined, "the 'fixture/issues' repository has disabled issues"])(

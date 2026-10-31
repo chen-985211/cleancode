@@ -51,6 +51,8 @@ export const zhCNSettingsMessages = {
   'settings.shortcuts.command.quickExecution4': '执行快捷位 4',
   'settings.shortcuts.command.quickExecution5': '执行快捷位 5',
   'settings.canvas.title': '画布',
+  'settings.canvas.zoomOnBlankClick': '点击空白处缩小画布',
+  'settings.canvas.zoomOnBlankClickDescription': '点击画布空白处时，将画布缩放至 50%。',
   'settings.canvas.nodeFocus': '节点定位方式',
   'settings.canvas.nodeFocus.center': '居中显示',
   'settings.canvas.nodeFocus.preserve-view': '移入视野',

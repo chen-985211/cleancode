@@ -4,6 +4,8 @@ import { ElasticSegmentedControl } from '../../../shared/components/ElasticSegme
 import type { CanvasNodeFocusMode } from './canvasNodeFocusPreference'
 
 export function CanvasSettingsPane({
+  zoomOnBlankClick,
+  onZoomOnBlankClickChange,
   nodeFocusMode,
   onNodeFocusModeChange,
   followQuickExecutionTarget,
@@ -11,6 +13,8 @@ export function CanvasSettingsPane({
   reduceVisualNoise,
   onReduceVisualNoiseChange
 }: {
+  readonly zoomOnBlankClick: boolean
+  readonly onZoomOnBlankClickChange: (enabled: boolean) => void
   readonly nodeFocusMode: CanvasNodeFocusMode
   readonly onNodeFocusModeChange: (mode: CanvasNodeFocusMode) => void
   readonly followQuickExecutionTarget: boolean
@@ -19,6 +23,7 @@ export function CanvasSettingsPane({
   readonly onReduceVisualNoiseChange: (reduceVisualNoise: boolean) => void
 }) {
   const { t } = useI18n()
+  const blankClickZoomDescriptionId = 'canvas-settings-blank-click-zoom-description'
   const visualNoiseDescriptionId = 'canvas-settings-visual-noise-description'
   const quickExecutionFollowDescriptionId = 'canvas-settings-quick-execution-follow-description'
 
@@ -28,6 +33,20 @@ export function CanvasSettingsPane({
         <h2>{t('settings.canvas.title')}</h2>
       </header>
       <section className="canvas-settings-group" aria-label={t('settings.canvas.title')}>
+        <div className="canvas-settings-row">
+          <span className="canvas-settings-row__copy">
+            <strong>{t('settings.canvas.zoomOnBlankClick')}</strong>
+            <span id={blankClickZoomDescriptionId}>
+              {t('settings.canvas.zoomOnBlankClickDescription')}
+            </span>
+          </span>
+          <ApplicationSettingsSwitch
+            checked={zoomOnBlankClick}
+            aria-describedby={blankClickZoomDescriptionId}
+            label={t('settings.canvas.zoomOnBlankClick')}
+            onClick={() => onZoomOnBlankClickChange(!zoomOnBlankClick)}
+          />
+        </div>
         <div className="canvas-settings-row">
           <span className="canvas-settings-row__copy">
             <strong>{t('settings.canvas.reduceVisualNoise')}</strong>

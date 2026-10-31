@@ -145,6 +145,8 @@ describe('canvas node positioning mode', () => {
       const [mode, setMode] = useState<'center' | 'preserve-view'>('center')
       return (
         <CanvasSettingsPane
+          zoomOnBlankClick
+          onZoomOnBlankClickChange={vi.fn()}
           nodeFocusMode={mode}
           onNodeFocusModeChange={setMode}
           reduceVisualNoise={false}

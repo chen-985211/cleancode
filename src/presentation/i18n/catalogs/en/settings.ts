@@ -53,6 +53,9 @@ export const enSettingsMessages = {
   'settings.shortcuts.command.quickExecution4': 'Run quick slot 4',
   'settings.shortcuts.command.quickExecution5': 'Run quick slot 5',
   'settings.canvas.title': 'Canvas',
+  'settings.canvas.zoomOnBlankClick': 'Zoom out on blank canvas click',
+  'settings.canvas.zoomOnBlankClickDescription':
+    'Zoom the canvas to 50% when clicking an empty area.',
   'settings.canvas.nodeFocus': 'Node positioning',
   'settings.canvas.nodeFocus.center': 'Center node',
   'settings.canvas.nodeFocus.preserve-view': 'Bring into view',
