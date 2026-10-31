@@ -97,7 +97,7 @@ describe('quick execution e2e', () => {
         terminalBlockId: graph.blocks[0]?.id
       })
 
-      const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；点击仅用于定位视图。`
+      const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；单击定位视图，双击直接运行。`
       const quickSlotTooltip = page.getByRole('tooltip', {
         name: quickExecutionTooltip,
         exact: true
@@ -165,7 +165,7 @@ describe('quick execution e2e', () => {
       await page.getByRole('button', { name: '完成整理' }).click()
 
       const boundSlot = page.getByRole('button', {
-        name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+        name: '快捷位 2：Terminal 1，单击定位，双击或快捷键运行'
       })
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await page.waitForFunction(
@@ -175,10 +175,12 @@ describe('quick execution e2e', () => {
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
       await waitForCanvasViewportToSettle(page)
       const focusedViewport = await readCanvasViewportTransform(page)
+      await boundSlot.dblclick()
+      await waitForQuickLaunchCount(reportPath, launchOutput, 2)
       expect(await panCanvasAwayFromQuickExecutionTarget(page)).not.toBe(focusedViewport)
       await page.getByRole('button', { name: '新建 Agent' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
-      await waitForQuickLaunchCount(reportPath, launchOutput, 2)
+      await waitForQuickLaunchCount(reportPath, launchOutput, 3)
       await waitForCanvasViewportTransform(page, focusedViewport)
       expect(
         await setQuickExecutionTargetFollowing(page, false, 'quick-execution-canvas-settings.png')
@@ -195,7 +197,7 @@ describe('quick execution e2e', () => {
       await page.waitForLoadState('domcontentloaded')
 
       const restoredSlot = page.getByRole('button', {
-        name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+        name: '快捷位 2：Terminal 1，单击定位，双击或快捷键运行'
       })
       await pollUntilState({
         description: 'workbench restoration to expose persisted quick execution slot 2',
@@ -210,7 +212,7 @@ describe('quick execution e2e', () => {
       const unfollowedViewport = await panCanvasAwayFromQuickExecutionTarget(page)
       await page.getByRole('button', { name: '新建 Agent' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
-      await waitForQuickLaunchCount(reportPath, launchOutput, 3)
+      await waitForQuickLaunchCount(reportPath, launchOutput, 4)
       await waitForCanvasViewportToSettle(page)
       expect(await readCanvasViewportTransform(page)).toBe(unfollowedViewport)
 

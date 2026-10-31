@@ -41,6 +41,7 @@ export function WorkbenchCanvasBottomControls({
   onAddQuickExecutionTarget,
   onArrange,
   onClearQuickExecutionSlot,
+  onExecuteQuickExecutionTarget,
   onReorderQuickExecutionSlots,
   quickExecutionContainer,
   reactFlowInstanceRef,
@@ -57,6 +58,9 @@ export function WorkbenchCanvasBottomControls({
     target: QuickExecutionTargetSnapshot
   ) => Promise<void> | void
   readonly onArrange?: ArrangeCanvasSelectionHandler
+  readonly onExecuteQuickExecutionTarget?: (
+    target: QuickExecutionTargetSnapshot
+  ) => Promise<void> | void
   readonly onClearQuickExecutionSlot?: (number: QuickExecutionSlotNumber) => Promise<void> | void
   readonly onReorderQuickExecutionSlots?: (
     sourceNumber: QuickExecutionSlotNumber,
@@ -76,6 +80,7 @@ export function WorkbenchCanvasBottomControls({
     currentWorkbench &&
     onAddQuickExecutionTarget &&
     onClearQuickExecutionSlot &&
+    onExecuteQuickExecutionTarget &&
     onReorderQuickExecutionSlots
   const requestedBottomControl: CanvasBottomControl | null = hasCanvasSelection
     ? 'arrangement'
@@ -98,6 +103,7 @@ export function WorkbenchCanvasBottomControls({
               open={bottomControlHandoff.quickExecutionOpen}
               onAdd={onAddQuickExecutionTarget}
               onClear={onClearQuickExecutionSlot}
+              onExecute={onExecuteQuickExecutionTarget}
               onFocus={(target) =>
                 focusQuickExecutionTargetInCanvas({
                   instance: reactFlowInstanceRef.current,

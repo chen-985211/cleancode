@@ -38,7 +38,7 @@ export const zhCNCanvasMessages = {
   'quickExecution.arrange': '整理快捷位',
   'quickExecution.doneArranging': '完成整理',
   'quickExecution.addFavorites': '添加常用对象',
-  'quickExecution.boundSlot': '快捷位 {number}：{name}，点击定位，仅支持快捷键执行',
+  'quickExecution.boundSlot': '快捷位 {number}：{name}，单击定位，双击或快捷键运行',
   'quickExecution.bindEmpty': '为快捷位 {number} 添加对象',
   'quickExecution.execute': '执行快捷位 {number}：{name}',
   'quickExecution.removeDropTarget': '拖到此处清空快捷位 {number}',
@@ -47,7 +47,8 @@ export const zhCNCanvasMessages = {
   'quickExecution.type.terminal': '终端',
   'quickExecution.type.workflow': '流程',
   'quickExecution.type.combination': '组合',
-  'quickExecution.tooltip.bound': '已绑定{type}「{name}」。{shortcutHint}；点击仅用于定位视图。',
+  'quickExecution.tooltip.bound':
+    '已绑定{type}「{name}」。{shortcutHint}；单击定位视图，双击直接运行。',
   'quickExecution.tooltip.empty': '快捷位 {number} 为空，可绑定当前画布中的对象。',
   'quickExecution.tooltip.executeShortcut': '按 {shortcut} 执行此快捷位',
   'quickExecution.updateFailedTitle': '快捷执行栏更新失败',

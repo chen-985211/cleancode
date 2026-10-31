@@ -205,7 +205,7 @@ describe('workbench canvas object context menu', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: '快捷位 1：workflow-a → workflow-b → workflow-c，点击定位，仅支持快捷键执行'
+        name: '快捷位 1：workflow-a → workflow-b → workflow-c，单击定位，双击或快捷键运行'
       })
     )
 
@@ -550,6 +550,7 @@ function renderCanvas({
       onDeleteTerminalScope={onDeleteTerminalScope}
       onAddQuickExecutionTarget={onAddQuickExecutionTarget}
       onClearQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}
+      onExecuteQuickExecutionTarget={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onReorderQuickExecutionSlots={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onQuickExecutionNodeDrop={onQuickExecutionNodeDrop}
       onCreateTerminalBlock={vi.fn()}

@@ -86,6 +86,9 @@ export interface WorkbenchCanvasProps {
   readonly onAddQuickExecutionTarget?: (
     target: QuickExecutionTargetSnapshot
   ) => Promise<void> | void
+  readonly onExecuteQuickExecutionTarget?: (
+    target: QuickExecutionTargetSnapshot
+  ) => Promise<void> | void
   readonly onClearQuickExecutionSlot?: (number: QuickExecutionSlotNumber) => Promise<void> | void
   readonly onReorderQuickExecutionSlots?: (
     sourceNumber: QuickExecutionSlotNumber,

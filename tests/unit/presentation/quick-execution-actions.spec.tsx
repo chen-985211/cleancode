@@ -69,6 +69,28 @@ describe('quick execution actions', () => {
     }
   )
 
+  it('shares in-flight execution protection between double-click and keyboard entries', async () => {
+    const target = { type: 'terminal' as const, terminalBlockId: 'terminal-1' }
+    const harness = createHarness(target, false)
+    let finish!: () => void
+    harness.quickLaunchTerminal.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finish = () => resolve(undefined)
+        })
+    )
+    await act(async () => {
+      const execution = harness.result.current.executeTarget(target)
+      await harness.result.current.executeSlot(1)
+      await harness.result.current.executeTarget(target)
+      expect(harness.quickLaunchTerminal).toHaveBeenCalledOnce()
+      finish()
+      await execution
+    })
+    await act(async () => harness.result.current.executeSlot(1))
+    expect(harness.quickLaunchTerminal).toHaveBeenCalledTimes(2)
+  })
+
   it('executes without moving the viewport when following is disabled', async () => {
     const target = { type: 'terminal' as const, terminalBlockId: 'terminal-1' }
     const harness = createHarness(target, false)
