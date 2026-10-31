@@ -40,6 +40,7 @@ interface QuickExecutionBarProps {
   readonly onAdd: (target: QuickExecutionTargetSnapshot) => Promise<void> | void
   readonly onClear: (number: QuickExecutionSlotNumber) => Promise<void> | void
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
+  readonly onExecute: (target: QuickExecutionTargetSnapshot) => Promise<void> | void
   readonly onExitComplete?: () => void
   readonly onReorder: (
     sourceNumber: QuickExecutionSlotNumber,
@@ -61,6 +62,7 @@ export function QuickExecutionBar({
   onClear,
   onExitComplete,
   onFocus,
+  onExecute,
   onReorder,
   shortcutPlatform = 'mac',
   shortcutTooltips
@@ -313,6 +315,7 @@ export function QuickExecutionBar({
         shortcutPlatform={shortcutPlatform}
         shortcutTooltips={shortcutTooltips}
         onFocus={onFocus}
+        onExecute={onExecute}
         onPointerDown={onPointerDown}
         swapOffset={swapOffset}
         preview={dragPreview?.surface === surface ? dragPreview : null}

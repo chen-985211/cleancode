@@ -13,6 +13,7 @@ describe('quick execution bar', () => {
         onAdd: vi.fn(),
         onClear: vi.fn(),
         onFocus: vi.fn(),
+        onExecute: vi.fn(),
         onReorder: vi.fn()
       }
       const { rerender } = render(<QuickExecutionBar {...props} />)
@@ -32,6 +33,7 @@ describe('quick execution bar', () => {
       onAdd: vi.fn(),
       onClear: vi.fn(),
       onFocus: vi.fn(),
+      onExecute: vi.fn(),
       onReorder: vi.fn()
     }
     const { rerender } = render(<QuickExecutionBar {...props} open />)
@@ -61,6 +63,7 @@ describe('quick execution bar', () => {
       onAdd: vi.fn(),
       onClear: vi.fn(),
       onFocus: vi.fn(),
+      onExecute: vi.fn(),
       onReorder: vi.fn()
     }
     const { rerender } = render(<QuickExecutionBar {...props} open />)
@@ -81,6 +84,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={onAdd}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
@@ -104,6 +108,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={onFocus}
         onReorder={vi.fn()}
       />
@@ -111,7 +116,7 @@ describe('quick execution bar', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: '快捷位 2：Worker，点击定位，仅支持快捷键执行'
+        name: '快捷位 2：Worker，单击定位，双击或快捷键运行'
       })
     )
     expect(onFocus).toHaveBeenCalledWith({
@@ -123,12 +128,13 @@ describe('quick execution bar', () => {
     expect(screen.getByText('不可用')).toBeInTheDocument()
   })
 
-  it('uses shared tooltips to explain bound and empty slots without implying click execution', async () => {
+  it('uses shared tooltips to explain bound and empty slots including single-click location and double-click execution', async () => {
     render(
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
         shortcutPlatform="other"
@@ -140,7 +146,7 @@ describe('quick execution bar', () => {
     expect(boundSlot.querySelector('[title]')).toBeNull()
     fireEvent.pointerMove(boundSlot, { pointerType: 'mouse' })
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      '已绑定终端「Worker」。执行快捷位 2 (Ctrl+2)；点击仅用于定位视图。'
+      '已绑定终端「Worker」。执行快捷位 2 (Ctrl+2)；单击定位视图，双击直接运行。'
     )
 
     fireEvent.pointerLeave(boundSlot)
@@ -161,6 +167,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
         shortcutPlatform="other"
@@ -171,7 +178,7 @@ describe('quick execution bar', () => {
     fireEvent.pointerMove(boundSlot, { pointerType: 'mouse' })
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      '已绑定终端「Worker」。按 Ctrl+2 执行此快捷位；点击仅用于定位视图。'
+      '已绑定终端「Worker」。按 Ctrl+2 执行此快捷位；单击定位视图，双击直接运行。'
     )
   })
 
@@ -181,6 +188,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
@@ -231,6 +239,7 @@ describe('quick execution bar', () => {
           }}
           onAdd={vi.fn()}
           onClear={vi.fn()}
+          onExecute={vi.fn()}
           onFocus={onFocus}
           onReorder={onReorder}
         />
@@ -262,6 +271,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
@@ -288,6 +298,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={onClear}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
@@ -398,6 +409,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={vi.fn()}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
@@ -429,6 +441,7 @@ describe('quick execution bar', () => {
         graph={createGraph()}
         onAdd={vi.fn()}
         onClear={onClear}
+        onExecute={vi.fn()}
         onFocus={vi.fn()}
         onReorder={onReorder}
       />
@@ -480,6 +493,7 @@ describe('quick execution bar', () => {
           graph={createGraph()}
           onAdd={vi.fn()}
           onClear={vi.fn()}
+          onExecute={vi.fn()}
           onFocus={vi.fn()}
           onReorder={vi.fn()}
         />

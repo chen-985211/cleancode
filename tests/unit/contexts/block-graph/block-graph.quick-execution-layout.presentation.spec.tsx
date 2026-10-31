@@ -46,7 +46,13 @@ describe('quick execution dock layout continuity', () => {
   it.each([1, 2, 3] as const)(
     'preserves surviving entries at removal of position %s, then closes the gap smoothly',
     (removed) => {
-      const props = { onAdd: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onReorder: vi.fn() }
+      const props = {
+        onAdd: vi.fn(),
+        onClear: vi.fn(),
+        onFocus: vi.fn(),
+        onExecute: vi.fn(),
+        onReorder: vi.fn()
+      }
       const { rerender, unmount } = render(
         <QuickExecutionBar {...props} graph={graph([1, 2, 3])} />
       )
@@ -84,7 +90,13 @@ describe('quick execution dock layout continuity', () => {
   )
 
   it('continues a second removal from the current position and snaps only for reduced motion or a different workspace', () => {
-    const props = { onAdd: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onReorder: vi.fn() }
+    const props = {
+      onAdd: vi.fn(),
+      onClear: vi.fn(),
+      onFocus: vi.fn(),
+      onExecute: vi.fn(),
+      onReorder: vi.fn()
+    }
     const { rerender } = render(<QuickExecutionBar {...props} graph={graph([1, 2, 3])} />)
     rerender(<QuickExecutionBar {...props} graph={graph([1, 2])} />)
     step()
@@ -102,7 +114,13 @@ describe('quick execution dock layout continuity', () => {
   })
 
   it('keeps the wider empty-state add button inside the right edge after the last removal', () => {
-    const props = { onAdd: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onReorder: vi.fn() }
+    const props = {
+      onAdd: vi.fn(),
+      onClear: vi.fn(),
+      onFocus: vi.fn(),
+      onExecute: vi.fn(),
+      onReorder: vi.fn()
+    }
     const { rerender } = render(<QuickExecutionBar {...props} graph={graph([1])} />)
     const add = document.querySelector<HTMLElement>('.quick-execution__add')!
     const right = add.getBoundingClientRect().right

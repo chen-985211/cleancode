@@ -25,6 +25,7 @@ interface QuickExecutionSlotsProps {
   readonly shortcutPlatform: 'mac' | 'other'
   readonly shortcutTooltips?: Partial<Record<`quickExecution${QuickExecutionSlotNumber}`, string>>
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
+  readonly onExecute: (target: QuickExecutionTargetSnapshot) => Promise<void> | void
   readonly pending: boolean
   readonly preview: DragPreview | null
   readonly swapOffset: { readonly x: number; readonly y: number }
@@ -94,8 +95,11 @@ export function QuickExecutionSlots(props: QuickExecutionSlotsProps) {
                 name: projection.name,
                 number: slot.number
               })}
-              onClick={() => {
-                if (!props.pending && !props.preview) props.onFocus(projection.target)
+              onClick={(event) => {
+                if (props.pending || props.preview) return
+                // Handle the second click here so drag-release click suppression also guards execution.
+                if (event.detail === 2) void props.onExecute(projection.target)
+                else if (event.detail <= 1) props.onFocus(projection.target)
               }}
             >
               <kbd>{slot.number}</kbd>

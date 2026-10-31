@@ -197,6 +197,7 @@ function mount(numbers: readonly QuickExecutionSlotNumber[]) {
     onAdd: vi.fn(),
     onClear: vi.fn(),
     onFocus: vi.fn(),
+    onExecute: vi.fn(),
     onReorder: vi.fn()
   }
   return { ...render(<QuickExecutionBar {...input} />), input }

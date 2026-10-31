@@ -86,7 +86,7 @@ describe('quick execution pointer sorting', () => {
       fireEvent.keyDown(document, { key: 'Tab' })
       act(() => button.focus())
       expect(await screen.findByRole('tooltip')).toHaveTextContent(
-        '已绑定终端「Worker」。按 ⌘2 执行此快捷位；点击仅用于定位视图。'
+        '已绑定终端「Worker」。按 ⌘2 执行此快捷位；单击定位视图，双击直接运行。'
       )
       expect(onFocus).not.toHaveBeenCalled()
     }
@@ -308,6 +308,38 @@ describe('quick execution pointer sorting', () => {
     }
   )
 
+  it.each(['release', 'cancel'])(
+    'does not execute when a double-click gesture becomes a drag (%s)',
+    (finish) => {
+      const view = mount()
+      const source = slot(2)
+      const button = source.querySelector('button')!
+      fireEvent.click(button, { detail: 1 })
+      fireEvent.pointerDown(source, pointer(155, 210))
+      fireEvent.pointerMove(window, pointer(170, 210))
+      fireEvent.click(button, { detail: 2 })
+      expect(view.props.onExecute).not.toHaveBeenCalled()
+      if (finish === 'cancel') fireEvent.keyDown(window, { key: 'Escape' })
+      fireEvent.pointerUp(window, pointer(170, 210))
+      fireEvent.click(button, { detail: 2 })
+      fireEvent.doubleClick(button, { detail: 2 })
+      expect(view.onFocus).toHaveBeenCalledOnce()
+      expect(view.props.onExecute).not.toHaveBeenCalled()
+
+      fireEvent.pointerDown(source, pointer(155, 210))
+      fireEvent.pointerUp(source, pointer(155, 210))
+      fireEvent.click(button, { detail: 1 })
+      fireEvent.pointerDown(source, pointer(155, 210))
+      fireEvent.pointerUp(source, pointer(155, 210))
+      fireEvent.click(button, { detail: 2 })
+      fireEvent.doubleClick(button, { detail: 2 })
+      expect(view.props.onExecute).toHaveBeenCalledExactlyOnceWith({
+        type: 'terminal',
+        terminalBlockId: 'Worker'
+      })
+    }
+  )
+
   it('keeps a cancelled gesture from clicking when the mouse is released later', async () => {
     vi.useFakeTimers()
     try {
@@ -406,7 +438,14 @@ function mount(onReorder = vi.fn<() => Promise<void> | void>()) {
           : null
     }))
   }
-  const props = { graph, onAdd: vi.fn(), onClear: vi.fn(), onFocus: vi.fn(), onReorder }
+  const props = {
+    graph,
+    onAdd: vi.fn(),
+    onClear: vi.fn(),
+    onFocus: vi.fn(),
+    onExecute: vi.fn(),
+    onReorder
+  }
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: HTMLElement
   ) {

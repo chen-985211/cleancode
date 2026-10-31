@@ -42,7 +42,7 @@ export const enCanvasMessages = {
   'quickExecution.doneArranging': 'Done arranging',
   'quickExecution.addFavorites': 'Add a favorite',
   'quickExecution.boundSlot':
-    'Quick slot {number}: {name}. Click to locate; run with the keyboard shortcut only.',
+    'Quick slot {number}: {name}. Click to locate; double-click or use the keyboard shortcut to run.',
   'quickExecution.bindEmpty': 'Add an object to quick slot {number}',
   'quickExecution.execute': 'Run quick slot {number}: {name}',
   'quickExecution.removeDropTarget': 'Drop here to clear quick slot {number}',
@@ -52,7 +52,7 @@ export const enCanvasMessages = {
   'quickExecution.type.workflow': 'Workflow',
   'quickExecution.type.combination': 'Combination',
   'quickExecution.tooltip.bound':
-    'Bound to {type} “{name}”. {shortcutHint}. Clicking only focuses it on the canvas.',
+    'Bound to {type} “{name}”. {shortcutHint}. Click to locate on the canvas; double-click to run.',
   'quickExecution.tooltip.empty':
     'Quick slot {number} is empty and can be bound to an object on this canvas.',
   'quickExecution.tooltip.executeShortcut': 'Press {shortcut} to run this quick slot',

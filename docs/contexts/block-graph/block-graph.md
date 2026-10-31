@@ -160,7 +160,7 @@ Project 的工作区默认内容复用同一模板规则。`PrepareBlockTemplate
 - 模板库与保存对话框归 BlockGraph Presentation，只消费 BlockGraph DTO、模板投影和显式的 list/save/update/move/delete 动作。App Shell `BlockTemplateSurfaces` 负责把 preload API 适配为这些动作，并继续协调画布放置、焦点和“放置后运行”；上下文组件不得直接读取 `window.cleancode` 或拥有 Run 执行结果。
 - 模板放置的规范 footprint、外包围盒和纯预览归 BlockGraph Presentation：workflow 保留每个模板节点的相对位置，combination 投影为一个带规范 padding 和最小尺寸的组合边界。App Shell 只把实时 viewport 注入预览，并使用跨 Agent、终端与组合的工作台 occupancy 搜索最终空位；跨上下文碰撞策略不是 BlockGraph 单独事实。
 - 组合卡片、名称编辑、成员移除入口、结构动作、连接作用域、编辑选择、drop target 与反馈动效归 BlockGraph Presentation。App Shell 只注入 Run 状态标签与动作实现，并组合 React Flow handle、Agent 审批、统一对象动效和 preload 提交；上下文组件不读取 Run store、Agent DTO 或 `window.cleancode`。
-- 快捷执行栏、候选/绑定投影、拖拽反馈、资源和样式归 BlockGraph Presentation。栏内点击只发布画布定位，快捷位实际执行、Run 调度、启动命令编辑、通知和统一相机仍由 App Shell 协调。
+- 快捷执行栏、候选/绑定投影、拖拽反馈、资源和样式归 BlockGraph Presentation。栏内单击发布画布定位，双击发布执行意图；快捷位实际执行、Run 调度、启动命令编辑、通知和统一相机仍由 App Shell 协调。
 - BlockGraph 拥有 `TerminalRunLifecyclePort`，删除单个终端、完整流程或组合时由 Platform 把一个精确终端集合适配到 Run 的公开 lifecycle 服务；BlockGraph 不读取或操作 Run 内部进程和租约。
 - Agent 上下文拥有 `AgentBlockGraphToolPort`，其 BlockGraph 适配器把原生 MCP 工具转换为本上下文用例；Agent 不直接写 JSON 或调用聚合。
 - CanvasArrangement 只引用 BlockGraph DTO 中的规范终端、完整流程与终端组合身份；对象位置、依赖、组合成员和模板仍由 BlockGraph 拥有。

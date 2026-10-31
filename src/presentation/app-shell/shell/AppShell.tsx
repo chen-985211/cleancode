@@ -530,7 +530,6 @@ export function AppShell({
     setCurrentGraph,
     terminalWorkflow
   })
-  const hasMultipleWorkspaces = derived.hasMultipleWorkspaces(workbenches)
   const applicationShortcutActions = useAppShellShortcutActions({
     addProject,
     createAgent: createWorkspaceAgent,
@@ -543,7 +542,7 @@ export function AppShell({
         reactFlowInstanceRef.current,
         blockActions.createTerminalGroup
       ),
-    hasMultipleWorkspaces,
+    hasMultipleWorkspaces: derived.hasMultipleWorkspaces(workbenches),
     hasWorkbench: Boolean(currentWorkbench),
     isDesktopRuntime,
     isGroupSelectionMode: isTerminalGroupSelectionMode,
@@ -657,6 +656,7 @@ export function AppShell({
           onDeleteTerminalScope={blockActions.deleteTerminalScope}
           onAddQuickExecutionTarget={quickExecution.addTarget}
           onClearQuickExecutionSlot={quickExecution.clearSlot}
+          onExecuteQuickExecutionTarget={quickExecution.executeTarget}
           onReorderQuickExecutionSlots={quickExecution.reorderSlots}
           onQuickExecutionNodeDrop={bindQuickExecutionFromNodeDrop}
           onQuickExecutionDragPreview={clearTerminalGroupDropPreview}

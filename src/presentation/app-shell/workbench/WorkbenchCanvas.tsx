@@ -103,6 +103,7 @@ export function WorkbenchCanvas({
   onDeleteTerminalScope,
   onAddQuickExecutionTarget,
   onClearQuickExecutionSlot,
+  onExecuteQuickExecutionTarget,
   onReorderQuickExecutionSlots,
   onQuickExecutionNodeDrop,
   onQuickExecutionDragPreview,
@@ -649,6 +650,7 @@ export function WorkbenchCanvas({
               onAddQuickExecutionTarget={onAddQuickExecutionTarget}
               onArrange={onArrangeCanvasSelection}
               onClearQuickExecutionSlot={onClearQuickExecutionSlot}
+              onExecuteQuickExecutionTarget={onExecuteQuickExecutionTarget}
               onReorderQuickExecutionSlots={onReorderQuickExecutionSlots}
               reactFlowInstanceRef={reactFlowInstanceRef}
               selection={templateInteraction.canvasSelection}

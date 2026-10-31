@@ -32,6 +32,7 @@ describe('workbench canvas bottom controls', () => {
       onAddQuickExecutionTarget: vi.fn(),
       onArrange: vi.fn(),
       onClearQuickExecutionSlot: vi.fn(),
+      onExecuteQuickExecutionTarget: vi.fn(),
       onReorderQuickExecutionSlots: vi.fn(),
       quickExecutionContainer: statusbar,
       reactFlowInstanceRef: { current: null },
