@@ -25,6 +25,21 @@ describe('terminal theme palette', () => {
   )
 
   it.each(['light', 'dark'] as const)(
+    'keeps characters readable inside block cursors for the %s source theme and its projection',
+    (theme) => {
+      const palette = readCanonicalTerminalTheme(theme)
+      const cursor = requireColor(palette.cursor)
+      const cursorText = requireColor(palette.cursorAccent)
+      const matrix = readTerminalThemeProjectionMatrix(theme)
+
+      expect(colorContrastRatio(cursorText, cursor)).toBeGreaterThanOrEqual(4.5)
+      expect(
+        colorContrastRatio(projectColor(cursorText, matrix), projectColor(cursor, matrix))
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  )
+
+  it.each(['light', 'dark'] as const)(
     'keeps ANSI white foregrounds readable for the %s source theme and its projection',
     (theme) => {
       const palette = readCanonicalTerminalTheme(theme)
