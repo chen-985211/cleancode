@@ -61,6 +61,8 @@ import { useToolbarUtilityButtonMotion } from '../../../shared/hooks/useToolbarU
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 
 interface ApplicationSettingsRootProps {
+  readonly zoomOnBlankClick: boolean
+  readonly onZoomOnBlankClickChange: (enabled: boolean) => void
   readonly nodeFocusMode: CanvasNodeFocusMode
   readonly onNodeFocusModeChange: (mode: CanvasNodeFocusMode) => void
   readonly workspaceDefaultsSettings?: ReactNode
@@ -278,6 +280,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             <ApplicationSettingsPaneTransition activePane={activePane}>
               {activePane === 'canvas' ? (
                 <CanvasSettingsPane
+                  zoomOnBlankClick={props.zoomOnBlankClick}
+                  onZoomOnBlankClickChange={props.onZoomOnBlankClickChange}
                   nodeFocusMode={props.nodeFocusMode}
                   onNodeFocusModeChange={props.onNodeFocusModeChange}
                   followQuickExecutionTarget={props.followQuickExecutionTarget}

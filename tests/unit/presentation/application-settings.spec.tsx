@@ -336,6 +336,20 @@ describe('application settings', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
+  it('lets the user disable and re-enable zooming to 50% on a blank canvas click', () => {
+    render(<SettingsHarness initiallyOpen />)
+    fireEvent.click(screen.getByRole('button', { name: '画布' }))
+
+    const toggle = screen.getByRole('switch', { name: '点击空白处缩小画布' })
+    expect(toggle).toHaveAccessibleDescription('点击画布空白处时，将画布缩放至 50%。')
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('opens the lightweight problem feedback actions immediately before about', () => {
     render(<SettingsHarness initiallyOpen />)
 
@@ -382,6 +396,7 @@ function SettingsHarness({
   >('progressive')
   const [reduceVisualNoise, setReduceVisualNoise] = useState(true)
   const [followQuickExecutionTarget, setFollowQuickExecutionTarget] = useState(true)
+  const [zoomOnBlankClick, setZoomOnBlankClick] = useState(true)
 
   const changeBinding = (
     command: ApplicationShortcutCommand,
@@ -406,6 +421,8 @@ function SettingsHarness({
       onReduceVisualNoiseChange={setReduceVisualNoise}
       followQuickExecutionTarget={followQuickExecutionTarget}
       onFollowQuickExecutionTargetChange={setFollowQuickExecutionTarget}
+      zoomOnBlankClick={zoomOnBlankClick}
+      onZoomOnBlankClickChange={setZoomOnBlankClick}
       terminalScrollbackRows={terminalScrollbackRows}
       onTerminalScrollbackChange={setTerminalScrollbackRows}
       terminalWorkflowBuildMode={terminalWorkflowBuildMode}

@@ -43,6 +43,7 @@ import { useTerminalRuntimePreference } from '../../../contexts/run/presentation
 import { useTerminalWorkflowBuildPreference } from '../app-features/settings/useTerminalWorkflowBuildPreference'
 import { useCanvasVisualNoisePreference } from '../app-features/settings/useCanvasVisualNoisePreference'
 import { useCanvasNodeFocusPreference } from '../app-features/settings/useCanvasNodeFocusPreference'
+import { useCanvasBlankClickZoomPreference } from '../app-features/settings/useCanvasBlankClickZoomPreference'
 import { useTerminalRuntimeAvailability } from '../../../contexts/run/presentation/view-models/useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from '../projections/agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
@@ -192,6 +193,7 @@ export function AppShell({
     useTerminalWorkflowBuildPreference()
   const { changeReduceVisualNoise, reduceVisualNoise } = useCanvasVisualNoisePreference()
   const { nodeFocusMode, changeNodeFocusMode } = useCanvasNodeFocusPreference()
+  const { zoomOnBlankClick, changeZoomOnBlankClick } = useCanvasBlankClickZoomPreference()
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates: terminalStateProjection.states,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -358,6 +360,7 @@ export function AppShell({
     workspaceInitialization.cancelFocus()
   }
   const selectionViewport = useCanvasSelectionViewport({
+    zoomOnBlankClick,
     nodeFocusMode,
     canvasSizeRef,
     onUserAction: cancelAllLayoutFocus,
@@ -579,6 +582,7 @@ export function AppShell({
         aria-label={t('app.workspace')}
       >
         <AppShellSettings
+          {...{ zoomOnBlankClick, changeZoomOnBlankClick }}
           workspaceDefaultsSettings={workspaceInitialization.renderSettings(
             workbenches,
             applicationSettings.close
