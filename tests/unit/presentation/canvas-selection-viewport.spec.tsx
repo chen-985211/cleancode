@@ -3,6 +3,13 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types/workbenchFlowNode'
 import { useCanvasSelectionViewport } from '../../../src/presentation/app-shell/workbench/viewport/useCanvasSelectionViewport'
+import { cancelWorkbenchViewportMotion } from '../../../src/presentation/app-shell/workbench/viewport/workbenchViewportMotion'
+import {
+  cancelWorkbenchDirectZoom,
+  retargetWorkbenchDirectZoom
+} from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
+
+let reducedMotion = true
 
 describe('canvas selection viewport', () => {
   beforeEach(() => {
@@ -10,6 +17,8 @@ describe('canvas selection viewport', () => {
   })
 
   afterEach(() => {
+    cancelWorkbenchViewportMotion()
+    cancelWorkbenchDirectZoom()
     vi.unstubAllGlobals()
     vi.useRealTimers()
     document.body.replaceChildren()
@@ -289,6 +298,115 @@ describe('canvas selection viewport', () => {
     expect(setViewport).toHaveBeenCalledWith({ x: 280, y: 220, zoom: 0.5 }, { duration: 0 })
   })
 
+  it.each(
+    (['terminal', 'terminalGroup', 'agentConsole'] as const).flatMap((type) =>
+      [0.35, 0.5, 1, 1.5].flatMap((zoom) =>
+        [true, false].map((hasAnchor) => ({ type, zoom, hasAnchor }))
+      )
+    )
+  )(
+    'preserves $zoom zoom and position for $type (anchor=$hasAnchor) when disabled',
+    ({ type, zoom, hasAnchor }) => {
+      const node = createNode(
+        'selected-node',
+        { x: 100, y: 120 },
+        { width: 400, height: 300 },
+        type
+      )
+      const viewport = { x: -100, y: -80, zoom }
+      const { instance, setViewport } = createReactFlowInstance([node], viewport)
+      const onUserAction = vi.fn()
+      const { result } = renderSelectionViewportHook(instance, onUserAction, false)
+
+      act(() => result.current.returnToGlobalCanvasView(hasAnchor ? node.id : null))
+
+      expect(instance.getViewport()).toEqual(viewport)
+      expect(setViewport).not.toHaveBeenCalled()
+      expect(onUserAction).toHaveBeenCalledOnce()
+    }
+  )
+
+  it.each(['terminal', 'agentConsole'] as const)(
+    'stops an in-flight selection and its pending %s input activation when disabled',
+    async (type) => {
+      stubReducedMotionPreference(false)
+      vi.useFakeTimers({
+        toFake: [
+          'setTimeout',
+          'clearTimeout',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'performance'
+        ]
+      })
+      const { node, input } = renderSelectedInput(type)
+      const initialViewport = { x: -3_000, y: -800, zoom: 1 }
+      const { instance } = createReactFlowInstance([node], initialViewport)
+      const { result } = renderSelectionViewportHook(instance, vi.fn(), false)
+
+      await act(async () => {
+        result.current.focusSelectedWorkbenchNode(node.id)
+        await vi.advanceTimersByTimeAsync(80)
+      })
+      const interruptedViewport = { ...instance.getViewport() }
+      expect(interruptedViewport).not.toEqual(initialViewport)
+      expect(interruptedViewport.zoom).toBeLessThan(1)
+      act(() => result.current.returnToGlobalCanvasView(node.id))
+      await act(async () => vi.advanceTimersByTimeAsync(2_000))
+
+      expect(instance.getViewport()).toEqual(interruptedViewport)
+      expect(input).not.toHaveFocus()
+    }
+  )
+
+  it('preserves the current view when a blank click interrupts wheel zoom with the preference disabled', async () => {
+    vi.useFakeTimers({
+      toFake: [
+        'setTimeout',
+        'clearTimeout',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'performance'
+      ]
+    })
+    const node = createNode('selected-node', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance } = createReactFlowInstance([node])
+    const { result } = renderSelectionViewportHook(instance, vi.fn(), false)
+    await act(async () => {
+      retargetWorkbenchDirectZoom(instance, {
+        anchor: { x: 120, y: 100 },
+        deltaZoomStops: -0.5,
+        reducedMotion: false
+      })
+      await vi.advanceTimersByTimeAsync(16)
+    })
+    const interruptedViewport = { ...instance.getViewport() }
+    expect(interruptedViewport.zoom).toBeLessThan(1)
+    act(() => result.current.returnToGlobalCanvasView(null))
+    await act(async () => vi.advanceTimersByTimeAsync(1_000))
+    expect(instance.getViewport()).toEqual(interruptedViewport)
+  })
+
+  it('uses the latest preference and can return to overview after cancelling an earlier request', async () => {
+    const node = createNode('selected-node', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance, setViewport } = createReactFlowInstance([node])
+    const { result, rerender } = renderSelectionViewportHook(instance)
+
+    act(() => result.current.returnToGlobalCanvasView(node.id))
+    rerender({ zoomOnBlankClick: false })
+    act(() => result.current.returnToGlobalCanvasView(node.id))
+    await act(async () => instance.setViewport({ x: -100, y: -80, zoom: 1 }))
+    const preservedViewport = { ...instance.getViewport() }
+    act(() => result.current.returnToGlobalCanvasView(node.id))
+    expect(instance.getViewport()).toEqual(preservedViewport)
+
+    rerender({ zoomOnBlankClick: true })
+    setViewport.mockClear()
+    await act(async () => result.current.returnToGlobalCanvasView(node.id))
+    expect(instance.getViewport()).toEqual({ x: 330, y: 185, zoom: 0.5 })
+    expect(setViewport).toHaveBeenCalledOnce()
+  })
+
   it('does not move an empty canvas', () => {
     const { instance, setViewport } = createReactFlowInstance([])
     const { result } = renderSelectionViewportHook(instance)
@@ -317,14 +435,18 @@ describe('canvas selection viewport', () => {
 
 function renderSelectionViewportHook(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-  onUserAction = vi.fn()
+  onUserAction = vi.fn(),
+  zoomOnBlankClick = true
 ) {
-  return renderHook(() =>
-    useCanvasSelectionViewport({
-      canvasSizeRef: { current: { width: 960, height: 640 } },
-      onUserAction,
-      reactFlowInstanceRef: { current: instance }
-    })
+  return renderHook(
+    ({ zoomOnBlankClick }) =>
+      useCanvasSelectionViewport({
+        zoomOnBlankClick,
+        canvasSizeRef: { current: { width: 960, height: 640 } },
+        onUserAction,
+        reactFlowInstanceRef: { current: instance }
+      }),
+    { initialProps: { zoomOnBlankClick } }
   )
 }
 
@@ -409,11 +531,14 @@ function renderSelectedInput(type: 'terminal' | 'agentConsole') {
   return { node, input, viewport }
 }
 
-function stubReducedMotionPreference(): void {
+function stubReducedMotionPreference(matches = true): void {
+  reducedMotion = matches
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({
-      matches: true,
+      get matches() {
+        return reducedMotion
+      },
       media: '(prefers-reduced-motion: reduce)',
       onchange: null,
       addEventListener: vi.fn(),

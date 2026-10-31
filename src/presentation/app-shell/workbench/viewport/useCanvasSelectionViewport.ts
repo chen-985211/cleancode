@@ -12,15 +12,19 @@ import {
 } from '../../app-features/settings/canvasNodeFocusPreference'
 import { focusSelectedWorkbenchNodeInCanvas } from './focusSelectedWorkbenchNodeInCanvas'
 import {
+  cancelWorkbenchViewportMotion,
   readWorkbenchViewportPresentation,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
 import { isWorkbenchNodePresentationHidden } from '../../projections/workbenchNodeVisibility'
 import { useSelectedWorkbenchNodeInput } from '../nodes/useSelectedWorkbenchNodeInput'
+import { defaultZoomOnBlankClick } from '../../app-features/settings/canvasBlankClickZoomPreference'
+import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 
 const globalCanvasViewZoom = 0.5
 
 interface UseCanvasSelectionViewportInput {
+  readonly zoomOnBlankClick?: boolean
   readonly nodeFocusMode?: CanvasNodeFocusMode
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly onUserAction: () => void
@@ -28,6 +32,7 @@ interface UseCanvasSelectionViewportInput {
 }
 
 export function useCanvasSelectionViewport({
+  zoomOnBlankClick = defaultZoomOnBlankClick,
   nodeFocusMode = defaultCanvasNodeFocusMode,
   canvasSizeRef,
   onUserAction,
@@ -68,6 +73,13 @@ export function useCanvasSelectionViewport({
       onUserAction()
       const instance = reactFlowInstanceRef.current
       if (!instance) return
+
+      if (!zoomOnBlankClick) {
+        overviewRequestRef.current = null
+        cancelWorkbenchViewportMotion(instance)
+        cancelWorkbenchDirectZoom(instance)
+        return
+      }
 
       const stableVisibleNodes = instance
         .getNodes()
@@ -112,7 +124,7 @@ export function useCanvasSelectionViewport({
         () => clearOverviewRequest(overviewRequestRef, overviewRequest)
       )
     },
-    [cancelSelectedNodeInput, canvasSizeRef, onUserAction, reactFlowInstanceRef]
+    [cancelSelectedNodeInput, canvasSizeRef, onUserAction, reactFlowInstanceRef, zoomOnBlankClick]
   )
 
   return {

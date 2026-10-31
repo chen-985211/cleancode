@@ -17,6 +17,8 @@ import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreferenc
 import type { CanvasNodeFocusMode } from './canvasNodeFocusPreference'
 
 export function AppShellSettings({
+  zoomOnBlankClick,
+  changeZoomOnBlankClick,
   nodeFocusMode,
   changeNodeFocusMode,
   workspaceDefaultsSettings,
@@ -38,6 +40,8 @@ export function AppShellSettings({
   terminalScrollbackRows,
   terminalWorkflowBuildMode
 }: {
+  readonly zoomOnBlankClick: boolean
+  readonly changeZoomOnBlankClick: (enabled: boolean) => void
   readonly nodeFocusMode: CanvasNodeFocusMode
   readonly changeNodeFocusMode: (mode: CanvasNodeFocusMode) => void
   readonly workspaceDefaultsSettings: ReactNode
@@ -73,6 +77,8 @@ export function AppShellSettings({
       <LanguageSettingsRoot />
       <ThemeSettingsRoot />
       <ApplicationSettingsRoot
+        zoomOnBlankClick={zoomOnBlankClick}
+        onZoomOnBlankClickChange={changeZoomOnBlankClick}
         nodeFocusMode={nodeFocusMode}
         onNodeFocusModeChange={changeNodeFocusMode}
         workspaceDefaultsSettings={workspaceDefaultsSettings}
