@@ -19,6 +19,7 @@ const terminalPaletteProperties = [
   ['background', 'background'],
   ['foreground', 'foreground'],
   ['cursor', 'cursor'],
+  ['cursorAccent', 'cursor-accent'],
   ['selectionBackground', 'selection'],
   ['black', 'black'],
   ['red', 'red'],

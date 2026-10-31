@@ -444,6 +444,7 @@
   --cc-terminal-light-background: #f2f4f5;
   --cc-terminal-light-foreground: #172033;
   --cc-terminal-light-cursor: #172033;
+  --cc-terminal-light-cursor-accent: #f2f4f5;
   --cc-terminal-light-selection: #cbdcf8;
   --cc-terminal-light-search-active: #95630c;
   --cc-terminal-light-search-border: #2864c7;
@@ -466,6 +467,7 @@
   --cc-terminal-dark-background: #202326;
   --cc-terminal-dark-foreground: #d6dee8;
   --cc-terminal-dark-cursor: #f8fafc;
+  --cc-terminal-dark-cursor-accent: #202326;
   --cc-terminal-dark-selection: #2d415c;
   --cc-terminal-dark-search-active: #e7b65c;
   --cc-terminal-dark-search-border: #60a5fa;
@@ -503,6 +505,7 @@
   --cc-terminal-background: var(--cc-terminal-light-background);
   --cc-terminal-foreground: var(--cc-terminal-light-foreground);
   --cc-terminal-cursor: var(--cc-terminal-light-cursor);
+  --cc-terminal-cursor-accent: var(--cc-terminal-light-cursor-accent);
   --cc-terminal-selection: var(--cc-terminal-light-selection);
   --cc-terminal-search-match: var(--cc-terminal-light-selection);
   --cc-terminal-search-active: var(--cc-terminal-light-search-active);
@@ -531,6 +534,7 @@
   --cc-terminal-background: var(--cc-terminal-dark-background);
   --cc-terminal-foreground: var(--cc-terminal-dark-foreground);
   --cc-terminal-cursor: var(--cc-terminal-dark-cursor);
+  --cc-terminal-cursor-accent: var(--cc-terminal-dark-cursor-accent);
   --cc-terminal-selection: var(--cc-terminal-dark-selection);
   --cc-terminal-search-match: var(--cc-terminal-dark-selection);
   --cc-terminal-search-active: var(--cc-terminal-dark-search-active);
