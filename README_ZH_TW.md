@@ -13,6 +13,7 @@
   <a href="#quick-start"><img src="https://img.shields.io/badge/macOS-000000?style=flat&amp;logo=apple&amp;logoColor=white" alt="macOS" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/Windows-0078D6?style=flat" alt="Windows" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/Linux-FCC624?style=flat&amp;logo=linux&amp;logoColor=black" alt="Linux" /></a>
+  <a href="https://discord.gg/9FvjbrxsS5"><img src="https://img.shields.io/badge/Discord-5865F2.svg?style=flat&amp;logo=discord&amp;logoColor=white&amp;labelColor=5865F2" alt="Discord" /></a>
 </p>
 
 <p align="center">
