@@ -62,6 +62,23 @@ describe('filesystem Agent session repository', () => {
     }
   )
 
+  it('persists execution location separately from canvas ownership and clears it with the conversation', async () => {
+    const agent = createAgent('agent-1', 'Agent 1')
+    agent.bindProviderSession(
+      createScope('agent-1'),
+      codexThread('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+    )
+    agent.setExecutionDirectory('/repo/worktrees/feature')
+    await repository.save(agent)
+    const reopened = await repository.find(createScope('agent-1'))
+    expect(reopened?.toSnapshot()).toMatchObject({
+      workspaceId: 'workspace-main',
+      executionDirectory: '/repo/worktrees/feature'
+    })
+    await repository.delete(createScope('agent-1'))
+    expect((await repository.find(createScope('agent-1')))?.executionDirectory).toBeNull()
+  })
+
   it('keeps an atomic creation receipt after deleting an initialized Agent', async () => {
     const agent = createAgent('initialized-agent', 'Agent 1')
     await repository.save(agent, 'initialization:agent')
@@ -121,7 +138,7 @@ describe('filesystem Agent session repository', () => {
     expect(agents?.[0]?.providerSessionRef?.value).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
     expect(agents?.[1]?.providerSessionRef?.value).toBe('0190d8a2-4f13-7e17-a0c1-64c303571909')
     expect(agents?.map((agent) => agent.cleancodeMcpEnabled)).toEqual([true, false])
-    expect(persisted.version).toBe(6)
+    expect(persisted.version).toBe(7)
     expect(persisted.workspaces[0]).toMatchObject({
       projectId: 'project-1',
       workspaceId: 'workspace-main'
@@ -208,23 +225,26 @@ describe('filesystem Agent session repository', () => {
     expect(reopened?.providerSessionRef).toBeNull()
   })
 
-  it('reads version 5 without rewriting it and adds creation receipts on the next write', async () => {
-    const agent = createAgent('legacy-agent', 'Legacy')
-    await repository.save(agent)
-    const store = JSON.parse(await readFile(filePath, 'utf8'))
-    const contents = JSON.stringify({ ...store, version: 5 })
-    await writeFile(filePath, contents)
-    const reopened = new FileSystemAgentSessionRepository(filePath, createProviderRegistry())
-    expect((await reopened.findWorkspace('project-1', 'workspace-main'))?.[0]?.id).toBe(
-      'legacy-agent'
-    )
-    expect(await readFile(filePath, 'utf8')).toBe(contents)
-    await reopened.save(createAgent('initialized-agent', 'Initialized'), 'new-initialization')
-    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 6 })
-    expect(
-      await reopened.findCreation('project-1', 'workspace-main', 'new-initialization')
-    ).toMatchObject({ agentId: 'initialized-agent' })
-  })
+  it.each([5, 6])(
+    'reads version %s without rewriting it and upgrades only on the next write',
+    async (version) => {
+      const agent = createAgent('legacy-agent', 'Legacy')
+      await repository.save(agent)
+      const store = JSON.parse(await readFile(filePath, 'utf8'))
+      const contents = JSON.stringify({ ...store, version })
+      await writeFile(filePath, contents)
+      const reopened = new FileSystemAgentSessionRepository(filePath, createProviderRegistry())
+      expect((await reopened.findWorkspace('project-1', 'workspace-main'))?.[0]?.id).toBe(
+        'legacy-agent'
+      )
+      expect(await readFile(filePath, 'utf8')).toBe(contents)
+      await reopened.save(createAgent('initialized-agent', 'Initialized'), 'new-initialization')
+      expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 7 })
+      expect(
+        await reopened.findCreation('project-1', 'workspace-main', 'new-initialization')
+      ).toMatchObject({ agentId: 'initialized-agent' })
+    }
+  )
 
   it('rejects obsolete stores without migrating or rewriting them', async () => {
     const contents = JSON.stringify({ version: 4, workspaces: [] })

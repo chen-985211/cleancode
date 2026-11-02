@@ -74,6 +74,35 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
 }
 
 describe('archive branch workspace use case', () => {
+  it('holds the directory suspension through physical removal and project persistence', async () => {
+    const repository = new InMemoryProjectRepository()
+    repository.remember(createProjectWithFeatureWorkspace(true))
+    const git = new FakeGitWorkspacePort()
+    let released = false
+    const lifecycle = createNoopLifecycle()
+    lifecycle.suspend = async () => ({
+      wasQuarantined: false,
+      wasSuspended: false,
+      resume: async () => undefined,
+      quarantine: () => undefined,
+      resolve: () => undefined,
+      release: () => {
+        released = true
+      }
+    })
+    vi.spyOn(git, 'removeBranchWorktree').mockImplementation(async () => {
+      expect(released).toBe(false)
+    })
+    vi.spyOn(repository, 'save').mockImplementation(async () => {
+      expect(released).toBe(false)
+    })
+    await new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle).execute({
+      projectDirectory: '/work/app',
+      workspaceId: 'feature/sidebar'
+    })
+    expect(released).toBe(true)
+  })
+
   it('rejects archiving a dirty worktree without removing it', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()

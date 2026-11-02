@@ -38,11 +38,24 @@ export function useProjectGitStateSynchronization({
       try {
         const synchronizedWorkbench = await api.synchronizeProjectGitState({ projectDirectory })
 
+        const latest = latestWorkbenchRef.current
         if (
           !isDisposed &&
           synchronizedWorkbench &&
-          latestWorkbenchRef.current === workbenchAtRequestStart
+          latest &&
+          workbenchAtRequestStart &&
+          latest.project === workbenchAtRequestStart.project
         ) {
+          replaceWorkbench(
+            latest.graph.workspaceId === synchronizedWorkbench.graph.workspaceId
+              ? {
+                  ...latest,
+                  project: synchronizedWorkbench.project,
+                  gitBranches: synchronizedWorkbench.gitBranches
+                }
+              : synchronizedWorkbench
+          )
+        } else if (!isDisposed && synchronizedWorkbench && latest === workbenchAtRequestStart) {
           replaceWorkbench(synchronizedWorkbench)
         }
       } catch {

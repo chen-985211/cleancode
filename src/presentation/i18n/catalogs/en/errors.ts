@@ -21,6 +21,8 @@ export const enErrorsMessages = {
 
   'error.AGENT_PROVIDER_UNAVAILABLE':
     'This Agent provider is unavailable. Check its installation and Agent settings, then retry.',
+  'error.WORKSPACE_DIRECTORY_IN_USE':
+    'This directory is still used by an Agent in another workspace. Stop that Agent or switch its directory before archiving.',
   'error.WORKSPACE_DEFAULTS_INVALID': 'The defaults are invalid. Select the content again.',
   'error.WORKSPACE_INITIALIZATION_INVALID':
     'The initialization record is invalid. Reopen the project and try again.',

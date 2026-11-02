@@ -20,18 +20,25 @@ export class CodexThreadIdentityReporter {
     private readonly server: Server,
     private readonly onThreadIdentified: (threadId: string) => void,
     private readonly onTurnCompleted: () => void,
+    private readonly onExecutionDirectoryChanged:
+      ((directory: string, isCurrent?: () => boolean) => Promise<boolean>) | undefined,
     private readonly resolveThreadIdPrefix: CodexThreadIdPrefixResolver,
     readonly token: string,
     readonly url: string
   ) {}
 
   static async start(input: {
+    readonly onExecutionDirectoryChanged?: (
+      directory: string,
+      isCurrent?: () => boolean
+    ) => Promise<boolean>
     readonly onThreadIdentified: (threadId: string) => void
     readonly onTurnCompleted?: () => void
     readonly resolveThreadIdPrefix?: CodexThreadIdPrefixResolver
   }): Promise<CodexThreadIdentityReporter> {
     const token = randomBytes(24).toString('hex')
     let reporter: CodexThreadIdentityReporter | null = null
+    let notificationTail = Promise.resolve()
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -43,12 +50,12 @@ export class CodexThreadIdentityReporter {
       request.on('data', (chunk: string) => {
         body = body.length < 64_000 ? `${body}${chunk}` : body
       })
-      request.on('end', () => {
+      request.on('end', async () => {
         const notification = parseNotification(body)
-        const threadId = readCodexThreadId(notification)
-        if (threadId) reporter?.acceptReportedThreadId(threadId)
-        if (notification?.type === 'agent-turn-complete') reporter?.onTurnCompleted()
-
+        notificationTail = notificationTail
+          .then(() => reporter?.acceptNotification(notification))
+          .catch(() => undefined)
+        await notificationTail
         response.writeHead(204).end()
       })
     })
@@ -77,6 +84,7 @@ export class CodexThreadIdentityReporter {
       server,
       input.onThreadIdentified,
       input.onTurnCompleted ?? (() => undefined),
+      input.onExecutionDirectoryChanged,
       input.resolveThreadIdPrefix ?? (async () => null),
       token,
       `http://127.0.0.1:${address.port}/codex-thread`
@@ -112,9 +120,20 @@ export class CodexThreadIdentityReporter {
     await new Promise<void>((resolveClosed) => this.server.close(() => resolveClosed()))
   }
 
-  private acceptReportedThreadId(threadId: string): void {
-    if (this.activeThreadPrefix && !threadId.startsWith(this.activeThreadPrefix)) return
+  private async acceptNotification(notification: CodexNotification | null): Promise<void> {
+    const threadId = readCodexThreadId(notification)
+    if (!threadId || (this.activeThreadPrefix && !threadId.startsWith(this.activeThreadPrefix)))
+      return
+    const generation = this.titleGeneration
+    const isCurrent = (): boolean =>
+      generation === this.titleGeneration &&
+      (!this.activeThreadPrefix || threadId.startsWith(this.activeThreadPrefix))
+    if (typeof notification?.cwd === 'string' && this.onExecutionDirectoryChanged) {
+      if (!(await this.onExecutionDirectoryChanged(notification.cwd, isCurrent))) return
+    }
+    if (!isCurrent()) return
     this.emitThreadId(threadId)
+    if (notification?.type === 'agent-turn-complete') this.onTurnCompleted()
   }
 
   private emitThreadId(threadId: string): void {

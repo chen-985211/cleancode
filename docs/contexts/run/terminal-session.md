@@ -79,6 +79,8 @@ POSIX 前台任务可以提供可选 `fallbackPath`，由 Run 的 launch 脚本�
 
 前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。
 
+Agent 前台任务可携带独立 `workingDirectory`，它只控制本次子进程目录，不改写 terminal owner 的项目、工作区或归属目录。POSIX 在启动 marker 前安全切换，失败时仍写入退出状态；PowerShell 使用 LiteralPath，并为原生进程显式设置 WorkingDirectory。持久 Terminal Provider 使用独立 `launchForegroundJobInDirectory` RPC：旧服务不支持时明确结束该 launch，不允许降级到忽略目录的旧方法。未携带目录的既有启动继续使用兼容方法。
+
 ## PTY 端口语义
 
 Run 应用层只依赖 `TerminalProcessPort`：

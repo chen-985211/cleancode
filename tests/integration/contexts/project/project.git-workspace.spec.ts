@@ -74,10 +74,94 @@ describe('project git workspace adapter', () => {
     ).rejects.toMatchObject({ code: 'GITHUB_BASE_UNAVAILABLE' })
   })
 
+  it('identifies the registered checkout when the project itself is a detached linked worktree', async () => {
+    await initializeGitProject(projectDirectory)
+    const linked = join(appStateDirectory, 'registered-detached')
+    await execFileAsync('git', ['worktree', 'add', '--detach', linked], { cwd: projectDirectory })
+    const adapter = new GitCliWorkspaceAdapter()
+    const inspection = await adapter.inspectRepository(linked)
+    expect(inspection.worktrees).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          directory: await realpath(linked),
+          branchName: null,
+          head: expect.any(String),
+          isCurrent: true
+        }),
+        expect.objectContaining({
+          directory: await realpath(projectDirectory),
+          branchName: 'main',
+          isCurrent: false
+        })
+      ])
+    )
+    const opened = await new CreateOrOpenProjectUseCase(
+      new FileSystemProjectRepository(appStateDirectory),
+      adapter
+    ).execute({ directory: linked, name: 'detached-project' })
+    expect(
+      opened.workspaces.find((workspace) => workspace.workspaceKind === 'default')
+    ).toMatchObject({ directory: linked, gitBranch: null })
+    expect(opened.workspaces).toHaveLength(2)
+  })
+
+  it('keeps a linked workspace identity through detached HEAD and reattachment', async () => {
+    await initializeGitProject(projectDirectory)
+    const worktreeDirectory = join(appStateDirectory, 'detached-feature')
+    await execFileAsync('git', ['worktree', 'add', '-b', 'feature/detached', worktreeDirectory], {
+      cwd: projectDirectory
+    })
+    const repository = new FileSystemProjectRepository(appStateDirectory)
+    const adapter = new GitCliWorkspaceAdapter()
+    const opened = await new CreateOrOpenProjectUseCase(repository, adapter).execute({
+      directory: projectDirectory,
+      name: 'Detached workspace test'
+    })
+    const linked = opened.workspaces.find(
+      (workspace) => workspace.workspaceKind === 'linked-worktree'
+    )!
+    const synchronize = new SynchronizeProjectGitStateUseCase(repository, adapter)
+
+    await execFileAsync('git', ['checkout', '--detach'], { cwd: worktreeDirectory })
+    const detached = await synchronize.execute({ projectDirectory })
+    expect(
+      detached?.workspaces.find((workspace) => workspace.workspaceId === linked.workspaceId)
+    ).toMatchObject({ directory: await realpath(worktreeDirectory), gitBranch: null })
+
+    await execFileAsync('git', ['checkout', 'feature/detached'], { cwd: worktreeDirectory })
+    const reattached = await synchronize.execute({ projectDirectory })
+    expect(
+      reattached?.workspaces.find((workspace) => workspace.workspaceId === linked.workspaceId)
+    ).toMatchObject({ gitBranch: 'feature/detached' })
+  })
+
+  it('discovers multiple detached checkouts without merging their identities', async () => {
+    await initializeGitProject(projectDirectory)
+    const directories = ['detached-one', 'detached-two'].map((name) =>
+      join(appStateDirectory, name)
+    )
+    for (const directory of directories) {
+      await execFileAsync('git', ['worktree', 'add', '--detach', directory], {
+        cwd: projectDirectory
+      })
+    }
+    const repository = new FileSystemProjectRepository(appStateDirectory)
+    const opened = await new CreateOrOpenProjectUseCase(
+      repository,
+      new GitCliWorkspaceAdapter()
+    ).execute({ directory: projectDirectory, name: 'Detached workspace test' })
+    const linked = opened.workspaces.filter(
+      (workspace) => workspace.workspaceKind === 'linked-worktree'
+    )
+    expect(linked).toHaveLength(2)
+    expect(new Set(linked.map((workspace) => workspace.workspaceId)).size).toBe(2)
+    expect(linked.map((workspace) => workspace.gitBranch)).toEqual([null, null])
+  })
+
   it('reports a non-git project without a branch binding', async () => {
     const adapter = new GitCliWorkspaceAdapter()
 
-    await expect(adapter.inspectRepository(projectDirectory)).resolves.toEqual({
+    await expect(adapter.inspectRepository(projectDirectory)).resolves.toMatchObject({
       isGitRepository: false,
       currentBranch: null,
       localBranches: [],
@@ -99,7 +183,7 @@ describe('project git workspace adapter', () => {
     const canonicalProjectDirectory = await realpath(projectDirectory)
 
     await initializeGitProject(projectDirectory)
-    await expect(adapter.inspectRepository(projectDirectory)).resolves.toEqual({
+    await expect(adapter.inspectRepository(projectDirectory)).resolves.toMatchObject({
       isGitRepository: true,
       currentBranch: 'main',
       localBranches: ['main'],
@@ -128,7 +212,7 @@ describe('project git workspace adapter', () => {
       code: 'ENOENT'
     })
     await expect(getCurrentBranch(worktreeDirectory)).resolves.toBe('feature/sidebar')
-    await expect(adapter.inspectRepository(projectDirectory)).resolves.toEqual({
+    await expect(adapter.inspectRepository(projectDirectory)).resolves.toMatchObject({
       isGitRepository: true,
       currentBranch: 'main',
       localBranches: ['feature/sidebar', 'main'],

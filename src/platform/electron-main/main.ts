@@ -1,3 +1,4 @@
+import { createAgentSessionRuntime } from './createAgentSessionRuntime'
 import { registerProjectIssuesRuntime } from './projectIssuesRuntime'
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
@@ -8,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 import { createAgentWorkspaceRuntime } from './createAgentWorkspaceRuntime'
 import { DiscoverCreatableAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/DiscoverCreatableAgentProvidersUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
-import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
 import { AgentProviderAvailabilityService } from '../../contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../contexts/agent/application/services/AgentProviderRegistry'
 import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
@@ -18,13 +18,11 @@ import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/us
 import { UpdateAgentProviderPreferencesUseCase } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
-import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
 import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
 import { FileSystemAgentProviderPreferencesRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentProviderPreferencesRepository'
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
 import { createBuiltinAgentProviderContributions } from '../../contexts/agent/infrastructure/providers/catalog/BuiltinAgentProviderCatalog'
 import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
-import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddQuickExecutionTargetUseCase } from '../../contexts/block-graph/application/use-cases/AddQuickExecutionTargetUseCase'
 import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
 import { BindQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/BindQuickExecutionSlotUseCase'
@@ -311,23 +309,22 @@ const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
   agentSessionRepository,
   collaborationTools
 )
-const agentSessionService = new AgentSessionService(
-  new RunAgentTerminalRuntimeAdapter(terminalSessionService),
-  new CleancodeMcpHttpServer(),
-  executeAgentToolUseCase,
-  agentSessionRepository,
-  agentProviderRegistry,
-  defaultAgentProviderId,
-  createAgentRuntimeScopeValidation(
+const agentSessionService = createAgentSessionRuntime({
+  terminalSessions: terminalSessionService,
+  tools: executeAgentToolUseCase,
+  repository: agentSessionRepository,
+  providers: agentProviderRegistry,
+  defaultProviderId: defaultAgentProviderId,
+  scopeValidation: createAgentRuntimeScopeValidation(
     agentSessionRepository,
     getProjectRegistryRepository(),
     projectRepository
   ),
-  agentProviderAvailability,
-  agentProviderPreferencesRepository,
-  agentActivityRuntime.registry,
-  messageMailbox
-)
+  availability: agentProviderAvailability,
+  preferences: agentProviderPreferencesRepository,
+  activity: agentActivityRuntime.registry,
+  mailbox: messageMailbox
+})
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
   createBranchWorkspaceUseCase,

@@ -1,3 +1,5 @@
+import type { AgentExecutionDirectoryPort } from '../ports/AgentExecutionDirectoryPort'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { AgentTerminalRuntimePort } from '../ports/AgentTerminalRuntimePort'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import type { AgentRuntimeScopeValidationPort } from '../ports/AgentRuntimeScopeValidationPort'
@@ -33,7 +35,8 @@ export class AgentProviderLaunchCoordinator {
     private readonly providerLaunchShutdown: AgentProviderLaunchShutdownCoordinator,
     private readonly mailbox: AgentMessageMailbox,
     private readonly beginSessionToolClosing: (session: ManagedAgentSession) => void,
-    private readonly settleSessionToolCalls: (session: ManagedAgentSession) => Promise<void>
+    private readonly settleSessionToolCalls: (session: ManagedAgentSession) => Promise<void>,
+    private readonly executionDirectories: AgentExecutionDirectoryPort
   ) {}
   async launch(session: ManagedAgentSession, refresh = true): Promise<void> {
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
@@ -67,6 +70,47 @@ export class AgentProviderLaunchCoordinator {
         return
       this.persistence.persist(session, sessionRef, providerLaunchGeneration)
     }
+    if (session.executionDirectory) {
+      const resolved = await this.executionDirectories.resolve({
+        workspaceDirectory: session.workspaceDirectory,
+        executionDirectory: session.executionDirectory
+      })
+      if (!resolved)
+        throw createExpectedAppError(
+          'AGENT_SESSION_INVALID',
+          'Agent execution directory is no longer available.'
+        )
+      session.executionDirectory = resolved
+    }
+    let directorySequence = 0
+    const isCurrentLaunch = (): boolean =>
+      Boolean(
+        session.launchArtifacts &&
+        session.sessionId === processSessionId &&
+        session.providerLaunchGeneration === providerLaunchGeneration
+      )
+    const onExecutionDirectoryChanged = async (
+      candidate: string,
+      isCurrent?: () => boolean
+    ): Promise<boolean> => {
+      if (!isCurrentLaunch()) return false
+      const sequence = ++directorySequence
+      const directory = await this.executionDirectories.resolve({
+        workspaceDirectory: session.workspaceDirectory,
+        executionDirectory: candidate
+      })
+      if (
+        !directory ||
+        !isCurrentLaunch() ||
+        isCurrent?.() === false ||
+        sequence !== directorySequence
+      )
+        return false
+      this.persistence.persistDirectory(session, directory, providerLaunchGeneration)
+      session.executionDirectory = directory
+      transitionAgentRuntime(session, { executionDirectory: directory })
+      return true
+    }
     const plan = await createManagedAgentLaunchPlan({
       mailbox: this.mailbox,
       providerVersion:
@@ -77,6 +121,7 @@ export class AgentProviderLaunchCoordinator {
           : ((await this.providerAvailability.inspect(session.providerId)).version ?? undefined),
       ...(launchProfile ? { launchProfile } : {}),
       onActivityChanged: managedActivity.recordStatus,
+      onExecutionDirectoryChanged,
       onProviderSessionIdentified: persistProviderSessionRef,
       onProviderSessionCleared: () => persistProviderSessionRef(null),
       onTurnCompleted: managedActivity.recordTurnCompleted,

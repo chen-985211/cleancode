@@ -34,8 +34,9 @@ export interface CreateProjectInput {
 }
 
 export interface GitBranchWorktreeInput {
-  readonly branchName: string
+  readonly branchName: string | null
   readonly directory: string
+  readonly head?: string | null
 }
 
 export class Project {
@@ -224,22 +225,32 @@ export class Project {
     )
     const currentWorkspaceId = this.currentWorkspace.workspaceId
     const worktreeWorkspaces = input.worktrees.map((worktree) => {
-      const branchName = normalizeRequiredText(worktree.branchName, 'Git branch cannot be empty.')
+      const branchName = normalizeOptionalBranchName(worktree.branchName)
       const directory = normalizeRequiredText(
         worktree.directory,
         'Branch workspace directory cannot be empty.'
       )
-      const existingWorkspace = this.workspaceSnapshots.find(
-        (workspace) =>
-          workspace.workspaceKind === 'linked-worktree' &&
-          (workspace.directory === directory || workspace.gitBranch === branchName)
-      )
+      const existingWorkspace =
+        this.workspaceSnapshots.find(
+          (workspace) =>
+            workspace.workspaceKind === 'linked-worktree' && workspace.directory === directory
+        ) ??
+        this.workspaceSnapshots.find(
+          (workspace) =>
+            workspace.workspaceKind === 'linked-worktree' &&
+            branchName !== null &&
+            workspace.gitBranch === branchName &&
+            !input.worktrees.some((candidate) => candidate.directory === workspace.directory)
+        )
 
       return {
         ...(existingWorkspace?.issue ? { issue: existingWorkspace.issue } : {}),
         workspaceId: existingWorkspace?.workspaceId ?? createWorkspaceId(),
         workspaceKind: 'linked-worktree' as const,
-        displayName: existingWorkspace?.displayName ?? branchName,
+        displayName:
+          existingWorkspace?.displayName ??
+          branchName ??
+          `HEAD@${worktree.head?.slice(0, 7) ?? directory.split(/[\\/]/).pop()}`,
         directory,
         gitBranch: branchName,
         isCurrent: existingWorkspace?.workspaceId === currentWorkspaceId
@@ -326,7 +337,7 @@ export class Project {
       )
     }
 
-    if (!archivedWorkspace.gitBranch) {
+    if (archivedWorkspace.workspaceKind !== 'linked-worktree') {
       throw createExpectedAppError(
         'ONLY_GIT_WORKTREE_WORKSPACES_CAN_BE_ARCHIVED',
         'Only Git worktree workspaces can be archived.'
@@ -366,14 +377,19 @@ function deduplicateBranchWorkspaces(
   workspaces: readonly ProjectWorkspaceSnapshot[]
 ): readonly ProjectWorkspaceSnapshot[] {
   const seenBranches = new Set<string>()
+  const seenDirectories = new Set<string>()
   const uniqueWorkspaces: ProjectWorkspaceSnapshot[] = []
 
   for (const workspace of workspaces) {
-    if (!workspace.gitBranch || seenBranches.has(workspace.gitBranch)) {
+    if (
+      seenDirectories.has(workspace.directory) ||
+      (workspace.gitBranch && seenBranches.has(workspace.gitBranch))
+    ) {
       continue
     }
 
-    seenBranches.add(workspace.gitBranch)
+    seenDirectories.add(workspace.directory)
+    if (workspace.gitBranch) seenBranches.add(workspace.gitBranch)
     uniqueWorkspaces.push(workspace)
   }
 

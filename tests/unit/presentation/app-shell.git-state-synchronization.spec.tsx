@@ -7,7 +7,14 @@ import {
 import { AppShell } from '../../../src/presentation/app-shell/shell/AppShell'
 
 describe('app shell git state synchronization', () => {
+  afterEach(() => vi.unstubAllGlobals())
   beforeEach(() => {
+    vi.stubGlobal(
+      'DOMMatrixReadOnly',
+      class {
+        readonly m22 = 1
+      }
+    )
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: undefined
@@ -54,7 +61,7 @@ describe('app shell git state synchronization', () => {
     expect(terminateTerminal).not.toHaveBeenCalled()
   })
 
-  it('does not let an older git synchronization overwrite a newer workspace graph', async () => {
+  it('merges synchronized git metadata without overwriting a newer workspace graph', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       gitBranch: 'main'
     })
@@ -109,7 +116,7 @@ describe('app shell git state synchronization', () => {
       resolveSynchronization(synchronizedWorkbench)
       await synchronization
     })
-    expect(screen.queryByText('feature/free')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('feature/free')).toBeInTheDocument())
     expect(document.querySelector('[data-terminal-block-id="terminal-new"]')).not.toBeNull()
   })
 })

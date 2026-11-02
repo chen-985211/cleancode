@@ -27,6 +27,7 @@ interface MenuPosition {
 export function AgentConsoleActions({
   agent,
   capabilityControl,
+  executionDirectory,
   identityControl,
   onRemove,
   onRename,
@@ -35,6 +36,7 @@ export function AgentConsoleActions({
 }: {
   readonly agent: WorkspaceAgentSnapshot
   readonly capabilityControl?: ReactNode
+  readonly executionDirectory?: string
   readonly identityControl?: ReactNode
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
@@ -187,7 +189,19 @@ export function AgentConsoleActions({
             />
           </form>
         ) : (
-          <TooltipLabel content={t('agent.renameTitle')}>
+          <TooltipLabel
+            content={
+              <>
+                {executionDirectory ? (
+                  <>
+                    <div>{t('agent.executionDirectory')}</div>
+                    <div>{executionDirectory}</div>
+                  </>
+                ) : null}
+                <div>{t('agent.renameTitle')}</div>
+              </>
+            }
+          >
             <button
               className="agent-console-actions__title"
               type="button"

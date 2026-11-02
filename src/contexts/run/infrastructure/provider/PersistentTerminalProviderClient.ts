@@ -216,21 +216,11 @@ export class PersistentTerminalProviderClient
     this.backgroundRequest('write', { sessionId, input })
   }
   launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
-    this.foregroundJobs.bind(command)
-    void this.request('launchForegroundJob', {
-      foregroundJob: {
-        args: command.args,
-        environment: command.environment,
-        executable: command.executable,
-        fallbackPath: command.fallbackPath,
-        generation: command.generation,
-        launchId: command.launchId,
-        sessionId: command.sessionId
-      }
-    }).catch((error) => {
-      if (!this.foregroundJobs.failLaunch(command)) return
-      this.options.onBackgroundError?.(error)
-    })
+    this.foregroundJobs.launch(
+      command,
+      (method, params) => this.request(method, params),
+      this.options.onBackgroundError
+    )
   }
 
   pauseOutput(sessionId: string): void {

@@ -13,6 +13,28 @@ import {
 import { createWindowsForegroundJobInterruptInvocation } from '../../../../src/contexts/run/infrastructure/pty/WindowsForegroundJobInterrupt'
 
 describe('foreground job shell control', () => {
+  it.each(['linux', 'win32'] as const)(
+    'sets the requested execution directory before launching on %s',
+    (platform) => {
+      const workingDirectory =
+        platform === 'win32' ? String.raw`C:\work trees\中文'feature` : "/work trees/中文'feature"
+      const control = createForegroundJobShellControl(createCommand({ workingDirectory }), {
+        platform,
+        shellExecutable: platform === 'win32' ? 'powershell.exe' : '/bin/bash',
+        temporaryRoot: tmpdir(),
+        token: 'directorytoken'
+      })
+      try {
+        const script = readFileSync(control.scriptPath, 'utf8')
+        expect(script).toContain(platform === 'win32' ? 'Set-Location -LiteralPath' : 'cd -- ')
+        expect(
+          script.indexOf(platform === 'win32' ? 'Set-Location -LiteralPath' : 'cd -- ')
+        ).toBeLessThan(script.indexOf('CLEANCODE_JOB:directorytoken:started'))
+      } finally {
+        disposeForegroundJobShellControl(control)
+      }
+    }
+  )
   let temporaryRoot: string
 
   beforeEach(() => {

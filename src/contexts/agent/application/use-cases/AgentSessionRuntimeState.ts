@@ -1,7 +1,5 @@
 import type { AgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type {
-  AgentActivityStatus,
-  AgentBindingRuntimeStatus,
   AgentGraphUpdatedEvent,
   AgentRuntimeChangedEvent,
   AgentRuntimeSnapshot,
@@ -22,11 +20,9 @@ import type {
   AgentRuntimeScopeValidationCommand,
   AgentRuntimeScopeValidationPort
 } from '../ports/AgentRuntimeScopeValidationPort'
-import {
-  haveSameLaunchIdentity,
-  haveSameLaunchRuntime,
-  haveSameTerminalRuntime
-} from './AgentRuntimeFacetEquality'
+import { haveSameLaunchIdentity } from './AgentRuntimeFacetEquality'
+import { transitionAgentRuntime } from './AgentRuntimeTransition'
+export { createInitialAgentRuntime, transitionAgentRuntime } from './AgentRuntimeTransition'
 import {
   AgentConversationScope,
   type AgentConversationScopeSnapshot
@@ -72,6 +68,8 @@ export interface AgentSessionCallbacks {
 }
 
 export interface ManagedAgentSession {
+  terminalDirectory?: string
+  executionDirectory?: string | null
   messageDelivery?: AgentMessageDeliveryLease
   initialPrompt?: string
   readonly agentId: string
@@ -108,81 +106,6 @@ export function createAgentSessionCallbacks(command: AgentSessionCallbacks): Age
     onRuntimeChanged: command.onRuntimeChanged,
     onToolApprovalRequested: command.onToolApprovalRequested
   }
-}
-
-export function createInitialAgentRuntime(
-  input: {
-    readonly binding?: AgentBindingRuntimeStatus
-    readonly mcp?: AgentMcpRuntimeStatus
-  } = {}
-): AgentRuntimeSnapshot {
-  return {
-    activity: { status: 'unavailable' },
-    binding: { status: input.binding ?? 'unbound' },
-    launch: {
-      exitCode: null,
-      failureKind: null,
-      generation: 0,
-      launchId: null,
-      status: 'not_started'
-    },
-    mcp: { status: input.mcp ?? 'disabled' },
-    revision: 0,
-    terminal: {
-      exitCode: null,
-      processId: null,
-      status: 'not_started',
-      stopReason: null,
-      viewIdentity: null
-    }
-  }
-}
-
-export function transitionAgentRuntime(
-  session: ManagedAgentSession,
-  transition: {
-    readonly activity?: AgentActivityStatus
-    readonly binding?: AgentBindingRuntimeStatus
-    readonly launch?: Partial<AgentRuntimeSnapshot['launch']>
-    readonly mcp?: AgentMcpRuntimeStatus
-    readonly terminal?: Partial<AgentRuntimeSnapshot['terminal']>
-  }
-): boolean {
-  const runtime = session.runtime
-  const nextActivity = transition.activity ?? runtime.activity.status
-  const nextBinding = transition.binding ?? runtime.binding.status
-  const nextLaunch = { ...runtime.launch, ...transition.launch }
-  const nextMcp = transition.mcp ?? runtime.mcp.status
-  const nextTerminal = { ...runtime.terminal, ...transition.terminal }
-  if (
-    nextActivity === runtime.activity.status &&
-    nextBinding === runtime.binding.status &&
-    haveSameLaunchRuntime(nextLaunch, runtime.launch) &&
-    nextMcp === runtime.mcp.status &&
-    haveSameTerminalRuntime(nextTerminal, runtime.terminal)
-  ) {
-    return false
-  }
-
-  session.runtime = {
-    activity: { status: nextActivity },
-    binding: { status: nextBinding },
-    launch: nextLaunch,
-    mcp: { status: nextMcp },
-    revision: runtime.revision + 1,
-    terminal: nextTerminal
-  }
-  session.messageDelivery?.refresh()
-  try {
-    session.callbacks.onRuntimeChanged?.({
-      agentId: session.agentId,
-      runtime: session.runtime,
-      sessionId: session.sessionId
-    })
-  } catch {
-    // Runtime observers must not participate in terminal or Provider lifecycle control flow.
-  }
-  return true
 }
 
 function isActiveAgentLaunch(session: ManagedAgentSession): boolean {

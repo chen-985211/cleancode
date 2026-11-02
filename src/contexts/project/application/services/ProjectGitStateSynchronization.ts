@@ -26,12 +26,14 @@ export function synchronizeProjectGitBinding(
 
   const mainGitBranch =
     inspection.branches.find((branch) => branch.isCurrent)?.name ?? inspection.currentBranch
-  const worktrees = inspection.branches
-    .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
-    .map((branch) => ({
-      branchName: branch.name,
-      directory: branch.worktreeDirectory ?? project.directory
-    }))
+  const worktrees = inspection.worktrees
+    ? inspection.worktrees.filter((worktree) => !worktree.isCurrent)
+    : inspection.branches
+        .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
+        .map((branch) => ({
+          branchName: branch.name,
+          directory: branch.worktreeDirectory ?? project.directory
+        }))
 
   return project.syncGitBranchWorkspaces({
     mainDirectory: project.directory,

@@ -64,6 +64,7 @@ export interface LaunchForegroundJobProcessCommand extends ForegroundJobProcessI
   readonly executable: string
   /** POSIX search path appended after the live shell PATH, unless environment sets PATH. */
   readonly fallbackPath?: string
+  readonly workingDirectory?: string
   readonly onExit: (
     event: ForegroundJobProcessIdentity & { readonly exitCode: number | null }
   ) => void

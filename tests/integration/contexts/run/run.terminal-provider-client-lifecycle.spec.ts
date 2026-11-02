@@ -40,6 +40,35 @@ describe('persistent terminal provider client lifecycle', () => {
     await rm(rootDirectory, { force: true, recursive: true })
   })
 
+  it('fails a directory-specific launch on an older provider without retrying in the home directory', async () => {
+    const client = createClient(rootDirectory)
+    await client.initialize()
+    const onExit = vi.fn()
+    provider.failMethod('launchForegroundJobInDirectory', {
+      code: 'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
+      message: 'Unknown method',
+      isExpected: true
+    })
+    client.launchForegroundJob({
+      args: [],
+      environment: {},
+      executable: 'agent-cli',
+      workingDirectory: '/worktrees/feature',
+      generation: 1,
+      launchId: 'directory-launch',
+      sessionId: 'session-1',
+      onStarted: vi.fn(),
+      onExit
+    })
+    await provider.waitForRequests('launchForegroundJobInDirectory', 1)
+    await vi.waitFor(() => expect(onExit).toHaveBeenCalledOnce())
+    expect(provider.requests.filter(({ method }) => method === 'launchForegroundJob')).toEqual([])
+    expect(
+      provider.requests.find(({ method }) => method === 'launchForegroundJobInDirectory')?.params
+    ).toMatchObject({ foregroundJob: { workingDirectory: '/worktrees/feature' } })
+    await client.detachApplication()
+  })
+
   it('replays the latest scrollback setting after connecting without a disconnected warning', async () => {
     const backgroundErrors = vi.fn()
     const client = createClient(rootDirectory, backgroundErrors)

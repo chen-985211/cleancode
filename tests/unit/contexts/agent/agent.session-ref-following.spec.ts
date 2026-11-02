@@ -1,3 +1,4 @@
+import type { AgentExecutionDirectoryPort } from '../../../../src/contexts/agent/application/ports/AgentExecutionDirectoryPort'
 import type {
   AgentMcpRegistration,
   AgentMcpServerPort,
@@ -14,6 +15,215 @@ import {
 } from '../../../fixtures/agentTerminalRuntime'
 
 describe('Agent Provider session following', () => {
+  it('clears the execution directory for a new ephemeral conversation', async () => {
+    const providers = new RecordingAgentProviderRegistry()
+    const runtime = new RecordingAgentTerminalRuntime()
+    const service = createSessionService(providers, new RecordingAgentSessionRepository(), runtime)
+    await attachAgent(service, 'agent-1', undefined, 'ephemeral')
+    await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/feature')
+    runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+    await attachAgent(service, 'agent-1', 'new', 'ephemeral')
+    expect(providers.launchCommands[1]!.workspaceDirectory).toBe('/repo/app')
+    await service.disposeAll()
+  })
+
+  it('keeps the latest identified conversation when a later directory report retries a failed save', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    vi.spyOn(repository, 'save').mockRejectedValueOnce(new Error('disk unavailable'))
+    const ref = {
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    }
+    providers.launchCommands[0]!.onProviderSessionIdentified(ref)
+    await vi.waitFor(async () =>
+      expect((await attachAgent(service, 'agent-1')).runtime.binding.status).toBe(
+        'persistence_failed'
+      )
+    )
+    await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/feature')
+    await service.disposeAll()
+    expect(
+      (await repository.findAgent('project-1', 'main', 'agent-1'))?.toSnapshot()
+    ).toMatchObject({ providerSessionRef: ref, executionDirectory: '/repo/app-worktrees/feature' })
+  })
+
+  it('retries saving the same confirmed directory after a persistence failure', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    vi.spyOn(repository, 'save').mockRejectedValueOnce(new Error('disk unavailable'))
+    const report = providers.launchCommands[0]!.onExecutionDirectoryChanged!
+    await report('/repo/app-worktrees/feature')
+    await vi.waitFor(async () =>
+      expect((await attachAgent(service, 'agent-1')).runtime.binding.status).toBe(
+        'persistence_failed'
+      )
+    )
+    await report('/repo/app-worktrees/feature')
+    await service.disposeAll()
+    expect((await repository.findAgent('project-1', 'main', 'agent-1'))?.executionDirectory).toBe(
+      '/repo/app-worktrees/feature'
+    )
+  })
+
+  it('starts an explicit new conversation at home even when the retained shell was restored elsewhere', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const firstProviders = new RecordingAgentProviderRegistry()
+    const first = createSessionService(firstProviders, repository)
+    await attachAgent(first, 'agent-1')
+    firstProviders.launchCommands[0]!.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await firstProviders.launchCommands[0]!.onExecutionDirectoryChanged!(
+      '/repo/app-worktrees/feature'
+    )
+    await first.disposeAll()
+    const providers = new RecordingAgentProviderRegistry()
+    const runtime = new RecordingAgentTerminalRuntime()
+    const service = createSessionService(providers, repository, runtime)
+    await attachAgent(service, 'agent-1')
+    runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+    await attachAgent(service, 'agent-1', 'new')
+    expect(runtime.opens).toHaveLength(1)
+    expect(providers.launchCommands[1]!.workspaceDirectory).toBe('/repo/app')
+    expect(runtime.launches[1]!.plan.workingDirectory).toBe('/repo/app')
+    await service.disposeAll()
+  })
+
+  it('fails restoration if the confirmed directory disappeared instead of launching at home', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/removed')
+    await service.disposeAll()
+    const nextRuntime = new RecordingAgentTerminalRuntime()
+    const nextProviders = new RecordingAgentProviderRegistry()
+    const restored = await attachAgent(
+      createSessionService(nextProviders, repository, nextRuntime, { resolve: async () => null }),
+      'agent-1'
+    )
+    expect(restored.runtime.terminal.status).toBe('failed')
+    expect(nextRuntime.opens).toHaveLength(0)
+    expect(nextProviders.launchCommands).toHaveLength(0)
+  })
+
+  it('persists a directory update when the conversation was already bound before launch', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const initial = new RecordingAgentProviderRegistry()
+    const initialService = createSessionService(initial, repository)
+    await attachAgent(initialService, 'agent-1')
+    initial.launchCommands[0]!.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await initialService.disposeAll()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/second')
+    await service.disposeAll()
+    expect((await repository.findAgent('project-1', 'main', 'agent-1'))?.executionDirectory).toBe(
+      '/repo/app-worktrees/second'
+    )
+  })
+
+  it('refuses to suspend a directory used by an Agent from another canvas', async () => {
+    const providers = new RecordingAgentProviderRegistry()
+    const runtime = new RecordingAgentTerminalRuntime()
+    const service = createSessionService(providers, new RecordingAgentSessionRepository(), runtime)
+    await attachAgent(service, 'agent-1')
+    await providers.launchCommands[0]!.onExecutionDirectoryChanged!(
+      '/repo/app-worktrees/feature/subdir'
+    )
+    await expect(
+      service.suspendWorkspaceDirectory('/repo/app-worktrees/feature')
+    ).rejects.toMatchObject({ code: 'WORKSPACE_DIRECTORY_IN_USE' })
+    expect(runtime.stops).toEqual([])
+    await service.disposeAll()
+  })
+
+  it('blocks foreign directory reports for the duration of a directory lease', async () => {
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, new RecordingAgentSessionRepository())
+    await attachAgent(service, 'agent-1')
+    const lease = await service.suspendWorkspaceDirectory('/repo/app-worktrees/feature')
+    expect(
+      await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/feature')
+    ).toBe(false)
+    lease.release()
+    expect(
+      await providers.launchCommands[0]!.onExecutionDirectoryChanged!('/repo/app-worktrees/feature')
+    ).toBe(true)
+    await service.disposeAll()
+  })
+
+  it('checks the Provider identity again after asynchronous directory validation', async () => {
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService(providers, new RecordingAgentSessionRepository())
+    await attachAgent(service, 'agent-1')
+    const reported = await providers.launchCommands[0]!.onExecutionDirectoryChanged!(
+      '/repo/app-worktrees/old',
+      () => false
+    )
+    expect(reported).toBe(false)
+    await service.disposeAll()
+  })
+
+  it('follows execution directories without moving the logical Agent and restores the last directory', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const providers = new RecordingAgentProviderRegistry()
+    const runtime = new RecordingAgentTerminalRuntime()
+    const service = createSessionService(providers, repository, runtime)
+    const attached = await attachAgent(service, 'agent-1')
+    const launch = providers.launchCommands[0]!
+    expect(launch.onExecutionDirectoryChanged).toBeTypeOf('function')
+    launch.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await launch.onExecutionDirectoryChanged!('/repo/app-worktrees/feature')
+    await service.disposeAll()
+    const saved = await repository.findAgent('project-1', 'main', 'agent-1')
+    expect(saved?.toSnapshot()).toMatchObject({
+      workspaceId: 'main',
+      executionDirectory: '/repo/app-worktrees/feature'
+    })
+    const nextProviders = new RecordingAgentProviderRegistry()
+    const nextRuntime = new RecordingAgentTerminalRuntime()
+    const next = await attachAgent(
+      createSessionService(nextProviders, repository, nextRuntime),
+      'agent-1'
+    )
+    expect(next.workspaceId).toBe(attached.workspaceId)
+    expect(nextRuntime.opens[0]).toMatchObject({
+      workspaceId: 'main',
+      workspaceDirectory: '/repo/app',
+      workingDirectory: '/repo/app-worktrees/feature'
+    })
+    expect(nextProviders.launchCommands[0]?.workspaceDirectory).toBe('/repo/app-worktrees/feature')
+  })
+
+  it('rejects directory callbacks after a launch is disposed', async () => {
+    const providers = new RecordingAgentProviderRegistry()
+    const repository = new RecordingAgentSessionRepository()
+    const service = createSessionService(providers, repository)
+    await attachAgent(service, 'agent-1')
+    const launch = providers.launchCommands[0]!
+    expect(launch.onExecutionDirectoryChanged).toBeTypeOf('function')
+    await service.disposeAll()
+    expect(await launch.onExecutionDirectoryChanged!('/repo/app-worktrees/late')).toBe(false)
+  })
+
   it('starts a new conversation only after draining the exited launch final identity', async () => {
     const repository = new RecordingAgentSessionRepository()
     const providers = new RecordingAgentProviderRegistry()
@@ -230,7 +440,10 @@ describe('Agent Provider session following', () => {
 function createSessionService(
   providers: RecordingAgentProviderRegistry,
   repository: AgentSessionRepository,
-  runtime = new RecordingAgentTerminalRuntime()
+  runtime = new RecordingAgentTerminalRuntime(),
+  directories: AgentExecutionDirectoryPort = {
+    resolve: async ({ executionDirectory }) => executionDirectory
+  }
 ): AgentSessionService {
   const unusedTools: AgentToolExecutionOperations = {
     cancel: async () => {
@@ -246,14 +459,26 @@ function createSessionService(
     unusedTools,
     repository,
     providers,
-    'codex'
+    'codex',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    directories
   )
 }
 
-function attachAgent(service: AgentSessionService, agentId: string, restartMode?: 'new') {
+function attachAgent(
+  service: AgentSessionService,
+  agentId: string,
+  restartMode?: 'new',
+  persistenceMode?: 'ephemeral'
+) {
   return service.attach({
     agentId,
     restartMode,
+    persistenceMode,
     columns: 80,
     onGraphUpdated: () => undefined,
     onRuntimeChanged: () => undefined,

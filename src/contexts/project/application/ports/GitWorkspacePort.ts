@@ -11,6 +11,17 @@ export interface GitRepositoryInspection {
   readonly currentBranch: string | null
   readonly localBranches: readonly string[]
   readonly branches: readonly GitBranchInspection[]
+  /** Complete checkout inventory, including detached HEAD checkouts. */
+  readonly worktrees?: readonly GitWorktreeInspection[]
+}
+
+export interface GitWorktreeInspection {
+  readonly branchName: string | null
+  readonly directory: string
+  readonly head: string | null
+  readonly isLocked: boolean
+  readonly isCurrent: boolean
+  readonly lockReason: string | null
 }
 
 export interface CreateBranchWorktreeCommand {

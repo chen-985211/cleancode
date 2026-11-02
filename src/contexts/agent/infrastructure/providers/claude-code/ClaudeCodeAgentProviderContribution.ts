@@ -167,6 +167,7 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
       : undefined
     if (!inbox) command.messageDelivery?.(null)
     const reporter = await ClaudeCodeHookReporter.start({
+      onExecutionDirectoryChanged: command.onExecutionDirectoryChanged,
       onFileChanged: (path) => inbox?.claim(path),
       onSessionStarted: () => {
         if (inbox) command.messageDelivery?.(inbox)
