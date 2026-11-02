@@ -5,7 +5,6 @@ export const enAgentMessages = {
   'agent.consoleRegion': '{agentName} console',
   'agent.cliTerminal': '{provider} CLI terminal',
   'agent.cliInput': '{provider} CLI input',
-  'agent.executionDirectory': 'Execution directory:',
   'agent.name': 'Agent name',
   'agent.renameHint': '{agentName}, double-click to rename',
   'agent.renameTitle': 'Double-click to rename',

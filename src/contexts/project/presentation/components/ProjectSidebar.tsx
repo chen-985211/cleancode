@@ -201,7 +201,7 @@ interface ProjectCardProps<TWorkbench extends ProjectWorkbenchViewModel> {
 }
 
 interface ArchiveWorkspacePresentation<TWorkbench extends ProjectWorkbenchViewModel> {
-  readonly branch: TWorkbench['gitBranches'][number] | null
+  readonly lock: Pick<TWorkbench['gitBranches'][number], 'isLocked' | 'lockReason'> | null
   readonly open: boolean
   readonly workspace: TWorkbench['project']['workspaces'][number]
 }
@@ -424,7 +424,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
               const isDefaultWorkspace = workspace.workspaceKind === 'default'
               const isGitUninitialized =
                 isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
-              const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
+              const isWorktreeWorkspace = workspace.workspaceKind === 'linked-worktree'
               const workspaceDisplayName = isGitUninitialized
                 ? t('sidebar.gitUninitialized')
                 : workspace.displayName
@@ -566,13 +566,17 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                             isOpen={openWorkspaceMenuId === workspace.workspaceId}
                             workspaceName={workspace.displayName}
                             onArchive={() => {
-                              const branch =
+                              const lock =
+                                workbench.gitWorktrees?.find(
+                                  (candidate) => candidate.directory === workspace.directory
+                                ) ??
                                 workbench.gitBranches.find(
                                   (candidate) =>
                                     candidate.name === workspace.gitBranch &&
                                     candidate.worktreeDirectory === workspace.directory
-                                ) ?? null
-                              setArchivePresentation({ branch, open: true, workspace })
+                                ) ??
+                                null
+                              setArchivePresentation({ lock, open: true, workspace })
                             }}
                             onClose={closeWorkspaceMenu}
                             onToggle={() => toggleWorkspaceMenu(workspace.workspaceId)}
@@ -602,11 +606,12 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
       />
       {archivePresentation ? (
         <ArchiveWorkspaceDialog
+          gitBranch={archivePresentation.workspace.gitBranch}
           open={archivePresentation.open}
           workspaceName={archivePresentation.workspace.displayName}
           isCurrentWorkspace={archivePresentation.workspace.isCurrent && isCurrentProject}
-          isLocked={archivePresentation.branch?.isLocked ?? false}
-          lockReason={archivePresentation.branch?.lockReason ?? null}
+          isLocked={archivePresentation.lock?.isLocked ?? false}
+          lockReason={archivePresentation.lock?.lockReason ?? null}
           onCancel={() =>
             setArchivePresentation((current) => (current ? { ...current, open: false } : current))
           }
@@ -617,8 +622,8 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             onArchiveBranchWorkspace(
               workbench,
               archivePresentation.workspace.workspaceId,
-              archivePresentation.branch?.isLocked
-                ? { lockReason: archivePresentation.branch.lockReason }
+              archivePresentation.lock?.isLocked
+                ? { lockReason: archivePresentation.lock.lockReason }
                 : undefined
             )
             setArchivePresentation((current) => (current ? { ...current, open: false } : current))

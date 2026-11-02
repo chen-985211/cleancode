@@ -125,6 +125,9 @@ export const enProjectMessages = {
     'Remove this worktree directory while keeping Git branch {workspaceName}. You can recreate it later from the default workspace.',
   'archive.lockedDetail':
     'Git branch {workspaceName} is kept. Archiving is still rejected if the directory contains uncommitted changes.',
+  'archive.detachedDescription': 'This removes the worktree directory.',
+  'archive.detachedDetail':
+    'This checkout is not attached to a Git branch. Create a branch or tag first if you need to retain this commit.',
   'archive.currentDetail':
     'This workspace is currently in use. cleancode switches to the default workspace before archiving it.',
   'archive.confirm': 'Archive workspace',

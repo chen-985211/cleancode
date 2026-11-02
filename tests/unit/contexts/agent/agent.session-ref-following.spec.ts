@@ -15,6 +15,47 @@ import {
 } from '../../../fixtures/agentTerminalRuntime'
 
 describe('Agent Provider session following', () => {
+  it('keeps the launch directory and archive protection when the resumed conversation is missing', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const initialProviders = new RecordingAgentProviderRegistry()
+    const initial = createSessionService(initialProviders, repository)
+    await attachAgent(initial, 'agent-1')
+    initialProviders.launchCommands[0]!.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await initialProviders.launchCommands[0]!.onExecutionDirectoryChanged!(
+      '/repo/app-worktrees/feature'
+    )
+    await initial.disposeAll()
+    const providers = new RecordingAgentProviderRegistry()
+    const createPlan = providers.contribution.launcher.createLaunchPlan
+    vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockImplementation(
+      async (command) => ({ ...(await createPlan(command)), discardProviderSessionRef: true })
+    )
+    const runtime = new RecordingAgentTerminalRuntime()
+    const service = createSessionService(providers, repository, runtime)
+    try {
+      const attached = await attachAgent(service, 'agent-1')
+      expect(runtime.launches[0]!.plan.workingDirectory).toBe('/repo/app-worktrees/feature')
+      expect(attached.runtime.executionDirectory).toBe('/repo/app-worktrees/feature')
+      expect(attached.providerSessionRef).toBeNull()
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.toSnapshot()
+      ).toMatchObject({
+        executionDirectory: '/repo/app-worktrees/feature',
+        providerSessionRef: null
+      })
+      await expect(
+        service.suspendWorkspaceDirectory('/repo/app-worktrees/feature')
+      ).rejects.toMatchObject({ code: 'WORKSPACE_DIRECTORY_IN_USE' })
+      expect(runtime.stops).toEqual([])
+    } finally {
+      await service.disposeAll()
+    }
+  })
+
   it('clears the execution directory for a new ephemeral conversation', async () => {
     const providers = new RecordingAgentProviderRegistry()
     const runtime = new RecordingAgentTerminalRuntime()
@@ -354,7 +395,9 @@ describe('Agent Provider session following', () => {
       })
     )
     await attachAgent(createSessionService(providers, repository), 'agent-1')
-    expect(await repository.findAgent('project-1', 'main', 'agent-1')).toBeNull()
+    expect(
+      (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef
+    ).toBeNull()
 
     providers.launchCommands[0]!.onProviderSessionIdentified(ref)
     await vi.waitFor(async () => {

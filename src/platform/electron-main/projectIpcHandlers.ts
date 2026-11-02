@@ -1,6 +1,9 @@
 import { ProjectRegistryTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
+import type {
+  GitBranchNavigationItemSnapshot,
+  GitWorktreeNavigationItemSnapshot
+} from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
@@ -15,6 +18,7 @@ import type { Logger } from '../logging/Logger'
 
 interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
+  readonly gitWorktrees?: readonly GitWorktreeNavigationItemSnapshot[]
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }

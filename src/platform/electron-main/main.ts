@@ -556,16 +556,16 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
     projectId: project.id,
     workspaceId: currentWorkspace.workspaceId
   })
-  const gitBranches = (
+  const { branches: gitBranches, worktrees: gitWorktrees } =
     await listGitBranchNavigationUseCase.execute({
       projectDirectory: project.directory
     })
-  ).branches
   return {
     agents,
     canvasArrangement,
     project,
     gitBranches,
+    ...(gitWorktrees ? { gitWorktrees } : {}),
     graph,
     initialization: await workspaceInitialization.load(project)
   }

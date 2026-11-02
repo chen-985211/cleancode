@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { access, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -73,6 +73,44 @@ describe('project git workspace adapter', () => {
       adapter.resolve(projectDirectory, 'fixture/issues', '--upload-pack=other')
     ).rejects.toMatchObject({ code: 'GITHUB_BASE_UNAVAILABLE' })
   })
+
+  it.each(['main', 'linked', 'detached'] as const)(
+    'does not duplicate the current %s checkout for a subdirectory project',
+    async (kind) => {
+      await initializeGitProject(projectDirectory)
+      let checkout = projectDirectory
+      if (kind !== 'main') {
+        checkout = join(appStateDirectory, 'linked-checkout')
+        await execFileAsync(
+          'git',
+          [
+            'worktree',
+            'add',
+            ...(kind === 'detached' ? ['--detach'] : ['-b', 'feature/subdir']),
+            checkout
+          ],
+          { cwd: projectDirectory }
+        )
+      }
+      const subdirectory = join(checkout, 'packages', 'app')
+      await mkdir(subdirectory, { recursive: true })
+      const adapter = new GitCliWorkspaceAdapter()
+      const inspection = await adapter.inspectRepository(subdirectory)
+      expect(inspection.worktrees?.filter((worktree) => worktree.isCurrent)).toEqual([
+        expect.objectContaining({ directory: await realpath(checkout) })
+      ])
+      const opened = await new CreateOrOpenProjectUseCase(
+        new FileSystemProjectRepository(appStateDirectory),
+        adapter
+      ).execute({ directory: subdirectory, name: 'subdirectory-project' })
+      expect(opened.workspaces).not.toContainEqual(
+        expect.objectContaining({
+          workspaceKind: 'linked-worktree',
+          directory: await realpath(checkout)
+        })
+      )
+    }
+  )
 
   it('identifies the registered checkout when the project itself is a detached linked worktree', async () => {
     await initializeGitProject(projectDirectory)

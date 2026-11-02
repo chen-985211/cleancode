@@ -180,6 +180,56 @@ describe('app shell worktree archive', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 
+  it.each([null, 'native detached session'])(
+    'archives a detached checkout using its directory lock facts: %s',
+    async (lockReason) => {
+      const original = createWorkbenchWithTestWorktree(false)
+      const directory = '/tmp/alpha-project-worktrees/test'
+      const workbench = {
+        ...original,
+        project: {
+          ...original.project,
+          workspaces: original.project.workspaces.map((workspace) =>
+            workspace.workspaceId === 'test' ? { ...workspace, gitBranch: null } : workspace
+          )
+        },
+        gitBranches: original.gitBranches.filter((branch) => branch.name !== 'test'),
+        gitWorktrees: [{ directory, isLocked: lockReason !== null, lockReason }]
+      }
+      const archiveBranchWorkspace = vi.fn(async () => workbench)
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({
+          listWorkbenches: vi.fn(async () => [workbench]),
+          archiveBranchWorkspace
+        })
+      })
+      render(<AppShell />)
+      const card = await screen.findByRole('group', { name: '项目 alpha-project' })
+      fireEvent.click(within(card).getByRole('button', { name: '打开 test 工作区菜单' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
+      const dialog = await screen.findByRole('dialog', {
+        name: lockReason ? '解除锁并归档工作区 test' : '归档工作区 test'
+      })
+      expect(archiveBranchWorkspace).not.toHaveBeenCalled()
+      if (lockReason)
+        expect(within(dialog).getByText(/native detached session/)).toBeInTheDocument()
+      expect(dialog).toHaveTextContent('未绑定 Git 分支')
+      expect(dialog).not.toHaveTextContent('Git 分支 test 会被保留')
+      expect(dialog).not.toHaveTextContent('保留 Git 分支 test')
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: lockReason ? '解除锁并归档' : '归档工作区' })
+      )
+      await waitFor(() =>
+        expect(archiveBranchWorkspace).toHaveBeenCalledWith({
+          projectDirectory: '/tmp/alpha-project',
+          workspaceId: 'test',
+          ...(lockReason ? { lockedWorktreeConfirmation: { lockReason } } : {})
+        })
+      )
+    }
+  )
+
   it('requires an explicit unlock confirmation for a locked external worktree', async () => {
     const workbench = createWorkbenchWithTestWorktree(false, 'external agent session')
     const archiveBranchWorkspace = vi.fn(async () => workbench)

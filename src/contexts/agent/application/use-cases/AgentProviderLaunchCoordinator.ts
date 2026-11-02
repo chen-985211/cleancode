@@ -129,7 +129,7 @@ export class AgentProviderLaunchCoordinator {
       session
     })
     try {
-      if (plan.discardProviderSessionRef) await this.persistence.clear(session)
+      if (plan.discardProviderSessionRef) await this.persistence.discardProviderSessionRef(session)
       if (!canLaunchAgentProvider(session, processSessionId)) {
         managedActivity.recordExit()
         await disposeAgentLaunchArtifacts(session)

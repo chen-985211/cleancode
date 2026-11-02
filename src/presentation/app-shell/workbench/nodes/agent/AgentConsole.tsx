@@ -215,7 +215,6 @@ export function AgentConsole({
           {agent && onRename && onRemove ? (
             <AgentConsoleActions
               agent={agent}
-              executionDirectory={session?.runtime.executionDirectory}
               identityControl={
                 <AgentProviderIdentity
                   icon={providerCatalog.descriptor?.icon ?? null}

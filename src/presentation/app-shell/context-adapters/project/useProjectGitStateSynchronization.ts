@@ -51,7 +51,8 @@ export function useProjectGitStateSynchronization({
               ? {
                   ...latest,
                   project: synchronizedWorkbench.project,
-                  gitBranches: synchronizedWorkbench.gitBranches
+                  gitBranches: synchronizedWorkbench.gitBranches,
+                  gitWorktrees: synchronizedWorkbench.gitWorktrees
                 }
               : synchronizedWorkbench
           )

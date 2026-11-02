@@ -18,20 +18,12 @@ const agent = {
 }
 
 describe('Agent console actions', () => {
-  it('reveals a confirmed execution directory from the existing name tooltip', async () => {
-    renderActions(
-      <AgentConsoleActions
-        agent={agent}
-        executionDirectory="/repo/worktrees/feature"
-        onRemove={vi.fn()}
-        onRename={vi.fn()}
-      />
-    )
+  it('keeps only the rename hint in the Agent name tooltip', async () => {
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
     fireEvent.keyDown(document, { key: 'Tab' })
     act(() => screen.getByRole('button', { name: 'Agent 2，双击重命名' }).focus())
     const tooltip = await screen.findByRole('tooltip')
-    expect(tooltip).toHaveTextContent('执行目录：/repo/worktrees/feature')
-    expect(tooltip).toHaveTextContent('双击重命名')
+    expect(tooltip).toHaveTextContent(/^双击重命名$/)
   })
 
   it('selects the whole Agent from the title area without treating actions as selection', () => {

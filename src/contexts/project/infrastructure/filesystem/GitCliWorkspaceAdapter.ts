@@ -113,7 +113,9 @@ async function getLocalBranchInspections(
     runGit(directory, ['branch', '--format=%(refname:short)%09%(worktreepath)']),
     runGit(directory, ['worktree', 'list', '--porcelain', '-z'])
   ])
-  const currentDirectory = await realpath(directory)
+  const currentDirectory = await realpath(
+    (await runGit(directory, ['rev-parse', '--show-toplevel'])).trim()
+  )
   const worktrees = parseWorktreePorcelain(worktreeOutput).map((worktree) => ({
     ...worktree,
     isCurrent: worktree.directory === currentDirectory

@@ -50,7 +50,10 @@ import type {
   BlockTemplateSnapshot
 } from './contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { InstantiateBlockTemplateResult } from './contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
-import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
+import type {
+  GitBranchNavigationItemSnapshot,
+  GitWorktreeNavigationItemSnapshot
+} from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type {
   WorkspaceDefaults,
@@ -104,6 +107,7 @@ interface WorkbenchSnapshot {
   readonly canvasArrangement: CanvasArrangementSnapshot
   readonly isCurrentProject?: boolean
   readonly project: ProjectSnapshot
+  readonly gitWorktrees?: readonly GitWorktreeNavigationItemSnapshot[]
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }

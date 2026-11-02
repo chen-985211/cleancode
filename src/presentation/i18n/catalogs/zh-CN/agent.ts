@@ -3,7 +3,6 @@ export const zhCNAgentMessages = {
   'agent.consoleRegion': '{agentName} 控制台',
   'agent.cliTerminal': '{provider} CLI 终端',
   'agent.cliInput': '{provider} CLI 输入',
-  'agent.executionDirectory': '执行目录：',
   'agent.name': 'Agent 名称',
   'agent.renameHint': '{agentName}，双击重命名',
   'agent.renameTitle': '双击重命名',

@@ -8,6 +8,13 @@ export interface GitBranchNavigationItemSnapshot {
   readonly lockReason: string | null
 }
 
+export interface GitWorktreeNavigationItemSnapshot {
+  readonly directory: string
+  readonly isLocked: boolean
+  readonly lockReason: string | null
+}
+
 export interface GitBranchNavigationSnapshot {
+  readonly worktrees?: readonly GitWorktreeNavigationItemSnapshot[]
   readonly branches: readonly GitBranchNavigationItemSnapshot[]
 }

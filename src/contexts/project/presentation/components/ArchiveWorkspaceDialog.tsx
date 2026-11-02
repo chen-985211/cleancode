@@ -4,6 +4,7 @@ import { ProjectSidebarConfirmationDialog } from './ProjectSidebarConfirmationDi
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 
 interface ArchiveWorkspaceDialogProps {
+  readonly gitBranch: string | null
   readonly isCurrentWorkspace: boolean
   readonly isLocked: boolean
   readonly lockReason: string | null
@@ -15,6 +16,7 @@ interface ArchiveWorkspaceDialogProps {
 }
 
 export function ArchiveWorkspaceDialog({
+  gitBranch,
   isCurrentWorkspace,
   isLocked,
   lockReason,
@@ -25,6 +27,7 @@ export function ArchiveWorkspaceDialog({
   onConfirm
 }: ArchiveWorkspaceDialogProps) {
   const { t } = useI18n()
+  const isDetached = gitBranch === null
   const ariaLabel = isLocked
     ? t('archive.unlockDialog', { workspaceName })
     : t('archive.dialog', { workspaceName })
@@ -32,12 +35,18 @@ export function ArchiveWorkspaceDialog({
     ? t('archive.lockedDescription', {
         lockReason: lockReason ?? t('archive.missingLockReason')
       })
-    : t('archive.description', { workspaceName })
-  const detail = isLocked
-    ? t('archive.lockedDetail', { workspaceName })
-    : isCurrentWorkspace
-      ? t('archive.currentDetail')
-      : undefined
+    : isDetached
+      ? t('archive.detachedDescription')
+      : t('archive.description', { workspaceName })
+  const detail = isDetached
+    ? [t('archive.detachedDetail'), isCurrentWorkspace ? t('archive.currentDetail') : null]
+        .filter(Boolean)
+        .join(' ')
+    : isLocked
+      ? t('archive.lockedDetail', { workspaceName })
+      : isCurrentWorkspace
+        ? t('archive.currentDetail')
+        : undefined
 
   return (
     <ProjectSidebarConfirmationDialog
