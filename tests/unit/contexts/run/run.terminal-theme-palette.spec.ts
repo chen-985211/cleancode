@@ -24,6 +24,16 @@ describe('terminal theme palette', () => {
     }
   )
 
+  it.each([
+    ['light', '#c2414f', '#238a55', '#b7791f', '#2b60cc'],
+    ['dark', '#ee7180', '#52c488', '#e0a84c', '#75a0f5']
+  ] as const)(
+    'keeps %s terminal status colors aligned with the Agent palette',
+    (theme, red, green, yellow, blue) => {
+      expect(canonicalTerminalPalettes[theme]).toMatchObject({ red, green, yellow, blue })
+    }
+  )
+
   it.each(['light', 'dark'] as const)(
     'keeps characters readable inside block cursors for the %s source theme and its projection',
     (theme) => {

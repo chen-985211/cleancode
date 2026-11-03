@@ -53,10 +53,10 @@ export function renderTerminalRasterFixture(
       cursorBlink: false,
       fontFamily:
         font === 'surface'
-          ? 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace'
+          ? 'SFMono-Regular, Cascadia Mono, Consolas, Liberation Mono, Menlo, monospace'
           : 'Consolas, Liberation Mono, Menlo, monospace',
       fontSize: font === 'surface' ? 13 : 12,
-      fontWeight: font === 'surface' ? 530 : 500,
+      fontWeight: font === 'surface' ? 600 : 500,
       lineHeight: 1.32,
       theme:
         theme === 'light'
