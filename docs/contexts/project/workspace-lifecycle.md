@@ -104,7 +104,7 @@ Issue 创建复用普通分支工作区的默认内容与初始化流程，冻�
 
 归档前必须确认工作区存在、不是默认工作区、属于真实 Git worktree 且工作树干净；detached HEAD 同样支持归档；普通脏工作树必须在任何运行时清理前拒绝。预检通过后，应用层先挂起并排空该目录的 Agent，再次确认工作树干净，随后通过 `WorkspaceAgentLifecyclePort` 取得 Agent attach lease，并通过 `WorkspaceRunLifecyclePort` 阻止新 Run 启动、等待在途启动并硬清理该工作区的终端、Provider 恢复资格/checkpoint、探测器和端口租约。终端的应用退出保留策略不能覆盖这个硬清理。若排空期间出现改动，必须恢复原 Agent、释放运行时 lease，且不得删除 worktree。二次检查通过后才删除并 prune worktree、保存聚合变化。保存成功后 resolve 两类 lease；若 worktree 已删除但 prune 或保存失败，则 quarantine blocker，避免旧界面向已删除目录重新附加或启动 PTY。后续归档重试可识别 quarantine，跳过已经完成的删除并在保存成功后 resolve。有绑定的 Git 分支继续存在；detached HEAD 的确认文案必须明确未绑定分支，如需保留该提交应先创建分支或标签，不承诺自动创建或保留不存在的分支。
 
-Agent 的目录使用保护必须持有到物理删除、prune 和项目保存全部结束；其他画布的 Agent 前台进程或保留 shell 仍使用该目录时明确拒绝归档，不自动停止或迁移它。目录恢复与结构化上报共同服从这项保护，不能在检查后重新进入待删除目录。
+Agent 的目录使用保护必须持有到物理删除、prune 和项目保存全部结束；其他画布的 Agent 前台进程或保留 shell 仍使用该目录时明确拒绝归档，不自动停止或迁移它。前台已结束且保留 shell 不在该目录时，历史执行目录不阻止归档，但须保留为恢复目标；再次启动时重新校验目录及 lease，失效时明确失败。目录恢复与结构化上报共同服从这项保护，不能在检查后重新进入待删除目录。
 
 Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不写入 `Project` 快照。导航查询以工作树目录传递该状态，detached HEAD 与有分支的工作区使用同一侧栏归档入口和显式解锁确认。cleancode 创建和外部工具创建、随后被同步进项目的 worktree 使用同一归档规则：干净但锁定的 worktree 必须返回 `GIT_WORKTREE_LOCKED`，由界面展示锁定原因并取得“解除锁并归档”的单次显式确认。应用层在 Agent 排空后重新读取锁状态；锁原因变化或新出现未确认的锁时，必须恢复 Agent 并停止归档。
 

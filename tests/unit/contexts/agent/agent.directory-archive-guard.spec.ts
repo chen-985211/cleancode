@@ -12,6 +12,127 @@ const worktree = '/repo/worktree'
 const childProject = `${worktree}/packages/app`
 
 describe('Agent directory archive protection', () => {
+  it.each([0, 1])(
+    'releases a foreground-only directory after exit %s while preserving its restore target',
+    async (exitCode) => {
+      const home = '/repo/main'
+      const { service, providers, runtime } = createHarness()
+      let lease: Awaited<ReturnType<AgentSessionService['suspendWorkspaceDirectory']>> | undefined
+      try {
+        await attach(service, home)
+        await providers.launchCommands[0]!.onExecutionDirectoryChanged!(worktree)
+        await expect(service.suspendWorkspaceDirectory(worktree)).rejects.toMatchObject({
+          code: 'WORKSPACE_DIRECTORY_IN_USE'
+        })
+        runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode })
+        const exited = await attach(service, home)
+        expect(exited.runtime.executionDirectory).toBe(worktree)
+        expect(exited.runtime.launch.status).toBe('exited')
+        expect(exited.runtime.terminal.status).toBe('running')
+
+        lease = await service.suspendWorkspaceDirectory(worktree)
+        expect(lease.wasSuspended).toBe(false)
+        const blockedRetry = await attach(service, home, { restartMode: 'retry' })
+        expect(blockedRetry.runtime.launch.status).toBe('failed')
+        expect(blockedRetry.runtime.executionDirectory).toBe(worktree)
+        expect(runtime.launches).toHaveLength(1)
+        lease.release()
+        // A failed restore attempt also cannot turn a historical directory into live occupancy.
+        lease = await service.suspendWorkspaceDirectory(worktree)
+        lease.release()
+
+        const resumed = await attach(service, home, { restartMode: 'retry' })
+        expect(resumed.runtime.launch.status).toBe('running')
+        expect(runtime.launches[1]!.plan.workingDirectory).toBe(worktree)
+        expect(runtime.opens).toHaveLength(1)
+        expect(runtime.stops).toEqual([])
+      } finally {
+        lease?.release()
+        await service.disposeAll()
+      }
+    }
+  )
+
+  it.each([
+    { restartMode: 'new', reportedDirectory: null },
+    { restartMode: 'new', reportedDirectory: worktree },
+    { restartMode: 'retry', reportedDirectory: null },
+    { restartMode: 'retry', reportedDirectory: worktree }
+  ] as const)(
+    'pins $restartMode to its target even if the retained shell has changed cwd: $reportedDirectory',
+    async ({ restartMode, reportedDirectory }) => {
+      const home = '/repo/main'
+      const { service, providers, runtime } = createHarness()
+      try {
+        await attach(service, home)
+        if (reportedDirectory)
+          await providers.launchCommands[0]!.onExecutionDirectoryChanged!(reportedDirectory)
+        runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+        const next = await attach(service, home, { restartMode })
+        const target = restartMode === 'new' ? home : (reportedDirectory ?? home)
+        expect(next.runtime.launch.status).toBe('running')
+        // An explicit target prevents inheritance of any user-selected shell cwd.
+        expect(runtime.launches[1]!.plan.workingDirectory).toBe(target)
+        expect(providers.launchCommands[1]!.workspaceDirectory).toBe(target)
+        expect(next.runtime.executionDirectory).toBe(
+          restartMode === 'new' ? undefined : (reportedDirectory ?? undefined)
+        )
+        expect(runtime.opens).toHaveLength(1)
+        expect(runtime.stops).toEqual([])
+      } finally {
+        await service.disposeAll()
+      }
+    }
+  )
+
+  it.each(['terminal', 'foreground'] as const)(
+    'keeps the restore directory protected during %s startup',
+    async (phase) => {
+      const { service, providers, runtime } = createHarness(undefined, async (scope) => {
+        const saved = AgentSession.start(scope, 'codex')
+        saved.setExecutionDirectory(worktree)
+        return saved
+      })
+      const entered = createGate()
+      const gate = createGate()
+      if (phase === 'terminal') {
+        const open = runtime.open.bind(runtime)
+        vi.spyOn(runtime, 'open').mockImplementation(async (command) => {
+          entered.release()
+          await gate.promise
+          return open(command)
+        })
+      } else {
+        await attach(service, '/repo/main')
+        await providers.launchCommands[0]!.onExecutionDirectoryChanged!(worktree)
+        runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+        const createPlan = providers.contribution.launcher.createLaunchPlan
+        vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockImplementation(
+          async (command) => {
+            entered.release()
+            await gate.promise
+            return createPlan(command)
+          }
+        )
+      }
+      const pending = attach(service, '/repo/main', {
+        persisted: phase === 'terminal',
+        restartMode: phase === 'foreground' ? 'retry' : undefined
+      })
+      try {
+        await entered.promise
+        await expect(service.suspendWorkspaceDirectory(worktree)).rejects.toMatchObject({
+          code: 'WORKSPACE_DIRECTORY_IN_USE'
+        })
+        expect(runtime.stops).toEqual([])
+      } finally {
+        gate.release()
+        await pending
+        await service.disposeAll()
+      }
+    }
+  )
+
   it.each([
     { home: childProject, blocked: true },
     { home: `${worktree}-sibling`, blocked: false }
@@ -82,7 +203,7 @@ describe('Agent directory archive protection', () => {
     }
   })
 
-  it.each(['report-home', 'new-conversation'] as const)(
+  it.each(['report-home', 'new-conversation', 'foreground-exit'] as const)(
     'protects a restored shell after the foreground Agent leaves via %s',
     async (transition) => {
       const home = '/repo/main'
@@ -98,8 +219,10 @@ describe('Agent directory archive protection', () => {
           await providers.launchCommands[0]!.onExecutionDirectoryChanged!(home)
         } else {
           runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
-          await attach(service, home, { persisted: true, restartMode: 'new' })
-          expect(runtime.launches[1]!.plan.workingDirectory).toBe(home)
+          if (transition === 'new-conversation') {
+            await attach(service, home, { persisted: true, restartMode: 'new' })
+            expect(runtime.launches[1]!.plan.workingDirectory).toBe(home)
+          }
         }
         expect(runtime.opens).toHaveLength(1)
         await expect(service.suspendWorkspaceDirectory(worktree)).rejects.toMatchObject({

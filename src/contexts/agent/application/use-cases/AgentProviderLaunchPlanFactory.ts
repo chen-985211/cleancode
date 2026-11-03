@@ -68,10 +68,7 @@ export async function createManagedAgentLaunchPlan(command: {
     artifacts.seal()
     return {
       ...plan,
-      ...(session.executionDirectory ||
-      (session.terminalDirectory && session.terminalDirectory !== session.workspaceDirectory)
-        ? { workingDirectory: session.executionDirectory ?? session.workspaceDirectory }
-        : {})
+      workingDirectory: session.executionDirectory ?? session.workspaceDirectory
     }
   } catch (error) {
     await delivery?.dispose()

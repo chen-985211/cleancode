@@ -50,16 +50,22 @@ export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirecto
             workspaceDirectory: session.workspaceDirectory,
             executionDirectory: session.workspaceDirectory
           })) ?? session.workspaceDirectory
-        const actual = session.executionDirectory ?? home
         const terminal = session.terminalDirectory
           ? ((await this.directories.resolve({
               workspaceDirectory: session.workspaceDirectory,
               executionDirectory: session.terminalDirectory
             })) ?? session.terminalDirectory)
           : home
+        const occupiedDirectories = [terminal]
+        if (
+          ['not_started', 'starting'].includes(session.runtime.terminal.status) ||
+          ['launching', 'running'].includes(session.runtime.launch.status)
+        ) {
+          occupiedDirectories.push(session.executionDirectory ?? home)
+        }
         if (
           !ownsDirectory(session) &&
-          [actual, terminal].some((directory) => containsDirectory(canonical, directory))
+          occupiedDirectories.some((directory) => containsDirectory(canonical, directory))
         ) {
           throw createExpectedAppError(
             'WORKSPACE_DIRECTORY_IN_USE',
