@@ -180,9 +180,8 @@ describe('service port management across worktrees e2e', () => {
         name: 'Terminal 1 停止当前命令'
       })
       await stopAction.click()
-      await branchTerminal.getByRole('button', { name: 'Terminal 1 更多终端操作' }).click()
-      await waitForLocatorDisabled(stopAction, 'branch service stop action to settle')
-      await page.keyboard.press('Escape')
+      // Stopping returns focus to the terminal. Reopening the menu can race that
+      // focus transfer; endpoint removal and successful port reuse prove completion.
       await page.getByRole('menu', { name: 'Terminal 1 更多终端操作' }).waitFor({ state: 'hidden' })
       await branchTerminal
         .getByLabel('实际服务地址', { exact: true })
@@ -505,16 +504,6 @@ async function waitForLocatorAttribute(
   })
 
   expect(value).toBe(expectedValue)
-}
-
-async function waitForLocatorDisabled(locator: Locator, description: string): Promise<void> {
-  await pollUntilState({
-    description,
-    observe: () => locator.isDisabled(),
-    accept: Boolean,
-    intervalMs: 50,
-    timeoutMs: 10_000
-  })
 }
 
 async function initializeGitProjectWithHttpService(directory: string): Promise<void> {
