@@ -125,7 +125,7 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 - 工作区目录和 Git 分支是启动与显示元数据，不参与 Agent、terminal owner 或 Provider 对话身份。
 - `executionDirectory` 是独立的运行及恢复事实，不能反向改写 `projectId + workspaceId + agentId`、画布位置或 MCP 作用域。创建 worktree 本身不构成切换；Claude Hook 的正式 cwd 和 Codex 当前 thread 的 notify/SessionEnd cwd 才能确认目录。子 Agent、旧 thread、旧 generation 和异步校验期间失效的报告必须拒绝；不从输出、父 shell cwd 或历史对话猜测。
 - 目录由 Agent 自己的文件系统端口校验为存在的绝对目录及同一 Git common-dir；与归属目录相同时允许非 Git 项目。会话引用与目录进入同一有序持久化通道，当前运行目录随 runtime revision 发布。恢复前重新校验已保存目录，失效时明确失败，不静默回到其他目录。重新启动继续最后确认目录；显式新对话清除引用和目录，并在保留的 terminal 中显式回到归属目录。
-- 归档或目录重绑定前，目录 lease 阻止其他归属工作区的 Agent 新进入该目录；若仍有外部 Agent 使用该目录或子目录，返回 `WORKSPACE_DIRECTORY_IN_USE`，不误停该 Agent。原归属工作区被移除时仍按逻辑身份清理它自己的 Agent，不以执行目录迁移归属。
+- 归档或目录重绑定前，目录 lease 阻止其他归属工作区的 Agent 新进入该目录；只有本次挂起谓词精确匹配的归属目录才能获得豁免，保护检查和启动准入共用该谓词；子目录另行登记的项目不能因路径包含关系获豁免。若仍有外部 Agent 使用该目录或子目录，返回 `WORKSPACE_DIRECTORY_IN_USE`，不误停该 Agent；首次启动即使尚未收到执行目录上报，也必须检查目录 lease。原归属工作区被移除时仍按逻辑身份清理它自己的 Agent，不以执行目录迁移归属。
 - 默认工作区在普通分支、非 Git 状态或 detached HEAD 之间变化时，必须复用同一个 Agent terminal、PTY 和 Provider session ref。
 - 物理工作区被归档、移除或目录重绑定时，Project 才通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
 

@@ -74,6 +74,40 @@ describe('project git workspace adapter', () => {
     ).rejects.toMatchObject({ code: 'GITHUB_BASE_UNAVAILABLE' })
   })
 
+  it.each(['attached', 'detached'] as const)(
+    'excludes a bare repository from its %s checkout inventory',
+    async (kind) => {
+      await initializeGitProject(projectDirectory)
+      const bare = join(appStateDirectory, 'repository.git')
+      const checkout = join(appStateDirectory, 'bare-linked-checkout')
+      await execFileAsync('git', ['clone', '--bare', projectDirectory, bare])
+      await execFileAsync('git', [
+        '--git-dir',
+        bare,
+        'worktree',
+        'add',
+        ...(kind === 'detached' ? ['--detach'] : ['-b', 'feature/bare-checkout']),
+        checkout
+      ])
+      const directory = kind === 'detached' ? join(checkout, 'packages', 'app') : checkout
+      await mkdir(directory, { recursive: true })
+      const adapter = new GitCliWorkspaceAdapter()
+      const inspection = await adapter.inspectRepository(directory)
+      expect(inspection.worktrees).toEqual([
+        expect.objectContaining({ directory: await realpath(checkout), isCurrent: true })
+      ])
+      const repository = new FileSystemProjectRepository(appStateDirectory)
+      const opened = await new CreateOrOpenProjectUseCase(repository, adapter).execute({
+        directory,
+        name: 'bare-linked-project'
+      })
+      expect(opened.workspaces).toHaveLength(1)
+      expect(opened.workspaces).not.toContainEqual(
+        expect.objectContaining({ directory: await realpath(bare) })
+      )
+    }
+  )
+
   it.each(['main', 'linked', 'detached'] as const)(
     'does not duplicate the current %s checkout for a subdirectory project',
     async (kind) => {

@@ -161,13 +161,15 @@ function parseWorktreePorcelain(output: string): Omit<GitWorktreeInspection, 'is
   let branchName: string | null = null
   let head: string | null = null
   let isLocked = false
+  let isBare = false
   let lockReason: string | null = null
   const flush = (): void => {
-    if (directory) worktrees.push({ branchName, directory, head, isLocked, lockReason })
+    if (directory && !isBare) worktrees.push({ branchName, directory, head, isLocked, lockReason })
     directory = null
     branchName = null
     head = null
     isLocked = false
+    isBare = false
     lockReason = null
   }
 
@@ -179,6 +181,8 @@ function parseWorktreePorcelain(output: string): Omit<GitWorktreeInspection, 'is
       directory = resolve(field.slice('worktree '.length))
     } else if (field.startsWith('branch refs/heads/')) {
       branchName = field.slice('branch refs/heads/'.length)
+    } else if (field === 'bare') {
+      isBare = true
     } else if (field.startsWith('HEAD ')) {
       head = field.slice('HEAD '.length)
     } else if (field === 'locked' || field.startsWith('locked ')) {

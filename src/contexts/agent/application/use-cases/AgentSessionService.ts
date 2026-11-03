@@ -303,7 +303,7 @@ export class AgentSessionService {
   async suspendWorkspaceDirectory(
     workspaceDirectory: string
   ): Promise<AgentRuntimeSuspensionLease> {
-    const ownsDirectory = (owner: AgentSessionRuntimeOwner): boolean =>
+    const ownsDirectory = (owner: Pick<AgentSessionRuntimeOwner, 'workspaceDirectory'>): boolean =>
       owner.workspaceDirectory === workspaceDirectory
     const attachmentLease = await this.runtimeCoordinator.acquireDirectoryLease(
       workspaceDirectory,
@@ -313,7 +313,8 @@ export class AgentSessionService {
     try {
       releaseDirectory = await this.executionDirectories.block(
         workspaceDirectory,
-        this.sessions.values()
+        this.sessions.values(),
+        ownsDirectory
       )
       const results = await this.runtimeCoordinator.runForOwners(ownsDirectory, (owner) =>
         this.suspendRuntimeOwner(owner)
@@ -579,18 +580,16 @@ export class AgentSessionService {
         'Agent session service is shutting down.'
       )
     }
-    if (session.executionDirectory) {
-      const directory = await this.executionDirectories.resolve({
-        workspaceDirectory: session.workspaceDirectory,
-        executionDirectory: session.executionDirectory
-      })
-      if (!directory)
-        throw createExpectedAppError(
-          'AGENT_SESSION_INVALID',
-          'Agent execution directory is no longer available.'
-        )
-      session.executionDirectory = directory
-    }
+    const directory = await this.executionDirectories.resolve({
+      workspaceDirectory: session.workspaceDirectory,
+      executionDirectory: session.executionDirectory ?? session.workspaceDirectory
+    })
+    if (!directory)
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        'Agent execution directory is no longer available.'
+      )
+    if (session.executionDirectory) session.executionDirectory = directory
     const processSessionId = session.sessionId
     let exitObserved = false
     session.terminalDirectory = session.executionDirectory ?? session.workspaceDirectory

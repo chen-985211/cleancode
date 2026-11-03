@@ -2,9 +2,14 @@ import type { AgentExecutionDirectoryPort } from '../ports/AgentExecutionDirecto
 import type { ManagedAgentSession } from '../use-cases/AgentSessionRuntimeState'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
+interface DirectoryBlock {
+  readonly directory: string
+  readonly ownsDirectory: (owner: Pick<ManagedAgentSession, 'workspaceDirectory'>) => boolean
+}
+
 /** Keeps directory removal admission separate from logical Agent/canvas ownership. */
 export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirectoryPort {
-  private readonly blocked = new Set<{ readonly directory: string }>()
+  private readonly blocked = new Set<DirectoryBlock>()
 
   constructor(private readonly directories: AgentExecutionDirectoryPort) {}
 
@@ -13,26 +18,25 @@ export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirecto
   ): Promise<string | null> {
     const directory = await this.directories.resolve(command)
     if (!directory) return null
-    const home = await this.directories.resolve({
-      ...command,
-      executionDirectory: command.workspaceDirectory
-    })
     return [...this.blocked].some(
-      ({ directory: blocked }) =>
-        containsDirectory(blocked, directory) &&
-        !containsDirectory(blocked, home ?? command.workspaceDirectory)
+      ({ directory: blocked, ownsDirectory }) =>
+        containsDirectory(blocked, directory) && !ownsDirectory(command)
     )
       ? null
       : directory
   }
 
-  async block(directory: string, sessions: Iterable<ManagedAgentSession>): Promise<() => void> {
+  async block(
+    directory: string,
+    sessions: Iterable<ManagedAgentSession>,
+    ownsDirectory: DirectoryBlock['ownsDirectory']
+  ): Promise<() => void> {
     const canonical =
       (await this.directories.resolve({
         workspaceDirectory: directory,
         executionDirectory: directory
       })) ?? directory
-    const block = { directory: canonical }
+    const block = { directory: canonical, ownsDirectory }
     this.blocked.add(block)
     try {
       for (const session of sessions) {
@@ -47,7 +51,7 @@ export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirecto
             executionDirectory: session.workspaceDirectory
           })) ?? session.workspaceDirectory
         const actual = session.executionDirectory ?? home
-        if (!containsDirectory(canonical, home) && containsDirectory(canonical, actual)) {
+        if (!ownsDirectory(session) && containsDirectory(canonical, actual)) {
           throw createExpectedAppError(
             'WORKSPACE_DIRECTORY_IN_USE',
             'Workspace directory is used by an Agent from another workspace.',

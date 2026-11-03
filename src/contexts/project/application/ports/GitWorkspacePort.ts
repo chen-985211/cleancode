@@ -11,7 +11,7 @@ export interface GitRepositoryInspection {
   readonly currentBranch: string | null
   readonly localBranches: readonly string[]
   readonly branches: readonly GitBranchInspection[]
-  /** Complete checkout inventory, including detached HEAD checkouts. */
+  /** Complete checkout inventory, including detached HEAD checkouts and excluding bare repositories. */
   readonly worktrees?: readonly GitWorktreeInspection[]
 }
 
