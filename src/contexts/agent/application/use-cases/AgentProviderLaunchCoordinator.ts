@@ -70,18 +70,16 @@ export class AgentProviderLaunchCoordinator {
         return
       this.persistence.persist(session, sessionRef, providerLaunchGeneration)
     }
-    if (session.executionDirectory) {
-      const resolved = await this.executionDirectories.resolve({
-        workspaceDirectory: session.workspaceDirectory,
-        executionDirectory: session.executionDirectory
-      })
-      if (!resolved)
-        throw createExpectedAppError(
-          'AGENT_SESSION_INVALID',
-          'Agent execution directory is no longer available.'
-        )
-      session.executionDirectory = resolved
-    }
+    const resolved = await this.executionDirectories.resolve({
+      workspaceDirectory: session.workspaceDirectory,
+      executionDirectory: session.executionDirectory ?? session.workspaceDirectory
+    })
+    if (!resolved)
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        'Agent execution directory is no longer available.'
+      )
+    if (session.executionDirectory) session.executionDirectory = resolved
     let directorySequence = 0
     const isCurrentLaunch = (): boolean =>
       Boolean(

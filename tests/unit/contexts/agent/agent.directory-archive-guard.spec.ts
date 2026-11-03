@@ -12,6 +12,48 @@ const worktree = '/repo/worktree'
 const childProject = `${worktree}/packages/app`
 
 describe('Agent directory archive protection', () => {
+  it.each([
+    { home: childProject, blocked: true },
+    { home: `${worktree}-sibling`, blocked: false }
+  ])(
+    'checks the home directory when a retained shell starts a new conversation: $home',
+    async ({ home, blocked }) => {
+      const { service, runtime } = createHarness(undefined, async (scope) => {
+        const saved = AgentSession.start(scope, 'codex')
+        saved.setExecutionDirectory('/repo/other-worktree')
+        return saved
+      })
+      let lease: Awaited<ReturnType<AgentSessionService['suspendWorkspaceDirectory']>> | undefined
+      try {
+        await attach(service, home, { persisted: true })
+        expect(runtime.opens[0]!.workingDirectory).toBe('/repo/other-worktree')
+        runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+        lease = await service.suspendWorkspaceDirectory(worktree)
+        expect(lease.wasSuspended).toBe(false)
+        const next = await attach(service, home, { persisted: true, restartMode: 'new' })
+        expect(next.runtime.executionDirectory).toBeUndefined()
+        expect(next.runtime.launch.status).toBe(blocked ? 'failed' : 'running')
+        expect(runtime.launches).toHaveLength(blocked ? 1 : 2)
+        if (blocked) {
+          const retry = await attach(service, home, { persisted: true, restartMode: 'retry' })
+          expect(retry.runtime.launch.status).toBe('failed')
+          expect(runtime.launches).toHaveLength(1)
+          lease.release()
+          const released = await attach(service, home, { persisted: true, restartMode: 'retry' })
+          expect(released.runtime.launch.status).toBe('running')
+          expect(released.runtime.executionDirectory).toBeUndefined()
+          expect(runtime.launches).toHaveLength(2)
+        }
+        expect(runtime.launches[1]!.plan.workingDirectory).toBe(home)
+        expect(runtime.opens).toHaveLength(1)
+        expect(runtime.stops).toEqual([])
+      } finally {
+        lease?.release()
+        await service.disposeAll()
+      }
+    }
+  )
+
   it('finishes reciprocal workspace disposal while both directory protections remain held', async () => {
     const { service } = createHarness()
     const directories = ['/repo/a', '/repo/b']
@@ -200,7 +242,7 @@ function createHarness(
 function attach(
   service: AgentSessionService,
   home: string,
-  options?: { persisted?: boolean; restartMode?: 'new' }
+  options?: { persisted?: boolean; restartMode?: 'new' | 'retry' }
 ) {
   return service.attach({
     agentId: 'agent-1',
