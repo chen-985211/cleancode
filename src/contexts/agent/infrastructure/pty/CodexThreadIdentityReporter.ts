@@ -16,6 +16,7 @@ export class CodexThreadIdentityReporter {
   private lastEmittedThreadId: string | null = null
   private titleGeneration = 0
   private threadGeneration = 0
+  private notificationTail = Promise.resolve()
 
   private constructor(
     private readonly server: Server,
@@ -39,7 +40,6 @@ export class CodexThreadIdentityReporter {
   }): Promise<CodexThreadIdentityReporter> {
     const token = randomBytes(24).toString('hex')
     let reporter: CodexThreadIdentityReporter | null = null
-    let notificationTail = Promise.resolve()
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -52,11 +52,7 @@ export class CodexThreadIdentityReporter {
         body = body.length < 64_000 ? `${body}${chunk}` : body
       })
       request.on('end', async () => {
-        const notification = parseNotification(body)
-        notificationTail = notificationTail
-          .then(() => reporter?.acceptNotification(notification))
-          .catch(() => undefined)
-        await notificationTail
+        await reporter?.enqueueNotification(parseNotification(body))
         response.writeHead(204).end()
       })
     })
@@ -122,11 +118,22 @@ export class CodexThreadIdentityReporter {
     await new Promise<void>((resolveClosed) => this.server.close(() => resolveClosed()))
   }
 
-  private async acceptNotification(notification: CodexNotification | null): Promise<void> {
+  private enqueueNotification(notification: CodexNotification | null): Promise<void> {
+    const generation = this.threadGeneration
+    this.notificationTail = this.notificationTail
+      .then(() => this.acceptNotification(notification, generation))
+      .catch(() => undefined)
+    return this.notificationTail
+  }
+
+  private async acceptNotification(
+    notification: CodexNotification | null,
+    generation: number
+  ): Promise<void> {
+    if (generation !== this.threadGeneration) return
     const threadId = readCodexThreadId(notification)
     if (!threadId || (this.activeThreadPrefix && !threadId.startsWith(this.activeThreadPrefix)))
       return
-    const generation = this.threadGeneration
     const isCurrent = (): boolean =>
       generation === this.threadGeneration &&
       (!this.activeThreadPrefix || threadId.startsWith(this.activeThreadPrefix))
