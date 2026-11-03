@@ -7,13 +7,14 @@ import { agentToolDefinitions, createCleancodeMcpInstructions } from './AgentToo
 
 export function createAgentMcpConfiguration(categories?: AgentToolCategories) {
   const toolCategories = normalizeAgentToolCategories(categories)
+  const instructions = createCleancodeMcpInstructions(toolCategories)
   return {
     toolCategories,
     tools: agentToolDefinitions.filter(
       (tool) => toolCategories[agentToolCategoryByName[tool.name]]
     ),
-    instructions: createCleancodeMcpInstructions(toolCategories),
-    developerInstructions: createCleancodeMcpInstructions(toolCategories, true)
+    instructions,
+    developerInstructions: instructions
   }
 }
 

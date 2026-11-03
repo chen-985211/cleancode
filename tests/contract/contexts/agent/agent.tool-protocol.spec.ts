@@ -320,18 +320,15 @@ describe('agent tool protocol', () => {
     )
   })
 
-  it('disambiguates unqualified terminal requests as cleancode canvas work', () => {
-    const priorityInstructions = cleancodeMcpInstructions.slice(0, 512)
-
-    expect(priorityInstructions).toContain('inspect_graph')
-    expect(priorityInstructions).toContain('终端')
-    expect(priorityInstructions).toContain('整理终端')
-    expect(priorityInstructions).toContain('终端布局')
-    expect(priorityInstructions).toContain('终端组合')
-    expect(priorityInstructions).toContain('终端源码')
-    expect(priorityInstructions).toContain('Terminal component')
-    expect(priorityInstructions).toContain('xterm')
-    expect(priorityInstructions).toContain('PTY')
+  it('inspects canvas facts before authoring requested canvas objects', () => {
+    for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
+      expect(instructions).toContain(
+        'For canvas work, call inspect_graph before modifying canvas objects'
+      )
+      expect(instructions).toContain('整理终端')
+      expect(instructions).toContain('终端布局')
+      expect(instructions).toContain('终端组合')
+    }
   })
 
   it('requires enabled Codex sessions to complete startup terminal groups through canvas tools', () => {

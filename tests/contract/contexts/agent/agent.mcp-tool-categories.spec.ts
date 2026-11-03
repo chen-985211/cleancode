@@ -20,6 +20,10 @@ describe('CleanCode MCP category configuration', () => {
     'uses the same category snapshot for discovery, instructions and invocation: %j',
     async (toolCategories) => {
       const configuration = createAgentMcpConfiguration(toolCategories)
+      expect(configuration.developerInstructions).toBe(configuration.instructions)
+      expect(configuration.instructions.includes('MCP tools are additional capabilities')).toBe(
+        toolCategories.canvas || toolCategories.collaboration
+      )
       const executeMcpTool = vi.fn()
       const bridge = new CleancodeAgentJsonRpcToolBridge({
         executeMcpTool,

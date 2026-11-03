@@ -142,7 +142,13 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 未知方法返回 JSON-RPC `-32601`；未知工具名、非法调用外形或显式传入非对象 `arguments` 时返回 `-32602`。已识别工具的参数由 `tools/list` 暴露的同一份 Schema 在应用层递归校验，使用 `additionalProperties: false`、必填属性、联合类型、数值边界、数组长度和唯一性等约束；`create_terminal_workflow` 与 `create_terminal_set` 再由同一输入解析入口复用共享画布语义分类，分别只接受单一完整流程和多个独立顶层执行单元。每个 MCP `outputSchema` 的根明确声明 `type: object`，再以严格分支描述完成、失败和可选取消结果。输入失败返回 `AGENT_TOOL_INPUT_INVALID`，不得触达 BlockGraph 端口。工具输入、领域规则或执行失败仍属于合法的 MCP 工具结果：HTTP 保持 `200`，`isError` 为 `true`，并返回结构化错误。未知异常统一净化为 `UNEXPECTED_ERROR`，不得暴露原始异常文本或堆栈。
 
-进程级 `developer_instructions` 与 `initialize.instructions` 共同承担开启 CleanCode MCP 时的画布语义消歧：二者先投影共享画布语义契约生成的同一规范说明，再追加各自的路由和能力边界。用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”“终端工作流”“启动项目的终端组合”或同义请求时，Agent 必须先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布事实。Agent 可以在查看画布后读取仓库以确认真实启动单元；新建结构必须按规范分类一次调用：一个已配置终端使用 `create_terminal`，一条至少包含两个依赖连通终端的完整流程使用 `create_terminal_workflow`，多个独立顶层执行单元使用 `create_terminal_set`。用户明确要求流程时不得静默降级到另外两个工具；启动项目流程可以把仓库真实支持的依赖安装或初始化作为上游任务、开发服务作为下游服务，若仍无法识别两个真实阶段则先询问用户，不能只创建终端，也不能虚构等待或转发步骤。`terminalGroup` 默认省略，只有用户明确要求终端组合、容器或分组时才提供；多个相关终端或依赖关系本身不构成组合意图。要把既有完整流程纳入新组合时，也只有在用户明确要求组合时才先用 `create_terminal_group` 创建空组合，再用 `move_terminal_workflow_to_group` 移动流程；不要通过兼容字段 `memberBlockIds` 重新拼装既有流程。`create_block`、`update_terminal_execution_config`、`connect_terminal_blocks`、`create_terminal_group`、`move_terminal_workflow_to_group`、`arrange_terminal_layout` 和 `inspect_terminal_workflow_plan` 继续服务空白视觉终端或既有画布对象的增量编辑。不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成替代品。当前工具目录只能创作和检查工作流，没有启动工具，因此 Agent 只能声明已经搭建，不能声称终端或工作流已经运行。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
+进程级 `developer_instructions` 与 `initialize.instructions` 使用 `AgentMcpInstructions` 生成的同一份任务路由、能力边界和分类说明。MCP 是附加能力，不替代用户任务，也不限制 Provider 自身的文件、Shell 和其他工具。Agent 必须根据完整请求和对话上下文判断意图，不能仅凭“终端”“流程”或“cleancode”等词强制转向画布。排查 bug、实现功能、重构和运行测试（包括修改 cleancode 自身）应直接使用已有文件与 Shell 工具；不要求先调用 `inspect_graph`，也不要求用户说出“终端源码”、xterm 或 PTY 等特定词。混合任务分别使用源码工具和画布工具取得相应事实，查看画布不能代替源码排查。目标清楚时直接使用合适工具完成必要步骤；缺少事实时先做有用的只读检查，只有仍存在会实质改变结果的歧义时才询问用户。画布状态有助于复现、诊断或验证 bug 时，源码排查也应主动调用画布工具，顺序由所需证据决定。
+
+任务涉及画布结果或需要实时画布证据时，应主动使用对应工具，不要求用户说出 MCP、工具名称或“画布”。画布规则只作用于任务中的画布部分。修改前尚无当前图事实时调用 `inspect_graph`；已有工具返回的相关图快照应直接复用，只有所需事实缺失或过期才再次检查。读取仓库以理解项目、确认启动命令和真实执行阶段没有画布前置条件。新建结构必须按规范分类一次调用：一个已配置终端使用 `create_terminal`，一条至少包含两个依赖连通终端的完整流程使用 `create_terminal_workflow`，多个独立顶层执行单元使用 `create_terminal_set`。用户明确要求画布流程时不得静默降级到另外两个工具；启动项目流程可以把仓库真实支持的依赖安装或初始化作为上游任务、开发服务作为下游服务，若仍无法识别两个真实阶段则先询问用户，不能只创建终端，也不能虚构等待或转发步骤。`terminalGroup` 默认省略，只有用户明确要求终端组合、容器或分组时才提供；多个相关终端或依赖关系本身不构成组合意图。要把既有完整流程纳入新组合时，也只有在用户明确要求组合时才先用 `create_terminal_group` 创建空组合，再用 `move_terminal_workflow_to_group` 移动流程；不要通过兼容字段 `memberBlockIds` 重新拼装既有流程。`create_block`、`update_terminal_execution_config`、`connect_terminal_blocks`、`create_terminal_group`、`move_terminal_workflow_to_group`、`arrange_terminal_layout` 和 `inspect_terminal_workflow_plan` 继续服务空白视觉终端或既有画布对象的增量编辑。
+
+不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成用户所要求的画布对象的替代品；该限制不禁止代码任务所需的已授权命令、脚本、测试或项目配置修改。当前工具目录只能创作和检查工作流，没有启动工具，因此 Agent 只能声明已经搭建，不能声称终端或工作流已经运行。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
+
+权限判断必须依据实际配置、已有授权和工具拒绝结果。MCP 未提供文件或 Shell 工具，不代表 Provider 没有相应能力；用户已经给出的当前任务授权必须继续生效，不得仅因开启 MCP 反复要求重新授权。只有动作超出既有授权或实际策略要求审批时才请求追加授权；受阻时应说明具体动作与限制，并继续可独立完成的已授权工作。当前权限模式已经允许的动作应直接执行，无需反复声明或协商权限。此规则不改变 Provider sandbox、组织策略或 cleancode 独立 UI 审批；用户要求的画布动作需要产品审批时，应直接调用工具，由应用展示审批，不得在聊天里再加一轮确认。工具继续强制执行产品审批。
 
 组合连接限制同样由共享画布语义契约投影到 MCP 与 Provider 指引：依赖两端必须同属一个组合，或都位于组合之外。`connect_terminal_blocks` 不得跨组合边界，成员调整必须携带完整相连流程；BlockGraph 在所有入口统一校验，失败不提交图事实。工具描述引用结构化契约，不另行维护语义。
 
@@ -329,7 +335,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 
 ## 验证矩阵
 
-分类设置由 `agent.mcp-tool-categories.spec.ts`、`agent.http-mcp-server.spec.ts` 和 `agent.ipc.spec.ts` 验证四种组合与边界拒绝；`agent.provider-preferences.spec.ts` 和真实偏好仓储集成测试覆盖兼容恢复；`agent.reconfigure-mcp-capability.spec.ts` 验证当前会话快照、重连更新和双关闭；`agent.mcp-provider-categories.spec.ts` 验证支持 launch instructions 的 Provider 注入一致性；`agent.mcp-settings.presentation.spec.tsx` 验证完整清单、分类切换、保存失败和不可用状态。
+任务路由由 `agent.mcp-instructions.spec.ts` 覆盖两处指令入口和协作分类开关，保证源码任务无画布前置条件、已有授权不被否定且产品审批边界保留；这属于指令内容契约验证，不等同于真实模型行为评估。分类设置由 `agent.mcp-tool-categories.spec.ts`、`agent.http-mcp-server.spec.ts` 和 `agent.ipc.spec.ts` 验证四种组合与边界拒绝；`agent.provider-preferences.spec.ts` 和真实偏好仓储集成测试覆盖兼容恢复；`agent.reconfigure-mcp-capability.spec.ts` 验证当前会话快照、重连更新和双关闭；`agent.mcp-provider-categories.spec.ts` 验证支持 launch instructions 的 Provider 注入一致性；`agent.mcp-settings.presentation.spec.tsx` 验证完整清单、分类切换、保存失败和不可用状态。
 
 协作链路由以下测试补充覆盖：
 
