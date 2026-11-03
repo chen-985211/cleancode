@@ -10,6 +10,7 @@ export interface TerminalZoomRasterTarget {
   readonly id: string
   getRasterPriority(): TerminalZoomRasterPriority
   getRasterScale(): TerminalRasterScale
+  getPreferredRasterScale?(): TerminalRasterScale | undefined
   getRasterCost(scale: TerminalRasterScale): number
   onRasterCostChange?(listener: () => void): () => void
   onRasterPriorityChange?(listener: () => void): () => void
@@ -188,6 +189,7 @@ export class TerminalZoomRasterCoordinator {
           : resolveTerminalRasterScale({
               canvasZoom: this.canvasZoom,
               currentScale: target.getRasterScale(),
+              preferredScale: target.getPreferredRasterScale?.(),
               maximumScale: this.maximumRasterScale
             })
       )
@@ -239,6 +241,7 @@ export class TerminalZoomRasterCoordinator {
       const isOverBudget = currentBackingPixels > this.maxBackingPixels
       if (
         task.target.getRasterPriority() === 'hidden' ||
+        Number.isFinite(task.target.getPreferredRasterScale?.()) ||
         mustReleaseBeforeUpgrade ||
         isBudgetConstrained ||
         isOverBudget
@@ -365,7 +368,7 @@ function allocateRasterScales({
 }): Map<TerminalZoomRasterTarget, TerminalRasterScale> {
   const allocatedScales = new Map<TerminalZoomRasterTarget, TerminalRasterScale>()
   for (const target of orderedTargets) {
-    allocatedScales.set(target, 1)
+    allocatedScales.set(target, Math.min(1, policyScales.get(target) ?? 1))
   }
   let allocatedBackingPixels = sumRasterCosts(orderedTargets, (target) =>
     target.getRasterCost(allocatedScales.get(target)!)

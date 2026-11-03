@@ -30,6 +30,7 @@ export class TerminalRendererController {
   private isDisposed = false
   private activationId = 0
   private currentState: TerminalRendererState = 'dom'
+  private hasPendingContextLossRecovery = false
   private rasterScale: TerminalRasterScale = 1
   private readonly loadAddon: () => Promise<TerminalRendererAddon>
   private readonly onStateChange: (state: TerminalRendererState) => void
@@ -45,6 +46,10 @@ export class TerminalRendererController {
     return this.currentState
   }
 
+  get canRecoverAfterContextLoss(): boolean {
+    return !this.isDisposed && this.hasPendingContextLossRecovery
+  }
+
   refreshRasterAlignment(): void {
     if (!this.isDisposed) this.addon?.refreshRasterAlignment?.()
   }
@@ -58,6 +63,9 @@ export class TerminalRendererController {
   async activate(terminal: TerminalRendererHost): Promise<void> {
     if (this.isDisposed || this.addon) return
     const activationId = ++this.activationId
+    // One scheduled attempt consumes the loss. Unsupported/failed renderers
+    // stay on DOM instead of retrying on every subsequent workspace mount.
+    this.hasPendingContextLossRecovery = false
 
     try {
       const addon = await this.loadAddon()
@@ -72,7 +80,9 @@ export class TerminalRendererController {
         addon.dispose()
         return
       }
-      const contextLossSubscription = addon.onContextLoss(() => this.fallBackToDom())
+      const contextLossSubscription = addon.onContextLoss(() => {
+        if (activationId === this.activationId) this.fallBackToDom()
+      })
       try {
         terminal.loadAddon(addon)
       } catch {
@@ -110,6 +120,7 @@ export class TerminalRendererController {
     this.addon = null
     this.terminal = null
     addon?.dispose()
+    this.hasPendingContextLossRecovery = true
     this.setState('dom')
     if (!terminal) return
     terminal.refresh(0, Math.max(0, terminal.rows - 1))

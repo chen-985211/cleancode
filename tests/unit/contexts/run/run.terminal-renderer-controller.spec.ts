@@ -105,4 +105,39 @@ describe('terminal renderer controller', () => {
 
     expect(addon.setRasterScale).toHaveBeenCalledTimes(2)
   })
+
+  it('ignores repeated or stale context-loss callbacks after a replacement renderer activates', async () => {
+    const losses: Array<() => void> = []
+    const disposals: Array<ReturnType<typeof vi.fn>> = []
+    const controller = new TerminalRendererController({
+      loadAddon: async () => {
+        const dispose = vi.fn()
+        disposals.push(dispose)
+        return {
+          dispose,
+          setRasterScale: vi.fn(),
+          onContextLoss(listener) {
+            losses.push(listener)
+            return { dispose: vi.fn() }
+          }
+        }
+      },
+      scheduleRefresh: (refresh) => refresh()
+    })
+    const terminal = { loadAddon: vi.fn(), refresh: vi.fn(), rows: 24 }
+    await controller.activate(terminal)
+    losses[0]!()
+    losses[0]!()
+    expect(controller.canRecoverAfterContextLoss).toBe(true)
+    expect(disposals[0]).toHaveBeenCalledOnce()
+    await controller.activate(terminal)
+    expect(controller.canRecoverAfterContextLoss).toBe(false)
+    losses[0]!()
+    expect(controller.state).toBe('webgl')
+    expect(disposals[1]).not.toHaveBeenCalled()
+    controller.dispose()
+    losses[1]!()
+    expect(controller.canRecoverAfterContextLoss).toBe(false)
+    expect(disposals[1]).toHaveBeenCalledOnce()
+  })
 })

@@ -71,4 +71,16 @@ describe('terminal zoom raster policy', () => {
     expect(resolveTerminalRasterScale({ canvasZoom: 3 })).toBe(1.6)
     expect(resolveTerminalRasterScale({ canvasZoom: 0.01 })).toBe(1)
   })
+
+  it.each([
+    [0.01, 0.25],
+    [0.77, 0.77],
+    [1.2, 1.2],
+    [3, 1.6],
+    [0, 1.3],
+    [Number.NaN, 1.3],
+    [Number.POSITIVE_INFINITY, 1.3]
+  ])('bounds preferred display sampling %s to %s', (preferredScale, expected) => {
+    expect(resolveTerminalRasterScale({ canvasZoom: 1.2, preferredScale })).toBe(expected)
+  })
 })

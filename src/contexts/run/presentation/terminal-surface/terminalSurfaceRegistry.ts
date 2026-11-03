@@ -62,6 +62,7 @@ export interface TerminalSurfaceRegistryDiagnostics
 export interface TerminalSurfaceRasterTarget {
   getRasterPriority(): TerminalZoomRasterPriority
   getRasterScale(): TerminalRasterScale
+  getPreferredRasterScale?(): TerminalRasterScale | undefined
   getRasterCost(scale: TerminalRasterScale): number
   onRasterCostChange?(listener: () => void): () => void
   onRasterPriorityChange?(listener: () => void): () => void

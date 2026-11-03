@@ -20,6 +20,7 @@ export class TerminalXtermRasterTarget {
     getRasterCost: (scale) => this.getRasterCost(scale),
     getRasterPriority: () => this.priority,
     getRasterScale: () => this.scale,
+    getPreferredRasterScale: () => this.getPreferredRasterScale(),
     onRasterCostChange: (listener) => {
       this.costListeners.add(listener)
       return () => this.costListeners.delete(listener)
@@ -34,7 +35,8 @@ export class TerminalXtermRasterTarget {
 
   constructor(
     private readonly applyScale: (scale: TerminalRasterScale) => void,
-    private readonly refreshAlignment: () => void = () => undefined
+    private readonly refreshAlignment: () => void = () => undefined,
+    private readonly matchDisplayScale = false
   ) {}
 
   attach(element: HTMLDivElement): void {
@@ -92,11 +94,32 @@ export class TerminalXtermRasterTarget {
     this.updateRasterGeometry(null)
   }
 
+  refreshRendererGeometry(): void {
+    if (!this.matchDisplayScale || !this.element) return
+    // WebGL establishes screen geometry asynchronously, even when the outer
+    // viewport size stays unchanged and no ResizeObserver notification follows.
+    for (const listener of this.costListeners) listener()
+  }
+
   private setScale(scale: TerminalRasterScale): void {
     if (scale === this.scale) return
     this.applyScale(scale)
     this.scale = scale
     if (this.element) this.element.dataset.terminalRasterScale = String(scale)
+  }
+
+  private getPreferredRasterScale(): TerminalRasterScale | undefined {
+    if (!this.matchDisplayScale) return undefined
+    const screen = this.element?.querySelector<HTMLElement>('.xterm-screen')
+    const width = Number.parseFloat(screen?.style.width ?? '')
+    if (!screen || !Number.isFinite(width) || width <= 0) return undefined
+    // Measure the final transformed screen, including the restored viewport,
+    // rather than borrowing the last workspace's zoom or a nearby raster tier.
+    const scale = screen.getBoundingClientRect().width / width
+    // Subpixel DOMRect noise from a pure pan must not rebuild the glyph atlas.
+    return Number.isFinite(scale) && scale > 0
+      ? Math.round(scale * 1_000_000) / 1_000_000
+      : undefined
   }
 
   private readonly handleFocusIn = (): void => {

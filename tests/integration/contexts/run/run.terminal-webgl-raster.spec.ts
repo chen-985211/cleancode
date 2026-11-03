@@ -6,6 +6,11 @@ import { dirname, join } from 'node:path'
 import { _electron as electron, type ElectronApplication } from 'playwright'
 
 import { renderTerminalRasterFixture } from '../../../support/terminalRasterBrowser'
+import {
+  expectTerminalGlyphPixelsPreserved,
+  expectTerminalRasterMatchesDisplay,
+  expectTerminalRasterOriginAligned
+} from '../../../support/terminalRasterAssertions'
 
 const require = createRequire(import.meta.url)
 const xtermDirectory = dirname(require.resolve('@xterm/xterm'))
@@ -90,6 +95,9 @@ describe.each([1, 1.25, 1.5, 2])(
           { zoom: 1.6, rasterScale: 1.6, columns: 79, theme: 'dark' },
           { zoom: 0.35, rasterScale: 1, columns: 60, theme: 'light' },
           { zoom: 0.77, rasterScale: 1, columns: 60, theme: 'light' },
+          { zoom: 0.35, rasterScale: 0.35, columns: 60, theme: 'dark' },
+          { zoom: 0.77, rasterScale: 0.77, columns: 60, theme: 'light' },
+          { zoom: 1.2, rasterScale: 1.2, columns: 79, theme: 'dark' },
           { zoom: 1, rasterScale: 1, columns: 60, theme: 'dark' },
           { zoom: 1.15, rasterScale: 1.15, columns: 79, theme: 'dark' },
           { zoom: 1.15, rasterScale: 1.15, columns: 85, theme: 'light' },
@@ -148,12 +156,7 @@ describe.each([1, 1.25, 1.5, 2])(
             )
           }
           if (zoom === rasterScale) {
-            expect(projection.backingWidth).toBe(
-              Math.round(projection.displayWidth * deviceScaleFactor)
-            )
-            expect(projection.backingHeight).toBe(
-              Math.round(projection.displayHeight * deviceScaleFactor)
-            )
+            expectTerminalRasterMatchesDisplay(projection)
           } else {
             expect(projection.backingWidth).toBeGreaterThan(
               projection.displayWidth * deviceScaleFactor
@@ -162,21 +165,11 @@ describe.each([1, 1.25, 1.5, 2])(
               projection.displayHeight * deviceScaleFactor
             )
           }
-          expect(projection.displayLeft * deviceScaleFactor).toBeCloseTo(
-            Math.round(projection.displayLeft * deviceScaleFactor),
-            2
-          )
-          expect(projection.displayTop * deviceScaleFactor).toBeCloseTo(
-            Math.round(projection.displayTop * deviceScaleFactor),
-            2
-          )
+          expectTerminalRasterOriginAligned(projection)
           // Compare aligned glyph pixels within 8-bit GPU color precision. Windows
           // produces up to two intensity levels of variation at identical positions;
           // a shifted or resampled glyph still exceeds this per-pixel bound.
-          expect(
-            projection.glyphMaximumDifference,
-            JSON.stringify({ zoom, ...projection })
-          ).toBeLessThanOrEqual(2)
+          expectTerminalGlyphPixelsPreserved(projection.glyphMaximumDifference)
           expect(projection.hasInk).toBe(true)
           for (const glyph of projection.blockGlyphs) {
             expect(

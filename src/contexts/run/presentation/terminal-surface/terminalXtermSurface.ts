@@ -44,6 +44,7 @@ export function createTerminalXtermSurface(
 }
 
 class XtermTerminalSurface implements TerminalSurface {
+  private readonly isWindows = /^Win/iu.test(navigator.platform)
   private readonly terminal: XTerm
   private readonly presentation: TerminalSurfacePresentation
   private restoreRevision = 0
@@ -56,12 +57,14 @@ class XtermTerminalSurface implements TerminalSurface {
   private readonly rendererController = new TerminalRendererController({
     onStateChange: (state) => {
       if (this.element) this.element.dataset.terminalRenderer = state
+      this.xtermRasterTarget.refreshRendererGeometry()
       this.requestFitAndReportDimensions()
     }
   })
   private readonly xtermRasterTarget = new TerminalXtermRasterTarget(
     (scale) => this.rendererController.setRasterScale(scale),
-    () => this.rendererController.refreshRasterAlignment()
+    () => this.rendererController.refreshRasterAlignment(),
+    this.isWindows
   )
   readonly rasterTarget = this.xtermRasterTarget.target
   readonly workloadTarget: TerminalSurfaceWorkloadTarget = {
@@ -159,6 +162,14 @@ class XtermTerminalSurface implements TerminalSurface {
       attachment.resume && this.retainedHost && this.hasSnapshot && !this.isRestoring
     )
     this.isRestoring = !resume
+    const shouldRecoverRenderer =
+      this.isWindows &&
+      this.isRendererActivationSettled &&
+      this.rendererController.canRecoverAfterContextLoss
+    if (shouldRecoverRenderer) {
+      this.isRendererActivationStarted = false
+      this.isRendererActivationSettled = false
+    }
     this.presentationSequence = this.lastQueuedSequence
     this.presentation.attach(attachment.element, resume)
     this.element = attachment.element
@@ -196,9 +207,12 @@ class XtermTerminalSurface implements TerminalSurface {
     this.retainedHost = null
     if (!resume || !this.isOutputSettled()) this.presentation.conceal()
     this.fitAndReportDimensions()
+    // Reparenting can change the physical pixel origin without changing the grid.
+    if (this.isWindows) this.rendererController.refreshRasterAlignment()
     if (resume) this.terminal.refresh(0, this.terminal.rows - 1)
     this.resizeObserver = new ResizeObserver(this.requestFitAndReportDimensions)
     this.resizeObserver.observe(attachment.element)
+    if (shouldRecoverRenderer) this.notifyNonCriticalWorkChange()
   }
 
   detach(element: HTMLDivElement, preserve = false): void {

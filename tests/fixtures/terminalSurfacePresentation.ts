@@ -7,6 +7,7 @@ import {
 } from '../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from '../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { TerminalWorkloadScheduler } from '../../src/contexts/run/presentation/terminal-surface/terminalWorkloadScheduler'
+import { TerminalZoomRasterCoordinator } from '../../src/contexts/run/presentation/terminal-surface/terminalZoomRasterCoordinator'
 
 const identity = {
   projectId: 'project',
@@ -21,13 +22,14 @@ const identity = {
 }
 let constructions = 0
 const scheduler = new TerminalWorkloadScheduler()
+const rasterCoordinator = new TerminalZoomRasterCoordinator()
 const registry = new TerminalSurfaceRegistry(
   () => {
     constructions += 1
     return createTerminalXtermSurface('dark')
   },
   undefined,
-  undefined,
+  rasterCoordinator,
   scheduler
 )
 let stopContinuousOutput: (() => void) | null = null
@@ -52,6 +54,7 @@ let restoreCalls = 0
 let detachCalls = 0
 let hiddenLease: TerminalSurfaceLease | null = null
 const responses: string[] = []
+let canvasZoom = 1
 
 document.body.style.cssText = 'margin:24px;background:#202020;color:white;'
 
@@ -106,6 +109,7 @@ function mount(options: { generation?: number; width?: number; hot?: boolean } =
   const host = document.createElement('div')
   host.id = 'terminal'
   host.style.cssText = `width:${options.width ?? 800}px;height:360px;`
+  applyCanvasZoom(host)
   document.body.append(host)
   const scope = { ...identity, generation: options.generation ?? 1 }
   const lease = registry.create(scope)
@@ -191,6 +195,12 @@ async function restore(color: 'green' | 'blue' | 'unchanged') {
 
 const fixture = {
   mount,
+  setZoom: (zoom: number) => {
+    canvasZoom = zoom
+    if (current) applyCanvasZoom(current.host)
+    rasterCoordinator.updateCanvasZoom(zoom)
+    rasterCoordinator.requestRasterAlignment()
+  },
   startContinuousOutput: (priority: 'focused' | 'visible') => {
     stopContinuousOutput?.()
     continuousOutputBatches = 0
@@ -280,6 +290,8 @@ const fixture = {
     continuousOutputBatches,
     isContinuousOutputPending: stopContinuousOutput !== null,
     retainedPriority: hiddenLease?.surface.workloadTarget?.getOutputPriority(),
+    renderer: (current?.lease ?? hiddenLease)?.surface.getDiagnostics().rendererState,
+    rasterScale: (current?.lease ?? hiddenLease)?.surface.rasterTarget?.getRasterScale(),
     colors: current ? readRowColors(current.host) : [],
     ready: current?.host.dataset.terminalContentReady,
     opacity: current ? getComputedStyle(current.host.querySelector('.xterm')!).opacity : undefined
@@ -290,7 +302,13 @@ const fixture = {
     stopContinuousOutput?.()
     stopContinuousOutput = null
     scheduler.dispose()
+    rasterCoordinator.dispose()
   }
+}
+
+function applyCanvasZoom(host: HTMLElement): void {
+  host.style.transformOrigin = 'top left'
+  host.style.transform = canvasZoom === 1 ? '' : `translate(0.3px, 0.4px) scale(${canvasZoom})`
 }
 
 declare global {
