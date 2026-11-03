@@ -32,8 +32,21 @@ function readTerminalSearchThemeVariables(
 export function readCanonicalTerminalTheme(theme: TerminalSourceTheme): ITheme {
   const { background, foreground, cursor, cursorAccent, selectionBackground } =
     canonicalTerminalPalettes[theme]
-  // Leave ANSI and extendedAnsi unset so xterm owns the complete native color table.
-  return { background, foreground, cursor, cursorAccent, selectionBackground }
+  // Native ANSI whites disappear on a light source background, including after projection.
+  // Keep the existing readable white slots there; xterm owns all remaining ANSI colors.
+  return {
+    background,
+    foreground,
+    cursor,
+    cursorAccent,
+    selectionBackground,
+    ...(theme === 'light'
+      ? {
+          white: canonicalTerminalPalettes.light.white,
+          brightWhite: canonicalTerminalPalettes.light.brightWhite
+        }
+      : {})
+  }
 }
 
 export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceTheme): number[] {

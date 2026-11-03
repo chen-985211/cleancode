@@ -18,7 +18,7 @@ describe('terminal theme palette', () => {
   )
 
   it.each(['light', 'dark'] as const)(
-    'preserves the canonical %s terminal chrome without overriding native ANSI colors',
+    'preserves the canonical %s terminal chrome with only light ANSI white readability overrides',
     (theme) => {
       const palette = canonicalTerminalPalettes[theme]
       expect(readCanonicalTerminalTheme(theme)).toEqual({
@@ -26,8 +26,27 @@ describe('terminal theme palette', () => {
         foreground: palette.foreground,
         cursor: palette.cursor,
         cursorAccent: palette.cursorAccent,
-        selectionBackground: palette.selectionBackground
+        selectionBackground: palette.selectionBackground,
+        ...(theme === 'light' ? { white: palette.white, brightWhite: palette.brightWhite } : {})
       })
+    }
+  )
+
+  it.each(['light', 'dark'] as const)(
+    'keeps ANSI white text readable for the %s source theme and its projection',
+    (theme) => {
+      const palette = readCanonicalTerminalTheme(theme)
+      const background = requireColor(palette.background)
+      const matrix = readTerminalThemeProjectionMatrix(theme)
+      // xterm 6 defaults apply when an ANSI slot is not overridden.
+      const whites = [palette.white ?? '#d3d7cf', palette.brightWhite ?? '#eeeeec']
+
+      for (const foreground of whites) {
+        expect(colorContrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5)
+        expect(
+          colorContrastRatio(projectColor(foreground, matrix), projectColor(background, matrix))
+        ).toBeGreaterThanOrEqual(4.5)
+      }
     }
   )
 
