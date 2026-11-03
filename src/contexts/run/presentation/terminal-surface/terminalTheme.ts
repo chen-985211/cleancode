@@ -30,7 +30,10 @@ function readTerminalSearchThemeVariables(
 }
 
 export function readCanonicalTerminalTheme(theme: TerminalSourceTheme): ITheme {
-  return canonicalTerminalPalettes[theme]
+  const { background, foreground, cursor, cursorAccent, selectionBackground } =
+    canonicalTerminalPalettes[theme]
+  // Leave ANSI and extendedAnsi unset so xterm owns the complete native color table.
+  return { background, foreground, cursor, cursorAccent, selectionBackground }
 }
 
 export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceTheme): number[] {

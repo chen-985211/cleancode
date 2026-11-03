@@ -18,19 +18,16 @@ describe('terminal theme palette', () => {
   )
 
   it.each(['light', 'dark'] as const)(
-    'gives renderer xterm the canonical %s terminal palette',
+    'preserves the canonical %s terminal chrome without overriding native ANSI colors',
     (theme) => {
-      expect(readCanonicalTerminalTheme(theme)).toBe(canonicalTerminalPalettes[theme])
-    }
-  )
-
-  it.each([
-    ['light', '#c2414f', '#238a55', '#b7791f', '#2b60cc'],
-    ['dark', '#ee7180', '#52c488', '#e0a84c', '#75a0f5']
-  ] as const)(
-    'keeps %s terminal status colors aligned with the Agent palette',
-    (theme, red, green, yellow, blue) => {
-      expect(canonicalTerminalPalettes[theme]).toMatchObject({ red, green, yellow, blue })
+      const palette = canonicalTerminalPalettes[theme]
+      expect(readCanonicalTerminalTheme(theme)).toEqual({
+        background: palette.background,
+        foreground: palette.foreground,
+        cursor: palette.cursor,
+        cursorAccent: palette.cursorAccent,
+        selectionBackground: palette.selectionBackground
+      })
     }
   )
 
@@ -46,24 +43,6 @@ describe('terminal theme palette', () => {
       expect(
         colorContrastRatio(projectColor(cursorText, matrix), projectColor(cursor, matrix))
       ).toBeGreaterThanOrEqual(4.5)
-    }
-  )
-
-  it.each(['light', 'dark'] as const)(
-    'keeps ANSI white foregrounds readable for the %s source theme and its projection',
-    (theme) => {
-      const palette = readCanonicalTerminalTheme(theme)
-      const background = requireColor(palette.background)
-      const matrix = readTerminalThemeProjectionMatrix(theme)
-      const projectedBackground = projectColor(background, matrix)
-
-      for (const foreground of [palette.white, palette.brightWhite]) {
-        const requiredForeground = requireColor(foreground)
-        expect(colorContrastRatio(requiredForeground, background)).toBeGreaterThanOrEqual(4.5)
-        expect(
-          colorContrastRatio(projectColor(requiredForeground, matrix), projectedBackground)
-        ).toBeGreaterThanOrEqual(4.5)
-      }
     }
   )
 })
