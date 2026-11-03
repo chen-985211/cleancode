@@ -51,7 +51,16 @@ export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirecto
             executionDirectory: session.workspaceDirectory
           })) ?? session.workspaceDirectory
         const actual = session.executionDirectory ?? home
-        if (!ownsDirectory(session) && containsDirectory(canonical, actual)) {
+        const terminal = session.terminalDirectory
+          ? ((await this.directories.resolve({
+              workspaceDirectory: session.workspaceDirectory,
+              executionDirectory: session.terminalDirectory
+            })) ?? session.terminalDirectory)
+          : home
+        if (
+          !ownsDirectory(session) &&
+          [actual, terminal].some((directory) => containsDirectory(canonical, directory))
+        ) {
           throw createExpectedAppError(
             'WORKSPACE_DIRECTORY_IN_USE',
             'Workspace directory is used by an Agent from another workspace.',

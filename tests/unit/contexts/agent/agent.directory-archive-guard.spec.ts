@@ -1,4 +1,5 @@
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
+import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type { AgentMcpServerPort } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
 import type { AgentToolExecutionOperations } from '../../../../src/contexts/agent/application/use-cases/AgentToolApprovalCoordinator'
@@ -11,6 +12,67 @@ const worktree = '/repo/worktree'
 const childProject = `${worktree}/packages/app`
 
 describe('Agent directory archive protection', () => {
+  it('finishes reciprocal workspace disposal while both directory protections remain held', async () => {
+    const { service } = createHarness()
+    const directories = ['/repo/a', '/repo/b']
+    const protections = await Promise.all(
+      directories.map((dir) => service.suspendWorkspaceDirectory(dir))
+    )
+    const disposed: Awaited<ReturnType<AgentSessionService['disposeSession']>>[] = []
+    const pending = Promise.all(
+      directories.map(async (projectDirectory) => {
+        const lease = await service.disposeSession({ projectDirectory, workspaceId: 'linked-peer' })
+        disposed.push(lease)
+      })
+    )
+    try {
+      await vi.waitFor(() => expect(disposed).toHaveLength(2))
+      for (const dir of directories) {
+        await expect(attach(service, dir)).rejects.toMatchObject({
+          code: 'AGENT_SESSION_NOT_FOUND'
+        })
+      }
+    } finally {
+      protections.forEach((lease) => lease.release())
+      await pending
+      disposed.forEach((lease) => lease.release())
+      await service.disposeAll()
+    }
+  })
+
+  it.each(['report-home', 'new-conversation'] as const)(
+    'protects a restored shell after the foreground Agent leaves via %s',
+    async (transition) => {
+      const home = '/repo/main'
+      const { service, providers, runtime } = createHarness(undefined, async (scope) => {
+        const saved = AgentSession.start(scope, 'codex')
+        saved.setExecutionDirectory(worktree)
+        return saved
+      })
+      try {
+        await attach(service, home, { persisted: true })
+        expect(runtime.opens[0]!.workingDirectory).toBe(worktree)
+        if (transition === 'report-home') {
+          await providers.launchCommands[0]!.onExecutionDirectoryChanged!(home)
+        } else {
+          runtime.launches[0]!.onExit({ generation: 1, launchId: 'launch-1', exitCode: 0 })
+          await attach(service, home, { persisted: true, restartMode: 'new' })
+          expect(runtime.launches[1]!.plan.workingDirectory).toBe(home)
+        }
+        expect(runtime.opens).toHaveLength(1)
+        await expect(service.suspendWorkspaceDirectory(worktree)).rejects.toMatchObject({
+          code: 'WORKSPACE_DIRECTORY_IN_USE'
+        })
+        expect(runtime.stops).toEqual([])
+        runtime.opens[0]!.onTerminalExit(0)
+        const lease = await service.suspendWorkspaceDirectory(worktree)
+        lease.release()
+      } finally {
+        await service.disposeAll()
+      }
+    }
+  )
+
   it.each([
     { home: childProject, reportedDirectory: null, blocked: true },
     { home: childProject, reportedDirectory: `${childProject}/src`, blocked: true },
@@ -82,9 +144,12 @@ describe('Agent directory archive protection', () => {
   })
 })
 
-function createHarness(findAgent: AgentSessionRepository['findAgent'] = async () => null) {
+function createHarness(
+  findAgent: AgentSessionRepository['findAgent'] = async () => null,
+  find: AgentSessionRepository['find'] = async () => null
+) {
   const repository: AgentSessionRepository = {
-    find: async () => null,
+    find,
     findAgent,
     findWorkspace: async () => [],
     save: async () => undefined,
@@ -132,14 +197,19 @@ function createHarness(findAgent: AgentSessionRepository['findAgent'] = async ()
   }
 }
 
-function attach(service: AgentSessionService, home: string) {
+function attach(
+  service: AgentSessionService,
+  home: string,
+  options?: { persisted?: boolean; restartMode?: 'new' }
+) {
   return service.attach({
     agentId: 'agent-1',
     projectId: home,
     projectDirectory: home,
     workspaceId: 'default',
     workspaceDirectory: home,
-    persistenceMode: 'ephemeral',
+    persistenceMode: options?.persisted ? undefined : 'ephemeral',
+    restartMode: options?.restartMode,
     terminalSourceTheme: 'dark',
     onGraphUpdated: () => undefined,
     onToolApprovalRequested: () => undefined

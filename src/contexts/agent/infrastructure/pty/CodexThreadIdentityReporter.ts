@@ -15,6 +15,7 @@ export class CodexThreadIdentityReporter {
   private activeThreadPrefix: string | null = null
   private lastEmittedThreadId: string | null = null
   private titleGeneration = 0
+  private threadGeneration = 0
 
   private constructor(
     private readonly server: Server,
@@ -96,6 +97,7 @@ export class CodexThreadIdentityReporter {
     const identity = parseCodexTerminalTitle(title)
     if (!identity) return
     const generation = ++this.titleGeneration
+    if (this.activeThreadPrefix !== identity.prefix) this.threadGeneration += 1
     this.activeThreadPrefix = identity.prefix
     if (identity.threadId) {
       this.emitThreadId(identity.threadId)
@@ -124,9 +126,9 @@ export class CodexThreadIdentityReporter {
     const threadId = readCodexThreadId(notification)
     if (!threadId || (this.activeThreadPrefix && !threadId.startsWith(this.activeThreadPrefix)))
       return
-    const generation = this.titleGeneration
+    const generation = this.threadGeneration
     const isCurrent = (): boolean =>
-      generation === this.titleGeneration &&
+      generation === this.threadGeneration &&
       (!this.activeThreadPrefix || threadId.startsWith(this.activeThreadPrefix))
     if (typeof notification?.cwd === 'string' && this.onExecutionDirectoryChanged) {
       if (!(await this.onExecutionDirectoryChanged(notification.cwd, isCurrent))) return
