@@ -37,6 +37,7 @@ export type AgentMcpRuntimeStatus =
   'disabled' | 'unsupported' | 'inactive' | 'initializing' | 'ready' | 'degraded' | 'failed'
 
 export interface AgentRuntimeSnapshot {
+  readonly executionDirectory?: string
   readonly activity: { readonly status: AgentActivityStatus }
   readonly binding: { readonly status: AgentBindingRuntimeStatus }
   readonly launch: {

@@ -25,6 +25,7 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
 
   static async start(input: {
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
+    readonly onExecutionDirectoryChanged?: (directory: string) => Promise<boolean>
     readonly onSessionIdentified: (sessionId: string) => void
     readonly onFileChanged?: (path: unknown) => string | undefined
     readonly onSessionStarted?: () => void
@@ -34,6 +35,7 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
     const expectedDirectory = await resolveRealPath(input.workspaceDirectory)
     let lastReportedSessionId: string | null = null
     let activeSessionId: string | null = null
+    let payloadTail = Promise.resolve()
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -47,12 +49,19 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
       request.on('end', async () => {
         const payload = parsePayload(body)
         let reminder: string | undefined
-        if (payload) {
+        const acceptance = payloadTail.then(async () => {
+          if (!payload) return
           reminder = await acceptPayload(payload, expectedDirectory, {
             ...input,
             acceptSession: (event, sessionId) => {
+              return (
+                event === 'SessionStart' ||
+                activeSessionId === null ||
+                activeSessionId === sessionId
+              )
+            },
+            onSessionAccepted: (event, sessionId) => {
               if (event === 'SessionStart') activeSessionId = sessionId
-              return activeSessionId === null || activeSessionId === sessionId
             },
             onSessionIdentified: (sessionId) => {
               if (lastReportedSessionId === sessionId) return
@@ -60,7 +69,9 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
               input.onSessionIdentified(sessionId)
             }
           })
-        }
+        })
+        payloadTail = acceptance.catch(() => undefined)
+        await payloadTail
         if (reminder) response.writeHead(200).end(reminder)
         else response.writeHead(204).end()
       })
@@ -97,16 +108,17 @@ async function acceptPayload(
   expectedDirectory: string,
   input: {
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
+    readonly onExecutionDirectoryChanged?: (directory: string) => Promise<boolean>
     readonly onSessionIdentified: (sessionId: string) => void
     readonly onFileChanged?: (path: unknown) => string | undefined
     readonly onSessionStarted?: () => void
+    readonly onSessionAccepted: (event: string, sessionId: string) => void
     readonly acceptSession: (event: string, sessionId: string) => boolean
   }
 ): Promise<string | undefined> {
   if (
     payload.agent_id !== undefined ||
     typeof payload.cwd !== 'string' ||
-    (await resolveRealPath(payload.cwd)) !== expectedDirectory ||
     typeof payload.hook_event_name !== 'string'
   ) {
     return
@@ -121,6 +133,10 @@ async function acceptPayload(
     !input.acceptSession(payload.hook_event_name, payload.session_id)
   )
     return
+  if (input.onExecutionDirectoryChanged) {
+    if (!(await input.onExecutionDirectoryChanged(payload.cwd))) return
+  } else if ((await resolveRealPath(payload.cwd)) !== expectedDirectory) return
+  input.onSessionAccepted(payload.hook_event_name, payload.session_id)
   if (payload.hook_event_name === 'SessionStart') {
     if (isUuid(payload.session_id) && isResumableSessionStartSource(payload.source)) {
       input.onSessionIdentified(payload.session_id)

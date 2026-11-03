@@ -278,6 +278,7 @@ export class TerminalProviderServer {
       case 'startProcess':
         return this.startProcess(input.command)
       case 'launchForegroundJob':
+      case 'launchForegroundJobInDirectory':
         return launchTerminalProviderForegroundJob({
           command: input.foregroundJob,
           processes: this.processes,

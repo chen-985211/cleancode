@@ -29,7 +29,7 @@ interface AgentWorkspaceSnapshot {
 }
 
 interface AgentSessionStore {
-  readonly version: 6
+  readonly version: 7
   readonly workspaces: readonly AgentWorkspaceSnapshot[]
 }
 
@@ -97,7 +97,7 @@ export class FileSystemAgentSessionRepository
         }
         creations.push({
           operationId: creationOperationId,
-          agent: { ...snapshot, providerSessionRef: null }
+          agent: { ...snapshot, providerSessionRef: null, executionDirectory: undefined }
         })
       }
       return replaceWorkspace(workspaces, {
@@ -153,7 +153,8 @@ export class FileSystemAgentSessionRepository
         ...workspace,
         agents: replaceAgentSnapshot(workspace.agents, {
           ...agent,
-          providerSessionRef: null
+          providerSessionRef: null,
+          executionDirectory: undefined
         })
       })
     })
@@ -186,7 +187,7 @@ export class FileSystemAgentSessionRepository
       .catch(() => undefined)
       .then(async () => {
         const store = await this.readStore()
-        await this.writeStore({ version: 6, workspaces: updateWorkspaces(store.workspaces) })
+        await this.writeStore({ version: 7, workspaces: updateWorkspaces(store.workspaces) })
       })
 
     this.saveQueue = update
@@ -196,20 +197,23 @@ export class FileSystemAgentSessionRepository
   private async readStore(): Promise<AgentSessionStore> {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<
-        Omit<AgentSessionStore, 'version'> & { readonly version: 5 | 6 }
+        Omit<AgentSessionStore, 'version'> & { readonly version: 5 | 6 | 7 }
       >
 
-      if ((parsed.version !== 5 && parsed.version !== 6) || !Array.isArray(parsed.workspaces)) {
+      if (
+        (parsed.version !== 5 && parsed.version !== 6 && parsed.version !== 7) ||
+        !Array.isArray(parsed.workspaces)
+      ) {
         throw new Error('Persisted Agent session store is invalid.')
       }
 
       return this.validateStore({
-        version: 6,
+        version: 7,
         workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[]
       })
     } catch (error) {
       if (isMissingFileError(error)) {
-        return { version: 6, workspaces: [] }
+        return { version: 7, workspaces: [] }
       }
 
       throw error
@@ -226,7 +230,7 @@ export class FileSystemAgentSessionRepository
 
   private validateStore(store: AgentSessionStore): AgentSessionStore {
     return {
-      version: 6,
+      version: 7,
       workspaces: store.workspaces.map((workspace) => ({
         ...workspace,
         creations: validateCreationRecords(workspace.creations ?? []),

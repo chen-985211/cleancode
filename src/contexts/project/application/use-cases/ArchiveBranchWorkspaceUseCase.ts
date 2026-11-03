@@ -78,27 +78,36 @@ export class ArchiveBranchWorkspaceUseCase {
       ? null
       : await this.inspectWorktreeLock(project.directory, workspace.directory, workspace.gitBranch)
     assertWorktreeLockConfirmed(initialWorktreeLock, command.lockedWorktreeConfirmation)
-    const preparation = isRecoveringQuarantine
-      ? {
-          agentLease: await this.workspaceAgentLifecyclePort.disposeWorkspace({
-            projectDirectory: project.directory,
-            workspaceId
-          }),
-          worktreeLock: null
-        }
-      : await this.suspendAndDisposeWorkspace(
-          project.directory,
-          workspace.directory,
-          workspace.gitBranch,
-          workspaceId,
-          command.lockedWorktreeConfirmation
-        )
+    const suspension = await this.workspaceAgentLifecyclePort.suspend(workspace.directory)
+    let preparation
+    try {
+      preparation = isRecoveringQuarantine
+        ? {
+            agentLease: await this.workspaceAgentLifecyclePort.disposeWorkspace({
+              projectDirectory: project.directory,
+              workspaceId
+            }),
+            worktreeLock: null
+          }
+        : await this.verifyAndDisposeWorkspace(
+            project.directory,
+            workspace.directory,
+            workspace.gitBranch,
+            workspaceId,
+            command.lockedWorktreeConfirmation
+          )
+    } catch (error) {
+      if (suspension.wasSuspended) await suspension.resume().catch(() => undefined)
+      suspension.release()
+      throw error
+    }
     const { agentLease, worktreeLock } = preparation
     let runLease
     try {
       runLease = await this.workspaceRunLifecyclePort.disposeWorkspace(workspaceScope)
     } catch (error) {
       agentLease.release()
+      suspension.release()
       throw error
     }
     let worktreeRemoved = agentLease.wasQuarantined || runLease.wasQuarantined
@@ -125,10 +134,11 @@ export class ArchiveBranchWorkspaceUseCase {
         agentLease.release()
         runLease.release()
       }
+      suspension.release()
     }
   }
 
-  private async suspendAndDisposeWorkspace(
+  private async verifyAndDisposeWorkspace(
     projectDirectory: string,
     workspaceDirectory: string,
     gitBranch: string | null,
@@ -138,28 +148,20 @@ export class ArchiveBranchWorkspaceUseCase {
     readonly agentLease: WorkspaceAgentAttachmentLease
     readonly worktreeLock: WorktreeLock | null
   }> {
-    const suspension = await this.workspaceAgentLifecyclePort.suspend(workspaceDirectory)
-    try {
-      if (!(await this.gitWorkspacePort.isWorkingTreeClean(workspaceDirectory))) {
-        throw createDirtyWorkspaceError()
-      }
-      const worktreeLock = await this.inspectWorktreeLock(
-        projectDirectory,
-        workspaceDirectory,
-        gitBranch
-      )
-      assertWorktreeLockConfirmed(worktreeLock, lockedWorktreeConfirmation)
-      const agentLease = await this.workspaceAgentLifecyclePort.disposeWorkspace({
-        projectDirectory,
-        workspaceId
-      })
-      return { agentLease, worktreeLock }
-    } catch (error) {
-      if (suspension.wasSuspended) await suspension.resume().catch(() => undefined)
-      throw error
-    } finally {
-      suspension.release()
+    if (!(await this.gitWorkspacePort.isWorkingTreeClean(workspaceDirectory))) {
+      throw createDirtyWorkspaceError()
     }
+    const worktreeLock = await this.inspectWorktreeLock(
+      projectDirectory,
+      workspaceDirectory,
+      gitBranch
+    )
+    assertWorktreeLockConfirmed(worktreeLock, lockedWorktreeConfirmation)
+    const agentLease = await this.workspaceAgentLifecyclePort.disposeWorkspace({
+      projectDirectory,
+      workspaceId
+    })
+    return { agentLease, worktreeLock }
   }
 
   private async inspectWorktreeLock(
@@ -168,6 +170,8 @@ export class ArchiveBranchWorkspaceUseCase {
     gitBranch: string | null
   ): Promise<WorktreeLock | null> {
     const inspection = await this.gitWorkspacePort.inspectRepository(projectDirectory)
+    const checkout = inspection.worktrees?.find((entry) => entry.directory === workspaceDirectory)
+    if (checkout) return checkout.isLocked ? { lockReason: checkout.lockReason } : null
     const branch = inspection.branches.find(
       (candidate) =>
         candidate.name === gitBranch && candidate.worktreeDirectory === workspaceDirectory

@@ -142,6 +142,11 @@ function createPosixLaunchScript(
     [
       '#!/bin/sh',
       "trap ':' INT",
+      ...(command.workingDirectory
+        ? [
+            `cd -- ${quotePosixShellWord(command.workingDirectory)} || { printf '1\\n' > ${quotePosixShellWord(statusPath)}; exit 0; }`
+          ]
+        : []),
       `printf '\\036CLEANCODE_JOB:${token}:started\\037'`,
       ...(command.fallbackPath && !Object.hasOwn(command.environment, 'PATH')
         ? [`export PATH="$PATH":${quotePosixShellWord(command.fallbackPath)}`]
@@ -185,6 +190,11 @@ function createPowerShellLaunchScript(
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
+      ...(command.workingDirectory
+        ? [
+            `  Set-Location -LiteralPath (Decode-CleancodeJobValue '${encodePowerShellValue(command.workingDirectory)}') -ErrorAction Stop`
+          ]
+        : []),
       ...getPowerShellUtf8Bootstrap()
         .split('\n')
         .map((line) => `  ${line}`),
@@ -207,6 +217,7 @@ function createPowerShellLaunchScript(
       '    $cleancodeJobStartInfo = New-Object System.Diagnostics.ProcessStartInfo',
       '    $cleancodeJobStartInfo.FileName = $cleancodeJobCommand.Path',
       '    $cleancodeJobStartInfo.UseShellExecute = $false',
+      '    $cleancodeJobStartInfo.WorkingDirectory = (Get-Location).ProviderPath',
       '    $cleancodeJobStartInfo.Arguments = $cleancodeJobNativeArguments',
       '    $cleancodeJobProcess = New-Object System.Diagnostics.Process',
       '    $cleancodeJobProcess.StartInfo = $cleancodeJobStartInfo',

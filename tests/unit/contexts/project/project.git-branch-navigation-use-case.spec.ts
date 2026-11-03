@@ -8,6 +8,36 @@ import { ListGitBranchNavigationUseCase } from '../../../../src/contexts/project
 import type { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
 describe('git branch navigation use case', () => {
+  it('returns detached checkout lock facts without inventing a branch', async () => {
+    const repository = {
+      findByDirectory: async () => createProjectSnapshot(),
+      save: async () => undefined
+    } satisfies ProjectRepository
+    const git = createGitWorkspacePort({
+      isGitRepository: true,
+      currentBranch: 'main',
+      localBranches: ['main'],
+      branches: [],
+      worktrees: [
+        {
+          directory: '/work/detached',
+          branchName: null,
+          head: '1234567',
+          isCurrent: false,
+          isLocked: true,
+          lockReason: 'native session'
+        }
+      ]
+    })
+    const navigation = await new ListGitBranchNavigationUseCase(repository, git).execute({
+      projectDirectory: '/work/app'
+    })
+    expect(navigation.branches).toEqual([])
+    expect(navigation.worktrees).toEqual([
+      { directory: '/work/detached', isLocked: true, lockReason: 'native session' }
+    ])
+  })
+
   it('disables worktree branches under main and exposes their transient lock state', async () => {
     const project = createProjectSnapshot()
     const repository = {

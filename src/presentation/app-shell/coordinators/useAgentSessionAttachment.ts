@@ -119,12 +119,6 @@ export function useAgentSessionAttachment({
   const workspaceDirectory = currentWorkspace?.directory ?? null
   const workspaceId = currentWorkspace?.workspaceId ?? null
   const gitBranch = currentWorkspace?.gitBranch ?? null
-  const persistenceMode =
-    currentWorkspace && currentWorkbench
-      ? currentWorkspace.gitBranch || currentWorkbench.gitBranches.length === 0
-        ? 'persistent'
-        : 'ephemeral'
-      : null
 
   useEffect(() => {
     const api = window.cleancode
@@ -134,8 +128,7 @@ export function useAgentSessionAttachment({
       !projectDirectory ||
       !projectId ||
       !workspaceDirectory ||
-      !workspaceId ||
-      !persistenceMode
+      !workspaceId
     ) {
       setOperation({ status: 'idle' })
       return undefined
@@ -169,7 +162,6 @@ export function useAgentSessionAttachment({
         agentName: activeAgent.name,
         columns: measuredDimensions.columns,
         gitBranch,
-        persistenceMode,
         projectDirectory,
         projectId,
         providerId: activeAgent.providerId,
@@ -231,7 +223,6 @@ export function useAgentSessionAttachment({
     dimensionsRef,
     gitBranch,
     measuredTerminalKey,
-    persistenceMode,
     projectDirectory,
     projectId,
     setOperation,

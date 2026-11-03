@@ -113,6 +113,7 @@ interface AgentLaunchArtifactRegistrar {
 }
 
 export interface AgentLaunchPlan {
+  readonly workingDirectory?: string
   readonly args: readonly string[]
   /** Set only when the Provider confirms the prior conversation has no saved record. */
   readonly discardProviderSessionRef?: boolean
@@ -141,6 +142,10 @@ export interface CreateAgentLaunchPlanCommand {
   }
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged?: (activity: AgentActivityStatus) => void
+  readonly onExecutionDirectoryChanged?: (
+    directory: string,
+    isCurrent?: () => boolean
+  ) => Promise<boolean>
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
   /** The current CLI switched to a conversation that has no durable reference yet. */
   readonly onProviderSessionCleared?: () => void
@@ -176,6 +181,10 @@ export interface AgentTelemetryContribution {
   prepare(command: {
     readonly artifacts: AgentLaunchArtifactRegistrar
     readonly onActivityChanged?: (activity: AgentActivityStatus) => void
+    readonly onExecutionDirectoryChanged?: (
+      directory: string,
+      isCurrent?: () => boolean
+    ) => Promise<boolean>
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
     readonly onProviderSessionCleared?: () => void
     readonly onTurnCompleted?: () => void

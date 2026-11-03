@@ -68,9 +68,15 @@ import {
   type ManagedAgentSession
 } from './AgentSessionRuntimeState'
 
+import { AgentExecutionDirectoryCoordinator } from '../services/AgentExecutionDirectoryCoordinator'
 import { AgentMessageMailbox } from '../services/AgentMessageMailbox'
+import {
+  homeAgentExecutionDirectory,
+  type AgentExecutionDirectoryPort
+} from '../ports/AgentExecutionDirectoryPort'
 
 export class AgentSessionService {
+  private readonly executionDirectories: AgentExecutionDirectoryCoordinator
   private readonly sessions = new Map<string, ManagedAgentSession>()
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
   private readonly applicationShutdown: AgentApplicationShutdownCoordinator
@@ -94,8 +100,10 @@ export class AgentSessionService {
     private readonly providerAvailability = new AgentProviderAvailabilityService(providers),
     private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
     activityRegistry: AgentActivityRegistry = new AgentActivityRegistry(),
-    mailbox = new AgentMessageMailbox()
+    mailbox = new AgentMessageMailbox(),
+    executionDirectories: AgentExecutionDirectoryPort = homeAgentExecutionDirectory
   ) {
+    this.executionDirectories = new AgentExecutionDirectoryCoordinator(executionDirectories)
     this.managedActivity = new ManagedAgentActivityRegistry(activityRegistry)
     this.interactions = new Interaction.Coordinator(
       terminalRuntime,
@@ -119,7 +127,8 @@ export class AgentSessionService {
       this.providerLaunchShutdown,
       mailbox,
       (session) => this.beginSessionToolClosing(session),
-      (session) => this.settleSessionToolCalls(session)
+      (session) => this.settleSessionToolCalls(session),
+      this.executionDirectories
     )
     this.applicationShutdown = new AgentApplicationShutdownCoordinator({
       beginClosing: (session) => this.beginSessionToolClosing(session),
@@ -178,7 +187,7 @@ export class AgentSessionService {
     if (existingSession?.isTerminalRunning) {
       existingSession.initialPrompt ??= command.initialPrompt
       existingSession.callbacks = createAgentSessionCallbacks(command)
-      if (command.restartMode === 'new' && existingSession.shouldPersist) {
+      if (command.restartMode === 'new') {
         await disposeAgentLaunchArtifacts(existingSession)
         await this.persistence.clear(existingSession)
       }
@@ -264,8 +273,10 @@ export class AgentSessionService {
       providerId,
       providerLaunchGeneration: 0,
       providerSessionRef,
+      executionDirectory: persistedSession?.executionDirectory ?? null,
       rows: command.rows ?? 24,
       runtime: createInitialAgentRuntime({
+        executionDirectory: persistedSession?.executionDirectory,
         binding: providerSessionRef ? 'persisted' : 'unbound',
         mcp: !cleancodeMcpEnabled ? 'disabled' : !mcpSupported ? 'unsupported' : 'inactive'
       }),
@@ -292,22 +303,41 @@ export class AgentSessionService {
   async suspendWorkspaceDirectory(
     workspaceDirectory: string
   ): Promise<AgentRuntimeSuspensionLease> {
-    const ownsDirectory = (owner: AgentSessionRuntimeOwner): boolean =>
+    const ownsDirectory = (owner: Pick<AgentSessionRuntimeOwner, 'workspaceDirectory'>): boolean =>
       owner.workspaceDirectory === workspaceDirectory
     const attachmentLease = await this.runtimeCoordinator.acquireDirectoryLease(
       workspaceDirectory,
       ownsDirectory
     )
+    let releaseDirectory: (() => void) | undefined
     try {
+      releaseDirectory = await this.executionDirectories.block(
+        workspaceDirectory,
+        this.sessions.values(),
+        ownsDirectory
+      )
       const results = await this.runtimeCoordinator.runForOwners(ownsDirectory, (owner) =>
         this.suspendRuntimeOwner(owner)
       )
       return {
         ...attachmentLease,
+        release: () => {
+          releaseDirectory?.()
+          attachmentLease.release()
+        },
+        resolve: () => {
+          releaseDirectory?.()
+          attachmentLease.resolve()
+        },
+        quarantine: () => {
+          releaseDirectory?.()
+          attachmentLease.quarantine()
+        },
         resume: () => this.resumeWorkspaceDirectory(workspaceDirectory),
         wasSuspended: results.some(Boolean)
       }
     } catch (error) {
+      releaseDirectory?.()
       attachmentLease.release()
       throw error
     }
@@ -519,6 +549,7 @@ export class AgentSessionService {
     session.isTerminalRunning = false
     session.sessionId = createAgentRuntimeSessionId()
     session.runtime = createInitialAgentRuntime({
+      executionDirectory: session.executionDirectory,
       binding: session.providerSessionRef ? 'persisted' : 'unbound',
       mcp: cleancodeMcpEnabled ? (!session.mcpSupported ? 'unsupported' : 'inactive') : 'disabled'
     })
@@ -549,8 +580,19 @@ export class AgentSessionService {
         'Agent session service is shutting down.'
       )
     }
+    const directory = await this.executionDirectories.resolve({
+      workspaceDirectory: session.workspaceDirectory,
+      executionDirectory: session.executionDirectory ?? session.workspaceDirectory
+    })
+    if (!directory)
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        'Agent execution directory is no longer available.'
+      )
+    if (session.executionDirectory) session.executionDirectory = directory
     const processSessionId = session.sessionId
     let exitObserved = false
+    session.terminalDirectory = session.executionDirectory ?? session.workspaceDirectory
     beginAgentTerminalRuntime(session)
     try {
       const handle = await this.terminalRuntime.open({
@@ -572,6 +614,7 @@ export class AgentSessionService {
         sessionId: processSessionId,
         terminalSourceTheme: session.terminalSourceTheme,
         workspaceDirectory: session.workspaceDirectory,
+        ...(session.executionDirectory ? { workingDirectory: session.executionDirectory } : {}),
         workspaceId: session.workspaceId
       })
       if (exitObserved || !recordAgentTerminalRunning(session, processSessionId, handle)) return

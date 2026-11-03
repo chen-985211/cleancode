@@ -15,6 +15,8 @@ export const zhCNErrorsMessages = {
 
   'error.AGENT_PROVIDER_UNAVAILABLE':
     '此 Agent Provider 当前不可用，请检查安装和 Agent 设置后重试。',
+  'error.WORKSPACE_DIRECTORY_IN_USE':
+    '其他工作区的 Agent 仍在使用此目录，请先停止该 Agent 或切换其执行目录，再归档。',
   'error.WORKSPACE_DEFAULTS_INVALID': '默认内容配置无效，请重新选择。',
   'error.WORKSPACE_INITIALIZATION_INVALID': '工作区初始化记录无效。请重新打开项目后重试。',
   'error.WORKSPACE_INITIALIZATION_CONFLICT': '此操作与已保存的进度冲突，请先处理未完成的内容。',

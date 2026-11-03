@@ -50,15 +50,15 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；应用级工具分类与新 Agent 默认开关由 `AgentProviderPreferences` 独立持久化，当前 launch 在启动或重连时冻结分类快照，不随偏好保存热更新；URL、Token、Hook、活动状态、完成事件、终端和 launch 都不持久化。
 7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
 
-文件系统仓储当前写入 schema v6，兼容读取 v5；读取 v5 不回写，下次真实写入时保存为 v6。每个 Agent 只有一个 `providerSessionRef`。更早 schema、未知 session ref 版本或畸形数据必须拒绝读取，不迁移或回写；产品尚未公开期间由新的应用状态代际生成全新数据。cleancode 不复制或解析 Provider 对话正文。
+文件系统仓储当前写入 schema v7，兼容读取 v5/v6；读取旧版本不回写，下次真实写入时保存为 v7。每个 Agent 只有一个 `providerSessionRef`，以及可选的已确认 `executionDirectory`；旧记录缺少目录时沿用归属工作区。更早 schema、未知 session ref 版本或畸形数据必须拒绝读取，不迁移或回写；产品尚未公开期间由新的应用状态代际生成全新数据。cleancode 不复制或解析 Provider 对话正文。
 
 Codex 的 title、完成回合 notify 和 `SessionEnd` Hook 上报的是已分配身份，UUID 存在不代表聊天记录已经保存。Agent 仍跟随并保存 CLI 最后报告的编号，包括 CLI 内切换到空 thread 的情况；是否可恢复由启动时的正式查询确认，不能因空 thread 尚无记录而继续恢复前一个 thread。
 
-Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时清除绑定并打开空白对话；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
+Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-server thread/read(includeTurns=false)` 检查已保存引用，明确返回该 ID 无保存记录时只清除对话引用，保留已确认执行目录并在其中打开空白对话，目录使用与归档保护继续有效；查询超时、CLI 不可用、不支持查询或未知错误均保留原引用和 resume 行为。Agent 的身份、名称、布局和 MCP 偏好不因此改变。
 
 查询结果须等待查询进程关闭后再返回：先关闭标准输入，允许 CLI 及其启动器正常退出；有界等待超时后，Windows 终止本次查询的进程树。清理超时同样返回不可用，不能据此清除绑定。Windows 原生 CLI 由 Node 直接启动并拥有 JSON-RPC 标准流和原生参数；没有可执行扩展名的命令先通过短命 PowerShell 查询其真实路径，再直接启动原生文件，避免在协议管道中插入 PowerShell。脚本 shim 继续使用既有 PowerShell 启动方式。
 
-工作区默认内容通过既有 `CreateWorkspaceAgentUseCase` 创建新身份、固定 Provider 和新会话，不复制其他 Agent 的 session ref 或自动发送提示词。内部初始化项 ID 与 Agent 创建凭据在 schema v6 的同一次 Agent 仓储写入中提交；凭据在 Agent 被删除后继续保留，用于拒绝重复创建。首次列表查询仍只初始化空列表，不能据默认配置创建 Agent。Provider 可用性、停用偏好和 Project 作用域校验沿用正常创建流程。
+工作区默认内容通过既有 `CreateWorkspaceAgentUseCase` 创建新身份、固定 Provider 和新会话，不复制其他 Agent 的 session ref 或自动发送提示词。内部初始化项 ID 与 Agent 创建凭据在当前 schema 的同一次 Agent 仓储写入中提交；凭据在 Agent 被删除后继续保留，用于拒绝重复创建。首次列表查询仍只初始化空列表，不能据默认配置创建 Agent。Provider 可用性、停用偏好和 Project 作用域校验沿用正常创建流程。
 
 ## Provider contribution
 
@@ -123,6 +123,10 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 
 - Agent 画布身份遵循 `projectId + workspaceId + agent + agentId`，其中对象类型使用 Shared Kernel 的规范值。
 - 工作区目录和 Git 分支是启动与显示元数据，不参与 Agent、terminal owner 或 Provider 对话身份。
+- 画布 Agent 的附加入口使用应用层默认的持久化策略，不得依据 Git 分支是否绑定或仓库分支数量推导临时会话。默认工作区、linked worktree、detached HEAD 和非 Git 项目均按稳定 Agent 身份读取恢复绑定并保存后续会话引用与执行目录；重新启动和新对话沿用同一策略。
+- `executionDirectory` 是独立的运行及恢复事实，不能反向改写 `projectId + workspaceId + agentId`、画布位置或 MCP 作用域。创建 worktree 本身不构成切换；Claude Hook 的正式 cwd 和 Codex 当前 thread 的 notify/SessionEnd cwd 才能确认目录。子 Agent、旧 thread、旧 generation 和异步校验期间失效的报告必须拒绝；同一 Codex thread 的标题刷新或改名不使有效报告失效，报告入队时固定 thread generation，出队及异步校验完成后重新检查；切走再切回仍拒绝切换前的在途报告（包括等待通知队列的报告）；不从输出、父 shell cwd 或历史对话猜测。
+- 目录由 Agent 自己的文件系统端口校验为存在的绝对目录及同一 Git common-dir；与归属目录相同时允许非 Git 项目。会话引用与目录进入同一有序持久化通道，当前运行目录随 runtime revision 发布。恢复前重新校验已保存目录，失效时明确失败，不静默回到其他目录。重新启动继续最后确认目录；显式新对话清除引用和目录，并在保留的 terminal 中显式回到归属目录。每次前台启动均显式传递 executionDirectory ?? workspaceDirectory，不依赖 shell 的初始目录判断是否可以省略；用户在保留 shell 中手动 cd 不能改变下一次新对话或重试的目标目录。
+- 归档或目录重绑定前，目录 lease 阻止其他归属工作区的 Agent 新进入该目录；只有本次挂起谓词精确匹配的归属目录才能获得豁免，保护检查和启动准入共用该谓词；子目录另行登记的项目不能因路径包含关系获豁免。目录锁与项目生命周期锁使用独立命名空间，按 owner 排空操作，避免跨项目反向归档形成锁循环。使用检查同时覆盖启动中或运行中的前台 executionDirectory 与保留 shell 的 terminalDirectory；前台退出或启动失败后，历史 executionDirectory 只用于恢复，不单独构成占用，初始 terminal 尚在启动时仍保护其恢复目标。前台回到归属目录、退出或开始新对话不释放仍存活 shell 的目录保护。若仍有外部 Agent 使用该目录或子目录，返回 `WORKSPACE_DIRECTORY_IN_USE`，不误停该 Agent；首次启动、保留 shell 内的新对话和重试均校验 executionDirectory ?? workspaceDirectory；即使执行目录尚未确认或已清空，也必须对归属目录检查 lease，不能将这次准入校验写成已确认的执行目录事实。原归属工作区被移除时仍按逻辑身份清理它自己的 Agent，不以执行目录迁移归属。
 - 默认工作区在普通分支、非 Git 状态或 detached HEAD 之间变化时，必须复用同一个 Agent terminal、PTY 和 Provider session ref。
 - 物理工作区被归档、移除或目录重绑定时，Project 才通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
 

@@ -17,6 +17,7 @@ export interface OpenAgentTerminalCommand {
   readonly rows: number
   readonly sessionId: string
   readonly terminalSourceTheme: 'dark' | 'light'
+  readonly workingDirectory?: string
   readonly workspaceDirectory: string
   readonly workspaceId: string
 }

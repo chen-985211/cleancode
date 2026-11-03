@@ -86,6 +86,47 @@ describe('archive locked branch worktree', () => {
     expect(git.removeCalls).toEqual([])
   })
 
+  it('uses the complete inventory to protect and archive a detached locked checkout', async () => {
+    const repository = new InMemoryProjectRepository()
+    const snapshot = createProjectSnapshot()
+    vi.spyOn(repository, 'findByDirectory').mockResolvedValue({
+      ...snapshot,
+      workspaces: snapshot.workspaces.map((workspace) =>
+        workspace.workspaceId === 'test-c' ? { ...workspace, gitBranch: null } : workspace
+      )
+    })
+    const git = new LockedWorktreeGitPort()
+    const inspection = {
+      ...createInspection('native worktree'),
+      branches: [],
+      worktrees: [
+        {
+          branchName: null,
+          directory: '/work/app/.claude/worktrees/test-c',
+          head: '123456789abcdef',
+          isCurrent: false,
+          isLocked: true,
+          lockReason: 'native worktree'
+        }
+      ]
+    }
+    git.inspections = [inspection, inspection, inspection]
+    const lifecycle = createLifecycle()
+    const archive = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle.port)
+    await expect(
+      archive.execute({ projectDirectory: '/work/app', workspaceId: 'test-c' })
+    ).rejects.toMatchObject({ code: 'GIT_WORKTREE_LOCKED' })
+    expect(lifecycle.calls).toEqual([])
+    await archive.execute({
+      projectDirectory: '/work/app',
+      workspaceId: 'test-c',
+      lockedWorktreeConfirmation: { lockReason: 'native worktree' }
+    })
+    expect(git.unlockCalls).toHaveLength(1)
+    expect(git.removeCalls).toHaveLength(1)
+    expect(repository.savedProjects[0]?.workspaces).toHaveLength(1)
+  })
+
   it('requires explicit confirmation before touching a clean locked worktree', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new LockedWorktreeGitPort()
@@ -133,7 +174,7 @@ describe('archive locked branch worktree', () => {
     expect(git.removeCalls).toHaveLength(1)
     expect(git.lockCalls).toEqual([])
     expect(repository.savedProjects).toHaveLength(1)
-    expect(lifecycle.calls).toEqual(['suspend', 'dispose', 'suspension-release', 'resolve'])
+    expect(lifecycle.calls).toEqual(['suspend', 'dispose', 'resolve', 'suspension-release'])
   })
 
   it('resumes suspended Agents if the lock reason changes while they drain', async () => {
@@ -187,7 +228,7 @@ describe('archive locked branch worktree', () => {
       }
     ])
     expect(repository.savedProjects).toEqual([])
-    expect(lifecycle.calls).toEqual(['suspend', 'dispose', 'suspension-release', 'release'])
+    expect(lifecycle.calls).toEqual(['suspend', 'dispose', 'release', 'suspension-release'])
   })
 })
 

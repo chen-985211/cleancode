@@ -7,11 +7,33 @@ import { matchesForegroundJob } from './PersistentTerminalProviderClientSupport'
 export class TerminalProviderForegroundJobEventBridge {
   private readonly callbacks = new Map<string, LaunchForegroundJobProcessCommand>()
 
-  bind(command: LaunchForegroundJobProcessCommand): void {
+  launch(
+    command: LaunchForegroundJobProcessCommand,
+    request: (method: string, params: unknown) => Promise<unknown>,
+    onBackgroundError?: (error: unknown) => void
+  ): void {
     this.callbacks.set(command.sessionId, command)
+    void request(
+      command.workingDirectory ? 'launchForegroundJobInDirectory' : 'launchForegroundJob',
+      {
+        foregroundJob: {
+          args: command.args,
+          environment: command.environment,
+          executable: command.executable,
+          fallbackPath: command.fallbackPath,
+          ...(command.workingDirectory ? { workingDirectory: command.workingDirectory } : {}),
+          generation: command.generation,
+          launchId: command.launchId,
+          sessionId: command.sessionId
+        }
+      }
+    ).catch((error) => {
+      if (!this.failLaunch(command)) return
+      onBackgroundError?.(error)
+    })
   }
 
-  failLaunch(command: LaunchForegroundJobProcessCommand): boolean {
+  private failLaunch(command: LaunchForegroundJobProcessCommand): boolean {
     if (this.callbacks.get(command.sessionId) !== command) return false
     this.callbacks.delete(command.sessionId)
     command.onExit({

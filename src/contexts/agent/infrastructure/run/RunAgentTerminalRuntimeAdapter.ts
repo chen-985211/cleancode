@@ -45,7 +45,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: command.workspaceDirectory,
       workspaceId: command.workspaceId,
-      workingDirectory: command.workspaceDirectory
+      workingDirectory: command.workingDirectory ?? command.workspaceDirectory
     })
     if (terminal.status !== 'running' || terminal.processId === null) {
       throw createExpectedAppError(
@@ -79,6 +79,9 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
     try {
       const job = this.terminalSessions.launchForegroundJob({
         args: command.plan.args,
+        ...(command.plan.workingDirectory
+          ? { workingDirectory: command.plan.workingDirectory }
+          : {}),
         environment: command.plan.env,
         executable: command.plan.executable,
         fallbackPath: this.posixPath,

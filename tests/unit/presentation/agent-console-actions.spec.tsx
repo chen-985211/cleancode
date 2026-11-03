@@ -18,6 +18,14 @@ const agent = {
 }
 
 describe('Agent console actions', () => {
+  it('keeps only the rename hint in the Agent name tooltip', async () => {
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
+    fireEvent.keyDown(document, { key: 'Tab' })
+    act(() => screen.getByRole('button', { name: 'Agent 2，双击重命名' }).focus())
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent(/^双击重命名$/)
+  })
+
   it('selects the whole Agent from the title area without treating actions as selection', () => {
     const onSelect = vi.fn()
 

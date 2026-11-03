@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { realpath } from 'node:fs/promises'
 import { runGit } from './GitProcess'
 
 import type {
@@ -7,6 +8,7 @@ import type {
   GitBranchInspection,
   GitRepositoryInspection,
   GitWorkspacePort,
+  GitWorktreeInspection,
   LockBranchWorktreeCommand,
   PruneWorktreesCommand,
   RemoveBranchWorktreeCommand,
@@ -25,13 +27,14 @@ export class GitCliWorkspaceAdapter implements GitWorkspacePort {
     }
 
     const currentBranch = await getCurrentBranch(directory)
-    const branches = await getLocalBranchInspections(directory, currentBranch)
+    const { branches, worktrees } = await getLocalBranchInspections(directory, currentBranch)
 
     return {
       isGitRepository: true,
       currentBranch,
       localBranches: branches.map((branch) => branch.name),
-      branches
+      branches,
+      worktrees
     }
   }
 
@@ -105,24 +108,24 @@ async function getCurrentBranch(directory: string): Promise<string | null> {
 async function getLocalBranchInspections(
   directory: string,
   currentBranch: string | null
-): Promise<GitBranchInspection[]> {
+): Promise<{ branches: GitBranchInspection[]; worktrees: GitWorktreeInspection[] }> {
   const [output, worktreeOutput] = await Promise.all([
     runGit(directory, ['branch', '--format=%(refname:short)%09%(worktreepath)']),
     runGit(directory, ['worktree', 'list', '--porcelain', '-z'])
   ])
-  const worktrees = parseWorktreePorcelain(worktreeOutput)
+  const currentDirectory = await realpath(
+    (await runGit(directory, ['rev-parse', '--show-toplevel'])).trim()
+  )
+  const worktrees = parseWorktreePorcelain(worktreeOutput).map((worktree) => ({
+    ...worktree,
+    isCurrent: worktree.directory === currentDirectory
+  }))
 
-  return output
+  const branches = output
     .split('\n')
     .map((line) => parseBranchInspectionLine(line, currentBranch, worktrees))
     .filter((branch): branch is GitBranchInspection => Boolean(branch))
-}
-
-interface GitWorktreeInspection {
-  readonly branchName: string | null
-  readonly directory: string
-  readonly isLocked: boolean
-  readonly lockReason: string | null
+  return { branches, worktrees }
 }
 
 function parseBranchInspectionLine(
@@ -152,17 +155,21 @@ function parseBranchInspectionLine(
   }
 }
 
-function parseWorktreePorcelain(output: string): GitWorktreeInspection[] {
-  const worktrees: GitWorktreeInspection[] = []
+function parseWorktreePorcelain(output: string): Omit<GitWorktreeInspection, 'isCurrent'>[] {
+  const worktrees: Omit<GitWorktreeInspection, 'isCurrent'>[] = []
   let directory: string | null = null
   let branchName: string | null = null
+  let head: string | null = null
   let isLocked = false
+  let isBare = false
   let lockReason: string | null = null
   const flush = (): void => {
-    if (directory) worktrees.push({ branchName, directory, isLocked, lockReason })
+    if (directory && !isBare) worktrees.push({ branchName, directory, head, isLocked, lockReason })
     directory = null
     branchName = null
+    head = null
     isLocked = false
+    isBare = false
     lockReason = null
   }
 
@@ -174,6 +181,10 @@ function parseWorktreePorcelain(output: string): GitWorktreeInspection[] {
       directory = resolve(field.slice('worktree '.length))
     } else if (field.startsWith('branch refs/heads/')) {
       branchName = field.slice('branch refs/heads/'.length)
+    } else if (field === 'bare') {
+      isBare = true
+    } else if (field.startsWith('HEAD ')) {
+      head = field.slice('HEAD '.length)
     } else if (field === 'locked' || field.startsWith('locked ')) {
       isLocked = true
       lockReason = field === 'locked' ? null : field.slice('locked '.length)

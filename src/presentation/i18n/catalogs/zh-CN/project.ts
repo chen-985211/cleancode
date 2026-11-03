@@ -118,6 +118,8 @@ export const zhCNProjectMessages = {
     '将移除这个 worktree 目录，但保留 Git 分支 {workspaceName}。之后可以从默认工作区重新创建。',
   'archive.lockedDetail':
     'Git 分支 {workspaceName} 会被保留；如果目录包含未提交更改，归档仍会被拒绝。',
+  'archive.detachedDescription': '将移除这个 worktree 目录。',
+  'archive.detachedDetail': '当前检出未绑定 Git 分支。如需保留此提交，请先创建分支或标签。',
   'archive.currentDetail': '当前正在使用该工作区，归档前将自动切回默认工作区。',
   'archive.confirm': '归档工作区',
   'archive.unlockConfirm': '解除锁并归档',

@@ -79,7 +79,7 @@ describe('workspace Agents e2e', () => {
       const store = JSON.parse(
         await waitForJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
       ) as { version: number; workspaces: Array<{ agents: unknown[] }> }
-      expect(store.version).toBe(6)
+      expect(store.version).toBe(7)
       expect(store.workspaces[0]?.agents).toHaveLength(1)
     }
   )

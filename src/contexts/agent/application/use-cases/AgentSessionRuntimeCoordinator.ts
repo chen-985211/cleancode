@@ -177,7 +177,7 @@ export class AgentSessionRuntimeCoordinator {
     predicate: OwnerPredicate
   ): Promise<AgentRuntimeAttachmentLease> {
     return this.acquireAttachmentLease(
-      `project:${workspaceDirectory}`,
+      `directory:${workspaceDirectory}`,
       `project:${workspaceDirectory}\0directory:${workspaceDirectory}`,
       false,
       predicate

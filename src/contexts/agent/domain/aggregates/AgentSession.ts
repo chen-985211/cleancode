@@ -15,6 +15,7 @@ export const defaultAgentLayoutSize = { width: 720, height: 460 } as const
 
 export interface PersistedAgentSessionSnapshot {
   readonly agentId: string
+  readonly executionDirectory?: string
   readonly cleancodeMcpEnabled: boolean
   readonly layout: AgentLayoutSnapshot
   readonly name: string
@@ -44,7 +45,8 @@ export class AgentSession {
     private agentLayout: AgentLayoutSnapshot,
     private isCleancodeMcpEnabled: boolean,
     private providerSession: ProviderSessionRef | null,
-    private activeScope: AgentConversationScope | null = null
+    private activeScope: AgentConversationScope | null = null,
+    private directory: string | null = null
   ) {}
 
   static create(input: CreateAgentSessionInput): AgentSession {
@@ -92,7 +94,8 @@ export class AgentSession {
       snapshot.providerSessionRef
         ? ProviderSessionRef.create(snapshot.providerSessionRef, snapshot.providerId)
         : null,
-      activeScope
+      activeScope,
+      normalizeExecutionDirectory(snapshot.executionDirectory)
     )
   }
 
@@ -150,13 +153,23 @@ export class AgentSession {
     this.isCleancodeMcpEnabled = enabled
   }
 
+  get executionDirectory(): string | null {
+    return this.directory
+  }
+
+  setExecutionDirectory(directory: string | null): void {
+    this.directory = normalizeExecutionDirectory(directory)
+  }
+
   clearProviderSession(): void {
     this.providerSession = null
+    this.directory = null
   }
 
   toSnapshot(): PersistedAgentSessionSnapshot {
     return {
       agentId: this.id,
+      ...(this.directory ? { executionDirectory: this.directory } : {}),
       cleancodeMcpEnabled: this.isCleancodeMcpEnabled,
       layout: copyLayout(this.agentLayout),
       name: this.agentName,
@@ -214,4 +227,19 @@ function copyLayout(layout: AgentLayoutSnapshot): AgentLayoutSnapshot {
     position: { ...layout.position },
     size: { ...layout.size }
   }
+}
+
+function normalizeExecutionDirectory(directory: string | null | undefined): string | null {
+  if (directory == null) return null
+  if (
+    typeof directory !== 'string' ||
+    directory.includes('\0') ||
+    !/^(?:\/|[a-z]:[\\/]|\\\\)/i.test(directory)
+  ) {
+    throw createExpectedAppError(
+      'AGENT_SESSION_INVALID',
+      'Agent execution directory must be absolute.'
+    )
+  }
+  return directory
 }

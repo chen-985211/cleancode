@@ -13,6 +13,7 @@ export async function createManagedAgentLaunchPlan(command: {
   readonly providerVersion?: string
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged: NonNullable<CreateAgentLaunchPlanCommand['onActivityChanged']>
+  readonly onExecutionDirectoryChanged?: CreateAgentLaunchPlanCommand['onExecutionDirectoryChanged']
   readonly onProviderSessionIdentified: CreateAgentLaunchPlanCommand['onProviderSessionIdentified']
   readonly onProviderSessionCleared?: CreateAgentLaunchPlanCommand['onProviderSessionCleared']
   readonly onTurnCompleted: NonNullable<CreateAgentLaunchPlanCommand['onTurnCompleted']>
@@ -56,15 +57,19 @@ export async function createManagedAgentLaunchPlan(command: {
         : undefined,
       ...(launchProfile ? { launchProfile } : {}),
       onActivityChanged,
+      onExecutionDirectoryChanged: command.onExecutionDirectoryChanged,
       onProviderSessionIdentified,
       onProviderSessionCleared: command.onProviderSessionCleared,
       onTurnCompleted,
       providerSessionRef: session.providerSessionRef ?? undefined,
-      workspaceDirectory: session.workspaceDirectory
+      workspaceDirectory: session.executionDirectory ?? session.workspaceDirectory
     })
     if (delivery) artifacts.track('agent-inbox-delivery', delivery)
     artifacts.seal()
-    return plan
+    return {
+      ...plan,
+      workingDirectory: session.executionDirectory ?? session.workspaceDirectory
+    }
   } catch (error) {
     await delivery?.dispose()
     artifacts.seal()

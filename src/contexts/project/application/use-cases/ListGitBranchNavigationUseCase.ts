@@ -32,6 +32,15 @@ export class ListGitBranchNavigationUseCase {
     const mainGitBranch = mainWorkspace?.gitBranch ?? inspection.currentBranch
 
     return {
+      ...(inspection.worktrees
+        ? {
+            worktrees: inspection.worktrees.map(({ directory, isLocked, lockReason }) => ({
+              directory,
+              isLocked,
+              lockReason
+            }))
+          }
+        : {}),
       branches: inspection.branches.map((branch) => {
         const isMainWorkspaceBranch = branch.name === mainGitBranch
         const isCheckedOutInAnotherWorktree = Boolean(

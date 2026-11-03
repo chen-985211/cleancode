@@ -1,3 +1,4 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
@@ -16,7 +17,8 @@ export class AgentProviderSessionPersistenceCoordinator {
   persist(
     session: ManagedAgentSession,
     sessionRefSnapshot: ProviderSessionRefSnapshot | null,
-    providerLaunchGeneration: number
+    providerLaunchGeneration: number,
+    executionDirectory: string | null = session.executionDirectory ?? null
   ): void {
     if (!session.shouldPersist) return
     let sessionRef
@@ -29,10 +31,11 @@ export class AgentProviderSessionPersistenceCoordinator {
       return
     }
     const lane = this.resolveLane(session, providerLaunchGeneration)
-    const identity = sessionRef ? providerSessionIdentity(sessionRef.toSnapshot()) : null
+    const identity = bindingIdentity(sessionRef?.toSnapshot() ?? null, executionDirectory)
     if (lane.latestIdentity === identity) return
 
     lane.latestIdentity = identity
+    lane.latestSessionRef = sessionRef?.toSnapshot() ?? null
     const sequence = ++lane.latestSequence
     transitionAgentRuntime(session, { binding: 'persisting' })
 
@@ -45,6 +48,7 @@ export class AgentProviderSessionPersistenceCoordinator {
         if (!isCurrentPersistence(session, providerLaunchGeneration)) return
         if (sessionRef) persistedSession.bindProviderSession(session.scope, sessionRef)
         else persistedSession.clearProviderSession()
+        persistedSession.setExecutionDirectory(executionDirectory)
         await this.repository.save(persistedSession)
         if (isLatestPersistence(session, lane, providerLaunchGeneration, sequence, identity)) {
           session.providerSessionRef = sessionRef?.toSnapshot() ?? null
@@ -53,9 +57,8 @@ export class AgentProviderSessionPersistenceCoordinator {
       })
       .catch(() => {
         if (isLatestPersistence(session, lane, providerLaunchGeneration, sequence, identity)) {
-          lane.latestIdentity = session.providerSessionRef
-            ? providerSessionIdentity(session.providerSessionRef)
-            : null
+          // The live directory can be ahead of disk; a repeated report must retry this write.
+          lane.latestIdentity = null
           transitionAgentRuntime(session, { binding: 'persistence_failed' })
         }
       })
@@ -65,8 +68,26 @@ export class AgentProviderSessionPersistenceCoordinator {
     void persistence.finally(() => this.pending.delete(persistence))
   }
 
+  persistDirectory(session: ManagedAgentSession, directory: string, generation: number): void {
+    const lane = this.resolveLane(session, generation)
+    this.persist(session, lane.latestSessionRef, generation, directory)
+  }
+
   async waitForIdle(): Promise<void> {
     while (this.pending.size > 0) await Promise.all([...this.pending])
+  }
+
+  async discardProviderSessionRef(session: ManagedAgentSession): Promise<void> {
+    this.persist(session, null, session.providerLaunchGeneration)
+    await this.lanes.get(session)?.tail
+    if (session.runtime.binding.status === 'persistence_failed') {
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        'Unable to clear the missing Provider conversation reference.'
+      )
+    }
+    session.providerSessionRef = null
+    transitionAgentRuntime(session, { binding: 'unbound' })
   }
 
   async clear(session: ManagedAgentSession): Promise<void> {
@@ -74,7 +95,8 @@ export class AgentProviderSessionPersistenceCoordinator {
     if (session.shouldPersist) await this.repository.delete(session.scope)
     this.lanes.delete(session)
     session.providerSessionRef = null
-    transitionAgentRuntime(session, { binding: 'unbound' })
+    session.executionDirectory = null
+    transitionAgentRuntime(session, { binding: 'unbound', executionDirectory: null })
   }
 
   private resolveLane(
@@ -85,17 +107,21 @@ export class AgentProviderSessionPersistenceCoordinator {
     if (existing) {
       if (existing.providerLaunchGeneration !== providerLaunchGeneration) {
         existing.providerLaunchGeneration = providerLaunchGeneration
-        existing.latestIdentity = session.providerSessionRef
-          ? providerSessionIdentity(session.providerSessionRef)
-          : null
+        existing.latestSessionRef = session.providerSessionRef
+        existing.latestIdentity =
+          session.runtime.binding.status === 'persistence_failed'
+            ? null
+            : bindingIdentity(session.providerSessionRef, session.executionDirectory ?? null)
       }
       return existing
     }
 
     const lane: PersistenceLane = {
-      latestIdentity: session.providerSessionRef
-        ? providerSessionIdentity(session.providerSessionRef)
-        : null,
+      latestSessionRef: session.providerSessionRef,
+      latestIdentity: bindingIdentity(
+        session.providerSessionRef,
+        session.executionDirectory ?? null
+      ),
       latestSequence: 0,
       providerLaunchGeneration,
       tail: Promise.resolve()
@@ -106,6 +132,7 @@ export class AgentProviderSessionPersistenceCoordinator {
 }
 
 interface PersistenceLane {
+  latestSessionRef: ProviderSessionRefSnapshot | null
   latestIdentity: string | null
   latestSequence: number
   providerLaunchGeneration: number
@@ -134,6 +161,9 @@ function isLatestPersistence(
   )
 }
 
-function providerSessionIdentity(sessionRef: ProviderSessionRefSnapshot): string {
-  return JSON.stringify([sessionRef.formatVersion, sessionRef.kind, sessionRef.value])
+function bindingIdentity(
+  sessionRef: ProviderSessionRefSnapshot | null,
+  directory: string | null
+): string {
+  return JSON.stringify([sessionRef?.formatVersion, sessionRef?.kind, sessionRef?.value, directory])
 }

@@ -72,12 +72,14 @@ export class CheckoutMainWorkspaceBranchUseCase {
       })
       checkoutCompleted = true
 
-      const worktrees = inspection.branches
-        .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
-        .map((branch) => ({
-          branchName: branch.name,
-          directory: branch.worktreeDirectory ?? project.directory
-        }))
+      const worktrees = inspection.worktrees
+        ? inspection.worktrees.filter((worktree) => !worktree.isCurrent)
+        : inspection.branches
+            .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
+            .map((branch) => ({
+              branchName: branch.name,
+              directory: branch.worktreeDirectory ?? project.directory
+            }))
       const updatedProject = project
         .syncGitBranchWorkspaces({
           mainDirectory: project.directory,

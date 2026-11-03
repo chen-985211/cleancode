@@ -12,7 +12,7 @@
 | BlockGraph        | 已实现 | `BlockGraph`、`BlockTemplateLibrary`                    | 终端积木、组合、布局、执行配置、依赖连接和应用级模板快照                                            |
 | CanvasArrangement | 已实现 | `CanvasArrangement`                                     | 跨类型画布对象的视觉堆叠身份、有序成员、锚点与已提交遮挡顺序                                        |
 | Run               | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun`       | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态                                   |
-| Agent             | 已实现 | `AgentSession`                                          | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计                            |
+| Agent             | 已实现 | `AgentSession`                                          | Agent 身份、固定 Provider、session ref、独立执行目录、launch/activity、MCP、审批和审计              |
 | Plugin            | 规划中 | 尚无                                                    | 尚未形成当前领域模型、用例或持久化事实                                                              |
 
 `src/platform` 是最外层 composition root 与 Electron 适配层，不是限界上下文。`src/presentation` 负责跨上下文应用外壳与派生视图，也不拥有领域事实。

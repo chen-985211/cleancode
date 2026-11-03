@@ -59,6 +59,7 @@ type CodexTelemetryFactory = (command: {
   readonly appServerArgs: readonly string[]
   readonly environment: Readonly<Record<string, string>>
   readonly executable: string
+  readonly onExecutionDirectoryChanged?: CreateAgentLaunchPlanCommand['onExecutionDirectoryChanged']
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
   readonly onTurnCompleted?: () => void
   readonly workspaceDirectory: string
@@ -198,6 +199,7 @@ class CodexTelemetryContribution implements AgentTelemetryContribution {
       appServerArgs: [...this.baseArgs, ...(command.launchProfile?.arguments ?? [])],
       environment: command.launchProfile?.environment ?? {},
       executable,
+      onExecutionDirectoryChanged: command.onExecutionDirectoryChanged,
       onProviderSessionIdentified: command.onProviderSessionIdentified,
       onTurnCompleted: command.onTurnCompleted,
       workspaceDirectory: command.workspaceDirectory
@@ -364,6 +366,7 @@ async function createCodexTelemetryRuntime(
     readonly appServerArgs: readonly string[]
     readonly environment: Readonly<Record<string, string>>
     readonly executable: string
+    readonly onExecutionDirectoryChanged?: CreateAgentLaunchPlanCommand['onExecutionDirectoryChanged']
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
     readonly onTurnCompleted?: () => void
     readonly workspaceDirectory: string
@@ -373,6 +376,7 @@ async function createCodexTelemetryRuntime(
   runtimePlatform: NodeJS.Platform
 ): Promise<CodexTelemetryRuntime> {
   const reporter = await CodexThreadIdentityReporter.start({
+    onExecutionDirectoryChanged: command.onExecutionDirectoryChanged,
     onThreadIdentified: (threadId) =>
       command.onProviderSessionIdentified({
         formatVersion: 1,

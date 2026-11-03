@@ -101,6 +101,28 @@ describe('project physical workspaces', () => {
     expect(project.workspaces.filter(({ isCurrent }) => isCurrent)).toEqual([defaultWorkspace()])
   })
 
+  it('does not reuse an occupied directory identity for another checkout of its former branch', () => {
+    const project = Project.fromSnapshot({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app',
+      workspaces: [defaultWorkspace(), featureWorkspace()]
+    })
+    const synchronized = project.syncGitBranchWorkspaces({
+      mainDirectory: '/work/app',
+      mainGitBranch: 'main',
+      worktrees: [
+        { branchName: 'other', directory: featureWorkspace().directory },
+        { branchName: featureWorkspace().gitBranch, directory: '/work/new-checkout' }
+      ]
+    })
+    const linked = synchronized.workspaces.filter(
+      (workspace) => workspace.workspaceKind === 'linked-worktree'
+    )
+    expect(new Set(linked.map((workspace) => workspace.workspaceId)).size).toBe(2)
+    expect(linked[0]?.workspaceId).toBe('workspace-feature')
+  })
+
   it('preserves linked-worktree ids when either its branch or directory changes', () => {
     const moved = Project.fromSnapshot({
       id: 'project-1',
