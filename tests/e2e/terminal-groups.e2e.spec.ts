@@ -160,63 +160,73 @@ describe('terminal group direct manipulation', () => {
       expect((await readE2eBlockGraph(workbench)).blocks).toEqual(before.blocks)
       expect((await readE2eBlockGraph(workbench)).terminalGroups).toEqual(before.terminalGroups)
 
-      await root.locator('.terminal-node__disclosure').click()
-      await page.waitForFunction((id) => {
-        const r = document
-          .querySelector(`[data-terminal-block-id="${id}"] .terminal-node`)
-          ?.getBoundingClientRect()
-        const anchor = document
-          .querySelector(`[data-terminal-block-id="${id}"]`)
-          ?.closest('.react-flow__node')
-          ?.getBoundingClientRect()
-        return r && anchor && r.width / anchor.width > 0.6 && r.width / anchor.width < 0.9
-      }, ids.terminals[0]!)
-      const groupHeader = await requiredBox(group.locator('.terminal-group-node__header'))
-      const grab = { x: groupHeader.x + 100, y: groupHeader.y + 20 }
-      await page.mouse.move(grab.x, grab.y)
-      await page.mouse.down()
-      let previousFrame:
-        | {
-            dx: number
-            material: { x: number; y: number }
-            members: { x: number; y: number; width: number; height: number }[]
-          }
-        | undefined
+      const motionClock = await holdAnimationClock(page)
       try {
-        for (const dx of [30, 70, 110]) {
-          await page.mouse.move(grab.x + dx, grab.y + 30, { steps: 3 })
-          await page.evaluate(
-            () =>
-              new Promise<void>((resolve) =>
-                requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-              )
-          )
-          const material = await requiredBox(group.locator('.terminal-group-node__material'))
-          const members = []
-          for (const id of ids.terminals) {
-            const member = await requiredBox(terminal(page, id).locator('.terminal-node'))
-            members.push(member)
-            expect(member.x).toBeGreaterThanOrEqual(material.x - 1)
-            expect(member.x + member.width).toBeLessThanOrEqual(material.x + material.width + 1)
-            expect(member.y + member.height).toBeLessThanOrEqual(material.y + material.height + 1)
-          }
-          if (previousFrame) {
-            expect(
-              Math.abs(material.x - previousFrame.material.x - (dx - previousFrame.dx))
-            ).toBeLessThan(1)
-            for (let i = 0; i < members.length; i++) {
-              const before = previousFrame.members[i]!,
-                current = members[i]!
-              expect(Math.abs(current.x - before.x - (dx - previousFrame.dx))).toBeLessThan(1)
-              expect(Math.abs(current.y - before.y)).toBeLessThan(1)
-              expect(Math.abs(current.width - before.width)).toBeLessThan(1)
-              expect(Math.abs(current.height - before.height)).toBeLessThan(1)
+        await root.locator('.terminal-node__disclosure').click()
+        await pollUntilState({
+          description: 'partially expanded terminal before combination drag',
+          timeoutMs: 10_000,
+          observe: async () => {
+            await motionClock.evaluate((clock) => clock.advanceFrame())
+            return page.evaluate((id) => {
+              const r = document
+                .querySelector(`[data-terminal-block-id="${id}"] .terminal-node`)
+                ?.getBoundingClientRect()
+              const anchor = document
+                .querySelector(`[data-terminal-block-id="${id}"]`)
+                ?.closest('.react-flow__node')
+                ?.getBoundingClientRect()
+              return r && anchor ? r.width / anchor.width : 0
+            }, ids.terminals[0]!)
+          },
+          accept: (ratio) => ratio > 0.6 && ratio < 0.9
+        })
+        const groupHeader = await requiredBox(group.locator('.terminal-group-node__header'))
+        const grab = { x: groupHeader.x + 100, y: groupHeader.y + 20 }
+        await page.mouse.move(grab.x, grab.y)
+        await page.mouse.down()
+        let previousFrame:
+          | {
+              dx: number
+              material: { x: number; y: number }
+              members: { x: number; y: number; width: number; height: number }[]
             }
+          | undefined
+        try {
+          for (const dx of [30, 70, 110]) {
+            await page.mouse.move(grab.x + dx, grab.y + 30, { steps: 3 })
+            // Time must advance during dragging too: the product must keep member sizes fixed.
+            await motionClock.evaluate((clock) => clock.advanceFrame())
+            const material = await requiredBox(group.locator('.terminal-group-node__material'))
+            const members = []
+            for (const id of ids.terminals) {
+              const member = await requiredBox(terminal(page, id).locator('.terminal-node'))
+              members.push(member)
+              expect(member.x).toBeGreaterThanOrEqual(material.x - 1)
+              expect(member.x + member.width).toBeLessThanOrEqual(material.x + material.width + 1)
+              expect(member.y + member.height).toBeLessThanOrEqual(material.y + material.height + 1)
+            }
+            if (previousFrame) {
+              expect(
+                Math.abs(material.x - previousFrame.material.x - (dx - previousFrame.dx))
+              ).toBeLessThan(1)
+              for (let i = 0; i < members.length; i++) {
+                const before = previousFrame.members[i]!,
+                  current = members[i]!
+                expect(Math.abs(current.x - before.x - (dx - previousFrame.dx))).toBeLessThan(1)
+                expect(Math.abs(current.y - before.y)).toBeLessThan(1)
+                expect(Math.abs(current.width - before.width)).toBeLessThan(1)
+                expect(Math.abs(current.height - before.height)).toBeLessThan(1)
+              }
+            }
+            previousFrame = { dx, material, members }
           }
-          previousFrame = { dx, material, members }
+        } finally {
+          await page.mouse.up()
         }
       } finally {
-        await page.mouse.up()
+        await motionClock.evaluate((clock) => clock.restore())
+        await motionClock.dispose()
       }
       await waitForMotion(page)
       await waitForGraph(
@@ -596,6 +606,37 @@ async function waitForGraph(
     observe: () => readE2eBlockGraph(workbench),
     accept,
     timeoutMs: 10_000
+  })
+}
+// Keep real browser frames/input, but advance animation time only when the test asks.
+// Otherwise click/trace round trips can miss the entire intermediate disclosure state.
+async function holdAnimationClock(page: Page) {
+  return page.evaluateHandle(() => {
+    const requestFrame = window.requestAnimationFrame.bind(window)
+    const originalRequestFrame = window.requestAnimationFrame
+    const timelineDescriptor = Object.getOwnPropertyDescriptor(document.timeline, 'currentTime')
+    let timestamp = Number(document.timeline.currentTime ?? performance.now())
+    let held = true
+    window.requestAnimationFrame = (callback) =>
+      requestFrame((nativeTimestamp) => callback(held ? timestamp : nativeTimestamp))
+    Object.defineProperty(document.timeline, 'currentTime', {
+      configurable: true,
+      get: () => timestamp
+    })
+    return {
+      async advanceFrame() {
+        timestamp += 1000 / 60
+        await new Promise<void>((resolve) => requestFrame(() => requestFrame(() => resolve())))
+      },
+      restore() {
+        if (!held) return
+        held = false
+        window.requestAnimationFrame = originalRequestFrame
+        if (timelineDescriptor)
+          Object.defineProperty(document.timeline, 'currentTime', timelineDescriptor)
+        else Reflect.deleteProperty(document.timeline, 'currentTime')
+      }
+    }
   })
 }
 async function waitForMotion(page: Page) {
