@@ -18,9 +18,35 @@ describe('terminal theme palette', () => {
   )
 
   it.each(['light', 'dark'] as const)(
-    'gives renderer xterm the canonical %s terminal palette',
+    'preserves the canonical %s terminal chrome with only light ANSI white readability overrides',
     (theme) => {
-      expect(readCanonicalTerminalTheme(theme)).toBe(canonicalTerminalPalettes[theme])
+      const palette = canonicalTerminalPalettes[theme]
+      expect(readCanonicalTerminalTheme(theme)).toEqual({
+        background: palette.background,
+        foreground: palette.foreground,
+        cursor: palette.cursor,
+        cursorAccent: palette.cursorAccent,
+        selectionBackground: palette.selectionBackground,
+        ...(theme === 'light' ? { white: palette.white, brightWhite: palette.brightWhite } : {})
+      })
+    }
+  )
+
+  it.each(['light', 'dark'] as const)(
+    'keeps ANSI white text readable for the %s source theme and its projection',
+    (theme) => {
+      const palette = readCanonicalTerminalTheme(theme)
+      const background = requireColor(palette.background)
+      const matrix = readTerminalThemeProjectionMatrix(theme)
+      // xterm 6 defaults apply when an ANSI slot is not overridden.
+      const whites = [palette.white ?? '#d3d7cf', palette.brightWhite ?? '#eeeeec']
+
+      for (const foreground of whites) {
+        expect(colorContrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5)
+        expect(
+          colorContrastRatio(projectColor(foreground, matrix), projectColor(background, matrix))
+        ).toBeGreaterThanOrEqual(4.5)
+      }
     }
   )
 
@@ -36,24 +62,6 @@ describe('terminal theme palette', () => {
       expect(
         colorContrastRatio(projectColor(cursorText, matrix), projectColor(cursor, matrix))
       ).toBeGreaterThanOrEqual(4.5)
-    }
-  )
-
-  it.each(['light', 'dark'] as const)(
-    'keeps ANSI white foregrounds readable for the %s source theme and its projection',
-    (theme) => {
-      const palette = readCanonicalTerminalTheme(theme)
-      const background = requireColor(palette.background)
-      const matrix = readTerminalThemeProjectionMatrix(theme)
-      const projectedBackground = projectColor(background, matrix)
-
-      for (const foreground of [palette.white, palette.brightWhite]) {
-        const requiredForeground = requireColor(foreground)
-        expect(colorContrastRatio(requiredForeground, background)).toBeGreaterThanOrEqual(4.5)
-        expect(
-          colorContrastRatio(projectColor(requiredForeground, matrix), projectedBackground)
-        ).toBeGreaterThanOrEqual(4.5)
-      }
     }
   )
 })

@@ -238,6 +238,8 @@ Electron 的 complete 阶段只注销 workflow/managed lifecycle 与 managed ter
 
 关键 E2E 覆盖低层测试不能单独证明的跨上下文用户目标：两个 worktree 使用同一首选端口时都能从界面成功启动并看到不同实际端点；默认工作区因另一 worktree 占用固定端口而直接“启动命令”失败后，可以切换过去停止服务，再返回默认工作区用同一“启动命令”入口成功重试。测试必须使用确定性本地服务、精确运行 identity/endpoint 事件作为完成条件，不能使用固定等待；策略边界、所有权失败和清理分支继续由低层测试证明。
 
+端口 E2E 通过现有公开应用 API 准备服务定义，只用真实界面验证启动、停止、工作区切换和端点结果。表单保存、取消与端口策略分支继续由 Presentation 单元测试覆盖；底部边缘编辑器的实际布局、画布遮挡避让、展开/关闭动效和减弱动效由 [`block-graph.terminal-metadata-layout.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.terminal-metadata-layout.spec.ts) 在隔离 Electron 窗口中挂载生产组件与 ReactFlow 验证，不再重复塞入每次服务创建步骤。
+
 ## 交付进度
 
 | 阶段                   | 状态     | 当前结果                                                                            |
