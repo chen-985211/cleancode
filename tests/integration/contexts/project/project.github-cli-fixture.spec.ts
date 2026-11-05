@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { createGitHubCliFixture } from '../../../fixtures/contexts/project/githubCliFixture'
+import { prepareE2eMainProcessEnvironment } from '../../../support/e2eMainProcessEnvironment'
 
 const execute = promisify(execFile)
 
@@ -49,4 +50,39 @@ describe('GitHub CLI process fixture', () => {
       }
     }
   )
+
+  it('prepares child CLI environment before startup even when NODE_OPTIONS is stripped', async () => {
+    const bin = join(directory, 'startup bin with spaces')
+    const { NODE_OPTIONS: childNodeOptions, ...environment } = await createGitHubCliFixture(bin)
+    const args = await prepareE2eMainProcessEnvironment(directory, {
+      NODE_OPTIONS: childNodeOptions ?? '',
+      CLEANCODE_FIXTURE_PRELOAD_READY: 'before-query'
+    })
+    const launchEnvironment = { ...process.env, ...environment }
+    delete launchEnvironment.NODE_OPTIONS
+    const executable = join(bin, process.platform === 'win32' ? 'gh.exe' : 'gh')
+    const query = `
+      const { execFileSync } = require('node:child_process');
+      process.stdout.write(JSON.stringify({
+        phase: process.env.CLEANCODE_FIXTURE_PRELOAD_READY,
+        repository: JSON.parse(execFileSync(process.argv[1], ['repo', 'view'], {
+          encoding: 'utf8', windowsHide: true
+        }))
+      }));
+    `
+    const { stdout } = await execute(process.execPath, [...args, '--eval', query, executable], {
+      cwd: directory,
+      env: launchEnvironment,
+      timeout: 5000,
+      windowsHide: true
+    })
+
+    expect(JSON.parse(stdout)).toEqual({
+      phase: 'before-query',
+      repository: {
+        nameWithOwner: 'fixture/issues',
+        defaultBranchRef: { name: 'main' }
+      }
+    })
+  })
 })

@@ -17,6 +17,7 @@ import {
 } from './e2eDiagnostics'
 import { runE2eTeardown, withE2eDeadline } from './e2eLifecycle'
 import { pollUntilState } from './e2ePolling'
+import { prepareE2eMainProcessEnvironment } from './e2eMainProcessEnvironment'
 import {
   encodeTerminalProviderFrame,
   TerminalProviderFrameDecoder,
@@ -48,6 +49,7 @@ export interface E2eScenarioResources {
 export interface LaunchAppOptions {
   readonly environment?: NodeJS.ProcessEnv
   readonly executablePath?: string
+  readonly mainProcessEnvironment?: Readonly<Record<string, string>>
 }
 
 export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> {
@@ -333,8 +335,13 @@ export async function launchApp(
   const runElectronInBackground = process.env.CLEANCODE_E2E_VISIBLE !== '1'
   const packagedExecutablePath =
     options.executablePath?.trim() || process.env.CLEANCODE_E2E_EXECUTABLE_PATH?.trim()
+  const environmentPreload = await prepareE2eMainProcessEnvironment(
+    workbench.registryDirectory,
+    options.mainProcessEnvironment
+  )
   const electronApplication = await electron.launch({
     args: [
+      ...environmentPreload,
       ...(packagedExecutablePath ? [] : ['.']),
       '--lang=zh-CN',
       `--user-data-dir=${join(workbench.appStateDirectory, 'electron-user-data')}`
