@@ -45,12 +45,6 @@
   background: transparent;
   color: var(--cc-canvas-node-menu-foreground);
   font: inherit;
-  font-family:
-    'Eina03-Regular',
-    'Avenir Next',
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
   font-size: 13px;
   font-synthesis: none;
   font-weight: 500;
