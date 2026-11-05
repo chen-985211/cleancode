@@ -64,15 +64,11 @@ describe('project issues', () => {
       join(workbench.registryDirectory, 'bin'),
       issuesError
     )
-    app = await launchApp(workbench, { environment: createE2eTerminalEnvironment(environment) })
+    app = await launchApp(workbench, {
+      environment: createE2eTerminalEnvironment(environment),
+      mainProcessEnvironment: childNodeOptions ? { NODE_OPTIONS: childNodeOptions } : undefined
+    })
     resources.electronApp = app
-    if (childNodeOptions) {
-      // Playwright strips NODE_OPTIONS when launching Electron. Install the gh.exe
-      // fixture preload for child Node processes after launch, before querying Issues.
-      await app.evaluate((_electron, nodeOptions) => {
-        process.env.NODE_OPTIONS = nodeOptions
-      }, childNodeOptions)
-    }
     page = await app.firstWindow()
     resources.page = page
     await expectDesktopRuntime(page)

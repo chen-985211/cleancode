@@ -1,9 +1,10 @@
 // @vitest-environment node
 
 import { EventEmitter } from 'node:events'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runInNewContext } from 'node:vm'
 
 import type { ElectronApplication } from 'playwright'
 
@@ -121,6 +122,43 @@ describe('E2E workbench lifecycle', () => {
     expect(tracing.stop).toHaveBeenCalledWith({
       path: join(process.cwd(), 'test-results', 'e2e', '123-electron-launch-failure.zip')
     })
+  })
+
+  it('installs fixture environment through a preload before application startup', async () => {
+    const registryDirectory = await mkdtemp(join(tmpdir(), 'cleancode preload with spaces '))
+    const childNodeOptions = '--require "C:\\fixture with spaces\\gh-preload.cjs"'
+    const electronProcess = createElectronProcess()
+    const electronApp = {
+      context: () => ({ tracing: { start: vi.fn() } }),
+      evaluate: vi.fn(() => {
+        throw new Error('Main-process execution context is unavailable')
+      }),
+      on: vi.fn(),
+      process: () => electronProcess,
+      windows: () => []
+    } as unknown as ElectronApplication
+    vi.stubEnv('CLEANCODE_E2E_VISIBLE', '1')
+    vi.stubEnv('CLEANCODE_E2E_SHUTDOWN_DIAGNOSTICS', '0')
+    launchElectron.mockImplementation(async ({ args }: { args: string[] }) => {
+      expect(args[0]).toBe('--require')
+      expect(args[2]).toBe('.')
+      const environment = { EXISTING: 'preserved' }
+      runInNewContext(await readFile(args[1]!, 'utf8'), { process: { env: environment } })
+      expect(environment).toEqual({ EXISTING: 'preserved', NODE_OPTIONS: childNodeOptions })
+      return electronApp
+    })
+
+    try {
+      await expect(
+        launchApp(
+          { ...workbench, registryDirectory },
+          { mainProcessEnvironment: { NODE_OPTIONS: childNodeOptions } }
+        )
+      ).resolves.toBe(electronApp)
+      expect(electronApp.evaluate).not.toHaveBeenCalled()
+    } finally {
+      await rm(registryDirectory, { recursive: true, force: true })
+    }
   })
 
   it('keeps one canonical Windows Path entry and gives launch overrides precedence', () => {
