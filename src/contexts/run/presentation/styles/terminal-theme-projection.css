@@ -1,4 +1,6 @@
 .terminal-theme-projection {
+  --terminal-reading-insets: 9px 0 9px 10px;
+  position: relative;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -6,7 +8,31 @@
   box-sizing: border-box;
   overflow: hidden;
   background: var(--cc-terminal-projection-background);
-  padding: 9px 0 9px 10px;
+  padding: var(--terminal-reading-insets);
+}
+
+.terminal-indexed-glyph-layer {
+  position: absolute;
+  inset: var(--terminal-reading-insets);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  display: none;
+  text-autospace: no-autospace;
+  text-spacing-trim: space-all;
+}
+
+:root[data-theme='light']
+  .terminal-theme-projection[data-terminal-source-theme='dark']
+  > [data-terminal-content-ready='true']
+  ~ .terminal-indexed-glyph-layer {
+  display: block;
+}
+
+.terminal-indexed-glyph-layer > canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .terminal-theme-projection__filter {

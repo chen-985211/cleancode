@@ -24,7 +24,8 @@ import {
   readCanonicalTerminalSearchTheme,
   readCanonicalTerminalTheme,
   readProjectedLightGlyphForeground,
-  readTerminalSourceTheme
+  readTerminalSourceTheme,
+  setIndexedGlyphLayer
 } from './terminalTheme'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
@@ -217,6 +218,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.resizeObserver = null
     this.themeObserver?.disconnect()
     this.themeObserver = null
+    setIndexedGlyphLayer(this.terminal, null)
     this.xtermRasterTarget.detach(element)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
@@ -227,8 +229,9 @@ class XtermTerminalSurface implements TerminalSurface {
     this.themeObserver?.disconnect()
     const projectedForeground = readProjectedLightGlyphForeground()
     const update = (): void => {
-      this.terminal.options.defaultGlyphForeground =
-        readTerminalSourceTheme(root) === 'light' ? projectedForeground : ''
+      const light = readTerminalSourceTheme(root) === 'light'
+      this.terminal.options.defaultGlyphForeground = light ? projectedForeground : ''
+      setIndexedGlyphLayer(this.terminal, light ? (this.element?.parentElement ?? null) : null)
     }
     update()
     this.themeObserver = new MutationObserver(update)

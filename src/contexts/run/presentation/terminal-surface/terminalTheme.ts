@@ -1,4 +1,4 @@
-import type { ITheme } from '@xterm/xterm'
+import type { ITheme, Terminal } from '@xterm/xterm'
 
 import { canonicalTerminalPalettes } from '../../application/dto/TerminalPalette.generated'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
@@ -91,6 +91,46 @@ export function readProjectedLightGlyphForeground(): string {
       .padStart(2, '0')
   })
   return '#' + hex.join('')
+}
+
+export function setIndexedGlyphLayer(terminal: Terminal, projection: HTMLElement | null): void {
+  const current = terminal.options.indexedGlyphLayer
+  if (current && current.element.parentElement === projection && projection) return
+  if (current) {
+    terminal.options.indexedGlyphLayer = null
+    current.element.remove()
+  }
+  if (!projection?.matches('.terminal-theme-projection[data-terminal-source-theme="dark"]')) return
+
+  const element = projection.ownerDocument.createElement('div')
+  element.className = 'terminal-indexed-glyph-layer'
+  element.setAttribute('aria-hidden', 'true')
+  projection.append(element)
+  const matrix = readTerminalThemeProjectionMatrix('dark')
+  terminal.options.indexedGlyphLayer = {
+    element,
+    white: canonicalTerminalPalettes.light.white,
+    brightWhite: canonicalTerminalPalettes.light.brightWhite,
+    projectBackground: (rgb) => {
+      const r = (rgb >>> 16) & 255
+      const g = (rgb >>> 8) & 255
+      const b = rgb & 255
+      const channel = (offset: number): number =>
+        Math.max(
+          0,
+          Math.min(
+            255,
+            Math.round(
+              matrix[offset]! * r +
+                matrix[offset + 1]! * g +
+                matrix[offset + 2]! * b +
+                matrix[offset + 4]! * 255
+            )
+          )
+        )
+      return (channel(0) << 16) | (channel(5) << 8) | channel(10)
+    }
+  }
 }
 
 function readRgb(color: string): readonly [number, number, number] {

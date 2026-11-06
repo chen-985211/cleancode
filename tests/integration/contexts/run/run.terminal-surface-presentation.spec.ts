@@ -5,6 +5,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import { createServer, type ViteDevServer } from 'vite'
 
 import type {} from '../../../fixtures/terminalSurfacePresentation'
+import type {} from '../../../fixtures/terminalIndexedGlyphs'
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { readProjectedLightGlyphForeground } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
@@ -22,6 +23,7 @@ beforeAll(async () => {
   await server.listen()
   application = await electron.launch({
     args: [
+      '--force-color-profile=srgb',
       join(process.cwd(), 'tests/fixtures/terminalRasterBrowser.mjs'),
       `--user-data-dir=${profile}`
     ]
@@ -392,3 +394,102 @@ async function restoreAndCheck(color: 'green' | 'blue' | 'unchanged', expected: 
   expect(firstFrame!.colors).toHaveLength(dimensions.rows)
   for (const pixel of firstFrame!.colors) expect(pixel).toEqual(expected)
 }
+
+it.each(['webgl', 'dom'])(
+  'matches native light for all 256 indexed foregrounds with %s',
+  async (renderer) => {
+    const mount = async (source: string) => {
+      await page.goto(
+        server!.resolvedUrls!.local[0] +
+          'tests/fixtures/terminalIndexedGlyphs.html?renderer=' +
+          renderer +
+          '&source=' +
+          source
+      )
+      await page.waitForFunction(() => Boolean(window.terminalIndexedFixture))
+    }
+    const capture = async () => {
+      const view = page.locator('[data-terminal-content-ready="true"]')
+      await view.waitFor()
+      expect(await view.getAttribute('data-terminal-renderer')).toBe(renderer)
+      const png = await view.locator('.xterm-screen').screenshot()
+      return page.evaluate(async (base64) => {
+        const im = new Image()
+        im.src = 'data:image/png;base64,' + base64
+        await im.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = im.naturalWidth
+        canvas.height = im.naturalHeight
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(im, 0, 0)
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+        const { rows, columns } = window.terminalIndexedFixture.dimensions()
+        const at = (x: number, y: number) => {
+          const i =
+            4 *
+            (Math.floor((y * canvas.height) / rows) * canvas.width +
+              Math.floor((x * canvas.width) / columns))
+          return data[i]! * 65536 + data[i + 1]! * 256 + data[i + 2]!
+        }
+        return {
+          grid: Array.from({ length: 256 }, (_, i) =>
+            at(3 * (i % 32) + 0.5, Math.floor(i / 32) + 0.5)
+          ),
+          control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5)]
+        }
+      }, png.toString('base64'))
+    }
+    const sample = async (background = false, custom = false, rgb?: number[]) => {
+      await page.evaluate(
+        ({ background, custom, rgb }) =>
+          window.terminalIndexedFixture.draw(background, custom, rgb),
+        { background, custom, rgb }
+      )
+      return capture()
+    }
+    await mount('light')
+    const native = await sample()
+    await mount('dark')
+    const dark = await sample()
+    await page.evaluate(() => window.terminalIndexedFixture.theme('light'))
+    await expect.poll(async () => (await capture()).grid).toEqual(native.grid)
+    const result = await capture()
+    const backgrounds = await sample(true)
+    expect((await sample(true, false, dark.grid)).grid).toEqual(backgrounds.grid)
+    expect((await sample(false, false, dark.grid)).grid).toEqual(backgrounds.grid)
+    expect(backgrounds.grid[0]).toBe(result.control[0])
+    expect(backgrounds.grid[1]).toBe(result.control[2])
+    const explicit = await sample(false, true)
+    expect(explicit.grid[9]).toBe((await sample(true, true)).grid[9])
+    expect(explicit.grid.filter((_, i) => i !== 9)).toEqual(native.grid.filter((_, i) => i !== 9))
+    expect(explicit.control).toEqual(result.control)
+    // Reset the live OSC override without replaying the buffer.
+    await page.evaluate(() => window.terminalIndexedFixture.write('\x1b]104;9\x07'))
+    await sample()
+    await page.evaluate(() => window.terminalIndexedFixture.write('\x1b]4;9;rgb:44/66/88\x07'))
+    await expect.poll(async () => (await capture()).grid[9]).toBe(explicit.grid[9])
+    await page.evaluate(() => window.terminalIndexedFixture.write('\x1b]104;9\x07'))
+    await expect.poll(async () => (await capture()).grid).toEqual(native.grid)
+    // Even assigning the original slot's RGB must opt out.
+    await page.evaluate(() => window.terminalIndexedFixture.write('\x1b]4;9;rgb:ef/29/29\x07'))
+    await expect.poll(async () => (await capture()).grid[9]).toBe(backgrounds.grid[9])
+    await page.evaluate(() =>
+      window.terminalIndexedFixture.write('\x1b]104;9\x07\x1b[H\x1b[38;5;9m██\x1b[0m')
+    )
+    await expect.poll(async () => (await capture()).grid[0]).toBe(native.grid[9])
+    await page.evaluate(() => window.terminalIndexedFixture.zoom(1.3))
+    const expected = native.grid.slice()
+    expected[0] = native.grid[9]!
+    await expect.poll(async () => (await capture()).grid).toEqual(expected)
+    await page.evaluate(() =>
+      window.terminalIndexedFixture.write('\x1b[999;1H' + '\r\n\x1b[38;5;4m██\x1b[0m'.repeat(50))
+    )
+    await expect.poll(async () => (await capture()).grid[0]).toBe(native.grid[4])
+    await page.evaluate(() => window.terminalIndexedFixture.readHistory())
+    await expect.poll(async () => (await capture()).grid).toEqual(expected)
+    await page.evaluate(() => window.terminalIndexedFixture.zoom(1))
+    await page.evaluate(() => window.terminalIndexedFixture.theme('dark'))
+    expect((await sample()).grid).toEqual(dark.grid)
+  },
+  30000
+)
