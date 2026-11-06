@@ -25,7 +25,8 @@ import {
   readCanonicalTerminalTheme,
   readProjectedLightGlyphForeground,
   readTerminalSourceTheme,
-  setProjectedGlyphLayer
+  setProjectedGlyphLayer,
+  type TerminalColorPair
 } from './terminalTheme'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
@@ -46,6 +47,7 @@ export function createTerminalXtermSurface(
 }
 
 class XtermTerminalSurface implements TerminalSurface {
+  private colorPairs?: readonly TerminalColorPair[]
   private readonly terminal: XTerm
   private readonly presentation: TerminalSurfacePresentation
   private restoreRevision = 0
@@ -224,6 +226,15 @@ class XtermTerminalSurface implements TerminalSurface {
     this.element = null
   }
 
+  setColorPairs(pairs?: readonly TerminalColorPair[]): void {
+    if (this.colorPairs === pairs) return
+    this.colorPairs = pairs
+    if (this.element) {
+      setProjectedGlyphLayer(this.terminal, null, this.terminalSourceTheme)
+      this.observeGlyphForeground(this.element.ownerDocument.documentElement)
+    }
+  }
+
   private observeGlyphForeground(root: HTMLElement): void {
     this.themeObserver?.disconnect()
     // Bare dark-source surfaces can still use the in-viewport foreground correction.
@@ -233,7 +244,8 @@ class XtermTerminalSurface implements TerminalSurface {
       setProjectedGlyphLayer(
         this.terminal,
         mismatch ? (this.element?.parentElement ?? null) : null,
-        this.terminalSourceTheme
+        this.terminalSourceTheme,
+        this.colorPairs
       )
       this.terminal.options.defaultGlyphForeground =
         mismatch && !this.terminal.options.indexedGlyphLayer ? fallback : ''

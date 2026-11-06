@@ -6,6 +6,7 @@ import { createServer, type ViteDevServer } from 'vite'
 
 import type {} from '../../../fixtures/terminalSurfacePresentation'
 import type {} from '../../../fixtures/terminalIndexedGlyphs'
+import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { readProjectedLightGlyphForeground } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
@@ -395,6 +396,48 @@ async function restoreAndCheck(color: 'green' | 'blue' | 'unchanged', expected: 
   for (const pixel of firstFrame!.colors) expect(pixel).toEqual(expected)
 }
 
+async function mountIndexedGlyphs(renderer: string, source: string) {
+  await page.goto(
+    server!.resolvedUrls!.local[0] +
+      'tests/fixtures/terminalIndexedGlyphs.html?renderer=' +
+      renderer +
+      '&source=' +
+      source
+  )
+  await page.waitForFunction(() => Boolean(window.terminalIndexedFixture))
+}
+
+async function captureIndexedGlyphs(renderer: string) {
+  const view = page.locator('[data-terminal-content-ready="true"]')
+  await view.waitFor()
+  expect(await view.getAttribute('data-terminal-renderer')).toBe(renderer)
+  const png = await view.locator('.xterm-screen').screenshot()
+  return page.evaluate(async (base64) => {
+    const im = new Image()
+    im.src = 'data:image/png;base64,' + base64
+    await im.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = im.naturalWidth
+    canvas.height = im.naturalHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(im, 0, 0)
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    const { rows, columns } = window.terminalIndexedFixture.dimensions()
+    const at = (x: number, y: number) => {
+      const i =
+        4 *
+        (Math.floor((y * canvas.height) / rows) * canvas.width +
+          Math.floor((x * canvas.width) / columns))
+      return data[i]! * 65536 + data[i + 1]! * 256 + data[i + 2]!
+    }
+    return {
+      grid: Array.from({ length: 256 }, (_, i) => at(3 * (i % 32) + 0.5, Math.floor(i / 32) + 0.5)),
+      defaults: [at(0.5, 9.5), at(3.5, 9.5), at(6.5, 9.5)],
+      control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5), at(9.5, 8.5)]
+    }
+  }, png.toString('base64'))
+}
+
 it.each([
   ['webgl', 'light', 'dark'],
   ['dom', 'light', 'dark'],
@@ -403,48 +446,8 @@ it.each([
 ] as const)(
   'matches native %s rendering for all 256 foregrounds switching from %s to %s',
   async (renderer, source, target) => {
-    const mount = async (source: string) => {
-      await page.goto(
-        server!.resolvedUrls!.local[0] +
-          'tests/fixtures/terminalIndexedGlyphs.html?renderer=' +
-          renderer +
-          '&source=' +
-          source
-      )
-      await page.waitForFunction(() => Boolean(window.terminalIndexedFixture))
-    }
-    const capture = async () => {
-      const view = page.locator('[data-terminal-content-ready="true"]')
-      await view.waitFor()
-      expect(await view.getAttribute('data-terminal-renderer')).toBe(renderer)
-      const png = await view.locator('.xterm-screen').screenshot()
-      return page.evaluate(async (base64) => {
-        const im = new Image()
-        im.src = 'data:image/png;base64,' + base64
-        await im.decode()
-        const canvas = document.createElement('canvas')
-        canvas.width = im.naturalWidth
-        canvas.height = im.naturalHeight
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(im, 0, 0)
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-        const { rows, columns } = window.terminalIndexedFixture.dimensions()
-        const at = (x: number, y: number) => {
-          const i =
-            4 *
-            (Math.floor((y * canvas.height) / rows) * canvas.width +
-              Math.floor((x * canvas.width) / columns))
-          return data[i]! * 65536 + data[i + 1]! * 256 + data[i + 2]!
-        }
-        return {
-          grid: Array.from({ length: 256 }, (_, i) =>
-            at(3 * (i % 32) + 0.5, Math.floor(i / 32) + 0.5)
-          ),
-          defaults: [at(0.5, 9.5), at(3.5, 9.5), at(6.5, 9.5)],
-          control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5), at(9.5, 8.5)]
-        }
-      }, png.toString('base64'))
-    }
+    const mount = (theme: string) => mountIndexedGlyphs(renderer, theme)
+    const capture = () => captureIndexedGlyphs(renderer)
     const sample = async (background = false, custom = false, rgb?: number[]) => {
       await page.evaluate(
         ({ background, custom, rgb }) =>
@@ -515,6 +518,113 @@ it.each([
     await page.evaluate(() => window.terminalIndexedFixture.zoom(1))
     await page.evaluate((theme) => window.terminalIndexedFixture.theme(theme), source)
     expect(await sample()).toEqual(original)
+  },
+  30000
+)
+
+// Real Codex SGR operands, sampled as solid glyphs in the same three-cell grid as the ANSI oracle.
+const agentColors = {
+  dark: {
+    composer: '58;61;64',
+    history: '67;70;72',
+    ink: [
+      '246;226;183',
+      '171;223;167',
+      '141;147;154',
+      '214;222;232',
+      '196;167;103',
+      '99;168;248',
+      '243;139;168'
+    ]
+  },
+  light: {
+    composer: '232;234;235',
+    history: '237;239;240',
+    ink: [
+      '150;101;33',
+      '59;126;44',
+      '106;112;124',
+      '55;63;80',
+      '139;98;20',
+      '28;100;200',
+      '210;15;57'
+    ]
+  }
+} as const
+
+function agentSampleLine(theme: keyof typeof agentColors): string {
+  const { composer, history, ink } = agentColors[theme]
+  return (
+    [
+      `\x1b[48;2;${composer}m  `,
+      `\x1b[2;48;2;${composer}m██`,
+      ...ink.map((rgb) => `\x1b[38;2;${rgb}m██`),
+      `\x1b[48;2;${history}m  `,
+      // These same RGB values in the opposite roles should still use the general filter.
+      `\x1b[38;2;${composer}m██`,
+      `\x1b[48;2;${ink[0]}m  `
+    ].join('\x1b[0m ') + '\x1b[0m'
+  )
+}
+
+it.each([
+  ['webgl', 'dark', 'light'],
+  ['dom', 'dark', 'light'],
+  ['webgl', 'light', 'dark'],
+  ['dom', 'light', 'dark']
+] as const)(
+  'paints existing and new Agent truecolor with %s from %s to %s',
+  async (renderer, source, target) => {
+    const pairs = new CodexAgentProviderContribution().descriptor.terminalColorPairs
+    const mount = async (theme: keyof typeof agentColors) => {
+      await mountIndexedGlyphs(renderer, theme)
+      await page.evaluate(
+        async ({ pairs, line }) => {
+          const f = window.terminalIndexedFixture
+          f.setColorPairs(pairs)
+          await f.draw()
+          // Keep a blank row before the first projected glyph to exercise overlay alignment.
+          await f.write('\x1b[2J\x1b[2;1H' + line)
+        },
+        { pairs, line: agentSampleLine(theme) }
+      )
+    }
+    const sample = async (row = 1) =>
+      (await captureIndexedGlyphs(renderer)).grid.slice(row * 32, row * 32 + 12)
+    await mount(target)
+    const native = await sample()
+    expect(new Set(native.slice(0, -2)).size).toBe(10)
+    await mount(source)
+    const original = await sample()
+    await page.evaluate((theme) => window.terminalIndexedFixture.theme(theme), target)
+    await expect
+      .poll(async () => {
+        const pixels = await sample()
+        return native.slice(0, -2).flatMap((expected, i) => {
+          // A half-opacity DOM glyph or a filtered RGB background may round by one byte.
+          const tolerance = i === 9 || (i === 1 && renderer === 'dom') ? 1 : 0
+          const observed = pixels[i]!
+          const differs = [0, 8, 16].some(
+            (shift) =>
+              Math.abs(((observed >>> shift) & 255) - ((expected >>> shift) & 255)) > tolerance
+          )
+          return differs ? [{ cell: i, expected, observed }] : []
+        })
+      })
+      .toEqual([])
+    const projected = await sample()
+    await page.evaluate(
+      (line) => window.terminalIndexedFixture.write('\x1b[3;1H' + line),
+      agentSampleLine(source)
+    )
+    await expect.poll(() => sample(2)).toEqual(projected)
+    await page.evaluate(() => window.terminalIndexedFixture.setColorPairs([]))
+    await expect.poll(async () => (await sample()).slice(0, -2)).not.toEqual(projected.slice(0, -2))
+    expect((await sample()).slice(-2)).toEqual(projected.slice(-2))
+    await page.evaluate((p) => window.terminalIndexedFixture.setColorPairs(p), pairs)
+    await expect.poll(() => sample()).toEqual(projected)
+    await page.evaluate((theme) => window.terminalIndexedFixture.theme(theme), source)
+    await expect.poll(() => sample()).toEqual(original)
   },
   30000
 )

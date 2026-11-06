@@ -8,6 +8,8 @@ import {
   restoreTerminalViewWithRetry
 } from '../../../contexts/run/presentation/terminal-surface/terminalViewAttachment'
 import { createTerminalXtermSurface } from '../../../contexts/run/presentation/terminal-surface/terminalXtermSurface'
+import type { TerminalColorPair } from '../../../contexts/run/presentation/terminal-surface/terminalTheme'
+import type { TerminalSurface } from '../../../contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { useTerminalSurfaceRegistry } from '../../../contexts/run/presentation/terminal-surface/useTerminalSurfaceRegistry'
 import type { AgentTerminalMeasurement } from '../workbench/nodes/agent/agentConsoleModel'
 import type { TerminalDimensions } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
@@ -16,12 +18,14 @@ const terminalInputBatchWindowMs = 16
 
 export function useAgentTerminalView({
   dimensionsRef,
+  colorPairs,
   enabled,
   session,
   terminalElementRef,
   workspaceKey,
   onDimensionsChange
 }: {
+  readonly colorPairs?: readonly TerminalColorPair[]
   readonly dimensionsRef: MutableRefObject<AgentTerminalMeasurement | null>
   readonly enabled: boolean
   readonly session: AgentSessionSnapshot | null
@@ -29,6 +33,7 @@ export function useAgentTerminalView({
   readonly workspaceKey: string | null
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
 }): void {
+  const activeSurface = useRef<TerminalSurface | null>(null)
   const surfaceRegistry = useTerminalSurfaceRegistry()
   const identity = session?.runtime.terminal.viewIdentity
   const runtimeSessionId = session?.sessionId ?? null
@@ -75,6 +80,7 @@ export function useAgentTerminalView({
       createTerminalXtermSurface(terminalSourceTheme)
     )
     const surface = lease.surface
+    activeSurface.current = surface
     let isReleased = false
     let hasAttachedView = Boolean(lease.retained)
     let restoreTail = Promise.resolve()
@@ -148,6 +154,7 @@ export function useAgentTerminalView({
     if (!lease.retained) requestRestore()
 
     return () => {
+      activeSurface.current = null
       isReleased = true
       if (inputTimer !== null) window.clearTimeout(inputTimer)
       pendingInput = ''
@@ -181,4 +188,9 @@ export function useAgentTerminalView({
     terminalSourceTheme,
     workspaceKey
   ])
+
+  // Descriptor discovery can finish after attach. Update colors without renewing the lease.
+  useLayoutEffect(() => {
+    activeSurface.current?.setColorPairs?.(colorPairs)
+  })
 }

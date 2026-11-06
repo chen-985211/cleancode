@@ -36,6 +36,26 @@ describe('Agent Provider registry', () => {
     })
   })
 
+  it.each([
+    [{ role: 'foreground', dark: 0x1000000, light: 0 }],
+    [{ role: 'background', dark: 0, light: -1 }],
+    [
+      { role: 'foreground', dark: 1, light: 2 },
+      { role: 'foreground', dark: 3, light: 2 }
+    ]
+  ] as const)('rejects invalid or ambiguous truecolor declarations', (...terminalColorPairs) => {
+    const provider = createContribution('fixture-provider')
+    expect(
+      () =>
+        new AgentProviderRegistry([
+          {
+            ...provider,
+            descriptor: { ...provider.descriptor, terminalColorPairs }
+          }
+        ])
+    ).toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_INVALID' }))
+  })
+
   it('accepts safe gradients and transforms in a vector Provider icon', () => {
     const contribution = createContribution('fixture-provider')
     const icon = {

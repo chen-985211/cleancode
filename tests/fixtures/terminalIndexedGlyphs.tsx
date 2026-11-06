@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import '@xterm/xterm/css/xterm.css'
 import '../../src/presentation/app-shell/shell/AppShell.css'
 import { TerminalThemeProjection } from '../../src/contexts/run/presentation/components/TerminalThemeProjection'
+import type { TerminalColorPair } from '../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 import { createTerminalXtermSurface } from '../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { applyEffectiveTheme } from '../../src/presentation/app-shell/app-features/settings/themePreference'
 
@@ -48,6 +49,7 @@ const identity = {
   gitBranch: 'main'
 }
 const fixture = {
+  setColorPairs: (pairs: readonly TerminalColorPair[]) => surface.setColorPairs?.(pairs),
   theme: (value: 'light' | 'dark') => applyEffectiveTheme(value),
   dimensions: () => dimensions,
   zoom: (scale: number) => {
