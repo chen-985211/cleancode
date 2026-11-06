@@ -395,9 +395,14 @@ async function restoreAndCheck(color: 'green' | 'blue' | 'unchanged', expected: 
   for (const pixel of firstFrame!.colors) expect(pixel).toEqual(expected)
 }
 
-it.each(['webgl', 'dom'])(
-  'matches native light for all 256 indexed foregrounds with %s',
-  async (renderer) => {
+it.each([
+  ['webgl', 'light', 'dark'],
+  ['dom', 'light', 'dark'],
+  ['webgl', 'dark', 'light'],
+  ['dom', 'dark', 'light']
+] as const)(
+  'matches native %s rendering for all 256 foregrounds switching from %s to %s',
+  async (renderer, source, target) => {
     const mount = async (source: string) => {
       await page.goto(
         server!.resolvedUrls!.local[0] +
@@ -435,7 +440,8 @@ it.each(['webgl', 'dom'])(
           grid: Array.from({ length: 256 }, (_, i) =>
             at(3 * (i % 32) + 0.5, Math.floor(i / 32) + 0.5)
           ),
-          control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5)]
+          defaults: [at(0.5, 9.5), at(3.5, 9.5), at(6.5, 9.5)],
+          control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5), at(9.5, 8.5)]
         }
       }, png.toString('base64'))
     }
@@ -447,18 +453,37 @@ it.each(['webgl', 'dom'])(
       )
       return capture()
     }
-    await mount('light')
+    await mount(target)
     const native = await sample()
-    await mount('dark')
-    const dark = await sample()
-    await page.evaluate(() => window.terminalIndexedFixture.theme('light'))
+    await mount(source)
+    const original = await sample()
+    await page.evaluate((theme) => window.terminalIndexedFixture.theme(theme), target)
     await expect.poll(async () => (await capture()).grid).toEqual(native.grid)
     const result = await capture()
+    expect(result.defaults.slice(0, 2)).toEqual(native.defaults.slice(0, 2))
+    // A transparent DOM layer can round dim (half-opacity) text one sRGB level differently.
+    for (const shift of [0, 8, 16]) {
+      const observed = (result.defaults[2]! >> shift) & 255
+      const expected = (native.defaults[2]! >> shift) & 255
+      expect(Math.abs(observed - expected)).toBeLessThanOrEqual(renderer === 'dom' ? 1 : 0)
+    }
     const backgrounds = await sample(true)
-    expect((await sample(true, false, dark.grid)).grid).toEqual(backgrounds.grid)
-    expect((await sample(false, false, dark.grid)).grid).toEqual(backgrounds.grid)
+    expect((await sample(true, false, original.grid)).grid).toEqual(backgrounds.grid)
+    expect((await sample(false, false, original.grid)).grid).toEqual(backgrounds.grid)
     expect(backgrounds.grid[0]).toBe(result.control[0])
     expect(backgrounds.grid[1]).toBe(result.control[2])
+    // OSC 10 overrides even a default-matching RGB. OSC 110 restores ordinary text.
+    const sourceForeground = canonicalTerminalPalettes[source].foreground
+      .slice(1)
+      .match(/../gu)!
+      .join('/')
+    await page.evaluate(
+      (rgb) => window.terminalIndexedFixture.write('\x1b]10;rgb:' + rgb + '\x07'),
+      sourceForeground
+    )
+    await expect.poll(async () => (await capture()).defaults[0]).toBe(result.control[3])
+    await page.evaluate(() => window.terminalIndexedFixture.write('\x1b]110;\x07'))
+    await expect.poll(async () => (await capture()).defaults).toEqual(result.defaults)
     const explicit = await sample(false, true)
     expect(explicit.grid[9]).toBe((await sample(true, true)).grid[9])
     expect(explicit.grid.filter((_, i) => i !== 9)).toEqual(native.grid.filter((_, i) => i !== 9))
@@ -488,8 +513,8 @@ it.each(['webgl', 'dom'])(
     await page.evaluate(() => window.terminalIndexedFixture.readHistory())
     await expect.poll(async () => (await capture()).grid).toEqual(expected)
     await page.evaluate(() => window.terminalIndexedFixture.zoom(1))
-    await page.evaluate(() => window.terminalIndexedFixture.theme('dark'))
-    expect((await sample()).grid).toEqual(dark.grid)
+    await page.evaluate((theme) => window.terminalIndexedFixture.theme(theme), source)
+    expect(await sample()).toEqual(original)
   },
   30000
 )

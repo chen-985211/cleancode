@@ -1,3 +1,4 @@
+import { canonicalTerminalPalettes } from '../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { createRef } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
@@ -84,11 +85,19 @@ const fixture = {
       }).join('')
     )
     lines[0] += 'history-anchor'
+    const sourceRgb = canonicalTerminalPalettes[source].foreground
+      .slice(1)
+      .match(/../gu)!
+      .map((channel) => parseInt(channel, 16))
+      .join(';')
     const content =
       '\x1b[?25l' +
       (custom ? '\x1b]4;9;rgb:44/66/88\x07' : '\x1b]104;9\x07') +
       lines.join('\r\n') +
-      '\r\n\x1b[38;2;46;52;54m██\x1b[0m \x1b[48;2;58;61;64m  \x1b[0m \x1b[7;31m  \x1b[0m\r\n\x1b[31m中文 Red\x1b[1;32m 粗体 Bold\x1b[0m'
+      '\r\n\x1b[38;2;46;52;54m██\x1b[0m \x1b[48;2;58;61;64m  \x1b[0m \x1b[7;31m  \x1b[0m ' +
+      '\x1b[38;2;' +
+      sourceRgb +
+      'm██\x1b[0m\r\n██ \x1b[1m██\x1b[0m \x1b[2m██\x1b[0m\r\n\x1b[31m中文 Red\x1b[1;32m 粗体 Bold\x1b[0m'
     await surface.restore({
       identity,
       sequence: ++sequence,

@@ -25,7 +25,7 @@ import {
   readCanonicalTerminalTheme,
   readProjectedLightGlyphForeground,
   readTerminalSourceTheme,
-  setIndexedGlyphLayer
+  setProjectedGlyphLayer
 } from './terminalTheme'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
@@ -218,20 +218,25 @@ class XtermTerminalSurface implements TerminalSurface {
     this.resizeObserver = null
     this.themeObserver?.disconnect()
     this.themeObserver = null
-    setIndexedGlyphLayer(this.terminal, null)
+    setProjectedGlyphLayer(this.terminal, null, this.terminalSourceTheme)
     this.xtermRasterTarget.detach(element)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
   }
 
   private observeGlyphForeground(root: HTMLElement): void {
-    if (this.terminalSourceTheme !== 'dark') return
     this.themeObserver?.disconnect()
-    const projectedForeground = readProjectedLightGlyphForeground()
+    // Bare dark-source surfaces can still use the in-viewport foreground correction.
+    const fallback = this.terminalSourceTheme === 'dark' ? readProjectedLightGlyphForeground() : ''
     const update = (): void => {
-      const light = readTerminalSourceTheme(root) === 'light'
-      this.terminal.options.defaultGlyphForeground = light ? projectedForeground : ''
-      setIndexedGlyphLayer(this.terminal, light ? (this.element?.parentElement ?? null) : null)
+      const mismatch = readTerminalSourceTheme(root) !== this.terminalSourceTheme
+      setProjectedGlyphLayer(
+        this.terminal,
+        mismatch ? (this.element?.parentElement ?? null) : null,
+        this.terminalSourceTheme
+      )
+      this.terminal.options.defaultGlyphForeground =
+        mismatch && !this.terminal.options.indexedGlyphLayer ? fallback : ''
     }
     update()
     this.themeObserver = new MutationObserver(update)

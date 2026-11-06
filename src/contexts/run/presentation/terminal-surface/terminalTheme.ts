@@ -93,24 +93,33 @@ export function readProjectedLightGlyphForeground(): string {
   return '#' + hex.join('')
 }
 
-export function setIndexedGlyphLayer(terminal: Terminal, projection: HTMLElement | null): void {
+export function setProjectedGlyphLayer(
+  terminal: Terminal,
+  projection: HTMLElement | null,
+  sourceTheme: TerminalSourceTheme
+): void {
   const current = terminal.options.indexedGlyphLayer
   if (current && current.element.parentElement === projection && projection) return
   if (current) {
     terminal.options.indexedGlyphLayer = null
     current.element.remove()
   }
-  if (!projection?.matches('.terminal-theme-projection[data-terminal-source-theme="dark"]')) return
+  if (
+    !projection?.matches(`.terminal-theme-projection[data-terminal-source-theme="${sourceTheme}"]`)
+  )
+    return
 
   const element = projection.ownerDocument.createElement('div')
   element.className = 'terminal-indexed-glyph-layer'
   element.setAttribute('aria-hidden', 'true')
   projection.append(element)
-  const matrix = readTerminalThemeProjectionMatrix('dark')
+  const matrix = readTerminalThemeProjectionMatrix(sourceTheme)
+  const target = readCanonicalTerminalTheme(sourceTheme === 'dark' ? 'light' : 'dark')
   terminal.options.indexedGlyphLayer = {
     element,
-    white: canonicalTerminalPalettes.light.white,
-    brightWhite: canonicalTerminalPalettes.light.brightWhite,
+    foreground: target.foreground,
+    white: target.white,
+    brightWhite: target.brightWhite,
     projectBackground: (rgb) => {
       const r = (rgb >>> 16) & 255
       const g = (rgb >>> 8) & 255
