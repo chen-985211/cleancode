@@ -1,10 +1,17 @@
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import {
   readCanonicalTerminalTheme,
+  readProjectedLightGlyphForeground,
   readTerminalThemeProjectionMatrix
 } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
 describe('terminal theme palette', () => {
+  it('projects default glyphs from a dark source to the native light foreground', () => {
+    expect(
+      projectColor(readProjectedLightGlyphForeground(), readTerminalThemeProjectionMatrix('dark'))
+    ).toBe(canonicalTerminalPalettes.light.foreground)
+  })
+
   it.each(['light', 'dark'] as const)(
     'maps the %s source background to the opposite theme background',
     (theme) => {

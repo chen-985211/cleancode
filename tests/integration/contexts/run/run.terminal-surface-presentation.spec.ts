@@ -5,6 +5,8 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import { createServer, type ViteDevServer } from 'vite'
 
 import type {} from '../../../fixtures/terminalSurfacePresentation'
+import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
+import { readProjectedLightGlyphForeground } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
 
 let application: ElectronApplication | undefined
 let server: ViteDevServer | undefined
@@ -205,6 +207,87 @@ it('switches retained mounts with no replay or blank frame, including hidden out
   for (const pixel of resizedFrame!.colors) expect(pixel).toEqual([0, 0, 192, 255])
   await page.evaluate(() => window.terminalPresentationFixture.dispose())
 }, 30_000)
+
+it.each(['webgl', 'dom'])(
+  'only compensates default glyphs in a dark-source %s surface',
+  async (renderer) => {
+    await page.goto(
+      `${server!.resolvedUrls!.local[0]}tests/fixtures/terminalSurfacePresentation.html?renderer=${renderer}`
+    )
+    await page.waitForFunction(() => Boolean(window.terminalPresentationFixture))
+    const dimensions = await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark'
+      window.terminalPresentationFixture.mount()
+      return window.terminalPresentationFixture.state().dimensions
+    })
+    const native = canonicalTerminalPalettes.dark.foreground
+    const projected = readProjectedLightGlyphForeground()
+    const channels = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16))
+    // The first row uses default foreground. The second specifies the identical RGB.
+    const sample = `\x1b[?25l\x1b[0m████\r\n\x1b[38;2;${channels(native).join(';')}m████`
+    const restore = (data: string) =>
+      page.evaluate((content) => window.terminalPresentationFixture.restoreContent(content), data)
+    const expectGlyphs = async (first: string) => {
+      const screen = page.locator('#terminal .xterm-screen')
+      await expect
+        .poll(
+          async () => {
+            const png = await screen.screenshot()
+            return page.evaluate(
+              async ({ png, dimensions, expected }) => {
+                const image = new Image()
+                image.src = `data:image/png;base64,${png}`
+                await image.decode()
+                const canvas = document.createElement('canvas')
+                canvas.width = image.naturalWidth
+                canvas.height = image.naturalHeight
+                const context = canvas.getContext('2d')!
+                context.drawImage(image, 0, 0)
+                return Math.max(
+                  ...expected.flatMap((rgb, row) => {
+                    const x = Math.floor((1.5 * canvas.width) / dimensions.columns)
+                    const y = Math.floor(((row + 0.5) * canvas.height) / dimensions.rows)
+                    const pixel = context.getImageData(x, y, 1, 1).data
+                    return rgb.map((v, i) => Math.abs(v - pixel[i]!))
+                  })
+                )
+              },
+              {
+                png: png.toString('base64'),
+                dimensions,
+                expected: [channels(first), channels(native)]
+              }
+            )
+          },
+          { timeout: 5000 }
+        )
+        .toBeLessThanOrEqual(2)
+    }
+    try {
+      await restore(sample)
+      await expectGlyphs(native)
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = 'light'
+      })
+      await expectGlyphs(projected)
+      await restore(
+        `\x1b]10;rgb:${channels(native)
+          .map((c) => c.toString(16))
+          .join('/')}\x07${sample}`
+      )
+      await expectGlyphs(native)
+      await restore(`\x1b]110;\x07${sample}`)
+      await expectGlyphs(projected)
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = 'dark'
+      })
+      await expectGlyphs(native)
+    } finally {
+      await page.evaluate(() => window.terminalPresentationFixture.dispose())
+    }
+  },
+  30_000
+)
 
 async function expectHidden() {
   expect(await page.evaluate(() => window.terminalPresentationFixture.state())).toMatchObject({

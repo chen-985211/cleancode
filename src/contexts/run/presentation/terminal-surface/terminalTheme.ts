@@ -3,6 +3,13 @@ import type { ITheme } from '@xterm/xterm'
 import { canonicalTerminalPalettes } from '../../application/dto/TerminalPalette.generated'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
+// The sRGB hue-rotate(180deg) matrix from Filter Effects §13.1.4.
+const halfTurnHueMatrix = [
+  [-0.574, 1.43, 0.144],
+  [0.426, 0.43, 0.144],
+  [0.426, 1.43, -0.856]
+] as const
+
 export function readCanonicalTerminalSearchTheme(theme: TerminalSourceTheme): {
   readonly active: string
   readonly border: string
@@ -53,13 +60,7 @@ export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceThe
   const targetTheme = sourceTheme === 'light' ? 'dark' : 'light'
   const source = readRgb(canonicalTerminalPalettes[sourceTheme].background)
   const target = readRgb(canonicalTerminalPalettes[targetTheme].background)
-  // The sRGB hue-rotate(180deg) matrix from Filter Effects §13.1.4.
-  const hueRows = [
-    [-0.574, 1.43, 0.144],
-    [0.426, 0.43, 0.144],
-    [0.426, 1.43, -0.856]
-  ]
-  const rows = hueRows.flatMap((hueRow, channel) => {
+  const rows = halfTurnHueMatrix.flatMap((hueRow, channel) => {
     const invertedBackground = hueRow.reduce(
       (sum, coefficient, index) => sum + coefficient * (1 - source[index]!),
       0
@@ -75,6 +76,21 @@ export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceThe
   })
 
   return [...rows, 0, 0, 0, 1, 0]
+}
+
+export function readProjectedLightGlyphForeground(): string {
+  const projection = readTerminalThemeProjectionMatrix('dark')
+  const target = readRgb(canonicalTerminalPalettes.light.foreground)
+  // Dark → light applies gain * (1 - hue(rgb)). Undo the gain and inversion,
+  // then undo the hue rotation with the same half-turn.
+  const rotated = target.map((channel, i) => 1 - channel / projection[i * 5 + 4]!)
+  const hex = halfTurnHueMatrix.map((row) => {
+    const channel = row.reduce((sum, coefficient, i) => sum + coefficient * rotated[i]!, 0)
+    return Math.round(Math.max(0, Math.min(1, channel)) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  })
+  return '#' + hex.join('')
 }
 
 function readRgb(color: string): readonly [number, number, number] {

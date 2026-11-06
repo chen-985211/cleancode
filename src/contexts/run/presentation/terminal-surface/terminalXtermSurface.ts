@@ -23,6 +23,7 @@ import type {
 import {
   readCanonicalTerminalSearchTheme,
   readCanonicalTerminalTheme,
+  readProjectedLightGlyphForeground,
   readTerminalSourceTheme
 } from './terminalTheme'
 import { TerminalRendererController } from './terminalRendererController'
@@ -85,6 +86,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private element: HTMLDivElement | null = null
   private retainedHost: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
+  private themeObserver: MutationObserver | null = null
   private dataSubscription: IDisposable | null = null
   private searchSubscription: IDisposable | null = null
   private fileLinkProviderSubscription: IDisposable | null = null
@@ -162,6 +164,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.presentationSequence = this.lastQueuedSequence
     this.presentation.attach(attachment.element, resume)
     this.element = attachment.element
+    this.observeGlyphForeground(attachment.element.ownerDocument.documentElement)
     this.xtermRasterTarget.attach(attachment.element)
     this.element.dataset.terminalRenderer = this.rendererController.state
     this.element.dataset.terminalRendererReady = String(this.isRendererActivationSettled)
@@ -212,9 +215,24 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    this.themeObserver?.disconnect()
+    this.themeObserver = null
     this.xtermRasterTarget.detach(element)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
+  }
+
+  private observeGlyphForeground(root: HTMLElement): void {
+    if (this.terminalSourceTheme !== 'dark') return
+    this.themeObserver?.disconnect()
+    const projectedForeground = readProjectedLightGlyphForeground()
+    const update = (): void => {
+      this.terminal.options.defaultGlyphForeground =
+        readTerminalSourceTheme(root) === 'light' ? projectedForeground : ''
+    }
+    update()
+    this.themeObserver = new MutationObserver(update)
+    this.themeObserver.observe(root, { attributes: true, attributeFilter: ['data-theme'] })
   }
 
   readonly focus = (): void => {

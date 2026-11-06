@@ -191,6 +191,11 @@ async function restore(color: 'green' | 'blue' | 'unchanged') {
 
 const fixture = {
   mount,
+  restoreContent: (data: string) => {
+    content = data
+    sequence += 1
+    return restore('unchanged')
+  },
   startContinuousOutput: (priority: 'focused' | 'visible') => {
     stopContinuousOutput?.()
     continuousOutputBatches = 0
