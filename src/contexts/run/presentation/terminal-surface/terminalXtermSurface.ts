@@ -23,11 +23,10 @@ import type {
 import {
   readCanonicalTerminalSearchTheme,
   readCanonicalTerminalTheme,
-  readProjectedLightGlyphForeground,
   readTerminalSourceTheme,
-  setProjectedGlyphLayer,
   type TerminalColorPair
 } from './terminalTheme'
+import { TerminalProjectionFrames } from './terminalProjectionFrames'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'
@@ -47,7 +46,7 @@ export function createTerminalXtermSurface(
 }
 
 class XtermTerminalSurface implements TerminalSurface {
-  private colorPairs?: readonly TerminalColorPair[]
+  private readonly projectionFrames: TerminalProjectionFrames
   private readonly terminal: XTerm
   private readonly presentation: TerminalSurfacePresentation
   private restoreRevision = 0
@@ -89,7 +88,6 @@ class XtermTerminalSurface implements TerminalSurface {
   private element: HTMLDivElement | null = null
   private retainedHost: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
-  private themeObserver: MutationObserver | null = null
   private dataSubscription: IDisposable | null = null
   private searchSubscription: IDisposable | null = null
   private fileLinkProviderSubscription: IDisposable | null = null
@@ -137,6 +135,11 @@ class XtermTerminalSurface implements TerminalSurface {
       scrollback: terminalSurfaceScrollbackRows,
       theme: readCanonicalTerminalTheme(terminalSourceTheme)
     })
+    this.projectionFrames = new TerminalProjectionFrames(
+      this.terminal,
+      terminalSourceTheme,
+      this.xtermRasterTarget.setProjectionBitmapAllocated
+    )
     this.presentation = new TerminalSurfacePresentation(this.terminal)
     this.terminal.loadAddon(this.fitAddon)
     this.terminal.loadAddon(this.searchAddon)
@@ -167,7 +170,6 @@ class XtermTerminalSurface implements TerminalSurface {
     this.presentationSequence = this.lastQueuedSequence
     this.presentation.attach(attachment.element, resume)
     this.element = attachment.element
-    this.observeGlyphForeground(attachment.element.ownerDocument.documentElement)
     this.xtermRasterTarget.attach(attachment.element)
     this.element.dataset.terminalRenderer = this.rendererController.state
     this.element.dataset.terminalRendererReady = String(this.isRendererActivationSettled)
@@ -198,6 +200,7 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.terminal.element) attachment.element.append(this.terminal.element)
     }
 
+    this.projectionFrames.attach(attachment.element)
     this.retainedHost?.remove()
     this.retainedHost = null
     if (!resume || !this.isOutputSettled()) this.presentation.conceal()
@@ -218,41 +221,14 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
-    this.themeObserver?.disconnect()
-    this.themeObserver = null
-    setProjectedGlyphLayer(this.terminal, null, this.terminalSourceTheme)
+    this.projectionFrames.detach()
     this.xtermRasterTarget.detach(element)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
   }
 
   setColorPairs(pairs?: readonly TerminalColorPair[]): void {
-    if (this.colorPairs === pairs) return
-    this.colorPairs = pairs
-    if (this.element) {
-      setProjectedGlyphLayer(this.terminal, null, this.terminalSourceTheme)
-      this.observeGlyphForeground(this.element.ownerDocument.documentElement)
-    }
-  }
-
-  private observeGlyphForeground(root: HTMLElement): void {
-    this.themeObserver?.disconnect()
-    // Bare dark-source surfaces can still use the in-viewport foreground correction.
-    const fallback = this.terminalSourceTheme === 'dark' ? readProjectedLightGlyphForeground() : ''
-    const update = (): void => {
-      const mismatch = readTerminalSourceTheme(root) !== this.terminalSourceTheme
-      setProjectedGlyphLayer(
-        this.terminal,
-        mismatch ? (this.element?.parentElement ?? null) : null,
-        this.terminalSourceTheme,
-        this.colorPairs
-      )
-      this.terminal.options.defaultGlyphForeground =
-        mismatch && !this.terminal.options.indexedGlyphLayer ? fallback : ''
-    }
-    update()
-    this.themeObserver = new MutationObserver(update)
-    this.themeObserver.observe(root, { attributes: true, attributeFilter: ['data-theme'] })
+    this.projectionFrames.setColorPairs(pairs)
   }
 
   readonly focus = (): void => {

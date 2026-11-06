@@ -122,37 +122,31 @@ function unprojectTerminalRgb(rgb: number, matrix: readonly number[]): number {
   return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)
 }
 
-export function setProjectedGlyphLayer(
-  terminal: Terminal,
-  projection: HTMLElement | null,
+export function createProjectedGlyphLayer(
+  element: HTMLElement,
   sourceTheme: TerminalSourceTheme,
+  onBitmapChange: (allocated: boolean) => void,
   colorPairs?: readonly TerminalColorPair[]
-): void {
-  const current = terminal.options.indexedGlyphLayer
-  if (current && current.element.parentElement === projection && projection) return
-  if (current) {
-    terminal.options.indexedGlyphLayer = null
-    current.element.remove()
-  }
-  if (
-    !projection?.matches(`.terminal-theme-projection[data-terminal-source-theme="${sourceTheme}"]`)
-  )
-    return
-
-  const element = projection.ownerDocument.createElement('div')
-  element.className = 'terminal-indexed-glyph-layer'
-  element.setAttribute('aria-hidden', 'true')
-  projection.append(element)
+): NonNullable<Terminal['options']['indexedGlyphLayer']> {
   const matrix = readTerminalThemeProjectionMatrix(sourceTheme)
   const other = sourceTheme === 'dark' ? 'light' : 'dark'
   const target = readCanonicalTerminalTheme(other)
   const rgbForeground = new Map<number, number>()
   const rgbBackground = new Map<number, number>()
+  const directBackground = new Map<number, number>()
   for (const pair of colorPairs ?? []) {
     if (pair.role === 'foreground') rgbForeground.set(pair[sourceTheme], pair[other])
-    else rgbBackground.set(pair[sourceTheme], unprojectTerminalRgb(pair[other], matrix))
+    else {
+      const paint = unprojectTerminalRgb(pair[other], matrix)
+      rgbBackground.set(pair[sourceTheme], paint)
+      if (projectTerminalRgb(paint, matrix) !== pair[other]) {
+        directBackground.set(pair[sourceTheme], pair[other])
+      }
+    }
   }
-  terminal.options.indexedGlyphLayer = {
+  return {
+    directBackground,
+    onBitmapChange,
     element,
     rgbForeground,
     rgbBackground,

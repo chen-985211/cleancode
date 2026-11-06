@@ -79,7 +79,10 @@ async function restoreContent(content: string): Promise<void> {
     }
   })
 }
+let costChanges = 0
+surface.rasterTarget?.onRasterCostChange?.(() => costChanges++)
 const fixture = {
+  raster: () => ({ cost: surface.rasterTarget!.getRasterCost(1), changes: costChanges }),
   restoreContent,
   input: () => [...input],
   setColorPairs: (pairs: readonly TerminalColorPair[]) => surface.setColorPairs?.(pairs),

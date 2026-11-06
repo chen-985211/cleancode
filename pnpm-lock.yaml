@@ -6,10 +6,10 @@ settings:
 
 patchedDependencies:
   '@xterm/addon-webgl@0.19.0':
-    hash: a8d406e3cdcc3f4aa72ceb618a21a15e12ee6588686c956b5d4506aa20b8efc1
+    hash: 7655793215359c3054b81cf8ed5c2ad1b1b2c851b9ec8405958843f25931e1eb
     path: patches/@xterm__addon-webgl@0.19.0.patch
   '@xterm/xterm@6.0.0':
-    hash: d0696d0233b195dd7353e16977d653c34275da1cd7951f32d51c814340f4a587
+    hash: c761b9c3277a4470453b5b95586e535f1703d0382018f5095fd10fe4c48eb620
     path: patches/@xterm__xterm@6.0.0.patch
   node-pty@1.1.0:
     hash: cd22b37e3ea1792204d1a9ef5546ba8e21ba70167ae6e35c67b4774ba5c54bd2
@@ -42,13 +42,13 @@ importers:
         version: 0.12.0
       '@xterm/addon-webgl':
         specifier: 0.19.0
-        version: 0.19.0(patch_hash=a8d406e3cdcc3f4aa72ceb618a21a15e12ee6588686c956b5d4506aa20b8efc1)
+        version: 0.19.0(patch_hash=7655793215359c3054b81cf8ed5c2ad1b1b2c851b9ec8405958843f25931e1eb)
       '@xterm/headless':
         specifier: 6.0.0
         version: 6.0.0
       '@xterm/xterm':
         specifier: 6.0.0
-        version: 6.0.0(patch_hash=d0696d0233b195dd7353e16977d653c34275da1cd7951f32d51c814340f4a587)
+        version: 6.0.0(patch_hash=c761b9c3277a4470453b5b95586e535f1703d0382018f5095fd10fe4c48eb620)
       '@xyflow/react':
         specifier: 12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -5502,11 +5502,11 @@ snapshots:
 
   '@xterm/addon-web-links@0.12.0': {}
 
-  '@xterm/addon-webgl@0.19.0(patch_hash=a8d406e3cdcc3f4aa72ceb618a21a15e12ee6588686c956b5d4506aa20b8efc1)': {}
+  '@xterm/addon-webgl@0.19.0(patch_hash=7655793215359c3054b81cf8ed5c2ad1b1b2c851b9ec8405958843f25931e1eb)': {}
 
   '@xterm/headless@6.0.0': {}
 
-  '@xterm/xterm@6.0.0(patch_hash=d0696d0233b195dd7353e16977d653c34275da1cd7951f32d51c814340f4a587)': {}
+  '@xterm/xterm@6.0.0(patch_hash=c761b9c3277a4470453b5b95586e535f1703d0382018f5095fd10fe4c48eb620)': {}
 
   '@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:

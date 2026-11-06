@@ -13,6 +13,7 @@ export class TerminalXtermRasterTarget {
   private priority: 'focused' | 'visible' | 'hidden' = 'hidden'
   private rasterGeometry: RasterGeometry | null = null
   private scale: TerminalRasterScale = 1
+  private projectionBitmapAllocated = false
   private readonly costListeners = new Set<() => void>()
   private readonly priorityListeners = new Set<() => void>()
 
@@ -92,6 +93,12 @@ export class TerminalXtermRasterTarget {
     this.updateRasterGeometry(null)
   }
 
+  readonly setProjectionBitmapAllocated = (allocated: boolean): void => {
+    if (this.projectionBitmapAllocated === allocated) return
+    this.projectionBitmapAllocated = allocated
+    for (const listener of this.costListeners) listener()
+  }
+
   private setScale(scale: TerminalRasterScale): void {
     if (scale === this.scale) return
     this.applyScale(scale)
@@ -159,7 +166,7 @@ export class TerminalXtermRasterTarget {
     if (!geometry) return 0
     const width = Math.ceil(geometry.width * geometry.devicePixelRatio * scale)
     const height = Math.ceil(geometry.height * geometry.devicePixelRatio * scale)
-    return width * height
+    return width * height * (this.projectionBitmapAllocated ? 2 : 1)
   }
 }
 

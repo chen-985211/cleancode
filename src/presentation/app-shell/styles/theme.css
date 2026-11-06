@@ -557,11 +557,19 @@
   --cc-terminal-bright-white: var(--cc-terminal-dark-bright-white);
 }
 
-:root[data-theme='dark']
-  .terminal-theme-projection[data-terminal-source-theme='light']
-  > :is(.agent-terminal-viewport, .terminal-viewport),
-:root[data-theme='light']
-  .terminal-theme-projection[data-terminal-source-theme='dark']
+.terminal-theme-projection[data-terminal-projected='false'] {
+  --cc-terminal-projection-background: var(--cc-terminal-background);
+}
+
+.terminal-theme-projection[data-terminal-projected='true'][data-terminal-source-theme='dark'] {
+  --cc-terminal-projection-background: var(--cc-terminal-light-background);
+}
+
+.terminal-theme-projection[data-terminal-projected='true'][data-terminal-source-theme='light'] {
+  --cc-terminal-projection-background: var(--cc-terminal-dark-background);
+}
+
+.terminal-theme-projection[data-terminal-projected='true']
   > :is(.agent-terminal-viewport, .terminal-viewport) {
   filter: var(--cc-terminal-theme-mismatch-filter);
 }

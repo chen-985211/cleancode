@@ -26,12 +26,7 @@
   text-spacing-trim: space-all;
 }
 
-:root[data-theme='light']
-  .terminal-theme-projection[data-terminal-source-theme='dark']
-  > [data-terminal-content-ready='true']
-  ~ .terminal-indexed-glyph-layer,
-:root[data-theme='dark']
-  .terminal-theme-projection[data-terminal-source-theme='light']
+.terminal-theme-projection[data-terminal-projected='true']
   > [data-terminal-content-ready='true']
   ~ .terminal-indexed-glyph-layer {
   display: block;

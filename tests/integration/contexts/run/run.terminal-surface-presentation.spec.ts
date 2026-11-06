@@ -12,6 +12,7 @@ import {
   checkTerminalPunctuation,
   checkTerminalPreedit
 } from '../../../support/terminalProjectionChecks'
+import { projectionFrameChecks } from '../../../support/terminalProjectionFrameChecks'
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
@@ -681,3 +682,15 @@ it.each([
     await checkTerminalPreedit(page, renderer, source)
   }
 )
+
+describe.each(['webgl', 'dom'])('%s projection frames', (renderer) => {
+  beforeEach(() => mountIndexedGlyphs(renderer, 'dark'))
+  it('holds complete frames during synchronized theme changes', () =>
+    projectionFrameChecks.synchronized(page, renderer))
+  it('paints saturated Provider backgrounds', () => projectionFrameChecks.saturated(page, renderer))
+  it(
+    'budgets the allocated projection bitmap',
+    () => projectionFrameChecks.bitmap(page, renderer),
+    15000
+  )
+})
