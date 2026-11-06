@@ -193,8 +193,6 @@
 
 .agent-terminal-viewport .xterm {
   height: 100%;
-  text-autospace: no-autospace;
-  text-spacing-trim: space-all;
 }
 
 .agent-terminal-viewport .xterm-viewport {

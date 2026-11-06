@@ -6,6 +6,13 @@ import { createServer, type ViteDevServer } from 'vite'
 
 import type {} from '../../../fixtures/terminalSurfacePresentation'
 import type {} from '../../../fixtures/terminalIndexedGlyphs'
+import {
+  captureTerminalGlyphs,
+  checkEffectiveBoldSlots,
+  checkTerminalPunctuation,
+  checkTerminalPreedit
+} from '../../../support/terminalProjectionChecks'
+import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 import { canonicalTerminalPalettes } from '../../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { readProjectedLightGlyphForeground } from '../../../../src/contexts/run/presentation/terminal-surface/terminalTheme'
@@ -396,47 +403,15 @@ async function restoreAndCheck(color: 'green' | 'blue' | 'unchanged', expected: 
   for (const pixel of firstFrame!.colors) expect(pixel).toEqual(expected)
 }
 
-async function mountIndexedGlyphs(renderer: string, source: string) {
+async function mountIndexedGlyphs(renderer: string, source: string, host = 'agent') {
+  const params = new URLSearchParams({ renderer, source, host })
   await page.goto(
-    server!.resolvedUrls!.local[0] +
-      'tests/fixtures/terminalIndexedGlyphs.html?renderer=' +
-      renderer +
-      '&source=' +
-      source
+    `${server!.resolvedUrls!.local[0]}tests/fixtures/terminalIndexedGlyphs.html?${params}`
   )
   await page.waitForFunction(() => Boolean(window.terminalIndexedFixture))
 }
 
-async function captureIndexedGlyphs(renderer: string) {
-  const view = page.locator('[data-terminal-content-ready="true"]')
-  await view.waitFor()
-  expect(await view.getAttribute('data-terminal-renderer')).toBe(renderer)
-  const png = await view.locator('.xterm-screen').screenshot()
-  return page.evaluate(async (base64) => {
-    const im = new Image()
-    im.src = 'data:image/png;base64,' + base64
-    await im.decode()
-    const canvas = document.createElement('canvas')
-    canvas.width = im.naturalWidth
-    canvas.height = im.naturalHeight
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(im, 0, 0)
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-    const { rows, columns } = window.terminalIndexedFixture.dimensions()
-    const at = (x: number, y: number) => {
-      const i =
-        4 *
-        (Math.floor((y * canvas.height) / rows) * canvas.width +
-          Math.floor((x * canvas.width) / columns))
-      return data[i]! * 65536 + data[i + 1]! * 256 + data[i + 2]!
-    }
-    return {
-      grid: Array.from({ length: 256 }, (_, i) => at(3 * (i % 32) + 0.5, Math.floor(i / 32) + 0.5)),
-      defaults: [at(0.5, 9.5), at(3.5, 9.5), at(6.5, 9.5)],
-      control: [at(0.5, 8.5), at(3.5, 8.5), at(6.5, 8.5), at(9.5, 8.5)]
-    }
-  }, png.toString('base64'))
-}
+const captureIndexedGlyphs = (renderer: string) => captureTerminalGlyphs(page, renderer)
 
 it.each([
   ['webgl', 'light', 'dark'],
@@ -627,4 +602,82 @@ it.each([
     await expect.poll(() => sample()).toEqual(original)
   },
   30000
+)
+
+it.each(['webgl', 'dom'])('uses the effective bold ANSI slot in %s', async (renderer) => {
+  await mountIndexedGlyphs(renderer, 'light')
+  await checkEffectiveBoldSlots(page, renderer)
+})
+
+it('renders OSC assignments identically after a cold view attach and provider checkpoint', async () => {
+  const adapter = new HeadlessTerminalModelAdapter()
+  const project = {
+    projectId: 'p',
+    workspaceId: 'w',
+    blockId: 'b',
+    runId: 'r',
+    sessionId: 's',
+    generation: 1,
+    projectDirectory: '/project',
+    workspaceDirectory: '/project',
+    gitBranch: null
+  }
+  const callbacks = { onQueryResponse: () => {}, onFlowControlChange: () => {} }
+  try {
+    adapter.create({
+      identity: project,
+      columns: 100,
+      rows: 16,
+      workingDirectory: '/project',
+      terminalSourceTheme: 'light',
+      ...callbacks
+    })
+    const text = '\x1b[?25l██ \x1b[37m██\x1b[0m'
+    const paint = '\x1b]4;7;rgb:4b/55/63\x07\x1b]10;#172033\x07' + text
+    adapter.acceptOutput(project, paint)
+    const render = async (content: string) => {
+      await mountIndexedGlyphs('dom', 'light')
+      await page.evaluate(async (data) => {
+        await window.terminalIndexedFixture.restoreContent(data)
+        window.terminalIndexedFixture.theme('dark')
+      }, content)
+      return (await captureIndexedGlyphs('dom')).grid.slice(0, 2)
+    }
+    const unset = await render(text)
+    const live = await render(paint)
+    expect(live[0]).not.toBe(unset[0])
+    expect(live[1]).not.toBe(unset[1])
+    const view = { identity: project, viewId: 'view', onOutput: () => {} }
+    expect(await render((await adapter.attachView(view)).content)).toEqual(live)
+    const checkpoint = await adapter.captureCheckpoint(project)
+    expect(await render(checkpoint.normalContent)).toEqual(live)
+    await adapter.restoreCheckpoint({ checkpoint, ...callbacks, terminalSourceTheme: 'light' })
+    expect(await render((await adapter.attachView(view)).content)).toEqual(live)
+    adapter.acceptOutput(project, '\x1b]104;7\x07\x1b]110;\x07')
+    const reset = (await adapter.attachView(view)).content
+    await page.evaluate((data) => window.terminalIndexedFixture.restoreContent(data), reset)
+    expect((await captureIndexedGlyphs('dom')).grid.slice(0, 2)).toEqual(unset)
+  } finally {
+    adapter.disposeAll()
+  }
+})
+
+it.each(['light', 'dark'] as const)(
+  'aligns repeated fullwidth punctuation in the ordinary %s terminal',
+  async (source) => {
+    await mountIndexedGlyphs('dom', source, 'terminal')
+    await checkTerminalPunctuation(page, source)
+  }
+)
+it.each([
+  ['dom', 'dark', 'terminal'],
+  ['webgl', 'dark', 'terminal'],
+  ['dom', 'light', 'agent'],
+  ['webgl', 'light', 'agent']
+] as const)(
+  'keeps IME preedit above existing %s ink on a %s %s',
+  async (renderer, source, host) => {
+    await mountIndexedGlyphs(renderer, source, host)
+    await checkTerminalPreedit(page, renderer, source)
+  }
 )

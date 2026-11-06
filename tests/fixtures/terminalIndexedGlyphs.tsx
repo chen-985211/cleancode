@@ -9,28 +9,32 @@ import type { TerminalColorPair } from '../../src/contexts/run/presentation/term
 import { createTerminalXtermSurface } from '../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { applyEffectiveTheme } from '../../src/presentation/app-shell/app-features/settings/themePreference'
 
-const source = new URLSearchParams(location.search).get('source') === 'light' ? 'light' : 'dark'
+const params = new URLSearchParams(location.search)
+const source = params.get('source') === 'light' ? 'light' : 'dark'
+const ordinary = params.get('host') === 'terminal'
 applyEffectiveTheme(source)
 const ref = createRef<HTMLDivElement>()
 const root = createRoot(document.getElementById('root')!)
+const projection = (
+  <TerminalThemeProjection sourceTheme={source}>
+    <div className={ordinary ? 'terminal-viewport' : 'agent-terminal-viewport'} ref={ref} />
+  </TerminalThemeProjection>
+)
 flushSync(() =>
-  root.render(
-    <TerminalThemeProjection sourceTheme={source}>
-      <div className="agent-terminal-viewport" ref={ref} />
-    </TerminalThemeProjection>
-  )
+  root.render(ordinary ? <div className="terminal-output-shell">{projection}</div> : projection)
 )
 const surface = createTerminalXtermSurface(source)
 let dimensions = { columns: 80, rows: 24 }
 let sequence = 0
 const noop = (): void => {}
+const input: string[] = []
 surface.attach({
   element: ref.current!,
   isResizeSuspended: false,
   onDimensionsChange: (value) => {
     dimensions = value
   },
-  onInput: noop,
+  onInput: (data) => input.push(data),
   onOpenLink: noop,
   onOpenSearch: noop,
   onRestoreRequired: noop,
@@ -48,7 +52,36 @@ const identity = {
   workspaceDirectory: '/fixture',
   gitBranch: 'main'
 }
+async function restoreContent(content: string): Promise<void> {
+  await surface.restore({
+    identity,
+    sequence: ++sequence,
+    dimensions,
+    content,
+    scrollbackRows: 1000,
+    unicodeVersion: '11',
+    terminalSourceTheme: source,
+    title: '',
+    transcript: '',
+    workingDirectory: '/fixture',
+    restoreMarker: { viewId: 'view', sequence },
+    modes: {
+      applicationCursorKeysMode: false,
+      applicationKeypadMode: false,
+      bracketedPasteMode: false,
+      insertMode: false,
+      mouseTrackingMode: 'none',
+      originMode: false,
+      reverseWraparoundMode: false,
+      sendFocusMode: false,
+      synchronizedOutputMode: false,
+      wraparoundMode: true
+    }
+  })
+}
 const fixture = {
+  restoreContent,
+  input: () => [...input],
   setColorPairs: (pairs: readonly TerminalColorPair[]) => surface.setColorPairs?.(pairs),
   theme: (value: 'light' | 'dark') => applyEffectiveTheme(value),
   dimensions: () => dimensions,
@@ -100,31 +133,7 @@ const fixture = {
       '\x1b[38;2;' +
       sourceRgb +
       'm██\x1b[0m\r\n██ \x1b[1m██\x1b[0m \x1b[2m██\x1b[0m\r\n\x1b[31m中文 Red\x1b[1;32m 粗体 Bold\x1b[0m'
-    await surface.restore({
-      identity,
-      sequence: ++sequence,
-      dimensions,
-      content,
-      scrollbackRows: 1000,
-      unicodeVersion: '11',
-      terminalSourceTheme: source,
-      title: '',
-      transcript: '',
-      workingDirectory: '/fixture',
-      restoreMarker: { viewId: 'view', sequence },
-      modes: {
-        applicationCursorKeysMode: false,
-        applicationKeypadMode: false,
-        bracketedPasteMode: false,
-        insertMode: false,
-        mouseTrackingMode: 'none',
-        originMode: false,
-        reverseWraparoundMode: false,
-        sendFocusMode: false,
-        synchronizedOutputMode: false,
-        wraparoundMode: true
-      }
-    })
+    await restoreContent(content)
   }
 }
 declare global {

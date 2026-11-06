@@ -326,6 +326,9 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.options.scrollback = snapshot.scrollbackRows
     if (!canReuseBuffer) {
       this.terminal.reset()
+      // xterm.reset() leaves OSC overrides in place. Rebuild from the pinned palette
+      // before replaying this snapshot, including older snapshots with no palette data.
+      this.terminal.options.theme = readCanonicalTerminalTheme(this.terminalSourceTheme)
       this.terminal.resize(snapshot.dimensions.columns, snapshot.dimensions.rows)
       await this.writeToTerminal(snapshot.content)
     }

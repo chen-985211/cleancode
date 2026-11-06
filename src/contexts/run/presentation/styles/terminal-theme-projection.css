@@ -18,6 +18,10 @@
   pointer-events: none;
   user-select: none;
   display: none;
+}
+
+.terminal-theme-projection .xterm,
+.terminal-indexed-glyph-layer {
   text-autospace: no-autospace;
   text-spacing-trim: space-all;
 }
