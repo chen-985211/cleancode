@@ -112,13 +112,14 @@ it.each(['dark', 'light'] as const)(
       const baseline = await page.screenshot({ clip })
       await page.mouse.move(grid.x + 3 * grid.w, grid.y + (row + 0.5) * grid.h)
       await page.locator('.xterm-cursor-pointer').waitFor()
-      const hovered = await page.screenshot({ clip })
+      // Capture the same viewport clip throughout; a locator screenshot can scroll the terminal.
+      const hovered = await page.screenshot({
+        clip,
+        path: join(output, source + '-hover-' + row + '.png')
+      })
       expect(hovered.equals(baseline), 'underline pixels on the visible composited screen').toBe(
         false
       )
-      await ready
-        .locator('.xterm-screen')
-        .screenshot({ path: join(output, source + '-hover-' + row + '.png') })
       await page.mouse.move(grid.x + 40 * grid.w, grid.y + 4 * grid.h)
       await page.locator('.xterm-cursor-pointer').waitFor({ state: 'detached' })
       expect((await page.screenshot({ clip })).equals(baseline)).toBe(true)
