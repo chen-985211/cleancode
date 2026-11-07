@@ -262,7 +262,13 @@ describe('canvas minimap', () => {
       viewportStore.setViewport({ x: -120, y: 48, zoom: 1.25 })
     })
 
-    expect(container.querySelector('.canvas-minimap__viewport-frame')).toHaveAttribute('x', '96')
+    expectViewportBounds(
+      container.querySelector('.canvas-minimap__viewport-frame'),
+      96,
+      -38.4,
+      768,
+      512
+    )
     expect(screen.getByLabelText('画布缩放比例')).toHaveTextContent('125%')
     expect(getMiniMapNodeColor).not.toHaveBeenCalled()
     expect(getMiniMapNodeStrokeColor).not.toHaveBeenCalled()
@@ -464,30 +470,40 @@ describe('canvas minimap', () => {
 
     const viewportFrame = container.querySelector('.canvas-minimap__viewport-frame')
 
-    expect(viewportFrame).toHaveAttribute('x', '0')
-    expect(viewportFrame).toHaveAttribute('y', '0')
-    expect(viewportFrame).toHaveAttribute('width', '960')
-    expect(viewportFrame).toHaveAttribute('height', '640')
+    expectViewportBounds(viewportFrame, 0, 0, 960, 640)
 
     act(() => {
       viewportStore.setViewport({ x: -120, y: 48, zoom: 1.25 })
     })
 
-    expect(viewportFrame).toHaveAttribute('x', '96')
-    expect(viewportFrame).toHaveAttribute('y', '-38.4')
-    expect(viewportFrame).toHaveAttribute('width', '768')
-    expect(viewportFrame).toHaveAttribute('height', '512')
+    expectViewportBounds(viewportFrame, 96, -38.4, 768, 512)
 
     act(() => {
       viewportStore.setViewport({ x: -240, y: 96, zoom: 1.5 })
     })
 
-    expect(viewportFrame).toHaveAttribute('x', '160')
-    expect(viewportFrame).toHaveAttribute('y', '-64')
-    expect(viewportFrame).toHaveAttribute('width', '640')
-    expect(viewportFrame).toHaveAttribute('height', `${640 / 1.5}`)
+    expectViewportBounds(viewportFrame, 160, -64, 640, 640 / 1.5)
   })
 })
+
+function expectViewportBounds(
+  element: Element | null,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const endpoints = element!
+    .getAttribute('d')!
+    .match(/[MLC][^MLCZ]+/g)!
+    .map((command) => command.slice(1).trim().split(/\s+/).map(Number).slice(-2))
+  const xs = endpoints.map((point) => point[0]!)
+  const ys = endpoints.map((point) => point[1]!)
+  expect(Math.min(...xs)).toBeCloseTo(x, 3)
+  expect(Math.min(...ys)).toBeCloseTo(y, 3)
+  expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(width, 3)
+  expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(height, 3)
+}
 
 function createCanvasMinimapProps() {
   return {

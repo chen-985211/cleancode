@@ -12,7 +12,8 @@
   align-items: center;
   gap: 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted-strong);
   font: inherit;
@@ -45,7 +46,8 @@
   height: 24px;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-warning-strong);
 }
@@ -87,6 +89,7 @@
   height: 6px;
   border: 1px solid var(--cc-surface);
   border-radius: 50%;
+  corner-shape: round;
   background: var(--cc-muted);
 }
 
@@ -125,6 +128,7 @@
   flex: 0 0 auto;
   border: 0;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-border-strong);
   transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
@@ -136,6 +140,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--cc-settings-switch-thumb);
   box-shadow: var(--cc-shadow-sm);
   transition:

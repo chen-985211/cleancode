@@ -4,6 +4,7 @@
   align-items: center;
   gap: 1px;
   border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   pointer-events: auto;
   transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
@@ -11,12 +12,14 @@
 
 .agent-create-split .toolbar-button {
   height: 38px;
+  corner-shape: round;
   border-color: transparent;
   background: transparent;
 }
 
 .agent-create-split__main {
   border-radius: 999px 3px 3px 999px;
+  corner-shape: round;
   padding: 0 14px;
 }
 
@@ -29,6 +32,7 @@
   width: 38px;
   padding: 0;
   border-radius: 3px 999px 999px 3px;
+  corner-shape: round;
 }
 
 .agent-create-split[data-disabled='false']:hover {
@@ -61,7 +65,8 @@
   width: 224px;
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 11px;
+  border-radius: calc(11px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-overlay);
   box-shadow: var(--cc-shadow-floating);
   padding: 5px;
@@ -82,7 +87,8 @@
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0 9px;
   color: inherit;

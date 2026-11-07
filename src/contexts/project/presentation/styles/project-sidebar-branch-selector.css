@@ -1,0 +1,191 @@
+.default-branch-selector {
+  height: 32px;
+  gap: 0;
+  padding: 0;
+}
+
+.default-branch-selector__select,
+.default-branch-selector__toggle {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.default-branch-selector__select {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  gap: 8px;
+  padding: 0 7px 0 8px;
+  text-align: left;
+}
+
+.default-branch-selector__toggle {
+  width: 30px;
+  flex: 0 0 auto;
+  justify-content: center;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+}
+
+.default-branch-selector__toggle:hover,
+.default-branch-selector__toggle[aria-expanded='true'] {
+  background: var(--cc-sidebar-selection-hover);
+  color: var(--cc-sidebar-selection-foreground);
+}
+
+.branch-selector-popover {
+  position: fixed;
+  z-index: 200;
+  width: min(300px, calc(100vw - 32px));
+  border: 1px solid var(--cc-divider);
+  border-radius: calc(11px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  background: var(--cc-chrome);
+  padding: 8px;
+  box-shadow: var(--cc-shadow-floating);
+}
+
+.branch-selector-search {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  background: var(--cc-chrome);
+  padding: 0 9px;
+  color: var(--cc-muted);
+}
+
+.branch-selector-search:focus-within {
+  border-color: var(--cc-sidebar-focus-ring);
+}
+
+.branch-selector-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 12px;
+}
+
+.branch-selector-search input::placeholder {
+  color: var(--cc-muted);
+}
+
+.branch-selector-label {
+  margin: 10px 4px 5px;
+  color: var(--cc-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.branch-selector-options {
+  display: grid;
+  gap: 2px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-color: var(--cc-scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.branch-selector-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.branch-selector-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.branch-selector-options::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--cc-scrollbar);
+}
+
+.branch-selector-option,
+.branch-selector-create {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  background: transparent;
+  color: var(--cc-sidebar-foreground);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.branch-selector-option {
+  min-height: 36px;
+  padding: 5px 8px;
+}
+
+.branch-selector-option:hover:not(:disabled),
+.branch-selector-option:focus-visible:not(:disabled) {
+  background: var(--cc-sidebar-hover);
+  color: var(--cc-sidebar-selection-foreground);
+}
+
+.branch-selector-option--current {
+  background: var(--cc-sidebar-selection);
+  color: var(--cc-sidebar-selection-foreground);
+}
+
+.branch-selector-option--current:hover:not(:disabled) {
+  background: var(--cc-sidebar-selection-hover);
+  color: var(--cc-sidebar-selection-foreground);
+}
+
+.branch-selector-option:disabled {
+  cursor: default;
+  color: var(--cc-muted);
+}
+
+.branch-selector-option:disabled:hover {
+  background: transparent;
+}
+
+.branch-selector-option__content {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 1px;
+}
+
+.branch-selector-option__meta {
+  color: var(--cc-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.branch-selector-empty {
+  padding: 10px 8px;
+  color: var(--cc-muted);
+  font-size: 12px;
+}
+
+.branch-selector-create {
+  margin-top: 8px;
+  border-top: 1px solid var(--cc-border);
+  border-radius: 0;
+  padding: 10px 5px 2px;
+  color: var(--cc-muted);
+  font-weight: 600;
+}

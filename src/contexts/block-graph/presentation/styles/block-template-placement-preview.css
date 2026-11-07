@@ -27,7 +27,8 @@
 
 .block-template-placement-preview__group {
   border: 1px dashed color-mix(in srgb, var(--cc-primary) 58%, transparent);
-  border-radius: 14px;
+  border-radius: calc(14px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: color-mix(in srgb, var(--cc-primary) 4%, transparent);
 }
 
@@ -38,7 +39,8 @@
   align-items: flex-start;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--cc-primary) 74%, transparent);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: color-mix(in srgb, var(--cc-surface-raised) 78%, transparent);
   box-shadow: var(--cc-shadow-xs);
   opacity: 0.78;

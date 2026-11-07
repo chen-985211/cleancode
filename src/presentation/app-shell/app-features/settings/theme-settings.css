@@ -20,7 +20,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
@@ -147,7 +148,8 @@
   grid-template-columns: 31% 1fr;
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--theme-preview-background);
   box-shadow: var(--cc-shadow-xs);
   transform: scale(calc(1 + var(--cc-selection-motion-progress, 0) * 0.008));
@@ -205,7 +207,8 @@
   flex-direction: column;
   gap: 6px;
   margin: 14px 10px;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--theme-preview-surface);
   padding: 8px;
 }
@@ -215,6 +218,7 @@
   width: 75%;
   height: 3px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--theme-preview-muted);
 }
 
@@ -233,6 +237,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-settings-selection-foreground);
   color: var(--cc-surface);
   box-shadow: var(--cc-shadow-xs);

@@ -9,7 +9,8 @@
   z-index: 55;
   width: 188px;
   border: 1px solid var(--cc-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   padding: 10px;
   color: var(--cc-foreground);
@@ -39,7 +40,8 @@
 .project-removal-popover__actions button {
   height: 27px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   padding: 0 9px;
   color: var(--cc-muted-strong);

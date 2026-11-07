@@ -15,6 +15,7 @@
 @import '../../shared/styles/toolbar-utility-button-motion.css';
 @import '../app-features/notifications/notifications.css';
 @import '../../../contexts/project/presentation/styles/project-sidebar.css';
+@import '../../../contexts/project/presentation/styles/project-sidebar-branch-selector.css';
 @import './project-sidebar/project-sidebar-layout.css';
 @import './project-sidebar/project-sidebar-titlebar.css';
 @import '../../../contexts/project/presentation/styles/project-sidebar-branch-workspace-form.css';

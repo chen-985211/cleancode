@@ -28,7 +28,8 @@
 
 .menu-option-highlight-motion {
   background: var(--cc-directional-menu-hover);
-  border-radius: var(--cc-menu-option-highlight-radius, 7px);
+  border-radius: var(--cc-menu-option-highlight-radius, calc(7px * var(--cc-corner-radius-scale)));
+  corner-shape: var(--cc-corner-shape);
   height: var(--cc-menu-option-highlight-height, 0px);
   left: var(--cc-menu-option-highlight-inset, 0px);
   opacity: 0;

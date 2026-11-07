@@ -57,7 +57,8 @@
   justify-content: center;
   margin-right: 2px;
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
   opacity: 0;
@@ -89,7 +90,8 @@
   gap: 1px;
   overflow-y: auto;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-overlay);
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
@@ -107,7 +109,8 @@
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0 8px;
   color: var(--cc-foreground);
@@ -148,7 +151,8 @@
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   padding: 18px;
   color: var(--cc-muted-strong);
@@ -189,7 +193,8 @@
 .project-sidebar-confirmation-dialog__actions button {
   height: 32px;
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   padding: 0 12px;
   color: var(--cc-muted-strong);

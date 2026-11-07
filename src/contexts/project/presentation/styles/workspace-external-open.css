@@ -5,7 +5,8 @@
   align-items: stretch;
   gap: 1px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   box-shadow: none;
   color: var(--cc-muted-strong);
@@ -32,7 +33,8 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0;
   color: inherit;
@@ -86,7 +88,8 @@
   min-width: 178px;
   gap: 1px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-overlay);
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
@@ -100,7 +103,8 @@
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0 8px;
   color: var(--cc-foreground);

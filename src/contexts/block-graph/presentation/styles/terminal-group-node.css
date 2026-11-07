@@ -94,7 +94,8 @@
   gap: 10px;
   box-sizing: border-box;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   color: var(--cc-muted-strong);
   font: inherit;
   font-size: 13px;
@@ -108,7 +109,8 @@
   width: 20px;
   height: 20px;
   box-sizing: content-box;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 8px;
   background: var(--cc-surface-raised);
   color: var(--cc-muted);
@@ -276,7 +278,8 @@
   justify-content: center;
   gap: 5px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 8px;
   background: var(--terminal-group-control);
   color: var(--cc-terminal-control-foreground);
@@ -351,7 +354,8 @@
 }
 
 .terminal-group-node__member:hover {
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
 }
 
@@ -359,6 +363,7 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--terminal-member-status);
   box-shadow: 0 0 0 3px var(--terminal-member-status-halo);
 }
@@ -405,7 +410,8 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0;
   background: transparent;
   color: var(--cc-muted);
@@ -456,7 +462,8 @@
   flex: 1 1 auto;
   box-sizing: border-box;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 9px;
   background: var(--cc-surface);
   color: var(--terminal-group-foreground);

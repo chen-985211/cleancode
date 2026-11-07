@@ -53,7 +53,8 @@ select:focus-visible {
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
@@ -80,7 +81,8 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
   transition:
@@ -98,7 +100,8 @@ select:focus-visible {
 .icon-button--small {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
 }
 
 .icon-button--send {

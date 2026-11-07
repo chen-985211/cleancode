@@ -9,7 +9,8 @@
   z-index: 58;
   width: min(218px, calc(100% - 36px));
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
@@ -34,7 +35,8 @@
   min-width: 0;
   height: 30px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   padding: 0 8px;
   color: var(--cc-foreground);
@@ -49,7 +51,8 @@
   justify-content: center;
   gap: 5px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-sidebar-foreground);
   font: inherit;

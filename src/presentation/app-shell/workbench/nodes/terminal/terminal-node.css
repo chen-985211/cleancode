@@ -116,7 +116,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-muted-strong);
   box-shadow: 0 1px 2px var(--cc-shadow-color);
@@ -206,7 +207,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-terminal-control-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--terminal-soft-control);
   color: var(--cc-terminal-control-foreground);
   box-shadow: none;
@@ -321,7 +323,8 @@
   min-width: 236px;
   padding: 4px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow: var(--cc-shadow-sm);
 }
@@ -356,7 +359,8 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
   cursor: pointer;
@@ -385,7 +389,8 @@
   max-width: calc(100% - 36px);
   padding: 5px 8px;
   border: 1px solid var(--cc-warning-border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-warning-soft);
   color: var(--cc-warning-strong);
   font-size: 11px;
@@ -403,7 +408,8 @@
   gap: 8px;
   padding: 6px 7px 6px 10px;
   border: 1px solid var(--cc-terminal-control-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-terminal-shell);
   color: var(--cc-warning-strong);
   box-shadow: var(--cc-shadow-sm);
@@ -424,7 +430,8 @@
   height: 24px;
   flex: 0 0 24px;
   place-items: center;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
 }
 
 .terminal-restore-failure:hover {
@@ -445,7 +452,8 @@
   bottom: 12px;
   max-width: calc(100% - 36px);
   border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-foreground);
   box-shadow: var(--cc-shadow-sm);
@@ -473,7 +481,8 @@
   min-height: 24px;
   padding: 0 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   color: inherit;
   font: inherit;
@@ -513,6 +522,7 @@
 
 .terminal-output-shell .xterm-viewport::-webkit-scrollbar-thumb {
   border-radius: 999px 0 0 999px;
+  corner-shape: round;
   background: var(--cc-scrollbar);
 }
 
@@ -604,6 +614,7 @@
   box-sizing: border-box;
   border-bottom: 0;
   border-radius: inherit;
+  corner-shape: inherit;
   padding-block: 5px;
 }
 
@@ -633,6 +644,7 @@
   padding: 0 5px;
   border: 0;
   border-radius: var(--cc-radius-sm);
+  corner-shape: var(--cc-corner-shape);
   color: var(--cc-muted);
   background: transparent;
   font: inherit;

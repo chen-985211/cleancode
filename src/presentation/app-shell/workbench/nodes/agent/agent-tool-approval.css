@@ -5,7 +5,8 @@
   flex: 0 0 auto;
   margin: 10px 12px 2px;
   border: 1px solid color-mix(in srgb, var(--cc-warning) 24%, var(--cc-border));
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   box-shadow:
     0 1px 0 var(--cc-highlight-inset) inset,
@@ -34,7 +35,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-warning-strong);
 }
@@ -85,6 +87,7 @@
   align-items: center;
   border: 1px solid var(--cc-border);
   border-radius: 999px;
+  corner-shape: round;
   padding: 0 8px;
   background: var(--cc-surface-subtle);
   box-shadow: 0 1px 0 var(--cc-highlight-inset) inset;
@@ -109,7 +112,8 @@
   align-items: center;
   gap: 10px;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 10px;
   background: var(--cc-surface-subtle);
   box-shadow:
@@ -124,7 +128,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   box-shadow:
     0 1px 0 var(--cc-highlight-inset) inset,
@@ -201,7 +206,8 @@
   justify-content: center;
   gap: 5px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 9px;
   background: var(--cc-surface-raised);
   box-shadow:
@@ -258,7 +264,8 @@
   height: 24px;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-warning-strong);
 }
@@ -271,7 +278,8 @@
   align-items: start;
   gap: 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 10px;
   background: transparent;
   color: var(--cc-danger-strong);
@@ -314,7 +322,8 @@
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 12px;
   background: var(--cc-surface-raised);
   box-shadow:
@@ -404,6 +413,7 @@
   position: absolute;
   border: 1px solid var(--cc-warning-border);
   border-radius: 999px;
+  corner-shape: round;
   padding: 4px 8px;
   background: var(--cc-surface-overlay);
   box-shadow:
@@ -439,6 +449,7 @@
   right: 13px;
   border: 1px solid var(--cc-warning-border);
   border-radius: 999px;
+  corner-shape: round;
   padding: 4px 8px;
   background: var(--cc-surface-overlay);
   box-shadow:

@@ -58,7 +58,8 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0;
   background: transparent;
   color: var(--cc-terminal-control-foreground);
@@ -137,7 +138,8 @@
   width: 78px;
   height: 30px;
   flex-basis: 78px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--terminal-group-control);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
@@ -163,11 +165,15 @@
 }
 
 .terminal-group-node__membership-actions .terminal-group-node__action:first-child {
-  border-radius: 7px 0 0 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale)) 0 0
+    calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
 }
 
 .terminal-group-node__membership-actions .terminal-group-node__action:last-child {
-  border-radius: 0 7px 7px 0;
+  border-radius: 0 calc(7px * var(--cc-corner-radius-scale))
+    calc(7px * var(--cc-corner-radius-scale)) 0;
+  corner-shape: var(--cc-corner-shape);
 }
 
 .terminal-group-node__membership-actions .terminal-group-node__action:hover:not(:disabled) {
@@ -176,7 +182,8 @@
 
 .terminal-group-node__edit-actions {
   height: 30px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--terminal-group-control);
   box-shadow: 0 0 0 1px var(--cc-terminal-control-border) inset;
 }
@@ -264,7 +271,8 @@
   left: 50%;
   margin-top: 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 6px 10px;
   background: var(--cc-surface);
   color: var(--cc-foreground);

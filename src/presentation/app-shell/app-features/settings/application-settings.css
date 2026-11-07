@@ -22,7 +22,8 @@
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
 }
 
 .application-settings-trigger:hover,
@@ -70,7 +71,8 @@
   height: 38px;
   flex: 0 0 auto;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-translucent);
   box-shadow: var(--cc-shadow-xs);
 }
@@ -133,7 +135,8 @@
   align-items: center;
   gap: 10px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0 12px;
   color: var(--cc-muted-strong);
@@ -191,6 +194,7 @@
   min-height: 32px;
   border: 2px solid transparent;
   border-radius: 999px;
+  corner-shape: round;
   background-color: var(--cc-scrollbar);
   background-clip: padding-box;
 }
@@ -310,7 +314,8 @@
   align-items: center;
   gap: 7px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow:
     inset 0 1px 0 var(--cc-highlight-inset),
@@ -347,7 +352,8 @@
   isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow:
     inset 0 1px 0 var(--cc-highlight-inset),
@@ -419,7 +425,8 @@
   justify-content: center;
   gap: 4px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 4px 7px;
   color: var(--cc-foreground);
@@ -449,7 +456,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   padding: 0 6px;
   color: var(--cc-muted-strong);
@@ -478,7 +486,8 @@
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   opacity: 0.48;
 }
 

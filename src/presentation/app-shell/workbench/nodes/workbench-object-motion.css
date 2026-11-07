@@ -302,17 +302,17 @@
 
 @keyframes workbench-object-create-accent {
   from {
-    clip-path: inset(49% 8% 49% 8% round 12px);
+    clip-path: inset(49% 8% 49% 8%);
     opacity: 0;
   }
 
   36% {
-    clip-path: inset(5% 2% 5% 2% round 12px);
+    clip-path: inset(5% 2% 5% 2%);
     opacity: 0.72;
   }
 
   to {
-    clip-path: inset(0 round 12px);
+    clip-path: inset(0);
     opacity: 0;
   }
 }
