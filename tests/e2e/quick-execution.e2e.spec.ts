@@ -356,7 +356,10 @@ describe('quick execution e2e', () => {
         await page.locator('.quick-execution__black-hole-hint').evaluate((element) => {
           const style = getComputedStyle(element)
           return {
-            borderRadius: style.borderRadius,
+            cornerShape: style.getPropertyValue('corner-shape'),
+            visualRadius:
+              Number.parseFloat(style.borderRadius) /
+              Number(style.getPropertyValue('--cc-corner-radius-scale')),
             fontSize: style.fontSize,
             fontWeight: style.fontWeight,
             paddingBlock: `${style.paddingTop} ${style.paddingBottom}`,
@@ -364,7 +367,8 @@ describe('quick execution e2e', () => {
           }
         })
       ).toEqual({
-        borderRadius: '6px',
+        cornerShape: 'squircle',
+        visualRadius: expect.closeTo(6, 3),
         fontSize: '12px',
         fontWeight: '500',
         paddingBlock: '6px 6px',
