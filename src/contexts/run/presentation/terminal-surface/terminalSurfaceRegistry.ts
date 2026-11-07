@@ -7,6 +7,7 @@ import type {
 } from '../../application/ports/TerminalModelPort'
 import type { TerminalScrollbackRows } from '../../application/dto/TerminalRuntimeSettings'
 import type { TerminalDimensions } from '../view-models/TerminalPresentationTypes'
+import type { TerminalColorPair } from './terminalTheme'
 import type { TerminalRendererState } from './terminalRendererController'
 import type {
   TerminalZoomRasterCoordinator,
@@ -92,6 +93,7 @@ export interface TerminalSurface {
   isOutputSettled(): boolean
   onOutputSettled(listener: () => void): () => void
   restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult>
+  setColorPairs?(pairs?: readonly TerminalColorPair[]): void
   setScrollbackRows(rows: TerminalScrollbackRows): void
   setResizeSuspended(isResizeSuspended: boolean): void
   write(output: SequencedTerminalOutput): void

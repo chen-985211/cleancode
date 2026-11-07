@@ -93,6 +93,18 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
     documentationUrl: 'https://developers.openai.com/codex/cli/',
     icon: codexProviderIcon,
     id: 'codex',
+    // Paired from native Codex 0.167.0 output with the host light and dark palettes.
+    terminalColorPairs: [
+      { role: 'background', dark: 0x3a3d40, light: 0xe8eaeb }, // composer
+      { role: 'background', dark: 0x434648, light: 0xedeff0 }, // submitted prompt
+      { role: 'foreground', dark: 0xf6e2b7, light: 0x966521 }, // model
+      { role: 'foreground', dark: 0xabdfa7, light: 0x3b7e2c }, // directory
+      { role: 'foreground', dark: 0x8d939a, light: 0x6a707c }, // secondary status text
+      { role: 'foreground', dark: 0xd6dee8, light: 0x373f50 }, // key hint
+      { role: 'foreground', dark: 0xc4a767, light: 0x8b6214 }, // warning
+      { role: 'foreground', dark: 0x63a8f8, light: 0x1c64c8 }, // accent
+      { role: 'foreground', dark: 0xf38ba8, light: 0xd20f39 } // tip
+    ] as const,
     launch: {
       defaultArguments: [],
       defaultEnvironment: {},

@@ -124,6 +124,22 @@ describe('terminal xterm raster target', () => {
     expect(onCostChange).toHaveBeenCalledOnce()
   })
 
+  it('counts a second allocated bitmap at every candidate scale until it is released', () => {
+    vi.stubGlobal('devicePixelRatio', 1)
+    const { target } = createAttachedTarget(intersectionObservers, { width: 4000, height: 2500 })
+    const changed = vi.fn()
+    target.target.onRasterCostChange?.(changed)
+    const budget = 32 * 1024 * 1024
+    expect(target.target.getRasterCost(1.6)).toBeLessThan(budget)
+    target.setProjectionBitmapAllocated(true)
+    target.setProjectionBitmapAllocated(true)
+    expect(target.target.getRasterCost(1.6)).toBeGreaterThan(budget)
+    expect(target.target.getRasterCost(1)).toBe(20_000_000)
+    target.setProjectionBitmapAllocated(false)
+    expect(target.target.getRasterCost(1.6)).toBe(25_600_000)
+    expect(changed).toHaveBeenCalledTimes(2)
+  })
+
   it('shares canvas visibility, geometry, and window resize observation across terminal surfaces', () => {
     const addWindowListener = vi.spyOn(window, 'addEventListener')
     const removeWindowListener = vi.spyOn(window, 'removeEventListener')

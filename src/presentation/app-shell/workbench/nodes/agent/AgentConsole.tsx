@@ -101,6 +101,7 @@ export function AgentConsole({
     scopeKey: currentWorkspaceKey
   })
   useAgentTerminalView({
+    colorPairs: providerCatalog.descriptor?.terminalColorPairs,
     dimensionsRef,
     enabled: true,
     onDimensionsChange: recordTerminalDimensions,

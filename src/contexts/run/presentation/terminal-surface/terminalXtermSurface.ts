@@ -23,8 +23,10 @@ import type {
 import {
   readCanonicalTerminalSearchTheme,
   readCanonicalTerminalTheme,
-  readTerminalSourceTheme
+  readTerminalSourceTheme,
+  type TerminalColorPair
 } from './terminalTheme'
+import { TerminalProjectionFrames } from './terminalProjectionFrames'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'
@@ -44,6 +46,7 @@ export function createTerminalXtermSurface(
 }
 
 class XtermTerminalSurface implements TerminalSurface {
+  private readonly projectionFrames: TerminalProjectionFrames
   private readonly terminal: XTerm
   private readonly presentation: TerminalSurfacePresentation
   private restoreRevision = 0
@@ -132,6 +135,11 @@ class XtermTerminalSurface implements TerminalSurface {
       scrollback: terminalSurfaceScrollbackRows,
       theme: readCanonicalTerminalTheme(terminalSourceTheme)
     })
+    this.projectionFrames = new TerminalProjectionFrames(
+      this.terminal,
+      terminalSourceTheme,
+      this.xtermRasterTarget.setProjectionBitmapAllocated
+    )
     this.presentation = new TerminalSurfacePresentation(this.terminal)
     this.terminal.loadAddon(this.fitAddon)
     this.terminal.loadAddon(this.searchAddon)
@@ -192,6 +200,7 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.terminal.element) attachment.element.append(this.terminal.element)
     }
 
+    this.projectionFrames.attach(attachment.element)
     this.retainedHost?.remove()
     this.retainedHost = null
     if (!resume || !this.isOutputSettled()) this.presentation.conceal()
@@ -212,9 +221,14 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
-    this.xtermRasterTarget.detach(element)
+    if (!preserve) this.projectionFrames.detach()
+    this.xtermRasterTarget.detach(element, preserve)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
+  }
+
+  setColorPairs(pairs?: readonly TerminalColorPair[]): void {
+    this.projectionFrames.setColorPairs(pairs)
   }
 
   readonly focus = (): void => {
@@ -288,6 +302,9 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.options.scrollback = snapshot.scrollbackRows
     if (!canReuseBuffer) {
       this.terminal.reset()
+      // xterm.reset() leaves OSC overrides in place. Rebuild from the pinned palette
+      // before replaying this snapshot, including older snapshots with no palette data.
+      this.terminal.options.theme = readCanonicalTerminalTheme(this.terminalSourceTheme)
       this.terminal.resize(snapshot.dimensions.columns, snapshot.dimensions.rows)
       await this.writeToTerminal(snapshot.content)
     }
@@ -395,6 +412,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.blur()
     this.terminal.options.cursorBlink = false
     if (this.terminal.element) host.append(this.terminal.element)
+    this.projectionFrames.moveTo(host)
     this.detach(element, true)
     this.lastReportedDimensions = null
     return true
@@ -414,6 +432,10 @@ class XtermTerminalSurface implements TerminalSurface {
   dispose(): void {
     if (this.isDisposed) return
     if (this.element) this.detach(this.element)
+    else {
+      this.projectionFrames.detach()
+      this.xtermRasterTarget.detach(null)
+    }
     this.isDisposed = true
     this.restoreRevision += 1
     this.presentation.detach()

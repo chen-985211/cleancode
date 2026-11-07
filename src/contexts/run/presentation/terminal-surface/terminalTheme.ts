@@ -1,7 +1,20 @@
-import type { ITheme } from '@xterm/xterm'
+import type { ITheme, Terminal } from '@xterm/xterm'
 
 import { canonicalTerminalPalettes } from '../../application/dto/TerminalPalette.generated'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+
+// The sRGB hue-rotate(180deg) matrix from Filter Effects §13.1.4.
+const halfTurnHueMatrix = [
+  [-0.574, 1.43, 0.144],
+  [0.426, 0.43, 0.144],
+  [0.426, 1.43, -0.856]
+] as const
+
+export interface TerminalColorPair {
+  readonly role: 'foreground' | 'background'
+  readonly dark: number
+  readonly light: number
+}
 
 export function readCanonicalTerminalSearchTheme(theme: TerminalSourceTheme): {
   readonly active: string
@@ -53,13 +66,7 @@ export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceThe
   const targetTheme = sourceTheme === 'light' ? 'dark' : 'light'
   const source = readRgb(canonicalTerminalPalettes[sourceTheme].background)
   const target = readRgb(canonicalTerminalPalettes[targetTheme].background)
-  // The sRGB hue-rotate(180deg) matrix from Filter Effects §13.1.4.
-  const hueRows = [
-    [-0.574, 1.43, 0.144],
-    [0.426, 0.43, 0.144],
-    [0.426, 1.43, -0.856]
-  ]
-  const rows = hueRows.flatMap((hueRow, channel) => {
+  const rows = halfTurnHueMatrix.flatMap((hueRow, channel) => {
     const invertedBackground = hueRow.reduce(
       (sum, coefficient, index) => sum + coefficient * (1 - source[index]!),
       0
@@ -75,6 +82,99 @@ export function readTerminalThemeProjectionMatrix(sourceTheme: TerminalSourceThe
   })
 
   return [...rows, 0, 0, 0, 1, 0]
+}
+
+export function readProjectedLightGlyphForeground(): string {
+  const target = parseInt(canonicalTerminalPalettes.light.foreground.slice(1), 16)
+  return (
+    '#' +
+    unprojectTerminalRgb(target, readTerminalThemeProjectionMatrix('dark'))
+      .toString(16)
+      .padStart(6, '0')
+  )
+}
+
+function unprojectTerminalRgb(rgb: number, matrix: readonly number[]): number {
+  // Undo the per-channel gain and offset. A half-turn is its own inverse.
+  const rotated = [16, 8, 0].map((shift, i) => {
+    const gain = -matrix[i * 5 + 1]! / halfTurnHueMatrix[i]![1]
+    return (matrix[i * 5 + 4]! * 255 - ((rgb >>> shift) & 255)) / gain
+  })
+  const [r, g, b] = halfTurnHueMatrix.map((row) =>
+    Math.max(
+      0,
+      Math.min(
+        255,
+        row.reduce((sum, coefficient, i) => sum + coefficient * rotated[i]!, 0)
+      )
+    )
+  ) as [number, number, number]
+  // Quantizing the inverse per channel can miss the target by a byte. Prefer an
+  // adjacent representable paint color that the viewport filter maps exactly.
+  for (const red of [Math.floor(r), Math.ceil(r)]) {
+    for (const green of [Math.floor(g), Math.ceil(g)]) {
+      for (const blue of [Math.floor(b), Math.ceil(b)]) {
+        const paint = (red << 16) | (green << 8) | blue
+        if (projectTerminalRgb(paint, matrix) === rgb) return paint
+      }
+    }
+  }
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)
+}
+
+export function createProjectedGlyphLayer(
+  element: HTMLElement,
+  sourceTheme: TerminalSourceTheme,
+  onBitmapChange: (allocated: boolean) => void,
+  colorPairs?: readonly TerminalColorPair[]
+): NonNullable<Terminal['options']['indexedGlyphLayer']> {
+  const matrix = readTerminalThemeProjectionMatrix(sourceTheme)
+  const other = sourceTheme === 'dark' ? 'light' : 'dark'
+  const target = readCanonicalTerminalTheme(other)
+  const rgbForeground = new Map<number, number>()
+  const rgbBackground = new Map<number, number>()
+  const directBackground = new Map<number, number>()
+  for (const pair of colorPairs ?? []) {
+    if (pair.role === 'foreground') rgbForeground.set(pair[sourceTheme], pair[other])
+    else {
+      const paint = unprojectTerminalRgb(pair[other], matrix)
+      rgbBackground.set(pair[sourceTheme], paint)
+      if (projectTerminalRgb(paint, matrix) !== pair[other]) {
+        directBackground.set(pair[sourceTheme], pair[other])
+      }
+    }
+  }
+  return {
+    directBackground,
+    onBitmapChange,
+    element,
+    rgbForeground,
+    rgbBackground,
+    foreground: target.foreground,
+    white: target.white,
+    brightWhite: target.brightWhite,
+    projectBackground: (rgb) => projectTerminalRgb(rgb, matrix)
+  }
+}
+
+function projectTerminalRgb(rgb: number, matrix: readonly number[]): number {
+  const r = (rgb >>> 16) & 255
+  const g = (rgb >>> 8) & 255
+  const b = rgb & 255
+  const channel = (offset: number): number =>
+    Math.max(
+      0,
+      Math.min(
+        255,
+        Math.round(
+          matrix[offset]! * r +
+            matrix[offset + 1]! * g +
+            matrix[offset + 2]! * b +
+            matrix[offset + 4]! * 255
+        )
+      )
+    )
+  return (channel(0) << 16) | (channel(5) << 8) | channel(10)
 }
 
 function readRgb(color: string): readonly [number, number, number] {

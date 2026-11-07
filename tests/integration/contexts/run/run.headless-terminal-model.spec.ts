@@ -98,6 +98,49 @@ describe('headless terminal model', () => {
     expect(queryResponses).toEqual([])
   })
 
+  it('replays only active OSC assignments ahead of an unfinished parser sequence', async () => {
+    const adapter = new HeadlessTerminalModelAdapter()
+    const identity = createIdentity()
+    const replies: string[] = []
+    const callbacks = {
+      onQueryResponse: (data: string) => replies.push(data),
+      onFlowControlChange: () => {}
+    }
+    try {
+      adapter.create({
+        identity,
+        columns: 40,
+        rows: 8,
+        workingDirectory: '/work/app',
+        ...callbacks
+      })
+      adapter.acceptOutput(identity, '\x1b]4;7;#abc;8;#123456;15;rg')
+      adapter.acceptOutput(identity, 'b:aa/bb/cc\x07\x1b]104;8\x07\x1b]4;7;bogus;256;#111\x07')
+      adapter.acceptOutput(identity, '\x1b]10;#123;#456;#789\x07\x1b]110;\x07\x1b]11;?\x07')
+      adapter.acceptOutput(identity, '\x1b]4;9;rgb:11/')
+      const checkpoint = await adapter.captureCheckpoint(identity)
+      for (const data of [checkpoint.content, checkpoint.normalContent]) {
+        expect(data).toContain('#abc')
+        expect(data).toContain('rgb:aa/bb/cc')
+        expect(data).toContain('#456')
+        expect(data).toContain('#789')
+        expect(data).not.toMatch(/#123|bogus|#111|;\?/)
+      }
+      expect(checkpoint.content).toMatch(/rgb:11\/$/)
+      expect(checkpoint.normalContent).not.toContain('rgb:11/')
+      await adapter.restoreCheckpoint({ checkpoint, ...callbacks })
+      adapter.acceptOutput(identity, '22/33\x07')
+      const complete = await adapter.captureCheckpoint(identity)
+      expect(complete.content).toContain('rgb:11/22/33')
+      adapter.acceptOutput(identity, '\x1b]104;\x07\x1b]111;\x07\x1b]112;\x07')
+      const cleared = await adapter.captureCheckpoint(identity)
+      expect(cleared.content).not.toMatch(/#abc|rgb:aa|rgb:11|#456|#789/)
+      expect(replies).toHaveLength(1)
+    } finally {
+      adapter.disposeAll()
+    }
+  })
+
   it('hands terminal query authority between the hidden model and the attached view', async () => {
     const queryResponses: string[] = []
     const adapter = new HeadlessTerminalModelAdapter()

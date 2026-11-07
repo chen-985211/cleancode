@@ -13,6 +13,7 @@ export class TerminalXtermRasterTarget {
   private priority: 'focused' | 'visible' | 'hidden' = 'hidden'
   private rasterGeometry: RasterGeometry | null = null
   private scale: TerminalRasterScale = 1
+  private projectionBitmapAllocated = false
   private readonly costListeners = new Set<() => void>()
   private readonly priorityListeners = new Set<() => void>()
 
@@ -38,7 +39,7 @@ export class TerminalXtermRasterTarget {
   ) {}
 
   attach(element: HTMLDivElement): void {
-    this.detach(this.element)
+    if (this.element) this.detach(this.element)
     this.element = element
     this.presentationOwner = findTerminalPresentationOwner(element)
     element.addEventListener('focusin', this.handleFocusIn)
@@ -74,8 +75,12 @@ export class TerminalXtermRasterTarget {
     }
   }
 
-  detach(element: HTMLDivElement | null): void {
-    if (!element || this.element !== element) return
+  detach(element: HTMLDivElement | null, retainGeometry = false): void {
+    if (this.element !== element) return
+    if (!element) {
+      this.updateRasterGeometry(null)
+      return
+    }
     element.removeEventListener('focusin', this.handleFocusIn)
     element.removeEventListener('focusout', this.handleFocusOut)
     this.observerCleanup?.()
@@ -89,7 +94,14 @@ export class TerminalXtermRasterTarget {
     this.isIntersecting = false
     this.isPresentationVisible = false
     this.refreshPriority()
-    this.updateRasterGeometry(null)
+    // A hot view still owns its allocated canvases at the last measured size.
+    if (!retainGeometry) this.updateRasterGeometry(null)
+  }
+
+  readonly setProjectionBitmapAllocated = (allocated: boolean): void => {
+    if (this.projectionBitmapAllocated === allocated) return
+    this.projectionBitmapAllocated = allocated
+    for (const listener of this.costListeners) listener()
   }
 
   private setScale(scale: TerminalRasterScale): void {
@@ -159,7 +171,7 @@ export class TerminalXtermRasterTarget {
     if (!geometry) return 0
     const width = Math.ceil(geometry.width * geometry.devicePixelRatio * scale)
     const height = Math.ceil(geometry.height * geometry.devicePixelRatio * scale)
-    return width * height
+    return width * height * (this.projectionBitmapAllocated ? 2 : 1)
   }
 }
 

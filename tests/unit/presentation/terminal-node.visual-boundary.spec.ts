@@ -20,6 +20,10 @@ describe('terminal node visual boundary', () => {
     const frameRule = readRule(terminalNodeStyles, '.terminal-frame')
     const rightEdgeRule = readRule(terminalNodeStyles, '.terminal-frame::after')
     const projectionRule = readRule(terminalThemeProjectionStyles, '.terminal-theme-projection')
+    const indexedGlyphRule = readRule(
+      terminalThemeProjectionStyles,
+      '.terminal-indexed-glyph-layer'
+    )
 
     expect(frameRule).toContain('position: relative;')
     expect(rightEdgeRule).toContain('position: absolute;')
@@ -31,6 +35,8 @@ describe('terminal node visual boundary', () => {
     expect(rightEdgeRule).toContain('pointer-events: none;')
     expect(projectionRule).toContain('box-sizing: border-box;')
     expect(projectionRule).toContain('background: var(--cc-terminal-projection-background);')
-    expect(projectionRule).toContain('padding: 9px 0 9px 10px;')
+    expect(projectionRule).toContain('--terminal-reading-insets: 9px 0 9px 10px;')
+    expect(projectionRule).toContain('padding: var(--terminal-reading-insets);')
+    expect(indexedGlyphRule).toContain('inset: var(--terminal-reading-insets);')
   })
 })

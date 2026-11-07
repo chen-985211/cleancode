@@ -70,6 +70,12 @@ export interface AgentProviderDescriptor {
   readonly documentationUrl?: string
   readonly icon: AgentProviderIcon
   readonly id: string
+  /** Verified CLI truecolor equivalents for a given SGR role, as 24-bit sRGB. */
+  readonly terminalColorPairs?: readonly {
+    readonly role: 'foreground' | 'background'
+    readonly dark: number
+    readonly light: number
+  }[]
   readonly launch?: AgentProviderLaunchConfiguration
 }
 

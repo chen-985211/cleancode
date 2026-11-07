@@ -75,6 +75,7 @@ function validateContribution(contribution: AgentProviderContribution): void {
     id !== id.trim() ||
     !contribution.descriptor.displayName.trim() ||
     !isValidProviderIcon(icon) ||
+    !hasValidColorPairs(contribution.descriptor.terminalColorPairs) ||
     capabilities.resume !== Boolean(contribution.resume) ||
     telemetrySignals.activity !== capabilities.activityTracking ||
     capturesSessionIdentity !== capabilities.sessionIdentityCapture ||
@@ -92,6 +93,22 @@ function validateContribution(contribution: AgentProviderContribution): void {
       { providerId: id || '<empty>' }
     )
   }
+}
+
+function hasValidColorPairs(pairs: AgentProviderDescriptor['terminalColorPairs']): boolean {
+  if (pairs === undefined) return true
+  if (!Array.isArray(pairs)) return false
+  const seen = new Set<string>()
+  for (const pair of pairs) {
+    if (!pair || (pair.role !== 'foreground' && pair.role !== 'background')) return false
+    for (const theme of ['light', 'dark'] as const) {
+      const rgb = pair[theme]
+      const key = `${pair.role}/${theme}/${rgb}`
+      if (!Number.isInteger(rgb) || rgb < 0 || rgb > 0xffffff || seen.has(key)) return false
+      seen.add(key)
+    }
+  }
+  return true
 }
 
 function isValidProviderIcon(icon: AgentProviderDescriptor['icon'] | undefined): boolean {

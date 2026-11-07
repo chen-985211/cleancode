@@ -32,6 +32,7 @@ import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalOscColorResponse } from './terminalSourcePalette'
+import { TerminalPaletteCheckpoint } from './TerminalPaletteCheckpoint'
 import { TerminalParserContinuation } from './TerminalParserContinuation'
 
 const nodeRequire = createRequire(import.meta.url)
@@ -180,6 +181,7 @@ class ManagedTerminalModel {
   readonly identity: TerminalRunScope
   private readonly terminal: HeadlessTerminalInstance
   private readonly serializeAddon: SerializeAddonInstance
+  private readonly palette: TerminalPaletteCheckpoint
   private readonly parserContinuation = new TerminalParserContinuation()
   private readonly onQueryResponse: (response: string) => void
   private readonly onFlowControlChange: (isPaused: boolean) => void
@@ -211,6 +213,7 @@ class ManagedTerminalModel {
       rows: command.rows,
       scrollback: scrollbackRows
     })
+    this.palette = new TerminalPaletteCheckpoint(this.terminal)
     this.serializeAddon = new SerializeAddon()
     const unicodeAddon = new Unicode11Addon()
     this.terminal.loadAddon(
@@ -387,17 +390,21 @@ class ManagedTerminalModel {
   private createCheckpoint(): TerminalModelCheckpoint {
     const scrollbackRows = this.terminal.options.scrollback ?? defaultTerminalScrollbackRows
     const continuation = this.parserContinuation.read()
+    const palette = this.palette.serialize()
     return {
       schemaVersion: 1,
       identity: this.identity,
       sequence: this.parsedSequence,
       scrollbackRows,
       unicodeVersion: '11',
-      content: this.serializeAddon.serialize({ scrollback: scrollbackRows }) + continuation,
-      normalContent: this.serializeAddon.serialize({
-        excludeAltBuffer: true,
-        scrollback: scrollbackRows
-      }),
+      content:
+        palette + this.serializeAddon.serialize({ scrollback: scrollbackRows }) + continuation,
+      normalContent:
+        palette +
+        this.serializeAddon.serialize({
+          excludeAltBuffer: true,
+          scrollback: scrollbackRows
+        }),
       transcript: readTranscript(this.terminal),
       dimensions: { columns: this.terminal.cols, rows: this.terminal.rows },
       title: this.title,
