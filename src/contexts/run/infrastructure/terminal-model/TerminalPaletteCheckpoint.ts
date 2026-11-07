@@ -10,8 +10,7 @@ export class TerminalPaletteCheckpoint {
       const fields = data.split(';')
       for (let i = 1; i < fields.length; i += 2) {
         const slot = ansiIndex(fields[i - 1]!)
-        const color = fields[i]!
-        if (slot !== undefined && isXtermColor(color)) this.indexed.set(slot, color)
+        if (slot !== undefined) storeColor(this.indexed, slot, fields[i]!)
       }
       return false
     })
@@ -30,7 +29,7 @@ export class TerminalPaletteCheckpoint {
       terminal.parser.registerOscHandler(code, (data) => {
         // OSC 10/11 may set consecutive default slots in a single command.
         for (const [i, color] of data.split(';', 13 - code).entries()) {
-          if (isXtermColor(color)) this.defaults.set(code + i, color)
+          storeColor(this.defaults, code + i, color)
         }
         return false
       })
@@ -54,7 +53,13 @@ function ansiIndex(field: string): number | undefined {
   return /^\d+$/u.test(field) && slot <= 255 ? slot : undefined
 }
 
-// Keep the original XParseColor operand so replay uses xterm's own RGB conversion.
+function storeColor(palette: Map<number, string>, slot: number, operand: string): void {
+  if (!isXtermColor(operand)) return
+  // A split field can retain the entire OSC input. Copy just the validated
+  // ASCII operand and let xterm perform its usual color conversion on replay.
+  palette.set(slot, Buffer.from(operand, 'ascii').toString('ascii'))
+}
+
 // An invalid assignment or a query must not displace an earlier valid color.
 function isXtermColor(value: string): boolean {
   if (/^#(?:[0-9a-f]{3}){1,4}$/iu.test(value)) return true

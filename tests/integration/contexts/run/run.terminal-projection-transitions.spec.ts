@@ -126,3 +126,91 @@ it.each(['dark', 'light'] as const)(
   },
   15000
 )
+
+describe.each(['dark', 'light'] as const)('DOM interaction while leaving a %s frame', (display) => {
+  it.each(['focus', 'blur', 'hover', 'leave'] as const)(
+    'holds the painted frame through %s until synchronized output ends',
+    async (interaction) => {
+      await electron.mountIndexedGlyphs('dom', 'dark')
+      const page = electron.page
+      const next = display === 'dark' ? 'light' : 'dark'
+      await page.evaluate(async (theme) => {
+        const f = window.terminalIndexedFixture
+        // Wrap the URL so the final redraw must underline the correct cells on both rows.
+        const column = f.dimensions().columns - 7
+        await f.restoreContent(`\x1b[?25l██ \x1b[31m██\x1b[0m\x1b[${column}Ghttps://example.com`)
+        f.theme(theme)
+      }, display)
+      const screen = page.locator('.xterm-screen')
+      const textarea = page.locator('.xterm-helper-textarea')
+      const link = page.locator('.xterm-cursor-pointer')
+      const underlinedText = () =>
+        screen.locator('.xterm-rows span').evaluateAll((spans) =>
+          spans
+            .filter((s) => (s as HTMLElement).style.textDecorationLine === 'underline')
+            .map((s) => s.textContent)
+            .join('')
+        )
+      const point = await screen.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const { columns, rows } = window.terminalIndexedFixture.dimensions()
+        return { x: r.x + (2.5 * r.width) / columns, y: r.y + (1.5 * r.height) / rows }
+      })
+      const hover = async (active: boolean) => {
+        await page.mouse.move(active ? point.x : 1, active ? point.y : 1)
+        await link.waitFor({ state: active ? 'attached' : 'detached' })
+      }
+      await hover(false)
+      if (interaction === 'blur') await textarea.focus()
+      if (interaction === 'focus') await textarea.blur()
+      await page
+        .locator(
+          `[data-terminal-projected="${display === 'light'}"] [data-terminal-content-ready="true"]`
+        )
+        .waitFor()
+      if (interaction === 'leave') {
+        const idle = await screen.screenshot()
+        await hover(true)
+        await expect.poll(underlinedText).toBe('https://example.com')
+        expect(
+          (await screen.screenshot()).equals(idle),
+          'visible underline before the freeze'
+        ).toBe(false)
+      }
+      const before = await screen.screenshot()
+      await write('\x1b[?2026h')
+      await page.evaluate<void, typeof display>(
+        (theme) => window.terminalIndexedFixture.theme(theme),
+        next
+      )
+      if (interaction === 'blur') await textarea.blur()
+      if (interaction === 'focus') await textarea.focus()
+      if (interaction === 'hover' || interaction === 'leave') await hover(interaction === 'hover')
+      const during = await screen.screenshot({
+        path: join(output, `dom-${display}-synchronized-${interaction}.png`)
+      })
+      expect(during.equals(before), 'same visible pixels before the flush').toBe(true)
+      await write('\x1b[?2026l')
+      await expect
+        .poll(async () => (await ink('dom'))[0])
+        .toBe(next === 'light' ? 0x172033 : 0xd6dee8)
+      if (interaction === 'focus' || interaction === 'blur') {
+        expect(await screen.locator('.xterm-rows.xterm-focus').count()).toBe(
+          interaction === 'focus' ? 1 : 0
+        )
+      }
+      if (interaction === 'hover' || interaction === 'leave') {
+        await expect.poll(underlinedText).toBe(interaction === 'hover' ? 'https://example.com' : '')
+      }
+      if (interaction === 'hover') {
+        const hovered = await screen.screenshot()
+        await hover(false)
+        await expect.poll(underlinedText).toBe('')
+        expect(
+          (await screen.screenshot()).equals(hovered),
+          'visible underline after the flush'
+        ).toBe(false)
+      }
+    }
+  )
+})

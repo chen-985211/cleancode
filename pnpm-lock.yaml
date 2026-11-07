@@ -9,7 +9,7 @@ patchedDependencies:
     hash: 86b81c65f5cdd588ad7490223f9a9e9a081bbbba32b631dfe4badf6adec4126c
     path: patches/@xterm__addon-webgl@0.19.0.patch
   '@xterm/xterm@6.0.0':
-    hash: a5d2b9dc89955dd571ea6fb9044bf641caecc0579e7eefb79e7e53d21214adfc
+    hash: a5b871d1230e16f3e0ceb412c1877b68d4468b8af0733ed864d74ac48ade78f7
     path: patches/@xterm__xterm@6.0.0.patch
   node-pty@1.1.0:
     hash: cd22b37e3ea1792204d1a9ef5546ba8e21ba70167ae6e35c67b4774ba5c54bd2
@@ -48,7 +48,7 @@ importers:
         version: 6.0.0
       '@xterm/xterm':
         specifier: 6.0.0
-        version: 6.0.0(patch_hash=a5d2b9dc89955dd571ea6fb9044bf641caecc0579e7eefb79e7e53d21214adfc)
+        version: 6.0.0(patch_hash=a5b871d1230e16f3e0ceb412c1877b68d4468b8af0733ed864d74ac48ade78f7)
       '@xyflow/react':
         specifier: 12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -5506,7 +5506,7 @@ snapshots:
 
   '@xterm/headless@6.0.0': {}
 
-  '@xterm/xterm@6.0.0(patch_hash=a5d2b9dc89955dd571ea6fb9044bf641caecc0579e7eefb79e7e53d21214adfc)': {}
+  '@xterm/xterm@6.0.0(patch_hash=a5b871d1230e16f3e0ceb412c1877b68d4468b8af0733ed864d74ac48ade78f7)': {}
 
   '@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
