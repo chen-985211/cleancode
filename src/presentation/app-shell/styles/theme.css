@@ -440,7 +440,8 @@
   --cc-easing-exit: ease-in;
   --cc-easing-brand-sweep: cubic-bezier(0.65, 0, 0.35, 1);
   --cc-easing-loading-shimmer-wave: ease-in-out;
-  --cc-canvas-node-radius: 20px;
+  --cc-canvas-node-radius: 28px;
+  --cc-canvas-node-corner-shape: squircle;
   --cc-terminal-light-background: #f2f4f5;
   --cc-terminal-light-foreground: #172033;
   --cc-terminal-light-cursor: #172033;

@@ -35,6 +35,7 @@
   inset: -1px;
   border: 1px solid var(--cc-primary-border);
   border-radius: inherit;
+  corner-shape: var(--cc-canvas-node-corner-shape);
   box-shadow: 0 0 22px var(--cc-shadow-color);
   content: '';
   pointer-events: none;

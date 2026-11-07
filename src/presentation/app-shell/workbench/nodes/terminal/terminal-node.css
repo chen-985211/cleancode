@@ -29,6 +29,7 @@
   overflow: visible;
   border: 1px solid var(--terminal-border);
   border-radius: var(--cc-canvas-node-radius);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   background: var(--terminal-shell);
   box-shadow: var(--cc-shadow-sm);
   transition:
@@ -92,6 +93,7 @@
   border-bottom: 1px solid var(--cc-divider);
   border-radius: calc(var(--cc-canvas-node-radius) - 1px) calc(var(--cc-canvas-node-radius) - 1px) 0
     0;
+  corner-shape: var(--cc-canvas-node-corner-shape);
   padding: 7px 9px 7px 10px;
   background: var(--terminal-shell-raised);
 }
@@ -274,6 +276,7 @@
   overflow: hidden;
   border-radius: 0 0 calc(var(--cc-canvas-node-radius) - 1px)
     calc(var(--cc-canvas-node-radius) - 1px);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   background: var(--terminal-screen);
 }
 
@@ -574,6 +577,7 @@
   flex: 1;
   flex-direction: column;
   border-radius: inherit;
+  corner-shape: var(--cc-canvas-node-corner-shape);
 }
 
 .terminal-node--disclosure-transition > .terminal-node__content {
@@ -604,7 +608,7 @@
 }
 
 .terminal-node--collapsed {
-  border-radius: 10px;
+  --cc-canvas-node-radius: 18px;
 }
 
 .terminal-node--collapsed .terminal-node__disclosure {

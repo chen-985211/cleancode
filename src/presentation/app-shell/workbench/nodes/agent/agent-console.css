@@ -5,6 +5,7 @@
   overflow: visible;
   border: 1px solid var(--cc-terminal-border);
   border-radius: var(--cc-canvas-node-radius);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   background: var(--cc-terminal-background);
   box-shadow: var(--cc-shadow-sm);
   transition:
@@ -24,6 +25,7 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: calc(var(--cc-canvas-node-radius) - 1px);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   background: var(--cc-terminal-background);
 }
 

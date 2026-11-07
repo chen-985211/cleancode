@@ -16,6 +16,7 @@
   inset: -4px;
   border: 1px solid color-mix(in srgb, var(--cc-primary) 72%, var(--cc-surface));
   border-radius: calc(var(--cc-canvas-node-radius) + 4px);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   box-shadow:
     0 0 0 3px var(--cc-primary-ring),
     var(--cc-shadow-node);
