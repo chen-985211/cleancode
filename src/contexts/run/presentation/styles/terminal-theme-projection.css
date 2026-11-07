@@ -38,6 +38,10 @@
   left: 0;
 }
 
+.terminal-indexed-glyph-layer > .xterm-link-layer {
+  filter: var(--cc-terminal-theme-mismatch-filter);
+}
+
 .terminal-theme-projection__filter {
   position: absolute;
   width: 0;

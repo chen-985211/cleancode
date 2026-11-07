@@ -151,7 +151,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
 
       const mainWorkspaceButton = projectCard.locator('.default-branch-selector__select')
       await armTerminalWorkspaceMeasurement(mainWorkspaceButton, [
-        { kind: 'agent', sessionId: mainSession.sessionId }
+        { kind: 'agent', sessionId: mainSession.sessionId, expectProjectedInk: true }
       ])
       await mainWorkspaceButton.click()
       const restoredMainSession = await waitForAgentTerminal(page, 'main', 'light')

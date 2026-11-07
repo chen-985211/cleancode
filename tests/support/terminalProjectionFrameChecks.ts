@@ -95,7 +95,7 @@ export const projectionFrameChecks = {
     await theme(page, 'light')
     const child = page
       .locator('.terminal-indexed-glyph-layer')
-      .locator(renderer === 'dom' ? '.xterm-rows' : 'canvas')
+      .locator(renderer === 'dom' ? '.xterm-rows' : 'canvas:not(.xterm-link-layer)')
     await child.waitFor()
     const projected = await raster()
     expect(projected.cost).toBe(base.cost * (renderer === 'dom' ? 1 : 2))

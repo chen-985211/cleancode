@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import '../../src/presentation/app-shell/shell/AppShell.css'
 import { TerminalThemeProjection } from '../../src/contexts/run/presentation/components/TerminalThemeProjection'
 import type { TerminalColorPair } from '../../src/contexts/run/presentation/terminal-surface/terminalTheme'
+import type { TerminalSurfaceAttachment } from '../../src/contexts/run/presentation/terminal-surface/terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from '../../src/contexts/run/presentation/terminal-surface/terminalXtermSurface'
 import { applyEffectiveTheme } from '../../src/presentation/app-shell/app-features/settings/themePreference'
 
@@ -20,16 +21,18 @@ const projection = (
     <div className={ordinary ? 'terminal-viewport' : 'agent-terminal-viewport'} ref={ref} />
   </TerminalThemeProjection>
 )
-flushSync(() =>
-  root.render(ordinary ? <div className="terminal-output-shell">{projection}</div> : projection)
-)
+function mountWorkspace() {
+  flushSync(() =>
+    root.render(ordinary ? <div className="terminal-output-shell">{projection}</div> : projection)
+  )
+}
+mountWorkspace()
 const surface = createTerminalXtermSurface(source)
 let dimensions = { columns: 80, rows: 24 }
 let sequence = 0
 const noop = (): void => {}
 const input: string[] = []
-surface.attach({
-  element: ref.current!,
+const attachment: Omit<TerminalSurfaceAttachment, 'element'> = {
   isResizeSuspended: false,
   onDimensionsChange: (value) => {
     dimensions = value
@@ -39,7 +42,8 @@ surface.attach({
   onOpenSearch: noop,
   onRestoreRequired: noop,
   onSearchResultsChange: noop
-})
+}
+surface.attach({ ...attachment, element: ref.current! })
 await surface.workloadTarget?.runInitialization?.()
 const identity = {
   projectId: 'project',
@@ -82,6 +86,14 @@ async function restoreContent(content: string): Promise<void> {
 let costChanges = 0
 surface.rasterTarget?.onRasterCostChange?.(() => costChanges++)
 const fixture = {
+  switchWorkspaceAway() {
+    if (!surface.retain?.(attachment)) throw new Error('Expected a hot terminal view')
+    flushSync(() => root.render(null))
+  },
+  switchWorkspaceBack() {
+    mountWorkspace()
+    surface.attach({ ...attachment, element: ref.current!, resume: true })
+  },
   raster: () => ({ cost: surface.rasterTarget!.getRasterCost(1), changes: costChanges }),
   restoreContent,
   input: () => [...input],

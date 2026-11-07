@@ -3,6 +3,7 @@ import type { Locator, Page } from 'playwright'
 interface TerminalTarget {
   readonly kind: 'agent' | 'terminal'
   readonly sessionId: string
+  readonly expectProjectedInk?: boolean
 }
 
 interface SwitchMeasurement {
@@ -41,7 +42,7 @@ export async function armTerminalWorkspaceMeasurement(
         frameTasks.port1.onmessage = () => {
           const elapsed = performance.now() - startedAt
           if (element.getAttribute('aria-current') === 'page') {
-            const missing = terminals.flatMap(({ kind, sessionId }) => {
+            const missing = terminals.flatMap(({ kind, sessionId, expectProjectedInk }) => {
               const selector =
                 kind === 'agent'
                   ? '.agent-terminal-viewport[data-agent-terminal-session-id'
@@ -52,6 +53,17 @@ export async function armTerminalWorkspaceMeasurement(
               const xterm = viewport?.querySelector<HTMLElement>('.xterm')
               if (!viewport || !xterm)
                 return [`${sessionId}: no ${viewport ? 'xterm' : 'viewport'}`]
+              if (expectProjectedInk) {
+                const projection = viewport.parentElement
+                const ink = projection?.querySelector<HTMLElement>('.terminal-indexed-glyph-layer')
+                if (
+                  projection?.dataset.terminalProjected !== 'true' ||
+                  !ink?.checkVisibility() ||
+                  !ink.querySelector('canvas:not(.xterm-link-layer), [data-indexed-glyph]')
+                ) {
+                  return [sessionId + ': projected text missing']
+                }
+              }
               const opacity = getComputedStyle(xterm).opacity
               const height = xterm.getBoundingClientRect().height
               return viewport.dataset.terminalContentReady === 'true' &&

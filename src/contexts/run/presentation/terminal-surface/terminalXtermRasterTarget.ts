@@ -39,7 +39,7 @@ export class TerminalXtermRasterTarget {
   ) {}
 
   attach(element: HTMLDivElement): void {
-    this.detach(this.element)
+    if (this.element) this.detach(this.element)
     this.element = element
     this.presentationOwner = findTerminalPresentationOwner(element)
     element.addEventListener('focusin', this.handleFocusIn)
@@ -75,8 +75,12 @@ export class TerminalXtermRasterTarget {
     }
   }
 
-  detach(element: HTMLDivElement | null): void {
-    if (!element || this.element !== element) return
+  detach(element: HTMLDivElement | null, retainGeometry = false): void {
+    if (this.element !== element) return
+    if (!element) {
+      this.updateRasterGeometry(null)
+      return
+    }
     element.removeEventListener('focusin', this.handleFocusIn)
     element.removeEventListener('focusout', this.handleFocusOut)
     this.observerCleanup?.()
@@ -90,7 +94,8 @@ export class TerminalXtermRasterTarget {
     this.isIntersecting = false
     this.isPresentationVisible = false
     this.refreshPriority()
-    this.updateRasterGeometry(null)
+    // A hot view still owns its allocated canvases at the last measured size.
+    if (!retainGeometry) this.updateRasterGeometry(null)
   }
 
   readonly setProjectionBitmapAllocated = (allocated: boolean): void => {

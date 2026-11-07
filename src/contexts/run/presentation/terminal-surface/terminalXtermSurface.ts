@@ -221,8 +221,8 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
-    this.projectionFrames.detach()
-    this.xtermRasterTarget.detach(element)
+    if (!preserve) this.projectionFrames.detach()
+    this.xtermRasterTarget.detach(element, preserve)
     if (!preserve) this.terminal.element?.remove()
     this.element = null
   }
@@ -412,6 +412,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.blur()
     this.terminal.options.cursorBlink = false
     if (this.terminal.element) host.append(this.terminal.element)
+    this.projectionFrames.moveTo(host)
     this.detach(element, true)
     this.lastReportedDimensions = null
     return true
@@ -431,6 +432,10 @@ class XtermTerminalSurface implements TerminalSurface {
   dispose(): void {
     if (this.isDisposed) return
     if (this.element) this.detach(this.element)
+    else {
+      this.projectionFrames.detach()
+      this.xtermRasterTarget.detach(null)
+    }
     this.isDisposed = true
     this.restoreRevision += 1
     this.presentation.detach()

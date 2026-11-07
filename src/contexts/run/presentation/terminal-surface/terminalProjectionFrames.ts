@@ -23,17 +23,34 @@ export class TerminalProjectionFrames {
   ) {}
 
   attach(viewport: HTMLElement): void {
-    this.detach()
-    this.root = viewport.ownerDocument.documentElement
+    const root = viewport.ownerDocument.documentElement
     const parent = viewport.parentElement
-    if (
-      parent?.matches(`.terminal-theme-projection[data-terminal-source-theme="${this.source}"]`)
-    ) {
-      this.wrapper = parent
+    const wrapper = parent?.matches(
+      `.terminal-theme-projection[data-terminal-source-theme="${this.source}"]`
+    )
+      ? parent
+      : undefined
+    if (wrapper && this.wrapper && this.root === root) {
+      this.moveTo(wrapper)
+      return
     }
+    this.detach()
+    this.root = root
+    this.wrapper = wrapper
     this.update()
     this.observer = new MutationObserver(() => this.update())
     this.observer.observe(this.root, { attributes: true, attributeFilter: ['data-theme'] })
+  }
+
+  /** Move both halves of the last frame together, including during DEC 2026. */
+  moveTo(host: HTMLElement): void {
+    if (!this.wrapper || this.wrapper === host) return
+    const painted = this.wrapper.dataset.terminalProjected
+    delete this.wrapper.dataset.terminalProjected
+    this.wrapper = host
+    if (painted === undefined) delete host.dataset.terminalProjected
+    else host.dataset.terminalProjected = painted
+    if (this.ink) host.append(this.ink)
   }
 
   setColorPairs(pairs?: readonly TerminalColorPair[]): void {
@@ -54,7 +71,7 @@ export class TerminalProjectionFrames {
     this.render?.dispose()
     this.render = this.terminal.onRender(({ start, end }) => {
       if (start !== 0 || end < this.terminal.rows - 1) return
-      wrapper.dataset.terminalProjected = String(mismatch)
+      if (this.wrapper) this.wrapper.dataset.terminalProjected = String(mismatch)
       if (!mismatch) this.removeInk()
       this.render?.dispose()
       this.render = undefined
