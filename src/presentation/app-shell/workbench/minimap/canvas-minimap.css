@@ -23,7 +23,8 @@
   overflow: hidden;
   box-sizing: border-box;
   border: 0;
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-canvas);
   margin-bottom: var(--canvas-minimap-panel-gap);
   opacity: var(--canvas-minimap-panel-opacity);
@@ -46,6 +47,7 @@
   overflow: hidden;
   box-sizing: border-box;
   border-radius: inherit;
+  corner-shape: inherit;
   background: var(--cc-canvas);
 }
 
@@ -176,7 +178,8 @@
   box-sizing: border-box;
   align-items: center;
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-chrome-translucent);
   padding: 1px;
   opacity: 1;
@@ -197,7 +200,8 @@
   align-items: center;
   gap: 1px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-chrome-translucent);
   padding: 1px 2px;
   color: var(--cc-muted-strong);
@@ -209,7 +213,8 @@
 .canvas-minimap__viewport-controls .icon-button--small {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   color: var(--cc-muted-strong);
 }
 

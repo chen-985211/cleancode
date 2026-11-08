@@ -1,3 +1,4 @@
+import { MinimapContinuousRect } from './MinimapContinuousRect'
 import {
   memo,
   useCallback,
@@ -331,7 +332,7 @@ function CanvasMinimapViewportFrame({
   const frame = resolveViewportFrame(viewport, canvasSize)
 
   return (
-    <rect
+    <MinimapContinuousRect
       className="canvas-minimap__viewport-frame"
       x={frame.x}
       y={frame.y}

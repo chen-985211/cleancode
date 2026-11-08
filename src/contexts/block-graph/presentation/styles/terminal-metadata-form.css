@@ -18,7 +18,8 @@
   box-sizing: border-box;
   flex-direction: column;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-overlay);
   box-shadow: var(--cc-shadow-floating);
   backdrop-filter: blur(14px);
@@ -102,7 +103,8 @@
   min-height: 34px;
   box-sizing: border-box;
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   padding: 7px 10px;
   color: var(--cc-foreground);
@@ -164,14 +166,16 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(56px, 1fr));
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   padding: 3px;
 }
 
 .terminal-execution-mode__indicator,
 .terminal-execution-mode:not([data-selection-motion-ready='true']) label:has(input:checked) {
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow: 0 1px 3px var(--cc-shadow-color);
 }
@@ -187,7 +191,8 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 5px 12px;
   color: var(--cc-muted-strong);
   cursor: pointer;
@@ -278,7 +283,8 @@
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 12px;
   background: var(--cc-surface);
   color: var(--cc-muted-strong);

@@ -1,6 +1,7 @@
 .application-settings-navigation__selection {
   z-index: 0;
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-settings-navigation-selection);
 }
 
@@ -11,6 +12,7 @@
   left: 4px;
   width: 2px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-settings-navigation-accent);
   content: '';
 }
@@ -28,6 +30,7 @@
   left: 4px;
   width: 2px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-settings-navigation-accent);
   content: '';
 }
@@ -38,6 +41,7 @@
   inset: -1px;
   border: 1px solid var(--cc-primary-border);
   border-radius: inherit;
+  corner-shape: inherit;
   background: var(--cc-primary-soft);
   box-shadow:
     0 0 0 3px var(--cc-primary-ring),

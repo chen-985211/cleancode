@@ -14,6 +14,7 @@ export default tseslint.config(
       'build/**',
       'release/**',
       'coverage/**',
+      'test-results/**',
       '.vite/**'
     ]
   },

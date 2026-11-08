@@ -13,7 +13,8 @@
   max-height: min(360px, calc(100vh - 100px));
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-canvas-node-menu-surface);
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
@@ -61,7 +62,8 @@
   align-items: center;
   gap: 4px;
   border: 0;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-neutral-overlay);
   color: var(--cc-foreground);
   font: inherit;
@@ -95,7 +97,8 @@
   align-items: center;
   gap: 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-foreground);
   font: inherit;
@@ -120,7 +123,8 @@
   flex: 0 0 22px;
   height: 22px;
   place-items: center;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-neutral-overlay);
 }
 
@@ -192,7 +196,8 @@
   min-width: 0;
   height: 42px;
   border-color: transparent;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
 }
 
 .quick-execution__arrangement-slots .quick-execution__slot--filled {
@@ -217,7 +222,8 @@
 }
 
 .quick-execution__drag-proxy-card.quick-execution__drag-proxy-card--row {
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background:
     linear-gradient(var(--cc-neutral-overlay), var(--cc-neutral-overlay)),
     var(--cc-canvas-node-menu-surface);
@@ -236,6 +242,7 @@
   inset: -1px;
   border: 1px solid var(--cc-border-strong);
   border-radius: inherit;
+  corner-shape: inherit;
   box-shadow: var(--cc-shadow-floating);
   content: '';
   opacity: var(--quick-execution-return-chrome-opacity, 1);
@@ -263,7 +270,8 @@
   width: 22px;
   height: 24px;
   border: 1px solid var(--cc-border);
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   color: var(--cc-muted-strong);
   font-size: 11px;
 }

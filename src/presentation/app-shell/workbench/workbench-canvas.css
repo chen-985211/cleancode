@@ -31,7 +31,8 @@
   align-items: center;
   gap: 3px;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-neutral-overlay);
   padding: 4px;
   box-shadow: 0 4px 16px var(--cc-shadow-color);
@@ -41,6 +42,7 @@
 .app-shell__toolbar-group--agent {
   flex: 0 0 auto;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-agent-create-surface);
   padding: 0;
 }
@@ -55,7 +57,8 @@
 .toolbar-button {
   height: 30px;
   border-color: transparent;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0 10px;
   font-size: 12px;
@@ -92,7 +95,8 @@
   height: 30px;
   align-items: center;
   gap: 6px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-primary-soft);
   padding: 0 8px;
   color: var(--cc-muted-strong);
@@ -113,6 +117,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-neutral-overlay);
   color: var(--cc-primary);
   font-size: 11px;
@@ -243,7 +248,8 @@
   flex-direction: column;
   align-items: center;
   border: 1px solid var(--cc-border);
-  border-radius: 16px;
+  border-radius: calc(16px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-translucent);
   padding: 23px 24px 21px;
   box-shadow:
@@ -330,7 +336,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   color: var(--cc-muted);
   box-shadow: 0 4px 14px var(--cc-shadow-color);
@@ -362,7 +369,8 @@
   width: 44px;
   height: 44px;
   grid-row: 1 / span 2;
-  border-radius: 11px;
+  border-radius: calc(11px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   box-shadow: none;
 }
 
@@ -427,7 +435,8 @@
   justify-content: center;
   gap: 7px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-primary);
   padding: 0 13px;
   color: var(--cc-primary-contrast);
@@ -543,6 +552,7 @@
   gap: 7px;
   border: 1px solid transparent;
   border-radius: var(--cc-statusbar-radius);
+  corner-shape: round;
   background: transparent;
   padding: 0 12px;
   color: var(--cc-statusbar-foreground);
@@ -554,6 +564,7 @@
   inset: -1px;
   border: 1px solid var(--cc-statusbar-border);
   border-radius: inherit;
+  corner-shape: inherit;
   box-shadow: var(--cc-shadow-xs);
   content: '';
   pointer-events: none;
@@ -569,6 +580,7 @@
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
+  corner-shape: inherit;
   background: var(--cc-statusbar-sheen), var(--cc-statusbar-background);
   box-shadow: inset 0 1px 0 var(--cc-statusbar-border);
   pointer-events: none;

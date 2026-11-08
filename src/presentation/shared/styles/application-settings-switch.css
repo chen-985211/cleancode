@@ -5,6 +5,7 @@
   flex: 0 0 auto;
   border: 0;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-border-strong);
   overflow: hidden;
   padding: 2px;
@@ -17,6 +18,7 @@
   z-index: 0;
   inset: 0;
   border-radius: inherit;
+  corner-shape: inherit;
   background: var(--cc-settings-switch-on);
   content: '';
   opacity: var(--cc-selection-motion-progress, 0);
@@ -30,6 +32,7 @@
   width: 15px;
   height: 15px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--cc-settings-switch-thumb);
   box-shadow: var(--cc-shadow-sm);
   transform: translate3d(calc(var(--cc-selection-motion-progress, 0) * 15px), 0, 0);

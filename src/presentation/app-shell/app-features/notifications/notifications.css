@@ -89,7 +89,8 @@
   align-items: center;
   gap: 6px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   padding: 6px 8px 6px 10px;
   color: var(--cc-foreground);
@@ -135,7 +136,8 @@
   min-width: 0;
   align-items: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0;
   color: inherit;
@@ -223,6 +225,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--notification-accent);
 }
 
@@ -289,7 +292,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 0;
   color: var(--cc-muted);

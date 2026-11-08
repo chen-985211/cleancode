@@ -1,6 +1,7 @@
 import { memo, useContext, type KeyboardEvent, type MouseEvent, type SyntheticEvent } from 'react'
 
 import { MinimapNodeInteractionContext } from './minimapInteraction'
+import { MinimapContinuousRect } from './MinimapContinuousRect'
 import { useI18n } from '../../../i18n/useI18n'
 
 interface MinimapWorkbenchNodeProps {
@@ -160,7 +161,7 @@ function MinimapAgentPreview({
 
   return (
     <>
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__node-shell canvas-minimap__agent-shell"
         x={x}
         y={y}
@@ -171,7 +172,7 @@ function MinimapAgentPreview({
         stroke={strokeColor}
         strokeWidth={strokeWidth}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__node-header canvas-minimap__agent-header"
         x={x + inset}
         y={y + inset}
@@ -180,7 +181,7 @@ function MinimapAgentPreview({
         rx={Math.max(2, borderRadius * 0.55)}
         fill="var(--cc-border)"
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__agent-icon"
         x={x + inset * 1.35}
         y={y + inset * 1.25}
@@ -190,7 +191,7 @@ function MinimapAgentPreview({
         fill="var(--cc-surface)"
         opacity={0.9}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__agent-body"
         x={x + inset}
         y={contentY}
@@ -220,7 +221,7 @@ function MinimapTerminalPreview({
 
   return (
     <>
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__node-shell"
         x={x}
         y={y}
@@ -231,7 +232,7 @@ function MinimapTerminalPreview({
         stroke={strokeColor}
         strokeWidth={strokeWidth}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__node-header"
         x={x + inset}
         y={y + inset}
@@ -247,7 +248,7 @@ function MinimapTerminalPreview({
         r={Math.max(2, Math.min(4, inset * 0.8))}
         fill={statusColor}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__node-screen"
         x={x + inset}
         y={screenY}
@@ -284,7 +285,7 @@ function MinimapGroupPreview({
 
   return (
     <>
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-ring"
         x={x - ringInset}
         y={y - ringInset}
@@ -296,7 +297,7 @@ function MinimapGroupPreview({
         strokeWidth={Math.max(1.3, strokeWidth + 0.2)}
         opacity={selected ? 0.72 : 0}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-shell"
         x={x}
         y={y}
@@ -307,7 +308,7 @@ function MinimapGroupPreview({
         stroke={strokeColor}
         strokeWidth={strokeWidth}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-header"
         x={contentX}
         y={headerY}
@@ -325,7 +326,7 @@ function MinimapGroupPreview({
         r={Math.max(2, Math.min(4, inset * 0.28))}
         fill={statusColor}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-title"
         x={contentX + inset * 1.45}
         y={headerY + headerInnerHeight / 2 - 2}
@@ -372,7 +373,7 @@ function MinimapGroupMemberRow({
 }: MinimapGroupMemberRowProps) {
   return (
     <>
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-member"
         x={x}
         y={y}
@@ -390,7 +391,7 @@ function MinimapGroupMemberRow({
         r={Math.max(2, Math.min(4, inset * 0.22))}
         fill={statusColor}
       />
-      <rect
+      <MinimapContinuousRect
         className="canvas-minimap__group-member-name"
         x={x + inset * 1.45}
         y={y + height / 2 - 1.5}

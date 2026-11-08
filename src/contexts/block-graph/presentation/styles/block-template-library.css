@@ -6,7 +6,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
@@ -96,13 +97,15 @@
   grid-template-columns: 1fr 1fr;
   isolation: isolate;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
 }
 
 .block-template-library-tabs__selection {
   z-index: 0;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   box-shadow:
     inset 0 1px 0 var(--cc-highlight-inset),
@@ -114,7 +117,8 @@
   z-index: 1;
   min-width: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 6px 8px;
   background: transparent;
   color: var(--cc-muted-strong);
@@ -146,7 +150,8 @@
   align-items: center;
   gap: 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 0 10px;
   color: var(--cc-muted);
   background: var(--cc-surface);
@@ -202,7 +207,8 @@
   justify-content: space-between;
   gap: 12px;
   border: 1px solid var(--cc-danger-border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 10px 12px;
   color: var(--cc-danger);
   font-size: 12px;
@@ -219,7 +225,8 @@
   column-gap: 14px;
   row-gap: 7px;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 12px;
   background: var(--cc-surface);
   box-shadow:
@@ -271,6 +278,7 @@
   width: fit-content;
   border: 1px solid var(--block-template-accent-border);
   border-radius: 999px;
+  corner-shape: round;
   padding: 2px 6px;
   background: var(--block-template-accent-soft);
   color: var(--block-template-accent);
@@ -284,6 +292,7 @@
   width: 5px;
   height: 5px;
   border-radius: 999px;
+  corner-shape: round;
   background: currentColor;
   content: '';
 }
@@ -324,7 +333,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
   opacity: 0;
@@ -366,7 +376,8 @@
   gap: 5px;
   border: 1px solid var(--cc-border);
   min-height: 30px;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 5px 9px;
   background: var(--cc-surface);
   color: var(--cc-foreground);
@@ -439,7 +450,8 @@
 .block-template-card-edit input,
 .block-template-card-edit textarea {
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 8px 9px;
   outline: 0;
   background: var(--cc-surface);
@@ -477,7 +489,8 @@
   width: min(430px, 100%);
   gap: 15px;
   border: 1px solid var(--cc-border);
-  border-radius: 13px;
+  border-radius: calc(13px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 18px;
   background: var(--cc-surface-raised);
   box-shadow: var(--cc-shadow-floating);
@@ -509,7 +522,8 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
 }
@@ -525,7 +539,8 @@
 .block-template-save-dialog > label input,
 .block-template-save-dialog textarea {
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 8px 9px;
   outline: 0;
   background: var(--cc-surface);
@@ -569,7 +584,8 @@
   align-items: center;
   gap: 6px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   padding: 7px 11px;
   background: var(--cc-surface);
   color: var(--cc-foreground);

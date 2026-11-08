@@ -3,7 +3,8 @@
   height: 16px;
   flex: 0 0 auto;
   align-items: center;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   padding: 0 5px;
   color: var(--cc-muted-strong);

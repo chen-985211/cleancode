@@ -6,7 +6,8 @@
 }
 
 img.agent-provider-icon {
-  border-radius: 2px;
+  border-radius: calc(2px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   object-fit: contain;
 }
 
@@ -23,7 +24,8 @@ img.agent-provider-icon {
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-warning-strong);
 }
@@ -59,6 +61,7 @@ img.agent-provider-icon {
   place-items: center;
   border: 1px solid var(--cc-surface);
   border-radius: 999px;
+  corner-shape: round;
   background: var(--cc-warning-strong);
   color: var(--cc-surface);
   font-size: 7px;
@@ -76,7 +79,8 @@ img.agent-provider-icon {
   display: grid;
   width: min(304px, calc(100vw - 16px));
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow: var(--cc-shadow-sm);
   padding: 14px;
@@ -98,7 +102,8 @@ img.agent-provider-icon {
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted);
 }
@@ -154,7 +159,8 @@ img.agent-provider-icon {
   justify-content: center;
   gap: 4px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
@@ -172,7 +178,8 @@ img.agent-provider-icon {
   min-width: 0;
   min-height: 32px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
   font: inherit;
@@ -225,7 +232,8 @@ img.agent-provider-icon {
   height: 34px;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   color: var(--cc-muted-strong);
 }
@@ -250,7 +258,8 @@ img.agent-provider-icon {
   min-width: 0;
   align-items: center;
   gap: 6px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-subtle);
   padding: 5px 6px 5px 9px;
 }

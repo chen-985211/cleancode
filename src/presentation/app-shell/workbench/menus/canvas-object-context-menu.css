@@ -15,7 +15,8 @@
   gap: 1px;
   overflow: hidden;
   border: 0;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-canvas-node-menu-surface);
   box-shadow: var(--cc-shadow-floating);
   padding: 5px;
@@ -41,7 +42,8 @@
   align-items: center;
   gap: 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-canvas-node-menu-foreground);
   font: inherit;
@@ -107,7 +109,8 @@
   min-width: 0;
   height: 38px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
@@ -132,7 +135,8 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: var(--cc-muted-strong);
 }

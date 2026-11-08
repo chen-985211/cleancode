@@ -32,7 +32,8 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   padding: 10px 12px;
   color: var(--cc-muted-strong);
@@ -48,7 +49,8 @@
 .application-diagnostics-actions {
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   box-shadow:
     inset 0 1px 0 var(--cc-highlight-inset),
@@ -84,7 +86,8 @@
   justify-content: center;
   gap: 7px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-raised);
   padding: 0 13px;
   color: var(--cc-foreground);

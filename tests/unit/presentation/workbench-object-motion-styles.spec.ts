@@ -232,7 +232,7 @@ describe('workbench object motion styles', () => {
       readStyleRule(agentConsoleStyles, '.agent-console-node')
     ]
 
-    expect(themeStyles).toContain('--cc-canvas-node-radius: 20px;')
+    expect(themeStyles).toContain('--cc-canvas-node-radius: 28px;')
     nodeRules.forEach((rule) => {
       expect(rule).toContain('border-radius: var(--cc-canvas-node-radius);')
     })

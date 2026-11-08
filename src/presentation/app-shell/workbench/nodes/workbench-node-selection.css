@@ -4,7 +4,8 @@
   inset: -2px;
   box-sizing: border-box;
   border: 2px solid var(--cc-workbench-node-selection);
-  border-radius: inherit;
+  border-radius: calc(var(--cc-canvas-node-radius) + 1px);
+  corner-shape: var(--cc-canvas-node-corner-shape);
   background: transparent;
   box-shadow: var(--cc-shadow-node);
   pointer-events: none;

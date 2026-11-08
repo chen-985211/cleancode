@@ -6,7 +6,8 @@
   min-height: 32px;
   padding: 6px 10px;
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
@@ -26,7 +27,8 @@
   overflow: auto;
   padding: 5px;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: var(--cc-surface-overlay);
   color: var(--cc-foreground);
   box-shadow: var(--cc-shadow-floating);
@@ -41,7 +43,8 @@
   min-height: 34px;
   padding: 7px 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
   background: transparent;
   color: inherit;
   font: inherit;
