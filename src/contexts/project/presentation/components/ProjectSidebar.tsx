@@ -1,5 +1,4 @@
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
-import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
@@ -428,13 +427,13 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
               const workspaceDisplayName = isGitUninitialized
                 ? t('sidebar.gitUninitialized')
                 : workspace.displayName
-              const shouldShowDefaultWorkspaceBadge =
+              const shouldDescribeDefaultWorkspace =
                 isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
               const shouldShowGitBranchBadge =
                 Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.displayName
               const workspaceButtonLabel = [
                 workspaceDisplayName,
-                shouldShowDefaultWorkspaceBadge ? t('sidebar.defaultWorkspace') : null,
+                shouldDescribeDefaultWorkspace ? t('sidebar.defaultWorkspace') : null,
                 isWorktreeWorkspace ? t('sidebar.separateWorkspace') : null,
                 shouldShowGitBranchBadge ? workspace.gitBranch : null
               ]
@@ -471,11 +470,6 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                               <GitBranchIcon size={14} />
                             </span>
                             <span className="workspace-row__name truncate">{boundBranchName}</span>
-                            {shouldShowDefaultWorkspaceBadge ? (
-                              <span className="badge badge--default-workspace">
-                                {t('sidebar.defaultWorkspace')}
-                              </span>
-                            ) : null}
                           </button>
                         </TooltipLabel>
                         <TooltipLabel content={t('sidebar.chooseDefaultBranchTitle')}>
@@ -540,23 +534,9 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                             <span className="workspace-row__name truncate">
                               {workspaceDisplayName}
                             </span>
-                            {shouldShowDefaultWorkspaceBadge ||
-                            isWorktreeWorkspace ||
-                            shouldShowGitBranchBadge ? (
+                            {shouldShowGitBranchBadge ? (
                               <span className="workspace-row__metadata">
-                                {shouldShowDefaultWorkspaceBadge ? (
-                                  <span className="badge badge--default-workspace">
-                                    {t('sidebar.defaultWorkspace')}
-                                  </span>
-                                ) : null}
-                                {isWorktreeWorkspace ? (
-                                  <span className="workspace-row__kind" aria-hidden="true">
-                                    <FoldersIcon size={12} />
-                                  </span>
-                                ) : null}
-                                {shouldShowGitBranchBadge ? (
-                                  <span className="badge badge--git">{workspace.gitBranch}</span>
-                                ) : null}
+                                <span className="badge badge--git">{workspace.gitBranch}</span>
                               </span>
                             ) : null}
                           </button>

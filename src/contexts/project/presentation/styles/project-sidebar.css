@@ -436,7 +436,6 @@
   font-weight: 620;
 }
 
-.workspace-row--active .workspace-row__kind,
 .workspace-row--active .workspace-row__menu-button {
   color: inherit;
 }
@@ -478,13 +477,6 @@
   border-color: var(--cc-sidebar-branch-badge-border);
   background: var(--cc-sidebar-branch-badge-surface);
   color: var(--cc-sidebar-branch-badge-foreground);
-}
-
-.badge--default-workspace {
-  max-width: 62px;
-  border-color: var(--cc-border);
-  background: var(--cc-surface-subtle);
-  color: var(--cc-muted-strong);
 }
 
 .workspace-row__branch-icon {

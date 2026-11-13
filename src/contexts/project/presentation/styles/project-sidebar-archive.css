@@ -23,22 +23,6 @@
   overflow: hidden;
 }
 
-.workspace-row__kind {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  align-items: center;
-  justify-content: center;
-  color: var(--cc-muted);
-}
-
-.workspace-row__kind svg {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-}
-
 .workspace-row--with-actions {
   gap: 0;
   padding: 0;
