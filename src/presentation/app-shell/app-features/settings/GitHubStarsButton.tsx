@@ -53,8 +53,8 @@ export function GitHubStarsButton() {
 
   const label =
     count === null ? t('settings.about.githubStar') : t('settings.about.githubStars', { count })
-  // Same composition as Animate UI's buttons-github-stars registry item.
-  // Its number, fill, particles and press spring run in the upstream package.
+  // Keep the link and press primitive mounted while only its count content changes.
+  // Number, fill, particles and press spring run in the upstream package.
   const button = (
     <Button asChild data-slot="github-stars-button">
       <a
@@ -72,31 +72,25 @@ export function GitHubStarsButton() {
             <Star className="github-stars-button__star" />
           </>
         ) : (
-          <>
-            <GithubStarsNumber className="github-stars-button__number" aria-hidden="true" />
-            <GithubStarsParticles className="github-stars-button__particles">
-              <GithubStarsIcon
-                icon={Star}
-                className="github-stars-button__star"
-                color="var(--cc-github-star)"
-              />
-            </GithubStarsParticles>
-          </>
+          <GithubStars asChild value={count}>
+            <span className="github-stars-button__content" aria-hidden="true">
+              <GithubStarsNumber className="github-stars-button__number" />
+              <GithubStarsParticles className="github-stars-button__particles">
+                <GithubStarsIcon
+                  icon={Star}
+                  className="github-stars-button__star"
+                  color="var(--cc-github-star)"
+                />
+              </GithubStarsParticles>
+            </span>
+          </GithubStars>
         )}
       </a>
     </Button>
   )
   return (
     <ReducedMotionContext value={reducedMotion ? 'always' : 'never'}>
-      <TooltipLabel content={label}>
-        {count === null ? (
-          button
-        ) : (
-          <GithubStars asChild value={count} aria-busy={false}>
-            {button}
-          </GithubStars>
-        )}
-      </TooltipLabel>
+      <TooltipLabel content={label}>{button}</TooltipLabel>
     </ReducedMotionContext>
   )
 }

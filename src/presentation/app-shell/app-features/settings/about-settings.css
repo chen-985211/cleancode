@@ -92,6 +92,12 @@
   pointer-events: none;
 }
 
+.github-stars-button__content {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}
+
 .github-stars-button__number {
   font-variant-numeric: tabular-nums;
 }

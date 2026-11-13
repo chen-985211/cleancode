@@ -93,6 +93,51 @@ describe('about repository stars', () => {
     expect(screen.getByRole('link')).not.toHaveTextContent('999')
   })
 
+  describe.each(['zh-CN', 'en'] as const)('async navigation in %s', (locale) => {
+    it.each([
+      { count: 0, reducedMotion: false },
+      { count: 113, reducedMotion: false },
+      { count: null, reducedMotion: false },
+      { count: 0, reducedMotion: true },
+      { count: 113, reducedMotion: true },
+      { count: null, reducedMotion: true }
+    ])(
+      'preserves the focused link after result $count with reducedMotion=$reducedMotion',
+      async ({ count, reducedMotion }) => {
+        vi.mocked(motionPreferenceStore.getSnapshot).mockReturnValue(reducedMotion)
+        let complete: () => void = () => undefined
+        installQuery(
+          () =>
+            new Promise<number>((resolve, reject) => {
+              complete = () => (count === null ? reject(new Error('offline')) : resolve(count))
+            })
+        )
+        render(
+          <I18nProvider initialLocale={locale}>
+            <AboutSettingsPane />
+          </I18nProvider>
+        )
+        const originalLink = screen.getByRole('link')
+        fireEvent.keyDown(document, { key: 'Tab' })
+        act(() => originalLink.focus())
+        expect(await screen.findByRole('tooltip')).toBeInTheDocument()
+
+        await act(async () => complete())
+
+        expect(screen.getByRole('link')).toBe(originalLink)
+        expect(originalLink).toHaveFocus()
+        expect(originalLink).toHaveAttribute('aria-busy', 'false')
+        if (count !== null) expect(originalLink.getAttribute('aria-label')).toContain(String(count))
+        expect(screen.getByRole('tooltip')).toHaveTextContent(
+          originalLink.getAttribute('aria-label')!
+        )
+        fireEvent.keyDown(originalLink, { key: 'Escape' })
+        await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+        expect(originalLink).toHaveFocus()
+      }
+    )
+  })
+
   it('uses the upstream rolling digits while preserving the accessible final count when motion is reduced', async () => {
     const preference = vi.mocked(motionPreferenceStore.getSnapshot).mockReturnValue(false)
     installQuery(vi.fn().mockResolvedValue(3200))
