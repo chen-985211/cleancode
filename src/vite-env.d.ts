@@ -120,6 +120,7 @@ declare global {
         command: ApplicationDiagnosticsExportCommand
       ): Promise<ApplicationDiagnosticsExportResult>
       getApplicationDiagnosticsSummary(): Promise<ApplicationDiagnosticsSummary>
+      getApplicationRepositoryStars(): Promise<number>
       showApplicationQuitConfirmation(command: ApplicationQuitConfirmationCommand): Promise<boolean>
       getPathForFile(file: File): string
       getWindowFullScreenState(): Promise<boolean>
