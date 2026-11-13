@@ -97,6 +97,7 @@ import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { configureApplicationQuitConfirmation as configureQuitConfirmation } from './applicationQuitConfirmation'
 import { configureApplicationDiagnostics } from './applicationDiagnosticsRuntime'
+import { configureApplicationRepository } from './applicationRepositoryRuntime'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
@@ -152,6 +153,7 @@ const terminalProviderRuntimeImage = new TerminalProviderRuntimeImageManager({
 })
 consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
 configureApplicationDiagnostics(appStateDirectoryPath, terminalProviderStateDirectoryPath)
+configureApplicationRepository()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 const getProjectRegistryRepository = createProjectRegistryProvider(appStateDirectoryPath)
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)

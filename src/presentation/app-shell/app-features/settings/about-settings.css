@@ -48,3 +48,75 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+.github-stars-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  max-width: 100%;
+  margin-top: 24px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--cc-github-stars-background);
+  color: var(--cc-github-stars-foreground);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial,
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  text-decoration: none;
+  outline: none;
+  transition:
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.github-stars-button:hover {
+  background: color-mix(in srgb, var(--cc-github-stars-background) 90%, transparent);
+}
+
+.github-stars-button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 3px;
+}
+
+.github-stars-button svg {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.github-stars-button__content {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}
+
+.github-stars-button__number {
+  font-variant-numeric: tabular-nums;
+}
+
+.github-stars-button__star {
+  fill: var(--cc-github-star-empty);
+  stroke: var(--cc-github-star-empty);
+}
+
+.github-stars-button__star path {
+  stroke: inherit;
+}
+
+.github-stars-button__particles {
+  color: var(--cc-github-star);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .github-stars-button {
+    transition: none;
+  }
+}

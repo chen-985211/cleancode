@@ -1,5 +1,6 @@
 import packageJson from '../../../../../package.json'
 import { useI18n } from '../../../i18n/useI18n'
+import { GitHubStarsButton } from './GitHubStarsButton'
 
 export function AboutSettingsPane() {
   const { t } = useI18n()
@@ -21,6 +22,7 @@ export function AboutSettingsPane() {
             <dd>{packageJson.version}</dd>
           </div>
         </dl>
+        <GitHubStarsButton />
       </div>
     </section>
   )

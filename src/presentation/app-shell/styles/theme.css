@@ -86,6 +86,10 @@
   --cc-success-soft: #e8f6ee;
   --cc-success-border: rgb(35 138 85 / 30%);
   --cc-success-ring: rgb(35 138 85 / 18%);
+  --cc-github-stars-background: #0a0a0a;
+  --cc-github-stars-foreground: #fafafa;
+  --cc-github-star-empty: #404040;
+  --cc-github-star: #edb200;
   --cc-warning: #b7791f;
   --cc-warning-strong: #865812;
   --cc-warning-soft: #fff6df;
@@ -204,6 +208,10 @@
   --cc-success-soft: #173628;
   --cc-success-border: rgb(82 196 136 / 38%);
   --cc-success-ring: rgb(82 196 136 / 23%);
+  --cc-github-stars-background: #fafafa;
+  --cc-github-stars-foreground: #0a0a0a;
+  --cc-github-star-empty: #d4d4d4;
+  --cc-github-star: #edb200;
   --cc-warning: #e0a84c;
   --cc-warning-strong: #f0bf6b;
   --cc-warning-soft: #3a2a13;

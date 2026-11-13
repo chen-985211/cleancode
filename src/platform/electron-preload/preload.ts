@@ -12,6 +12,7 @@ import {
 } from '../ipc/applicationQuitChannels'
 import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChannels'
 import { applicationDiagnosticsChannels } from '../ipc/applicationDiagnosticsChannels'
+import { applicationRepositoryStarsChannel } from '../ipc/applicationRepositoryChannels'
 
 const cleancodeApi = {
   appName: 'cleancode',
@@ -23,6 +24,7 @@ const cleancodeApi = {
     invokeCleancode(applicationDiagnosticsChannels.export, command),
   getApplicationDiagnosticsSummary: () =>
     invokeCleancode(applicationDiagnosticsChannels.getSummary),
+  getApplicationRepositoryStars: () => invokeCleancode<number>(applicationRepositoryStarsChannel),
   showApplicationQuitConfirmation: (command: ApplicationQuitConfirmationCommand) =>
     invokeCleancode<boolean>(applicationQuitChannels.show, command),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
