@@ -137,10 +137,19 @@ export function useCanvasObjectContextMenu({
             : (blockIds) => onRequestSaveBlockTemplate?.(blockIds)
         }
         onRemove={
-          onRequestDeleteTerminalScope
+          menuState.target.kind === 'terminal' || onRequestDeleteTerminalScope
             ? (target) => {
+                if (target.kind === 'terminal') {
+                  const node = nodes.find(
+                    (candidate) =>
+                      candidate.type === 'terminal' &&
+                      candidate.data.block.id === target.terminalBlockIds[0]
+                  )
+                  if (node?.type === 'terminal') node.data.onDelete(node.data.block)
+                  return
+                }
                 const removalTarget = toBatchTerminalRemovalTarget(target)
-                if (removalTarget) void onRequestDeleteTerminalScope(removalTarget)
+                if (removalTarget) void onRequestDeleteTerminalScope?.(removalTarget)
               }
             : undefined
         }

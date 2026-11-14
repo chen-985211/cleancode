@@ -142,7 +142,7 @@ describe('terminal autostart runtime epoch', () => {
     expect(screen.queryByRole('button', { name: 'Terminal 更多终端操作' })).not.toBeInTheDocument()
     await screen.findByTestId('terminal-input-disabled')
     fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
-    expect(screen.getByRole('menuitem', { name: 'Terminal 删除终端' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Terminal 移除终端' })).toBeInTheDocument()
     bounds.mockRestore()
     expect(data.onStart).not.toHaveBeenCalled()
     fireEvent.click(screen.getByText('measure terminal'))

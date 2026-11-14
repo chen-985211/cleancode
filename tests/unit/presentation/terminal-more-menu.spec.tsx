@@ -48,7 +48,7 @@ describe('terminal more menu', () => {
     ['menuitem', '停止当前命令', 'onStop'],
     ['menuitemcheckbox', '应用退出后继续运行此会话', 'onToggleRetention'],
     ['menuitem', '重开空终端会话', 'onRestart'],
-    ['menuitem', '删除终端', 'onDelete']
+    ['menuitem', '移除终端', 'onDelete']
   ] as const)('closes and only invokes %s %s once', (role, label, callback) => {
     const props = createProps()
     const onCanvasClick = vi.fn(),
@@ -117,7 +117,7 @@ describe('terminal more menu', () => {
     expect(trigger).toHaveFocus()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     fireEvent.keyDown(trigger, { key: 'ArrowUp' })
-    const remove = screen.getByRole('menuitem', { name: 'Terminal 删除终端' })
+    const remove = screen.getByRole('menuitem', { name: 'Terminal 移除终端' })
     await waitFor(() => expect(remove).toHaveFocus())
     fireEvent.keyDown(remove, { key: 'Tab' })
     expect(trigger).toHaveFocus()
@@ -136,6 +136,7 @@ describe('terminal more menu', () => {
       screen.getByRole('menu', { name: 'Terminal — More terminal actions' })
     ).toBeInTheDocument()
     expect(screen.getByRole('menuitemcheckbox')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Terminal — Remove terminal' })).toBeInTheDocument()
     expect(document.querySelector('[data-icon="terminal-retention"]')).toHaveAttribute(
       'data-icon-weight',
       'fill'
