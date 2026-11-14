@@ -151,7 +151,7 @@ describe('project sidebar navigation semantics', () => {
     })
 
     expect(within(defaultWorkspace).getByText('Git 未初始化')).toBeInTheDocument()
-    expect(within(defaultWorkspace).getByText('默认工作区')).toBeInTheDocument()
+    expect(within(defaultWorkspace).queryByText('默认工作区')).not.toBeInTheDocument()
     expect(within(defaultWorkspace).queryByText('main')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /选择默认工作区分支/ })).not.toBeInTheDocument()
   })

@@ -141,7 +141,7 @@ describe('app shell workspace branches', () => {
     expect(
       within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' })
     ).toBeEnabled()
-    expect(within(projectCard).getByText('默认工作区')).toBeInTheDocument()
+    expect(within(projectCard).queryByText('默认工作区')).not.toBeInTheDocument()
     expect(within(projectCard).queryByRole('button', { name: /feature\/free/ })).toBeNull()
     const worktreeWorkspaceButton = within(projectCard).getByRole('button', {
       name: 'feature/worktree 独立工作区'
@@ -149,12 +149,7 @@ describe('app shell workspace branches', () => {
 
     expect(worktreeWorkspaceButton).toBeEnabled()
     expect(worktreeWorkspaceButton).toHaveAccessibleName('feature/worktree 独立工作区')
-    const worktreeIndicator =
-      worktreeWorkspaceButton.querySelector<HTMLElement>('.workspace-row__kind')!
-
-    expect(worktreeIndicator).toBeInTheDocument()
-    expect(worktreeIndicator).toHaveAttribute('aria-hidden', 'true')
-    expect(worktreeIndicator.querySelector('svg')).toBeInTheDocument()
+    expect(worktreeWorkspaceButton.querySelectorAll('svg')).toHaveLength(1)
     expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 
     const branchTrigger = within(projectCard).getByRole('button', {
