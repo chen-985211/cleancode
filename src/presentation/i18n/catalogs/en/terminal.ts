@@ -88,7 +88,7 @@ export const enTerminalMessages = {
     'Restart with an empty terminal session without running the launch command',
   'terminal.action.edit': 'Edit terminal details',
   'terminal.action.cancelEdit': 'Cancel editing',
-  'terminal.action.delete': 'Delete terminal',
+  'terminal.action.delete': 'Remove terminal',
   'terminal.action.expand': 'Expand terminal',
   'terminal.action.collapse': 'Collapse terminal',
   'group.action.more': 'More group actions',

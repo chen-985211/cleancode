@@ -319,7 +319,7 @@ describe('terminal tooltips', () => {
         .querySelector('[data-icon="terminal-edit"]')
     ).toHaveAttribute('data-icon-glyph', 'pencil-simple')
 
-    const deleteButton = screen.getByRole('menuitem', { name: 'Terminal 删除终端' })
+    const deleteButton = screen.getByRole('menuitem', { name: 'Terminal 移除终端' })
     expect(deleteButton.querySelector('[data-icon="terminal-delete"]')).toHaveAttribute(
       'data-icon-glyph',
       'trash'
@@ -460,7 +460,7 @@ describe('terminal tooltips', () => {
       'Terminal 停止当前命令',
       'Terminal 应用退出后继续运行此会话',
       'Terminal 重开空终端会话',
-      'Terminal 删除终端'
+      'Terminal 移除终端'
     ])
   })
 

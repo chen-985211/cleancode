@@ -46,7 +46,7 @@ export function TerminalCanvasContextActions({
           {t('canvas.contextMenu.addToQuickExecution')}
         </CanvasMenuItem>
       ) : null}
-      {target.kind !== 'terminal' && onRemove ? (
+      {onRemove ? (
         <CanvasMenuItem
           type="button"
           role="menuitem"
@@ -56,7 +56,9 @@ export function TerminalCanvasContextActions({
           }}
         >
           <WorkbenchIcon role="delete" size={16} />
-          {t(`canvas.contextMenu.remove.${target.kind}`)}
+          {target.kind === 'terminal'
+            ? t('terminal.action.delete')
+            : t(`canvas.contextMenu.remove.${target.kind}`)}
         </CanvasMenuItem>
       ) : null}
     </>

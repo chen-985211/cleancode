@@ -184,13 +184,24 @@ describe('workbench canvas object context menu', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('does not add a batch removal action for an independent terminal', () => {
-    renderCanvas({ onDeleteTerminalScope: vi.fn() })
+  it.each(['standalone', 'combination-a'])(
+    'removes only terminal %s through its existing action',
+    (blockId) => {
+      const onDeleteTerminal = vi.fn()
+      const onDeleteTerminalScope = vi.fn()
+      renderCanvas({ onDeleteTerminal, onDeleteTerminalScope })
 
-    openNodeContextMenu('standalone')
+      openNodeContextMenu(blockId)
+      fireEvent.click(screen.getByRole('menuitem', { name: '移除终端' }))
 
-    expect(screen.queryByRole('menuitem', { name: /移除/ })).not.toBeInTheDocument()
-  })
+      expect(onDeleteTerminal).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ id: blockId })
+      )
+      expect(onDeleteTerminalScope).not.toHaveBeenCalled()
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(contextSelectedNodeIds()).toEqual([])
+    }
+  )
 
   it('fits a bound quick target into view without starting any workflow action', () => {
     const terminalWorkflow = createTerminalWorkflow(createGraph())
@@ -433,6 +444,7 @@ function renderCanvas({
   onPaneClick = vi.fn(),
   onRequestSaveBlockTemplate = vi.fn(),
   onDeleteTerminalScope,
+  onDeleteTerminal = vi.fn(),
   onAddQuickExecutionTarget,
   onNodeDragStop = vi.fn(),
   onQuickExecutionNodeDrop,
@@ -440,6 +452,7 @@ function renderCanvas({
   terminalWorkflow,
   selectedTerminalBlockIds = []
 }: {
+  readonly onDeleteTerminal?: (block: BlockGraphSnapshot['blocks'][number]) => void
   readonly onOrganizeCanvas?: WorkbenchCanvasProps['onOrganizeCanvas']
   readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
   readonly onPaneClick?: () => void
@@ -473,7 +486,7 @@ function renderCanvas({
   const terminalNodes = createTerminalFlowNodes({
     graph,
     handlers: {
-      onDelete: vi.fn(),
+      onDelete: onDeleteTerminal,
       onInput: vi.fn(),
       onQuickLaunch: vi.fn(),
       onResize: vi.fn(),
