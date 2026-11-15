@@ -608,6 +608,7 @@
 }
 
 .terminal-node--collapsed .terminal-node__header {
+  overflow: clip;
   min-height: 0;
   height: 100%;
   flex: 1 1 auto;
@@ -630,6 +631,12 @@
 
 .terminal-node--collapsed .terminal-node__meta {
   display: none;
+}
+
+.terminal-node--collapsed .terminal-node__title,
+.terminal-node--collapsed .terminal-node__actions,
+.terminal-node--collapsed .terminal-node__group-select {
+  position: relative;
 }
 
 .terminal-workflow-drag-handle {

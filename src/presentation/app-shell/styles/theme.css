@@ -443,6 +443,12 @@
   --cc-motion-duration-brand-sweep: 2300ms;
   --cc-motion-duration-loading-shimmer-wave: 1600ms;
   --cc-motion-duration-spinner: 900ms;
+  --cc-motion-duration-terminal-complete: 200ms;
+  --cc-motion-duration-terminal-tint: 120ms;
+  --cc-motion-duration-terminal-wash: 400ms;
+  --cc-motion-duration-terminal-glyph-enter: 240ms;
+  --cc-motion-duration-terminal-glyph-exit: 160ms;
+  --cc-easing-terminal-feedback: cubic-bezier(0.23, 1, 0.32, 1);
   --cc-easing-standard: ease;
   --cc-easing-enter: ease-out;
   --cc-easing-exit: ease-in;

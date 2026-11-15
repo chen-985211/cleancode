@@ -19,6 +19,7 @@ import {
 import type { TerminalSessionMenuItemsProps } from '../../../../../contexts/run/presentation/components/TerminalSessionMenuItems'
 import { TerminalMoreMenu } from './TerminalMoreMenu'
 import { TerminalServiceRuntimeBar } from '../../../../../contexts/run/presentation/components/TerminalServiceRuntimeBar'
+import { TerminalCollapsedFeedback } from '../../../../../contexts/run/presentation/components/TerminalCollapsedFeedback'
 import { TerminalViewport } from './TerminalViewport'
 import { useTerminalBodyMount } from './useTerminalBodyMount'
 import { useTerminalLaunchCommandEditing } from './useTerminalLaunchCommandEditing'
@@ -359,6 +360,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
             sessionKind={session.sessionKind ?? null}
             retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
             workflowStatus={data.workflowStatus}
+            collapsedSession={session}
+            isFeedbackVisible={isCollapsed && !isParked}
             isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
             isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
             onSelect={() => data.onSelect?.(block)}
@@ -488,6 +491,8 @@ interface TerminalHeaderProps {
   readonly sessionKind: TerminalSessionMenuItemsProps['sessionKind']
   readonly retentionPolicy: TerminalSessionMenuItemsProps['retentionPolicy']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
+  readonly collapsedSession: TerminalFlowNode['data']['session']
+  readonly isFeedbackVisible: boolean
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
   readonly onSelect: () => void
@@ -521,6 +526,8 @@ function TerminalHeader({
   sessionKind,
   retentionPolicy,
   workflowStatus,
+  collapsedSession,
+  isFeedbackVisible,
   isActiveWorkflowRoot,
   isStoppingWorkflow,
   onSelect,
@@ -534,6 +541,7 @@ function TerminalHeader({
   onStopWorkflow,
   onDelete
 }: TerminalHeaderProps) {
+  const headerRef = useRef<HTMLDivElement>(null)
   const { t } = useI18n()
   const editActionLabel = t(
     isEditingMetadata ? 'terminal.action.cancelEdit' : 'terminal.action.edit'
@@ -542,10 +550,19 @@ function TerminalHeader({
     ? t('terminal.action.selected')
     : t('terminal.action.select')
   return (
-    <div className="terminal-node__header" onClick={() => onSelect()}>
-      <span className="terminal-node__icon">
-        <WorkbenchIcon size={19} data-icon="terminal-node" role="terminal" />
-      </span>
+    <div ref={headerRef} className="terminal-node__header" onClick={() => onSelect()}>
+      <TerminalCollapsedFeedback
+        visible={isFeedbackVisible}
+        name={blockName}
+        session={collapsedSession}
+        workflowStatus={workflowStatus}
+        surfaceRef={headerRef}
+      />
+      {!isCollapsed ? (
+        <span className="terminal-node__icon">
+          <WorkbenchIcon size={19} data-icon="terminal-node" role="terminal" />
+        </span>
+      ) : null}
       {isTerminalGroupSelectionMode ? (
         <TooltipLabel content={terminalGroupSelectionLabel}>
           <button

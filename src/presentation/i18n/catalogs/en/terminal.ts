@@ -1,6 +1,7 @@
 import type { zhCNTerminalMessages } from '../zh-CN/terminal'
 
 export const enTerminalMessages = {
+  'terminal.collapsedStatus': '{name}: {status}',
   'terminalForm.editTitle': 'Edit terminal',
   'terminalForm.optional': 'Optional',
   'terminalForm.saveShort': 'Save',

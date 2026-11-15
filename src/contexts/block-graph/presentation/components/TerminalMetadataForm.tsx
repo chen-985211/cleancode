@@ -6,7 +6,7 @@ import {
 } from './useTerminalMetadataPlacement'
 import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
-import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
+import { TerminalCommandIcon } from '../../../../presentation/shared/components/TerminalCommandIcon'
 import type { Icon, IconWeight } from '@phosphor-icons/react'
 import {
   useId,
@@ -160,8 +160,8 @@ function TerminalMetadataFormContent({
         <header className="terminal-metadata-form__header">
           <span className="terminal-metadata-form__header-icon" aria-hidden="true">
             <TerminalMetadataIcon
-              IconComponent={TerminalWindowIcon}
-              glyph="terminal-window"
+              IconComponent={TerminalCommandIcon}
+              glyph="command-line"
               role="terminal"
               size={16}
               weight="regular"

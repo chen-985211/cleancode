@@ -2,13 +2,13 @@ import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree'
 import { FlowArrowIcon } from '@phosphor-icons/react/dist/csr/FlowArrow'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { StackIcon } from '@phosphor-icons/react/dist/csr/Stack'
-import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
+import { TerminalCommandIcon } from '../../../../presentation/shared/components/TerminalCommandIcon'
 import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
 
 const definitions = {
   add: [PlusIcon, 'plus', 'bold'],
   more: [DotsThreeIcon, 'dots-three', 'bold'],
-  terminal: [TerminalWindowIcon, 'terminal-window', 'regular'],
+  terminal: [TerminalCommandIcon, 'command-line', 'regular'],
   'terminal-group': [StackIcon, 'stack', 'regular'],
   workflow: [FlowArrowIcon, 'flow-arrow', 'regular']
 } satisfies Record<string, readonly [Icon, string, IconWeight]>

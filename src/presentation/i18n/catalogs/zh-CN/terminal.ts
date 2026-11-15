@@ -1,4 +1,5 @@
 export const zhCNTerminalMessages = {
+  'terminal.collapsedStatus': '{name}：{status}',
   'terminalForm.editTitle': '编辑终端',
   'terminalForm.optional': '可选',
   'terminalForm.saveShort': '保存',

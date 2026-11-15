@@ -34,7 +34,6 @@ import { StackMinusIcon } from '@phosphor-icons/react/dist/csr/StackMinus'
 import { StackPlusIcon } from '@phosphor-icons/react/dist/csr/StackPlus'
 import { StarIcon } from '@phosphor-icons/react/dist/csr/Star'
 import { StopIcon } from '@phosphor-icons/react/dist/csr/Stop'
-import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
 import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning'
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle'
@@ -42,6 +41,7 @@ import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
 
 import { CanvasArrangementStackIcon, CanvasArrangementUnstackIcon } from './CanvasArrangementIcons'
+import { TerminalCommandIcon } from './TerminalCommandIcon'
 
 type WorkbenchIconDefinition = readonly [
   icon: Icon,
@@ -99,7 +99,7 @@ const workbenchIconDefinitions = {
   'runtime-unavailable': [DesktopTowerIcon, 'desktop-tower', 'regular'],
   settings: [GearSixIcon, 'gear-six', 'bold'],
   stop: [StopIcon, 'stop', 'fill'],
-  terminal: [TerminalWindowIcon, 'terminal-window', 'regular'],
+  terminal: [TerminalCommandIcon, 'command-line', 'regular'],
   'terminal-group': [StackIcon, 'stack', 'regular'],
   warning: [WarningIcon, 'warning', 'fill'],
   workflow: [FlowArrowIcon, 'flow-arrow', 'regular'],
