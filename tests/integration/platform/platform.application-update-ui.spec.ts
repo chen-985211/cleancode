@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { _electron as electron } from 'playwright'
 import { createServer, type ViteDevServer } from 'vite'
 import react from '@vitejs/plugin-react'
+import { EventEmitter } from 'node:events'
+import { createApplicationUpdateService } from '../../../src/platform/electron-main/applicationUpdateService'
 import type { ApplicationUpdateSnapshot } from '../../../src/platform/ipc/applicationUpdateChannels'
 import type {} from '../../fixtures/presentation/applicationUpdate'
 
@@ -40,8 +42,28 @@ describe('application update Electron UI', () => {
         ],
         env
       })
+      const updater = Object.assign(new EventEmitter(), {
+        checkForUpdates: async () => {
+          updater.emit('update-available', { version: '0.2.0' })
+        },
+        downloadUpdate: async () => {
+          updater.emit('update-downloaded', { version: '0.2.0' })
+        },
+        quitAndInstall: () => undefined
+      })
+      // Use the production session owner outside the renderer so navigation cannot reset it.
+      const updateService = createApplicationUpdateService({
+        updater,
+        prepareRestart: async () => undefined,
+        restartAfterFailedInstall: async () => undefined
+      })
       try {
+        await updateService.check()
         const page = await application.firstWindow()
+        const claimPrompt = vi.fn((command: { readonly version: string }) =>
+          updateService.claimPrompt(command.version)
+        )
+        await page.exposeFunction('claimUpdatePrompt', claimPrompt)
         const publishUpdate = (value: ApplicationUpdateSnapshot) =>
           page.evaluate((snapshot) => {
             ;(
@@ -63,9 +85,9 @@ describe('application update Electron UI', () => {
         expect(windowState).toEqual({ visible: true, focused: false, outside: true })
         const errors: string[] = []
         page.on('pageerror', (error) => errors.push(error.message))
-        await page.goto(
-          `${baseUrl}tests/fixtures/presentation/applicationUpdate.html?theme=${theme}&locale=${theme === 'dark' ? 'en' : 'zh-CN'}`
-        )
+        const platform = theme === 'dark' ? 'other' : 'mac'
+        const fixtureUrl = `${baseUrl}tests/fixtures/presentation/applicationUpdate.html?theme=${theme}&locale=${theme === 'dark' ? 'en' : 'zh-CN'}&shortcutPlatform=${platform}`
+        await page.goto(fixtureUrl)
         const progress = page.getByRole('progressbar')
         await progress.waitFor({ state: 'visible' })
         expect(await progress.getAttribute('aria-valuenow')).toBe('42')
@@ -151,6 +173,20 @@ describe('application update Electron UI', () => {
         })
         const dialog = page.getByRole('alertdialog')
         await dialog.waitFor({ state: 'visible' })
+        const later = dialog.getByRole('button', { name: theme === 'dark' ? 'Later' : '稍后' })
+        await later.focus()
+        for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+          await page.keyboard.press(`${platform === 'mac' ? 'Meta' : 'Alt'}+${key}`)
+        }
+        for (const key of ['t', ',']) {
+          await page.keyboard.press(`${platform === 'mac' ? 'Meta' : 'Control'}+${key}`)
+        }
+        expect(
+          await page.evaluate(
+            () =>
+              (window as unknown as { applicationShortcutCalls: number }).applicationShortcutCalls
+          )
+        ).toBe(0)
         // Reduced motion must keep the same final position and keyboard behavior.
         await page.emulateMedia({ reducedMotion: 'reduce' })
         await page.waitForFunction(() => {
@@ -164,7 +200,6 @@ describe('application update Electron UI', () => {
           )
         })
         await page.screenshot({ path: join(output, `${theme}-confirm.png`) })
-        const later = dialog.getByRole('button', { name: theme === 'dark' ? 'Later' : '稍后' })
         await later.click()
         await dialog.waitFor({ state: 'hidden' })
         expect(
@@ -172,6 +207,19 @@ describe('application update Electron UI', () => {
             () => (window as unknown as Window & { updateInstallCount: number }).updateInstallCount
           )
         ).toBe(0)
+        await page.goto(`${fixtureUrl}&state=ready`)
+        await vi.waitFor(() => expect(claimPrompt).toHaveBeenCalledTimes(2))
+        await page.waitForFunction(
+          () => (window as unknown as { promptChecksCompleted: number }).promptChecksCompleted === 1
+        )
+        expect(await dialog.count()).toBe(0)
+        await page.keyboard.press(`${platform === 'mac' ? 'Meta' : 'Alt'}+ArrowRight`)
+        expect(
+          await page.evaluate(
+            () =>
+              (window as unknown as { applicationShortcutCalls: number }).applicationShortcutCalls
+          )
+        ).toBe(1)
         await page
           .getByRole('button', {
             name: theme === 'dark' ? 'Restart and update' : '重启并更新',
@@ -210,6 +258,7 @@ describe('application update Electron UI', () => {
         )
         expect(errors).toEqual([])
       } finally {
+        updateService.dispose()
         try {
           await application.close()
         } finally {

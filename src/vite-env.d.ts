@@ -120,6 +120,7 @@ declare global {
       appName: 'cleancode'
       getApplicationUpdate(): Promise<ApplicationUpdateSnapshot>
       checkApplicationUpdate(): Promise<ApplicationUpdateSnapshot>
+      claimApplicationUpdatePrompt(command: { readonly version: string }): Promise<boolean>
       installApplicationUpdate(command: {
         readonly version: string
       }): Promise<ApplicationUpdateSnapshot>

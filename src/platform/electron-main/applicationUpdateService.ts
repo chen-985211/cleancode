@@ -27,6 +27,7 @@ export function createApplicationUpdateService(input: {
   let checking: Promise<ApplicationUpdateSnapshot> | undefined
   let installRecoveryRequested = false
   const listeners = new Set<(value: ApplicationUpdateSnapshot) => void>()
+  const promptedVersions = new Set<string>()
   const update = (next: Omit<ApplicationUpdateSnapshot, 'revision'>) => {
     if (disposed) return
     snapshot = Object.freeze({ ...next, revision: snapshot.revision + 1 })
@@ -94,6 +95,17 @@ export function createApplicationUpdateService(input: {
 
   return {
     getSnapshot: () => snapshot,
+    claimPrompt(version: string): boolean {
+      if (
+        disposed ||
+        snapshot.status !== 'ready' ||
+        snapshot.version !== version ||
+        promptedVersions.has(version)
+      )
+        return false
+      promptedVersions.add(version)
+      return true
+    },
     subscribe(listener: (value: ApplicationUpdateSnapshot) => void) {
       listeners.add(listener)
       return () => {

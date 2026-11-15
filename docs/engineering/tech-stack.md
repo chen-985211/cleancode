@@ -67,6 +67,8 @@ Preview 的 macOS 应用使用 ad-hoc 签名且不 notarize，Windows 安装程�
 后台下载并校验后等待用户确认重启，不允许降级、退出时静默安装或 renderer 指定更新地址。
 确认后的运行时清理不可逆；安装抛异常或发送错误事件时，退出协调器等待清理结束后仅重新启动
 当前版本一次。Linux AppImage 的恢复使用原 AppImage 路径启动，不使用挂载目录中的 Electron 路径。
+已提醒版本由更新主进程服务在本次应用会话内保存；renderer 经受校验的精确版本 IPC 原子认领
+自动提醒资格，多个窗口与 renderer 重建共享同一份结果，不把延后选择保存在组件生命周期中。
 构建配置生成更新元数据，发布 workflow 同时上传 `latest*.yml`、alpha/beta 元数据及 blockmap。
 Windows NSIS 与 Linux AppImage 支持应用内安装；DEB、开发运行和其他不支持的目标禁用该能力。
 macOS 必须检测到 Developer ID Application 签名才启用，ad-hoc 包保持禁用。

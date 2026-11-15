@@ -10,7 +10,7 @@ export function registerApplicationUpdateIpc(input: {
   readonly logger: Logger
   readonly service: ReturnType<typeof createApplicationUpdateService>
 }): void {
-  for (const action of ['get', 'check', 'install'] as const) {
+  for (const action of ['get', 'check', 'install', 'claimPrompt'] as const) {
     registerIpcHandler({
       ipcMain: input.ipcMain,
       logger: input.logger,
@@ -19,7 +19,7 @@ export function registerApplicationUpdateIpc(input: {
       operation: `${action}ApplicationUpdate`,
       handler: (command: unknown, event) => {
         if (!input.isTrustedSender(event)) throw invalidCommand()
-        if (action === 'install') {
+        if (action === 'install' || action === 'claimPrompt') {
           if (
             typeof command !== 'object' ||
             command === null ||
@@ -29,7 +29,9 @@ export function registerApplicationUpdateIpc(input: {
             Object.keys(command).length !== 1
           )
             throw invalidCommand()
-          return input.service.install(command.version)
+          return action === 'install'
+            ? input.service.install(command.version)
+            : input.service.claimPrompt(command.version)
         }
         if (command !== undefined) throw invalidCommand()
         return action === 'get' ? input.service.getSnapshot() : input.service.check()

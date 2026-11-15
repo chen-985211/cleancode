@@ -26,6 +26,8 @@ const cleancodeApi = {
     invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.check),
   installApplicationUpdate: (command: { readonly version: string }) =>
     invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.install, command),
+  claimApplicationUpdatePrompt: (command: { readonly version: string }) =>
+    invokeCleancode<boolean>(applicationUpdateChannels.claimPrompt, command),
   onApplicationUpdateChanged: (listener: (event: ApplicationUpdateSnapshot) => void) =>
     subscribeRendererEvent(applicationUpdateChannels.changed, listener),
   onAgentPeerCreationRequested: (listener: (event: unknown) => void) =>

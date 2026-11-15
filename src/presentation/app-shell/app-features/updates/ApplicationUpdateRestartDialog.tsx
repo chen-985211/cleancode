@@ -27,6 +27,7 @@ export function ApplicationUpdateRestartDialog(props: {
           <AlertDialog.Overlay className="application-update-dialog-overlay" />
           <AlertDialog.Content
             className="application-update-dialog"
+            aria-modal="true"
             aria-busy={props.pending}
             onKeyDown={(event) => event.stopPropagation()}
             onEscapeKeyDown={(event) => {

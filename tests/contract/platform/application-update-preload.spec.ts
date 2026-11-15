@@ -15,10 +15,13 @@ describe('application update preload', () => {
     await api().getApplicationUpdate!()
     await api().checkApplicationUpdate!()
     await api().installApplicationUpdate!({ version: '0.2.0' })
+    mocks.invoke.mockResolvedValueOnce({ ok: true, value: true })
+    await expect(api().claimApplicationUpdatePrompt!({ version: '0.2.0' })).resolves.toBe(true)
     expect(mocks.invoke.mock.calls).toEqual([
       ['cleancode:get-application-update', undefined],
       ['cleancode:check-application-update', undefined],
-      ['cleancode:install-application-update', { version: '0.2.0' }]
+      ['cleancode:install-application-update', { version: '0.2.0' }],
+      ['cleancode:claim-application-update-prompt', { version: '0.2.0' }]
     ])
   })
   it('subscribes and unsubscribes the same update event callback', () => {

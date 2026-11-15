@@ -10,6 +10,7 @@ describe('application update IPC boundary', () => {
       subscribe: vi.fn(() => () => undefined),
       check: vi.fn(async () => snapshot),
       install: vi.fn(async () => snapshot),
+      claimPrompt: vi.fn(() => true),
       dispose: vi.fn()
     }
     registerApplicationUpdateIpc({
@@ -25,7 +26,11 @@ describe('application update IPC boundary', () => {
     return {
       service,
       call: (action: string, command?: unknown) =>
-        handlers.get(`cleancode:${action}-application-update`)!(null, command)
+        handlers.get(
+          action === 'claimPrompt'
+            ? 'cleancode:claim-application-update-prompt'
+            : `cleancode:${action}-application-update`
+        )!(null, command)
     }
   }
   it.each([
@@ -42,13 +47,40 @@ describe('application update IPC boundary', () => {
     })
     expect(service.install).not.toHaveBeenCalled()
   })
-  it.each(['get', 'check', 'install'])('rejects %s from an untrusted sender', async (action) => {
-    const { call, service } = harness(false)
-    expect(
-      await call(action, action === 'install' ? { version: '0.2.0' } : undefined)
-    ).toMatchObject({ ok: false })
-    expect(service.install).not.toHaveBeenCalled()
-    expect(service.check).not.toHaveBeenCalled()
+  it.each(['get', 'check', 'install', 'claimPrompt'])(
+    'rejects %s from an untrusted sender',
+    async (action) => {
+      const { call, service } = harness(false)
+      expect(
+        await call(
+          action,
+          action === 'install' || action === 'claimPrompt' ? { version: '0.2.0' } : undefined
+        )
+      ).toMatchObject({ ok: false })
+      expect(service.install).not.toHaveBeenCalled()
+      expect(service.check).not.toHaveBeenCalled()
+      expect(service.claimPrompt).not.toHaveBeenCalled()
+    }
+  )
+  it.each([
+    undefined,
+    null,
+    {},
+    { version: 1 },
+    { version: '0.2.0', force: true },
+    { version: 'x'.repeat(100) }
+  ])('rejects malformed prompt claims (%j)', async (command) => {
+    const { call, service } = harness()
+    expect(await call('claimPrompt', command)).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND' }
+    })
+    expect(service.claimPrompt).not.toHaveBeenCalled()
+  })
+  it('returns the main-process prompt claim result for the exact version', async () => {
+    const { call, service } = harness()
+    expect(await call('claimPrompt', { version: '0.2.0' })).toMatchObject({ ok: true, value: true })
+    expect(service.claimPrompt).toHaveBeenCalledExactlyOnceWith('0.2.0')
   })
   it('forwards only the confirmed version and never accepts a download address', async () => {
     const { call, service } = harness()

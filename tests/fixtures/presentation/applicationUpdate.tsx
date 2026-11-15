@@ -9,6 +9,8 @@ import { AppShellProjectArea } from '../../../src/presentation/app-shell/shell/p
 import { CanvasStatusbar } from '../../../src/presentation/app-shell/workbench/WorkbenchCanvasStates'
 import { ignoreAppNotifications } from '../../../src/presentation/shared/notifications/appNotifications'
 import { ApplicationUpdateProvider } from '../../../src/presentation/app-shell/app-features/updates/ApplicationUpdateProvider'
+import { useApplicationShortcuts } from '../../../src/presentation/app-shell/app-features/shortcuts/useApplicationShortcuts'
+import { getDefaultApplicationShortcutBindings } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 import { createWorkbenchSnapshot } from './appShellFixtures'
 
 const query = new URLSearchParams(location.search)
@@ -16,13 +18,20 @@ document.documentElement.dataset.theme = query.get('theme') ?? 'light'
 const fixtureWindow = window as unknown as Window & {
   publishUpdate: (state: ApplicationUpdateSnapshot) => void
   updateInstallCount: number
+  applicationShortcutCalls: number
+  promptChecksCompleted: number
+  claimUpdatePrompt: (command: { readonly version: string }) => Promise<boolean>
 }
 let snapshot: ApplicationUpdateSnapshot =
-  query.get('state') === 'idle'
-    ? { revision: 1, status: 'idle', version: null, percent: null }
-    : { revision: 1, status: 'downloading', version: '0.2.0', percent: 42 }
+  query.get('state') === 'ready'
+    ? { revision: 5, status: 'ready', version: '0.2.0', percent: 100 }
+    : query.get('state') === 'idle'
+      ? { revision: 1, status: 'idle', version: null, percent: null }
+      : { revision: 1, status: 'downloading', version: '0.2.0', percent: 42 }
 const listeners = new Set<(value: ApplicationUpdateSnapshot) => void>()
 fixtureWindow.updateInstallCount = 0
+fixtureWindow.applicationShortcutCalls = 0
+fixtureWindow.promptChecksCompleted = 0
 fixtureWindow.publishUpdate = (value) => {
   snapshot = value
   for (const listener of listeners) listener(value)
@@ -30,6 +39,11 @@ fixtureWindow.publishUpdate = (value) => {
 window.cleancode = {
   getWorkspaceExternalOpenCapabilities: async () => ({ vscode: { available: false } }),
   getApplicationUpdate: async () => snapshot,
+  claimApplicationUpdatePrompt: async (command: { readonly version: string }) => {
+    const claimed = await fixtureWindow.claimUpdatePrompt(command)
+    fixtureWindow.promptChecksCompleted += 1
+    return claimed
+  },
   checkApplicationUpdate: async () => {
     fixtureWindow.publishUpdate({
       revision: snapshot.revision + 1,
@@ -59,6 +73,22 @@ const noop = () => undefined
 function Fixture() {
   const [collapsed, setCollapsed] = useState(false)
   const toggle = useRef<HTMLButtonElement>(null)
+  const platform = query.get('shortcutPlatform') === 'other' ? 'other' : 'mac'
+  const recordShortcut = () => {
+    fixtureWindow.applicationShortcutCalls += 1
+  }
+  useApplicationShortcuts({
+    platform,
+    bindings: getDefaultApplicationShortcutBindings(platform),
+    actions: {
+      selectCanvasNodeLeft: { enabled: true, run: recordShortcut },
+      selectCanvasNodeRight: { enabled: true, run: recordShortcut },
+      selectCanvasNodeUp: { enabled: true, run: recordShortcut },
+      selectCanvasNodeDown: { enabled: true, run: recordShortcut },
+      createTerminal: { enabled: true, run: recordShortcut },
+      openSettings: { enabled: true, run: recordShortcut }
+    }
+  })
   return (
     <I18nProvider initialLocale={query.get('locale') === 'en' ? 'en' : 'zh-CN'}>
       <TooltipProvider>

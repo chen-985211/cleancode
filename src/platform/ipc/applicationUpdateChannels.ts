@@ -2,6 +2,7 @@ export const applicationUpdateChannels = {
   get: 'cleancode:get-application-update',
   check: 'cleancode:check-application-update',
   install: 'cleancode:install-application-update',
+  claimPrompt: 'cleancode:claim-application-update-prompt',
   changed: 'cleancode:application-update-changed'
 } as const
 

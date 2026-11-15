@@ -10,18 +10,25 @@ export function ApplicationUpdateProvider({ children }: { readonly children: Rea
   const [open, setOpen] = useState(false)
   const [actionFailed, setActionFailed] = useState(false)
   const [installPending, setInstallPending] = useState(false)
-  const promptedVersions = useRef(new Set<string>())
+  const interactionRevision = useRef(0)
   const returnFocus = useRef<HTMLElement | null>(null)
   const api = window.cleancode
   const showRestart = useCallback(() => {
+    interactionRevision.current += 1
     returnFocus.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     setOpen(true)
   }, [])
 
   useEffect(() => {
-    if (!api?.getApplicationUpdate || !api.onApplicationUpdateChanged) return
+    if (
+      !api?.getApplicationUpdate ||
+      !api.onApplicationUpdateChanged ||
+      !api.claimApplicationUpdatePrompt
+    )
+      return
     let active = true
+    const requestedVersions = new Set<string>()
     const accept = (next: ApplicationUpdateSnapshot) => {
       if (
         !active ||
@@ -33,9 +40,26 @@ export function ApplicationUpdateProvider({ children }: { readonly children: Rea
       snapshotRef.current = next
       setSnapshot(next)
       setActionFailed(false)
-      if (next.status === 'ready' && next.version && !promptedVersions.current.has(next.version)) {
-        promptedVersions.current.add(next.version)
-        showRestart()
+      if (next.status === 'ready' && next.version && !requestedVersions.has(next.version)) {
+        const version = next.version
+        const revision = interactionRevision.current
+        requestedVersions.add(version)
+        void api.claimApplicationUpdatePrompt({ version }).then(
+          (claimed) => {
+            if (
+              active &&
+              claimed &&
+              interactionRevision.current === revision &&
+              snapshotRef.current.status === 'ready' &&
+              snapshotRef.current.version === version
+            )
+              showRestart()
+          },
+          () => {
+            // A prompt transport error must not be presented as an installation failure.
+            requestedVersions.delete(version)
+          }
+        )
       }
     }
     // Subscribe first: a newer live event must beat an older initial query result.
@@ -76,7 +100,10 @@ export function ApplicationUpdateProvider({ children }: { readonly children: Rea
         version={snapshot.version}
         pending={installPending || snapshot.status === 'installing'}
         failed={actionFailed || snapshot.error === 'install'}
-        onOpenChange={setOpen}
+        onOpenChange={(nextOpen) => {
+          interactionRevision.current += 1
+          setOpen(nextOpen)
+        }}
         onInstall={() => {
           void install()
         }}

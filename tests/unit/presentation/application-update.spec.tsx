@@ -4,24 +4,38 @@ import { ApplicationUpdateControl } from '../../../src/presentation/app-shell/ap
 import type { ApplicationUpdateSnapshot } from '../../../src/platform/ipc/applicationUpdateChannels'
 
 function harness(initial: ApplicationUpdateSnapshot) {
+  let current = initial
+  const prompted = new Set<string>()
   let publish: (value: ApplicationUpdateSnapshot) => void = () => undefined
   const unsubscribe = vi.fn()
   const install = vi.fn(async () => initial)
-  const get = vi.fn(async () => initial)
+  const get = vi.fn(async () => current)
   const check = vi.fn(async () => initial)
+  const claimPrompt = vi.fn(async ({ version }: { version: string }) => {
+    if (current.status !== 'ready' || current.version !== version || prompted.has(version))
+      return false
+    prompted.add(version)
+    return true
+  })
   window.cleancode = {
     getApplicationUpdate: get,
     checkApplicationUpdate: check,
     installApplicationUpdate: install,
+    claimApplicationUpdatePrompt: claimPrompt,
     onApplicationUpdateChanged: (listener: typeof publish) => {
       publish = listener
       return unsubscribe
     }
   } as unknown as NonNullable<Window['cleancode']>
   return {
-    publish: (value: ApplicationUpdateSnapshot) => act(() => publish(value)),
+    publish: (value: ApplicationUpdateSnapshot) =>
+      act(() => {
+        current = value
+        publish(value)
+      }),
     install,
     check,
+    claimPrompt,
     get,
     unsubscribe
   }
@@ -96,7 +110,10 @@ describe('application update UI', () => {
     )
     await waitFor(() => expect(api.get).toHaveBeenCalledOnce())
     api.publish({ revision: 2, status: 'ready', version: '0.2.0', percent: 100 })
-    expect(await screen.findByRole('alertdialog', { name: '更新已就绪' })).toBeInTheDocument()
+    expect(await screen.findByRole('alertdialog', { name: '更新已就绪' })).toHaveAttribute(
+      'aria-modal',
+      'true'
+    )
     fireEvent.click(screen.getByRole('button', { name: '稍后' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(api.install).not.toHaveBeenCalled()
@@ -128,5 +145,61 @@ describe('application update UI', () => {
       finish({ revision: 1, status: 'idle', version: null, percent: null })
     })
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '75')
+  })
+
+  it('preserves deferral across renderer reconstruction and still allows manual reopening', async () => {
+    const api = harness({ revision: 1, status: 'ready', version: '0.2.0', percent: 100 })
+    const content = (
+      <ApplicationUpdateProvider>
+        <ApplicationUpdateControl />
+      </ApplicationUpdateProvider>
+    )
+    const first = render(content)
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '稍后' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    first.unmount()
+    render(content)
+    await waitFor(() => expect(api.claimPrompt).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重启并更新' }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+  })
+
+  it('grants an automatic prompt to only one mounted renderer for the same application session', async () => {
+    const api = harness({ revision: 1, status: 'ready', version: '0.2.0', percent: 100 })
+    render(
+      <>
+        <ApplicationUpdateProvider children={null} />
+        <ApplicationUpdateProvider children={null} />
+      </>
+    )
+    await waitFor(() => expect(api.claimPrompt).toHaveBeenCalledTimes(2))
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1)
+  })
+
+  it('does not let a delayed automatic prompt override a manual deferral', async () => {
+    const api = harness({ revision: 1, status: 'ready', version: '0.2.0', percent: 100 })
+    let finish: (value: boolean) => void = () => undefined
+    api.claimPrompt.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve
+        })
+    )
+    render(
+      <ApplicationUpdateProvider>
+        <ApplicationUpdateControl />
+      </ApplicationUpdateProvider>
+    )
+    await waitFor(() => expect(api.claimPrompt).toHaveBeenCalledOnce())
+    fireEvent.click(screen.getByRole('button', { name: '重启并更新' }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '稍后' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    await act(async () => {
+      finish(true)
+    })
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 })

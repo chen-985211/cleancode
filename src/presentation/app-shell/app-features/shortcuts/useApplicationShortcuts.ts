@@ -44,7 +44,9 @@ export function useApplicationShortcuts({
     const dispatchShortcut = (event: KeyboardEvent, capturePhase: boolean): void => {
       if (
         event.defaultPrevented ||
-        document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+        document.querySelector(
+          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
+        ) !== null
       ) {
         return
       }

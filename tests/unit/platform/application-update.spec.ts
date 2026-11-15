@@ -17,6 +17,24 @@ function harness() {
 }
 
 describe('application updates', () => {
+  it('grants only one automatic prompt per verified version for the application session', async () => {
+    const { updater, service } = harness()
+    expect(service.claimPrompt('0.2.0')).toBe(false)
+    await service.check()
+    expect(service.claimPrompt('0.2.0')).toBe(false)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    expect(service.claimPrompt('0.1.0')).toBe(false)
+    expect(service.claimPrompt('0.2.0')).toBe(true)
+    expect(service.claimPrompt('0.2.0')).toBe(false)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    expect(service.claimPrompt('0.2.0')).toBe(false)
+    service.dispose()
+    expect(service.claimPrompt('0.2.0')).toBe(false)
+    const nextSession = harness()
+    await nextSession.service.check()
+    nextSession.updater.emit('update-downloaded', { version: '0.2.0' })
+    expect(nextSession.service.claimPrompt('0.2.0')).toBe(true)
+  })
   it('downloads an available release and waits for verified download completion before allowing install', async () => {
     const { updater, restartAfterFailedInstall, service } = harness()
     await service.check()
