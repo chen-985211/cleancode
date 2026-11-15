@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import {
   createRuntimeApi,
@@ -18,7 +18,53 @@ describe('app shell worktree archive', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
+
+  it.each([false, true])(
+    'shows row feedback through the real archive callback (current: %s)',
+    async (current) => {
+      vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
+      const workbench = createWorkbenchWithTestWorktree(current)
+      const archived = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+        gitBranch: 'main'
+      })
+      let finish!: (value: typeof workbench) => void
+      const archiveBranchWorkspace = vi.fn(
+        () =>
+          new Promise<typeof workbench>((resolve) => {
+            finish = resolve
+          })
+      )
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({
+          listWorkbenches: vi.fn(async () => [workbench]),
+          archiveBranchWorkspace
+        })
+      })
+      render(<AppShell />)
+      const card = await screen.findByRole('group', { name: '项目 alpha-project' })
+      const select = within(card).getByRole('button', { name: 'test 独立工作区' })
+      const row = select.closest('.workspace-group')!
+      fireEvent.click(within(card).getByRole('button', { name: '打开 test 工作区菜单' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: '归档工作区 test' })).getByRole('button', {
+          name: '归档工作区'
+        })
+      )
+
+      await waitFor(() => expect(archiveBranchWorkspace).toHaveBeenCalledTimes(1))
+      expect(row).toHaveAttribute('aria-busy', 'true')
+      expect(select).toBeDisabled()
+      await act(async () => finish(archived))
+      expect(within(card).queryByRole('button', { name: 'test 独立工作区' })).toBeNull()
+      expect(row).toHaveAttribute('inert')
+      act(() => vi.advanceTimersByTime(2000))
+      expect(row).not.toBeInTheDocument()
+    }
+  )
 
   it('opens the workspace action menu beside the row and supports keyboard dismissal', async () => {
     const workbench = createWorkbenchWithTestWorktree(false)

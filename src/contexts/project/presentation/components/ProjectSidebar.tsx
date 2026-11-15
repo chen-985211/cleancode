@@ -1,8 +1,17 @@
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
+import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
-import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref
+} from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
@@ -10,6 +19,7 @@ import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspa
 import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
 import { ProjectCurrentMarker } from './ProjectCurrentMarker'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
+import { WorkspaceArchiveMotion } from './WorkspaceArchiveMotion'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { TooltipLabel } from '../../../../presentation/shared/components/Tooltip'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
@@ -17,6 +27,7 @@ import { useSelectionIndicatorMotion } from '../../../../presentation/shared/hoo
 import type { ProjectWorkbenchViewModel } from '../view-models/ProjectWorkbenchViewModel'
 import { useProjectSidebarBranchWorkspaceForm } from '../view-models/useProjectSidebarBranchWorkspaceForm'
 import { useProjectSidebarReorder } from '../view-models/useProjectSidebarReorder'
+import { useWorkspaceArchivePresentation } from '../view-models/useWorkspaceArchivePresentation'
 import { useProjectDisclosureMotion } from '../motion/useProjectDisclosureMotion'
 import { useProjectSidebarHoverMotion } from '../motion/useProjectSidebarHoverMotion'
 
@@ -46,7 +57,7 @@ interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
     workbench: TWorkbench,
     workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
-  ) => void
+  ) => void | Promise<void>
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
   readonly onCreateBranchWorkspace: (
     workbench: TWorkbench,
@@ -181,7 +192,7 @@ interface ProjectCardProps<TWorkbench extends ProjectWorkbenchViewModel> {
     workbench: TWorkbench,
     workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
-  ) => void
+  ) => void | Promise<void>
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
   readonly onCreateBranchWorkspace: (
     workbench: TWorkbench,
@@ -224,8 +235,16 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
   const currentWorkspaceId = isCurrentProject
     ? (workbench.project.workspaces.find((workspace) => workspace.isCurrent)?.workspaceId ?? null)
     : null
-  const [workspaceSelectionContainerRef, workspaceSelectionIndicatorRef] =
-    useSelectionIndicatorMotion(currentWorkspaceId ?? '')
+  const [
+    workspaceSelectionContainerRef,
+    workspaceSelectionIndicatorRef,
+    refreshWorkspaceSelection
+  ] = useSelectionIndicatorMotion(currentWorkspaceId ?? '')
+  const workspaceArchive = useWorkspaceArchivePresentation(workbench.project.workspaces)
+  useLayoutEffect(refreshWorkspaceSelection, [
+    refreshWorkspaceSelection,
+    workspaceArchive.rows.length
+  ])
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
   const disclosureMotionRef = useProjectDisclosureMotion(isExpanded)
@@ -417,8 +436,9 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                 aria-hidden="true"
               />
             ) : null}
-            {workbench.project.workspaces.map((workspace) => {
-              const isActiveWorkspace = workspace.isCurrent && isCurrentProject
+            {workspaceArchive.rows.map(({ workspace, present }) => {
+              const isActiveWorkspace = present && workspace.isCurrent && isCurrentProject
+              const isArchiving = workspaceArchive.pending.has(workspace.workspaceId)
               const boundBranchName = workspace.gitBranch ?? workspace.displayName
               const isDefaultWorkspace = workspace.workspaceKind === 'default'
               const isGitUninitialized =
@@ -441,11 +461,14 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                 .join(' ')
 
               return (
-                <div
-                  className="workspace-group"
-                  data-selection-motion-option={workspace.workspaceId}
+                <WorkspaceArchiveMotion
                   key={workspace.workspaceId}
-                  ref={isDefaultWorkspace ? branchSelectorRootRef : undefined}
+                  workspaceId={workspace.workspaceId}
+                  present={present}
+                  archiving={isArchiving}
+                  rootRef={isDefaultWorkspace ? branchSelectorRootRef : undefined}
+                  onExit={workspaceArchive.completeExit}
+                  onLayoutChange={refreshWorkspaceSelection}
                 >
                   {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
                     <>
@@ -526,10 +549,15 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                             aria-current={isActiveWorkspace ? 'page' : undefined}
                             className="workspace-row__select"
                             type="button"
+                            disabled={isArchiving}
                             onClick={() => onSelectWorkspace(workbench, workspace.workspaceId)}
                           >
                             <span className="workspace-row__branch-icon" aria-hidden="true">
-                              <GitBranchIcon size={14} />
+                              {isArchiving || !present ? (
+                                <ArchiveIcon size={14} />
+                              ) : (
+                                <GitBranchIcon size={14} />
+                              )}
                             </span>
                             <span className="workspace-row__name truncate">
                               {workspaceDisplayName}
@@ -541,7 +569,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                             ) : null}
                           </button>
                         </TooltipLabel>
-                        {isWorktreeWorkspace ? (
+                        {isWorktreeWorkspace && !isArchiving && present ? (
                           <WorkspaceRowMenu
                             isOpen={openWorkspaceMenuId === workspace.workspaceId}
                             workspaceName={workspace.displayName}
@@ -568,7 +596,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
                   {!isDefaultWorkspace && workspace.gitBranch ? (
                     <span className="workspace-git-branch sr-only">{workspace.gitBranch}</span>
                   ) : null}
-                </div>
+                </WorkspaceArchiveMotion>
               )
             })}
           </div>
@@ -599,12 +627,14 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             setArchivePresentation((current) => (current?.open ? current : null))
           }}
           onConfirm={() => {
-            onArchiveBranchWorkspace(
-              workbench,
-              archivePresentation.workspace.workspaceId,
-              archivePresentation.lock?.isLocked
-                ? { lockReason: archivePresentation.lock.lockReason }
-                : undefined
+            workspaceArchive.archive(archivePresentation.workspace.workspaceId, () =>
+              onArchiveBranchWorkspace(
+                workbench,
+                archivePresentation.workspace.workspaceId,
+                archivePresentation.lock?.isLocked
+                  ? { lockReason: archivePresentation.lock.lockReason }
+                  : undefined
+              )
             )
             setArchivePresentation((current) => (current ? { ...current, open: false } : current))
           }}
