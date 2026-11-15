@@ -8,10 +8,11 @@ import {
   resolveApplicationUpdateAvailability
 } from './applicationUpdateAvailability'
 import { registerApplicationUpdateIpc } from './applicationUpdateIpc'
+import { createApplicationUpdateRestart } from './applicationUpdateRestart'
 
 export async function configureApplicationUpdates(input: {
   readonly prepareRestart: () => Promise<void>
-  readonly restartAfterFailedInstall: () => Promise<void>
+  readonly restartAfterFailedInstall: (executable?: string) => Promise<void>
 }): Promise<void> {
   const updater = electronUpdater.autoUpdater
   // Install exclusively after a user confirms the exact verified release.
@@ -31,11 +32,27 @@ export async function configureApplicationUpdates(input: {
         ? await readMacApplicationSignature(app.getPath('exe'))
         : undefined
   })
+  const restart = createApplicationUpdateRestart({
+    ...input,
+    appImagePath: process.platform === 'linux' ? process.env.APPIMAGE : undefined,
+    isInstallFailed: () => service.getSnapshot().error === 'install',
+    onCleanupFailure: () =>
+      consoleLogger.warn({
+        scope: 'platform.application-update',
+        operation: 'cleanupBackup',
+        outcome: 'failure',
+        error: {
+          code: 'UNEXPECTED_ERROR',
+          isExpected: true,
+          message: 'Application update backup cleanup failed.'
+        }
+      })
+  })
   const service = createApplicationUpdateService({
     updater,
     unavailableReason,
-    prepareRestart: input.prepareRestart,
-    restartAfterFailedInstall: input.restartAfterFailedInstall,
+    prepareRestart: restart.prepareRestart,
+    restartAfterFailedInstall: restart.restartAfterFailedInstall,
     onFailure: (stage) =>
       consoleLogger.warn({
         scope: 'platform.application-update',
@@ -77,7 +94,9 @@ export async function configureApplicationUpdates(input: {
         4 * 60 * 60 * 1000
       )
   interval?.unref()
+  app.on('before-quit', restart.beforeQuit)
   app.once('will-quit', () => {
+    app.removeListener('before-quit', restart.beforeQuit)
     if (interval) clearInterval(interval)
     unsubscribe()
     service.dispose()

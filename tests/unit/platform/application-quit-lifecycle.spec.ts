@@ -81,6 +81,21 @@ describe('normal quit and update restart coordination', () => {
     expect(app.quit).toHaveBeenCalledOnce()
   })
 
+  it('relaunches the preserved executable if the original install path cannot be restored', async () => {
+    const app = Object.assign(new EventEmitter(), { quit: vi.fn(), relaunch: vi.fn() })
+    const lifecycle = bindApplicationQuitLifecycle({
+      app,
+      shutdown: async () => undefined,
+      relaunchExecutable: '/apps/CleanCode.AppImage'
+    })
+    await lifecycle.prepareUpdate()
+    await lifecycle.recoverFailedUpdate('/apps/.cleancode-update-backup/CleanCode.AppImage')
+    expect(app.relaunch).toHaveBeenCalledExactlyOnceWith({
+      execPath: '/apps/.cleancode-update-backup/CleanCode.AppImage'
+    })
+    expect(app.quit).toHaveBeenCalledOnce()
+  })
+
   it('restarts the current application even when cleanup itself rejects', async () => {
     const app = Object.assign(new EventEmitter(), { quit: vi.fn(), relaunch: vi.fn() })
     const lifecycle = bindApplicationQuitLifecycle({

@@ -11,7 +11,10 @@ export function bindApplicationQuitLifecycle(input: {
   readonly app: QuitApplication
   readonly shutdown: () => Promise<void>
   readonly relaunchExecutable?: string
-}): { prepareUpdate: () => Promise<void>; recoverFailedUpdate: () => Promise<void> } {
+}): {
+  prepareUpdate: () => Promise<void>
+  recoverFailedUpdate: (executable?: string) => Promise<void>
+} {
   let ready = false
   let intent: 'quit' | 'update' | null = null
   let updatePreparation: Promise<void> | undefined
@@ -36,14 +39,12 @@ export function bindApplicationQuitLifecycle(input: {
       })()
       await updatePreparation
     },
-    recoverFailedUpdate() {
+    recoverFailedUpdate(executable = input.relaunchExecutable) {
       if (intent !== 'update') return Promise.resolve()
       const restart = () => {
         ready = true
         try {
-          input.app.relaunch(
-            input.relaunchExecutable ? { execPath: input.relaunchExecutable } : undefined
-          )
+          input.app.relaunch(executable ? { execPath: executable } : undefined)
         } finally {
           input.app.quit()
         }

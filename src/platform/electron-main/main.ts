@@ -632,7 +632,8 @@ if (isPrimaryAppInstance) {
     agentActivityRuntime.initializeFailOpen()
     await configureApplicationUpdates({
       prepareRestart: () => applicationQuitLifecycle.prepareUpdate(),
-      restartAfterFailedInstall: () => applicationQuitLifecycle.recoverFailedUpdate()
+      restartAfterFailedInstall: (executable) =>
+        applicationQuitLifecycle.recoverFailedUpdate(executable)
     })
     const appIconPath = resolveAppIconPath({
       fileExists: existsSync,
