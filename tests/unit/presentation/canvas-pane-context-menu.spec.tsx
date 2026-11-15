@@ -48,7 +48,7 @@ describe('canvas pane context menu', () => {
     const groupTerminals = within(menu).getByRole('menuitem', { name: '新建组合' })
     expect(createTerminal.querySelector('[data-icon-role="terminal"]')).toHaveAttribute(
       'data-icon-glyph',
-      'terminal-window'
+      'command-line'
     )
     expect(groupTerminals.querySelector('[data-icon-role="terminal-group"]')).toHaveAttribute(
       'data-icon-glyph',

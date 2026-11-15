@@ -679,6 +679,7 @@ function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof us
     deleteEdges: vi.fn(async () => undefined),
     edges: createTerminalWorkflowEdges(graph, {}),
     nodeStatuses: {},
+    nodeStates: {},
     runs: [],
     start: vi.fn(async () => undefined),
     startScope: vi.fn(async () => undefined),

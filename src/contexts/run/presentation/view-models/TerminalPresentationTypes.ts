@@ -10,6 +10,12 @@ import type {
   TerminalSessionStatus
 } from '../../application/dto/TerminalSessionSnapshot'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import type { WorkflowRunNodeStatus } from '../../application/dto/WorkflowRunSnapshot'
+
+export interface TerminalWorkflowNodeState {
+  readonly runId: string
+  readonly status: WorkflowRunNodeStatus
+}
 
 export interface TerminalDimensions {
   readonly columns: number

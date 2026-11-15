@@ -1,0 +1,35 @@
+import { forwardRef } from 'react'
+import type { Icon, IconProps } from '@phosphor-icons/react'
+
+// Original CommandLine paths used by React Bits Call Chip / Hugeicons.
+export const TerminalCommandIcon: Icon = forwardRef<SVGSVGElement, IconProps>((props, ref) => {
+  const { color = 'currentColor', size = '1em' } = props
+  const svgProps = { ...props }
+  delete svgProps.alt
+  delete svgProps.color
+  delete svgProps.mirrored
+  delete svgProps.size
+  delete svgProps.weight
+  return (
+    <svg
+      {...svgProps}
+      ref={ref}
+      color={color}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M14 4H10C6.22876 4 4.34315 4 3.17157 5.17157C2 6.34315 2 8.22876 2 12C2 15.7712 2 17.6569 3.17157 18.8284C4.34315 20 6.22876 20 10 20H14C17.7712 20 19.6569 20 20.8284 18.8284C22 17.6569 22 15.7712 22 12C22 8.22876 22 6.34315 20.8284 5.17157C19.6569 4 17.7712 4 14 4Z" />
+      <path d="M7 9L8.83981 10.5858C9.61327 11.2525 10 11.5858 10 12C10 12.4142 9.61327 12.7475 8.83981 13.4142L7 15" />
+      <path d="M13 16H17" />
+    </svg>
+  )
+})
+
+TerminalCommandIcon.displayName = 'TerminalCommandIcon'

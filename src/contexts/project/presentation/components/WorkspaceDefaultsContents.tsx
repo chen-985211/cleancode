@@ -1,7 +1,7 @@
 import { useState, type ReactNode, type MouseEvent } from 'react'
 import { FolderIcon } from '@phosphor-icons/react/dist/csr/Folder'
 import { GlobeIcon } from '@phosphor-icons/react/dist/csr/Globe'
-import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
+import { TerminalCommandIcon } from '../../../../presentation/shared/components/TerminalCommandIcon'
 import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 import { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
@@ -149,7 +149,7 @@ export function WorkspaceDefaultsContents({
                 .filter((item) => item.source === source)
                 .map((template) => ({
                   ...template,
-                  icon: <TerminalWindowIcon size={18} aria-hidden="true" />,
+                  icon: <TerminalCommandIcon size={18} aria-hidden="true" />,
                   selected: value.templates.some((item) => item.templateId === template.id)
                 }))
             }))}
@@ -175,7 +175,7 @@ export function WorkspaceDefaultsContents({
                     content: (
                       <div className="workspace-defaults-row">
                         <span className="workspace-defaults-glyph">
-                          <TerminalWindowIcon size={20} aria-hidden="true" />
+                          <TerminalCommandIcon size={20} aria-hidden="true" />
                         </span>
                         <div className="workspace-defaults-name">
                           <span>{name}</span>

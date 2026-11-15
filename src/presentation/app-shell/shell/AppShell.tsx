@@ -503,7 +503,7 @@ export function AppShell({
       launchCommandEditRequest?.workspaceId === currentWorkspace?.workspaceId
         ? launchCommandEditRequest
         : null,
-    workflowNodeStatuses: terminalWorkflow.nodeStatuses,
+    workflowNodeStates: terminalWorkflow.nodeStates,
     onRemoveAgent: removeWorkspaceAgent,
     onMcpCapabilityChange: updateWorkspaceAgentMcpCapability,
     onRenameAgent: renameWorkspaceAgent,

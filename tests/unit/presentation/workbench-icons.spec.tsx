@@ -6,7 +6,7 @@ import {
 } from '../../../src/presentation/shared/components/WorkbenchIcons'
 
 const canonicalIconCases = [
-  ['terminal', 'terminal-window', 'regular'],
+  ['terminal', 'command-line', 'regular'],
   ['terminal-group', 'stack', 'regular'],
   ['workflow', 'flow-arrow', 'regular'],
   ['agent', 'robot', 'regular'],
@@ -35,6 +35,17 @@ const canonicalIconCases = [
 ] as const satisfies readonly (readonly [WorkbenchIconRole, string, string])[]
 
 describe('workbench icon semantics', () => {
+  it('uses the original framed command-line paths for every terminal identity', () => {
+    const { container } = render(<WorkbenchIcon role="terminal" size={19} />)
+    const icon = container.querySelector('svg')!
+    expect(icon).toHaveAttribute('viewBox', '0 0 24 24')
+    expect(icon).toHaveAttribute('fill', 'none')
+    expect([...icon.querySelectorAll('path')].map((path) => path.getAttribute('d'))).toEqual([
+      'M14 4H10C6.22876 4 4.34315 4 3.17157 5.17157C2 6.34315 2 8.22876 2 12C2 15.7712 2 17.6569 3.17157 18.8284C4.34315 20 6.22876 20 10 20H14C17.7712 20 19.6569 20 20.8284 18.8284C22 17.6569 22 15.7712 22 12C22 8.22876 22 6.34315 20.8284 5.17157C19.6569 4 17.7712 4 14 4Z',
+      'M7 9L8.83981 10.5858C9.61327 11.2525 10 11.5858 10 12C10 12.4142 9.61327 12.7475 8.83981 13.4142L7 15',
+      'M13 16H17'
+    ])
+  })
   it.each(canonicalIconCases)('%s uses %s with its canonical weight', (role, glyph, weight) => {
     const { container } = render(<WorkbenchIcon role={role} size={16} />)
     const icon = container.querySelector(`[data-icon-role="${role}"]`)

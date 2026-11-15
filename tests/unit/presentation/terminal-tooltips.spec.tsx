@@ -297,7 +297,7 @@ describe('terminal tooltips', () => {
 
     expect(document.querySelector('[data-icon="terminal-node"]')).toHaveAttribute(
       'data-icon-glyph',
-      'terminal-window'
+      'command-line'
     )
     expect(
       screen

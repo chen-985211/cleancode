@@ -40,6 +40,12 @@ describe('terminal workflow concurrent presentation', () => {
       ])
     )
     expect(result.current.nodeStatuses).toEqual({ frontend: 'running', backend: 'ready' })
+    expect(result.current).toMatchObject({
+      nodeStates: {
+        frontend: { runId: frontend.id, status: 'running' },
+        backend: { runId: backend.id, status: 'ready' }
+      }
+    })
     expect(concurrentProjection(result.current).activeRunIdByRootBlockId).toEqual({
       frontend: frontend.id,
       backend: backend.id

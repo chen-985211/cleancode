@@ -10,7 +10,7 @@ import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
 import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
-import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
+import { TerminalCommandIcon } from '../../../shared/components/TerminalCommandIcon'
 import {
   useCallback,
   useEffect,
@@ -236,7 +236,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               aria-current={activePane === 'terminal' ? 'page' : undefined}
               onClick={() => setSelectedPane('terminal')}
             >
-              <TerminalWindowIcon size={17} aria-hidden="true" />
+              <TerminalCommandIcon size={17} aria-hidden="true" />
               <span>{t('settings.terminal.title')}</span>
             </button>
             <button
