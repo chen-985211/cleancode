@@ -173,7 +173,7 @@ describe('project sidebar workspace archive feedback', () => {
     }
   )
 
-  it('redirects a restored row from its current exit position without replacing its node', () => {
+  it.each([80, 200])('restores the same row from its current exit position at %sms', (elapsed) => {
     const props = createProps()
     const { rerender, unmount } = render(<ProjectSidebar {...props} />)
     const row = screen
@@ -189,7 +189,7 @@ describe('project sidebar workspace archive feedback', () => {
       }
     }
     rerender(<ProjectSidebar {...props} currentWorkbench={removed} workbenches={[removed]} />)
-    act(() => vi.advanceTimersByTime(80))
+    act(() => vi.advanceTimersByTime(elapsed))
     const intermediateHeight = row.style.height
 
     rerender(<ProjectSidebar {...props} />)
@@ -198,9 +198,11 @@ describe('project sidebar workspace archive feedback', () => {
       screen.getByRole('button', { name: 'feature 独立工作区' }).closest('.workspace-group')
     ).toBe(row)
     expect(row.style.height).toBe(intermediateHeight)
+    expect(row).toHaveAttribute('data-workspace-row-motion', 'opening')
     expect(row).not.toHaveAttribute('inert')
     act(() => vi.advanceTimersByTime(2000))
     expect(row.style.height).toBe('auto')
+    expect(row).toHaveAttribute('data-workspace-row-motion', 'open')
     unmount()
     expect(vi.getTimerCount()).toBe(0)
   })
