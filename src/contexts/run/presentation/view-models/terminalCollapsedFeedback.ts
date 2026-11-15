@@ -6,14 +6,21 @@ export type TerminalCollapsedFeedbackStatus = 'idle' | 'running' | 'done' | 'err
 
 export function terminalCollapsedFeedback(
   session: TerminalViewState,
-  workflowStatus: WorkflowRunNodeStatus | undefined
+  workflowStatus: WorkflowRunNodeStatus | undefined,
+  workflowRunId: string | undefined
 ): { readonly status: TerminalCollapsedFeedbackStatus; readonly labelKey: MessageKey } {
   if (session.isRecoveryPending) return { status: 'idle', labelKey: 'terminal.status.idle' }
   if (session.servicePortState === 'quarantined')
     return { status: 'error', labelKey: 'service.quarantined' }
   if (session.servicePortState === 'releasing')
     return { status: 'idle', labelKey: 'service.releasing' }
-  if (workflowStatus) {
+  if (session.status === 'failed' || session.autoStartStatus === 'failed' || session.portConflict)
+    return { status: 'error', labelKey: 'terminal.status.failed' }
+  const ownsWorkflowState =
+    Boolean(workflowRunId) &&
+    session.runIdentity?.runId === workflowRunId &&
+    session.runIdentity?.sessionId === session.sessionId
+  if (workflowStatus && ownsWorkflowState) {
     const status =
       workflowStatus === 'running'
         ? 'running'
@@ -24,8 +31,6 @@ export function terminalCollapsedFeedback(
             : 'idle'
     return { status, labelKey: `workflow.status.${workflowStatus}` }
   }
-  if (session.status === 'failed' || session.autoStartStatus === 'failed' || session.portConflict)
-    return { status: 'error', labelKey: 'terminal.status.failed' }
   if (
     session.status === 'running' &&
     session.servicePortState === 'bound' &&

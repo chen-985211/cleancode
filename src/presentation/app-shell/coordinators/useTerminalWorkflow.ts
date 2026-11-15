@@ -6,6 +6,7 @@ import type {
   TerminalExecutionConfigSnapshot
 } from '../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkflowRunSnapshot } from '../../../contexts/run/application/dto/WorkflowRunSnapshot'
+import type { TerminalWorkflowNodeState } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 import type { TerminalWorkflowPlanScope } from '../../../contexts/run/application/ports/TerminalWorkflowPlanPort'
 import { createTerminalWorkflowEdges } from '../projections/terminalWorkflowEdges'
 import { resolveUserFacingErrorMessage } from '../../shared/errors/appErrorMessages'
@@ -98,12 +99,21 @@ export function useTerminalWorkflow({
     }
   }, [graphId, projectDirectory, projectId, workspaceId])
 
+  const nodeStates = useMemo(
+    () =>
+      Object.fromEntries(
+        runs.flatMap((run) =>
+          run.nodes.map((node) => [node.blockId, { runId: run.id, status: node.status }])
+        )
+      ) as Record<string, TerminalWorkflowNodeState>,
+    [runs]
+  )
   const nodeStatuses = useMemo(
     () =>
       Object.fromEntries(
-        runs.flatMap((run) => run.nodes.map((node) => [node.blockId, node.status]))
-      ) as Record<string, WorkflowRunSnapshot['nodes'][number]['status']>,
-    [runs]
+        Object.entries(nodeStates).map(([blockId, node]) => [blockId, node.status])
+      ),
+    [nodeStates]
   )
   const edges = useMemo(
     () => createTerminalWorkflowEdges(currentWorkbench?.graph ?? null, nodeStatuses),
@@ -255,6 +265,7 @@ export function useTerminalWorkflow({
     deleteEdges,
     edges,
     nodeStatuses,
+    nodeStates,
     runs,
     start,
     startScope,

@@ -9,7 +9,7 @@ import {
 import type { WorkspaceAgentSnapshot } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { AgentGraphUpdatedEvent } from '../../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
-import type { WorkflowRunNodeStatus } from '../../../contexts/run/application/dto/WorkflowRunSnapshot'
+import type { TerminalWorkflowNodeState } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 import { createAgentConsoleFlowNode } from '../projections/agentConsoleFlowNode'
 import { createAgentApprovalNodeIntents } from '../projections/agentApprovalPresentation'
@@ -59,7 +59,7 @@ interface UseWorkbenchFlowNodesInput {
     readonly blockId: string
     readonly requestId: number
   } | null
-  readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
+  readonly workflowNodeStates?: Readonly<Record<string, TerminalWorkflowNodeState>>
   readonly terminalWorkflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
   readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onMcpCapabilityChange: (
@@ -96,7 +96,7 @@ export function useWorkbenchFlowNodes({
   activeWorkflowRunIdByRootBlockId,
   stoppingWorkflowRunIds,
   launchCommandEditRequest,
-  workflowNodeStatuses,
+  workflowNodeStates,
   terminalWorkflowBuildPresentation,
   onRemoveAgent,
   onMcpCapabilityChange,
@@ -193,7 +193,7 @@ export function useWorkbenchFlowNodes({
         terminalStateStore,
         includeCollapsedMembers: true,
         workflowBuildPresentation: terminalWorkflowBuildPresentation,
-        workflowNodeStatuses
+        workflowNodeStates
       })
       setNodeTemplates?.(terminalNodeTemplates)
       const collapsedGraphMemberIds = new Set(
@@ -359,7 +359,7 @@ export function useWorkbenchFlowNodes({
     onAgentGraphUpdated,
     setNodes,
     terminalStateStore,
-    workflowNodeStatuses,
+    workflowNodeStates,
     terminalWorkflowBuildPresentation,
     onRemoveAgent,
     onMcpCapabilityChange,

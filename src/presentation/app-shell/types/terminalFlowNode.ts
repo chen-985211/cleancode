@@ -39,6 +39,7 @@ interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotio
   readonly isActiveWorkflowRoot?: boolean
   readonly isStoppingWorkflow?: boolean
   readonly workflowStatus?: WorkflowRunNodeStatus
+  readonly workflowRunId?: string
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onStop: (block: TerminalBlockSnapshot) => void
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void

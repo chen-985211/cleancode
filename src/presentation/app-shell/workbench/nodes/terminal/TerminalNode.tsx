@@ -360,6 +360,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
             sessionKind={session.sessionKind ?? null}
             retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
             workflowStatus={data.workflowStatus}
+            workflowRunId={data.workflowRunId}
             collapsedSession={session}
             isFeedbackVisible={isCollapsed && !isParked}
             isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
@@ -491,6 +492,7 @@ interface TerminalHeaderProps {
   readonly sessionKind: TerminalSessionMenuItemsProps['sessionKind']
   readonly retentionPolicy: TerminalSessionMenuItemsProps['retentionPolicy']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
+  readonly workflowRunId: string | undefined
   readonly collapsedSession: TerminalFlowNode['data']['session']
   readonly isFeedbackVisible: boolean
   readonly isActiveWorkflowRoot: boolean
@@ -526,6 +528,7 @@ function TerminalHeader({
   sessionKind,
   retentionPolicy,
   workflowStatus,
+  workflowRunId,
   collapsedSession,
   isFeedbackVisible,
   isActiveWorkflowRoot,
@@ -556,6 +559,7 @@ function TerminalHeader({
         name={blockName}
         session={collapsedSession}
         workflowStatus={workflowStatus}
+        workflowRunId={workflowRunId}
         surfaceRef={headerRef}
       />
       {!isCollapsed ? (

@@ -6,6 +6,18 @@ import {
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/projections/terminalFlowNodes'
 
 describe('terminal flow nodes', () => {
+  it('keeps the owning workflow identity paired with the node status', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph(),
+      hoveredTerminalBlockId: null,
+      handlers: createHandlers(),
+      workflowNodeStates: { 'terminal-1': { runId: 'workflow-run', status: 'succeeded' } }
+    })
+    expect(nodes[0]?.data).toMatchObject({
+      workflowRunId: 'workflow-run',
+      workflowStatus: 'succeeded'
+    })
+  })
   it('projects a compact folded terminal without replacing its saved expanded size', () => {
     const graph = createGraph()
     const nodes = createTerminalFlowNodes({

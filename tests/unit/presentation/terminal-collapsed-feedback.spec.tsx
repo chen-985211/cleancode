@@ -28,9 +28,96 @@ describe('collapsed terminal feedback', () => {
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate
   })
 
+  it.each(
+    (['succeeded', 'failed'] as const).flatMap((previous) => [
+      { previous, replacement: 'interactive', visual: 'idle', label: '运行中' },
+      { previous, replacement: 'direct', visual: 'idle', label: '运行中' },
+      { previous, replacement: 'failed', visual: 'error', label: '失败' },
+      { previous, replacement: 'auto-start-failed', visual: 'error', label: '失败' },
+      { previous, replacement: 'port-conflict', visual: 'error', label: '失败' },
+      { previous, replacement: 'service-ready', visual: 'done', label: '已就绪' }
+    ])
+  )('shows $replacement after a $previous workflow without reusing its result', (scenario) => {
+    const data = createWorkflowData(scenario.previous)
+    const store = createTerminalStateStore({ 'terminal-1': data.session })
+    render(node({ ...data, terminalStateStore: store }))
+    const session: TerminalFlowNode['data']['session'] = {
+      ...createData().session,
+      sessionId: 'replacement-session',
+      sessionKind: scenario.replacement === 'interactive' ? 'interactive' : 'direct',
+      status: scenario.replacement === 'failed' ? 'failed' : 'running',
+      autoStartStatus: scenario.replacement === 'auto-start-failed' ? 'failed' : 'succeeded',
+      runIdentity: {
+        ...data.session.runIdentity!,
+        sessionId: 'replacement-session',
+        runId: 'replacement-run',
+        generation: 2
+      },
+      portConflict:
+        scenario.replacement === 'port-conflict'
+          ? {
+              code: 'SERVICE_PORT_FIXED_CONFLICT',
+              port: 5173,
+              ownership: 'external',
+              managedOwner: null,
+              managedLeaseState: null
+            }
+          : null,
+      actualEndpoint:
+        scenario.replacement === 'service-ready'
+          ? {
+              protocol: 'http',
+              host: '127.0.0.1',
+              port: 5173,
+              requestedPort: null,
+              fallback: false,
+              displayAddress: 'http://127.0.0.1:5173',
+              openable: true
+            }
+          : null,
+      servicePortState: scenario.replacement === 'service-ready' ? 'bound' : null
+    }
+    act(() => store.replaceStates({ 'terminal-1': session }))
+    expect(screen.getByRole('status')).toHaveAttribute('data-status', scenario.visual)
+    expect(screen.getByRole('status')).toHaveAccessibleName(`测试终端：${scenario.label}`)
+  })
+
+  it.each([undefined, 'other-workflow'])('does not claim an unconfirmed workflow %s', (runId) => {
+    const data = createWorkflowData('succeeded')
+    render(node({ ...data, workflowRunId: runId }))
+    expect(screen.getByRole('status')).toHaveAttribute('data-status', 'idle')
+    expect(screen.getByRole('status')).toHaveAccessibleName('测试终端：已退出')
+  })
+
+  it('keeps a newer workflow session neutral until its own workflow state is available', () => {
+    const data = createWorkflowData('failed')
+    render(
+      node({
+        ...data,
+        session: {
+          ...data.session,
+          sessionId: 'new-workflow-session',
+          runIdentity: {
+            ...data.session.runIdentity!,
+            sessionId: 'new-workflow-session',
+            runId: 'new-workflow',
+            generation: 2
+          }
+        }
+      })
+    )
+    expect(screen.getByRole('status')).toHaveAttribute('data-status', 'idle')
+  })
+
+  it('shows a current session failure while the matching workflow result is still catching up', () => {
+    const data = createWorkflowData('succeeded')
+    render(node({ ...data, session: { ...data.session, status: 'failed' } }))
+    expect(screen.getByRole('status')).toHaveAttribute('data-status', 'error')
+  })
+
   it('keeps one forward decelerating sweep through session identity updates and disclosure', () => {
     const clock = createMotionClock()
-    const data = { ...createData(), workflowStatus: 'running' as const }
+    const data = createWorkflowData('running')
     const { rerender, container } = render(node(data))
     const fill = container.querySelector('.terminal-collapsed-feedback__fill') as HTMLElement
     const read = () => Number(fill.style.transform.match(/scaleX\(([^)]+)\)/)?.[1] ?? 0)
@@ -43,7 +130,14 @@ describe('collapsed terminal feedback', () => {
     expect(second).toBeGreaterThan(first)
     expect(second - first).toBeLessThan(first - start)
 
-    const claimed = { ...data, session: { ...data.session, sessionId: 'claimed-session' } }
+    const claimed = {
+      ...data,
+      session: {
+        ...data.session,
+        sessionId: 'claimed-session',
+        runIdentity: { ...data.session.runIdentity!, sessionId: 'claimed-session' }
+      }
+    }
     rerender(node(claimed))
     expect(read()).toBeGreaterThanOrEqual(second)
     rerender(
@@ -56,7 +150,7 @@ describe('collapsed terminal feedback', () => {
             workspaceId: 'main',
             blockId: 'terminal-1',
             sessionId: 'claimed-session',
-            runId: 'confirmed-run',
+            runId: 'workflow-run',
             generation: 1
           }
         }
@@ -89,7 +183,7 @@ describe('collapsed terminal feedback', () => {
 
   it('keeps the current sweep when reduced motion changes and releases its frame on unmount', () => {
     const clock = createMotionClock()
-    const data = { ...createData(), workflowStatus: 'running' as const }
+    const data = createWorkflowData('running')
     const { rerender, container, unmount } = render(node(data))
     clock.advance(1000)
     const fill = container.querySelector('.terminal-collapsed-feedback__fill') as HTMLElement
@@ -110,7 +204,7 @@ describe('collapsed terminal feedback', () => {
 
   it('accelerates a successful sweep without first dropping its forward speed', () => {
     const clock = createMotionClock()
-    const data = { ...createData(), workflowStatus: 'running' as const }
+    const data = createWorkflowData('running')
     const { rerender, container } = render(node(data))
     const fill = container.querySelector('.terminal-collapsed-feedback__fill') as HTMLElement
     const read = () => Number(fill.style.transform.match(/scaleX\(([^)]+)\)/)?.[1])
@@ -137,7 +231,7 @@ describe('collapsed terminal feedback', () => {
     { workflowStatus: 'blocked', visual: 'idle', glyph: 'tool', label: '已阻断' },
     { workflowStatus: 'stopped', visual: 'idle', glyph: 'tool', label: '已停止' }
   ])('shows $workflowStatus without a timer or changing the expand action', (scenario) => {
-    const data = { ...createData(), workflowStatus: scenario.workflowStatus }
+    const data = createWorkflowData(scenario.workflowStatus)
     const { container } = render(node(data))
     const status = screen.getByRole('status')
     expect(status).toHaveAccessibleName(`测试终端：${scenario.label}`)
@@ -220,7 +314,7 @@ describe('collapsed terminal feedback', () => {
     const cancel = vi.fn()
     const animate = vi.fn(() => ({ cancel }))
     Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
-    const data = { ...createData(), workflowStatus: 'running' as const }
+    const data = createWorkflowData('running')
     const { rerender } = render(node(data))
     rerender(node({ ...data, workflowStatus: 'failed' }))
     expect(screen.getByRole('status').querySelector('[data-glyph="tool"]')).toHaveAttribute(
@@ -240,7 +334,7 @@ describe('collapsed terminal feedback', () => {
     const cancel = vi.fn()
     const animate = vi.fn(() => ({ cancel }))
     Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
-    const data = { ...createData(), workflowStatus: 'running' as const }
+    const data = createWorkflowData('running')
     const { rerender } = render(node(data))
     rerender(node({ ...data, workflowStatus: 'failed' }))
     motion.reduced = true
@@ -254,7 +348,7 @@ describe('collapsed terminal feedback', () => {
   it('does not replay a saved failure on mount or start a shake with reduced motion', () => {
     const animate = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
-    const data = { ...createData(), workflowStatus: 'failed' as const }
+    const data = createWorkflowData('failed')
     const { unmount } = render(node(data))
     expect(animate).not.toHaveBeenCalled()
     unmount()
@@ -341,5 +435,30 @@ function createData(): TerminalFlowNode['data'] {
     onResize: vi.fn(),
     onResizeBlock: vi.fn(),
     onToggleTerminalGroupCandidate: vi.fn()
+  }
+}
+
+function createWorkflowData(status: WorkflowRunNodeStatus): TerminalFlowNode['data'] {
+  const data = createData()
+  return {
+    ...data,
+    workflowStatus: status,
+    workflowRunId: 'workflow-run',
+    session: {
+      ...data.session,
+      status:
+        status === 'succeeded' || status === 'failed' || status === 'stopped'
+          ? 'exited'
+          : 'running',
+      sessionKind: 'workflow',
+      runIdentity: {
+        projectId: 'project',
+        workspaceId: 'main',
+        blockId: 'terminal-1',
+        sessionId: 'session',
+        runId: 'workflow-run',
+        generation: 1
+      }
+    }
   }
 }

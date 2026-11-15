@@ -170,6 +170,7 @@ const terminalDataKeys = [
   'isActiveWorkflowRoot',
   'isStoppingWorkflow',
   'workflowStatus',
+  'workflowRunId',
   'isObjectLayoutChoreographed',
   'onStart',
   'onStop',

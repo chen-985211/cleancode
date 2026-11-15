@@ -23,7 +23,10 @@ import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
 import type { UpdateTerminalGroupMetadataInput } from '../../../contexts/block-graph/domain/aggregates/BlockGraphTypes'
 import type { TerminalDefinitionInput } from '../../../contexts/block-graph/presentation/view-models/TerminalDefinitionPresentationTypes'
-import type { TerminalViewState } from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
+import type {
+  TerminalViewState,
+  TerminalWorkflowNodeState
+} from '../../../contexts/run/presentation/view-models/TerminalPresentationTypes'
 
 import { terminalWorkflowDragHandles } from './terminalWorkflowDragHandles'
 
@@ -96,7 +99,7 @@ interface CreateTerminalFlowNodesInput {
   readonly terminalStates?: Record<string, TerminalViewState>
   readonly terminalStateStore?: TerminalStateStore
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
-  readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
+  readonly workflowNodeStates?: Readonly<Record<string, TerminalWorkflowNodeState>>
   readonly workflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
   readonly includeCollapsedMembers?: boolean
 }
@@ -116,7 +119,7 @@ export function createTerminalFlowNodes({
   terminalStates = {},
   terminalStateStore: providedTerminalStateStore,
   handlers,
-  workflowNodeStatuses = {},
+  workflowNodeStates = {},
   workflowBuildPresentation = null,
   includeCollapsedMembers = false
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
@@ -175,7 +178,8 @@ export function createTerminalFlowNodes({
         isTerminalGroupSelectionMode: false,
         terminalStateStore,
         workflowBuildPresentation,
-        workflowStatus: workflowNodeStatuses[block.id]
+        workflowStatus: workflowNodeStates[block.id]?.status,
+        workflowRunId: workflowNodeStates[block.id]?.runId
       })
     })
 
@@ -200,6 +204,7 @@ interface CreateTerminalFlowNodeInput {
   readonly isStoppingWorkflow: boolean
   readonly launchCommandEditRequestId?: number
   readonly workflowStatus?: WorkflowRunNodeStatus
+  readonly workflowRunId?: string
   readonly workflowBuildPresentation: TerminalWorkflowBuildPresentation | null
 }
 
@@ -221,6 +226,7 @@ function createTerminalFlowNode({
   isStoppingWorkflow,
   launchCommandEditRequestId,
   workflowStatus,
+  workflowRunId,
   workflowBuildPresentation
 }: CreateTerminalFlowNodeInput): TerminalFlowNode {
   const buildInitialPosition = workflowBuildPresentation?.initialPositionsByBlockId?.get(block.id)
@@ -263,6 +269,7 @@ function createTerminalFlowNode({
       isObjectLayoutChoreographed: workflowBuildPresentation?.terminalBlockIds.has(block.id),
       objectPresence,
       workflowStatus,
+      workflowRunId,
       ...handlers,
       onStopWorkflow:
         activeWorkflowRunId && handlers.onStopWorkflow

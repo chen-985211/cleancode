@@ -22,17 +22,19 @@ export function TerminalCollapsedFeedback({
   name,
   session,
   workflowStatus,
+  workflowRunId,
   surfaceRef,
   visible = true
 }: {
   readonly name: string
   readonly session: TerminalViewState
   readonly workflowStatus: WorkflowRunNodeStatus | undefined
+  readonly workflowRunId?: string
   readonly surfaceRef: RefObject<HTMLDivElement | null>
   readonly visible?: boolean
 }) {
   const { t } = useI18n()
-  const { status, labelKey } = terminalCollapsedFeedback(session, workflowStatus)
+  const { status, labelKey } = terminalCollapsedFeedback(session, workflowStatus, workflowRunId)
   const reducedMotion = usePrefersReducedMotion()
   const statusLabel = t('terminal.collapsedStatus', { name, status: t(labelKey) })
   const glyph: Glyph = status === 'done' ? 'check' : status === 'error' ? 'retry' : 'tool'

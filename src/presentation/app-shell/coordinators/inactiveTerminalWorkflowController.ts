@@ -6,6 +6,7 @@ export const inactiveTerminalWorkflowController = {
   deleteEdges: async () => undefined,
   edges: [],
   nodeStatuses: {},
+  nodeStates: {},
   runs: [],
   start: async () => undefined,
   startScope: async () => undefined,

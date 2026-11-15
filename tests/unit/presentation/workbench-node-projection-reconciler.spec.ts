@@ -7,6 +7,25 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { reconcileWorkbenchNodeProjection } from '../../../src/presentation/app-shell/projections/workbenchNodeProjectionReconciler'
 
 describe('Workbench node projection reconciler', () => {
+  it('updates the owning workflow when a new run has the same node status', () => {
+    const store = createTerminalStateStore(terminalStates)
+    const current = createNodes(createGraph(), store).map((node) =>
+      node.type !== 'terminal'
+        ? node
+        : {
+            ...node,
+            data: { ...node.data, workflowStatus: 'succeeded', workflowRunId: 'old-run' }
+          }
+    ) as WorkbenchFlowNode[]
+    const next = current.map((node) =>
+      node.type !== 'terminal'
+        ? node
+        : { ...node, data: { ...node.data, workflowRunId: 'new-run' } }
+    ) as WorkbenchFlowNode[]
+    const reconciled = reconcileWorkbenchNodeProjection(next, current)
+    expect(reconciled).not.toBe(current)
+    expect(reconciled.find((node) => node.type === 'terminal')?.data.workflowRunId).toBe('new-run')
+  })
   it('retains measured geometry across graph updates so existing edge handles stay initialized', () => {
     const store = createTerminalStateStore(terminalStates)
     const current = createNodes(createGraph(), store).map((node) => ({
