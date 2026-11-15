@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { AboutSettingsPane } from '../../../src/presentation/app-shell/app-features/settings/AboutSettingsPane'
 import { I18nProvider } from '../../../src/presentation/i18n/I18nProvider'
@@ -20,6 +20,8 @@ describe('about repository stars', () => {
   })
 
   afterEach(() => {
+    // Unmount while browser API stubs are still available to pending motion effects.
+    cleanup()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     Object.defineProperty(window, 'cleancode', { configurable: true, value: originalRuntime })
