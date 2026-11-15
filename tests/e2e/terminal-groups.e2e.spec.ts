@@ -16,6 +16,7 @@ import {
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { waitForTerminalDomText } from '../support/terminalSelectionE2e'
 import { pollUntilState } from '../support/e2ePolling'
+import { setElectronContentSize } from '../support/e2eWindow'
 import {
   asE2eTerminalInput,
   createE2ePrintCommand,
@@ -43,9 +44,7 @@ describe('terminal group direct manipulation', () => {
     page = await app.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
-    await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]!.setContentSize(2400, 1500)
-    )
+    await setElectronContentSize(app, { width: 2400, height: 1500 })
     await page.waitForFunction(() => innerWidth >= 2400 && innerHeight >= 1500)
   }, electronLaunchTimeoutMs)
   afterEach(async ({ task }) =>

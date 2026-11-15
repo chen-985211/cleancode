@@ -19,7 +19,7 @@ async function projectedFrame(renderer: string) {
     f.theme('light')
   })
   const frame = [0x172033, 0xcc0000, 0xf2f4f5]
-  await expect.poll(() => ink(renderer)).toEqual(frame)
+  await expect.poll(() => ink(renderer), { timeout: 5000 }).toEqual(frame)
   return frame
 }
 
@@ -47,7 +47,9 @@ it.each(['dom', 'webgl'])(
       .screenshot({ path: join(output, renderer + '-workspace.png') })
     await write('\x1b[?2026l')
     await expect.poll(() => ink(renderer)).toEqual([0x4e9a06, 0xcc0000, 0x202326])
-  }
+  },
+  // The first navigation compiles the fixture and initializes the native renderer.
+  15000
 )
 
 it.each(['dom', 'webgl'])(
