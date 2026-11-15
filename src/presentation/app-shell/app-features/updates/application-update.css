@@ -1,0 +1,176 @@
+.application-update-footer {
+  display: flex;
+  height: var(--cc-statusbar-height);
+  min-height: var(--cc-statusbar-height);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: calc(var(--cc-statusbar-bottom) - var(--cc-shell-control-inset));
+  padding: 0 4px;
+}
+
+.application-update-control {
+  position: relative;
+  display: flex;
+  width: var(--cc-statusbar-height);
+  height: var(--cc-statusbar-height);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  corner-shape: round;
+  padding: 0;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  cursor: pointer;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+.application-update-control:hover:not([aria-disabled='true']) {
+  background: var(--cc-sidebar-hover);
+  color: var(--cc-foreground);
+}
+.application-update-control:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+.application-update-control--downloading {
+  width: 64px;
+  height: 18px;
+  max-width: 100%;
+  border-color: var(--cc-border);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+  cursor: default;
+}
+.application-update-progress {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 0 6px;
+  isolation: isolate;
+}
+.application-update-progress__fill {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--cc-sidebar-selection);
+}
+.application-update-progress__percent {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.application-update-dialog-overlay {
+  position: fixed;
+  z-index: 300;
+  inset: 0;
+  background: var(--cc-backdrop);
+}
+.application-update-dialog {
+  position: fixed;
+  z-index: 301;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--cc-border);
+  border-radius: 14px;
+  padding: 0;
+  background: var(--cc-surface-raised);
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-floating);
+  outline: none;
+}
+.application-update-dialog__body {
+  padding: 20px;
+}
+.application-update-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.application-update-dialog p {
+  margin: 0;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.application-update-dialog p[role='alert'] {
+  margin-top: 12px;
+  color: var(--cc-danger);
+}
+.application-update-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--cc-border);
+  padding: 12px 16px;
+  background: var(--cc-surface-subtle);
+}
+.application-update-dialog__actions button {
+  min-height: 30px;
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.application-update-dialog__later {
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+}
+.application-update-dialog__install {
+  background: var(--cc-foreground);
+  color: var(--cc-background);
+}
+.application-update-dialog__actions button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+.application-update-dialog__actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.application-update-about {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+.application-update-about p {
+  margin: 0;
+  color: var(--cc-muted);
+  font-size: 12px;
+}
+.application-update-about button {
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  padding: 6px 12px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 12px;
+}
+.application-update-about button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .application-update-control {
+    transition: none;
+  }
+}

@@ -96,6 +96,8 @@ import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { configureApplicationQuitConfirmation as configureQuitConfirmation } from './applicationQuitConfirmation'
+import { configureApplicationUpdates } from './applicationUpdateRuntime'
+import { bindApplicationQuitLifecycle } from './applicationQuitLifecycle'
 import { configureApplicationDiagnostics } from './applicationDiagnosticsRuntime'
 import { configureApplicationRepository } from './applicationRepositoryRuntime'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
@@ -628,6 +630,9 @@ if (isPrimaryAppInstance) {
       })
     }
     agentActivityRuntime.initializeFailOpen()
+    await configureApplicationUpdates({
+      prepareRestart: () => applicationQuitLifecycle.prepareUpdate()
+    })
     const appIconPath = resolveAppIconPath({
       fileExists: existsSync,
       isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
@@ -663,8 +668,6 @@ app.on('window-all-closed', () => {
   }
 })
 
-let isReadyToQuit = false
-let isPreparingToQuit = false
 const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
   completeAgentSessions: () =>
     agentSessionService.completeApplicationShutdown().finally(() => agentActivityRuntime.dispose()),
@@ -680,19 +683,7 @@ const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
   prepareTerminalWorkflows: () => terminalWorkflowService.prepareApplicationShutdown()
 })
 
-app.on('before-quit', (event) => {
-  if (isReadyToQuit) {
-    return
-  }
-
-  event.preventDefault()
-  if (isPreparingToQuit) {
-    return
-  }
-
-  isPreparingToQuit = true
-  void applicationRuntimeShutdown.dispose().finally(() => {
-    isReadyToQuit = true
-    app.quit()
-  })
+const applicationQuitLifecycle = bindApplicationQuitLifecycle({
+  app,
+  shutdown: () => applicationRuntimeShutdown.dispose()
 })

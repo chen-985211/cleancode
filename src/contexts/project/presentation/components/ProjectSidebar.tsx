@@ -43,6 +43,7 @@ interface ProjectSidebarShortcutTooltips {
 }
 
 interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
+  readonly footer?: ReactNode
   readonly navigation?: ReactNode
   readonly workbenches: readonly TWorkbench[]
   readonly currentWorkbench: TWorkbench | null
@@ -69,6 +70,7 @@ interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
 }
 
 export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
+  footer,
   navigation,
   workbenches,
   currentWorkbench,
@@ -180,6 +182,7 @@ export function ProjectSidebar<TWorkbench extends ProjectWorkbenchViewModel>({
             />
           ))}
         </div>
+        {footer}
       </div>
     </aside>
   )

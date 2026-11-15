@@ -2,6 +2,7 @@ import type { ComponentProps, Ref } from 'react'
 import { ProjectSidebar } from '../../../../contexts/project/presentation/components/ProjectSidebar'
 import type { WorkbenchSnapshot } from '../../types/workbenchSnapshot'
 import { ProjectSidebarToggle } from './ProjectSidebarToggle'
+import { ApplicationUpdateControl } from '../../app-features/updates/ApplicationUpdateControl'
 
 interface AppShellSidebarProps extends Omit<
   ComponentProps<typeof ProjectSidebar<WorkbenchSnapshot>>,
@@ -34,7 +35,11 @@ export function AppShellSidebar({
         shortcutTooltip={toggleTooltip}
         onToggle={onToggle}
       />
-      <ProjectSidebar {...sidebar} motionSurfaceRef={motion.sidebarRef} />
+      <ProjectSidebar
+        {...sidebar}
+        footer={<ApplicationUpdateControl />}
+        motionSurfaceRef={motion.sidebarRef}
+      />
     </div>
   )
 }

@@ -11,6 +11,11 @@ files:
   - out/**/*
 
 asar: true
+publish:
+  provider: github
+  owner: chen-985211
+  repo: cleancode
+  releaseType: prerelease
 asarUnpack:
   - node_modules/node-pty/**/*
 

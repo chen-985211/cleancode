@@ -1,4 +1,18 @@
 export const zhCNSettingsMessages = {
+  'update.check': '检查更新',
+  'update.retry': '更新失败，点击重试',
+  'update.progressLabel': '更新进度 {percent}%',
+  'update.readyTitle': '更新已就绪',
+  'update.readyVersion': '版本 {version} 已就绪',
+  'update.restartDescription':
+    '版本 {version} 已下载并校验完成。重启将暂时中断当前工作和 Agent 会话，正在运行的工作流会停止。是否现在重启并更新？',
+  'update.later': '稍后',
+  'update.restart': '重启并更新',
+  'update.installing': '正在重启…',
+  'update.installError': '更新安装失败，请稍后重试。',
+  'update.checkError': '暂时无法完成更新，请重试。',
+  'update.unavailable': '此版本暂不支持应用内更新。',
+  'update.current': '当前版本',
   'theme.settings': '主题设置',
   'theme.description': '选择 cleancode 的界面外观。',
   'theme.close': '关闭主题设置',
