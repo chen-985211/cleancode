@@ -631,7 +631,8 @@ if (isPrimaryAppInstance) {
     }
     agentActivityRuntime.initializeFailOpen()
     await configureApplicationUpdates({
-      prepareRestart: () => applicationQuitLifecycle.prepareUpdate()
+      prepareRestart: () => applicationQuitLifecycle.prepareUpdate(),
+      restartAfterFailedInstall: () => applicationQuitLifecycle.recoverFailedUpdate()
     })
     const appIconPath = resolveAppIconPath({
       fileExists: existsSync,
@@ -685,5 +686,6 @@ const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
 
 const applicationQuitLifecycle = bindApplicationQuitLifecycle({
   app,
+  relaunchExecutable: process.platform === 'linux' ? process.env.APPIMAGE : undefined,
   shutdown: () => applicationRuntimeShutdown.dispose()
 })

@@ -10,13 +10,15 @@ function harness() {
     quitAndInstall: vi.fn()
   })
   const prepareRestart = vi.fn<() => Promise<void>>(async () => undefined)
-  const service = createApplicationUpdateService({ updater, prepareRestart })
-  return { updater, prepareRestart, service }
+  const restartAfterFailedInstall = vi.fn(async () => undefined)
+  const input = { updater, prepareRestart, restartAfterFailedInstall }
+  const service = createApplicationUpdateService(input)
+  return { updater, prepareRestart, restartAfterFailedInstall, service }
 }
 
 describe('application updates', () => {
   it('downloads an available release and waits for verified download completion before allowing install', async () => {
-    const { updater, service } = harness()
+    const { updater, restartAfterFailedInstall, service } = harness()
     await service.check()
     expect(updater.downloadUpdate).toHaveBeenCalledOnce()
     expect(service.getSnapshot()).toMatchObject({ status: 'downloading', version: '0.2.0' })
@@ -30,6 +32,7 @@ describe('application updates', () => {
     expect(service.getSnapshot().status).toBe('ready')
     await service.install('0.2.0')
     expect(updater.quitAndInstall).toHaveBeenCalledExactlyOnceWith(true, true)
+    expect(restartAfterFailedInstall).not.toHaveBeenCalled()
   })
 
   it('coalesces checks, ignores regressing progress and ignores late events after readiness', async () => {
@@ -86,17 +89,45 @@ describe('application updates', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('allows retrying a failed install of the same verified version', async () => {
-    const { updater, service } = harness()
+  it.each(['throw', 'event', 'deferred-event'] as const)(
+    'recovers the application once instead of retrying in a disposed runtime (%s)',
+    async (failure) => {
+      const { updater, prepareRestart, restartAfterFailedInstall, service } = harness()
+      await service.check()
+      updater.emit('update-downloaded', { version: '0.2.0' })
+      updater.quitAndInstall.mockImplementationOnce(() => {
+        const error = new Error('installer failed')
+        if (failure === 'throw') throw error
+        if (failure === 'event') updater.emit('error', error)
+        else queueMicrotask(() => updater.emit('error', error))
+      })
+      await service.install('0.2.0')
+      await vi.waitFor(() => expect(restartAfterFailedInstall).toHaveBeenCalledOnce())
+      expect(service.getSnapshot()).toMatchObject({ status: 'error', error: 'install' })
+      updater.emit('error', new Error('duplicate failure'))
+      await service.install('0.2.0')
+      expect(prepareRestart).toHaveBeenCalledOnce()
+      expect(updater.quitAndInstall).toHaveBeenCalledOnce()
+      expect(restartAfterFailedInstall).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('does not start the installer when an install error arrives during shutdown', async () => {
+    const { updater, prepareRestart, restartAfterFailedInstall, service } = harness()
+    let finish: () => void = () => undefined
+    prepareRestart.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        })
+    )
     await service.check()
     updater.emit('update-downloaded', { version: '0.2.0' })
-    updater.quitAndInstall.mockImplementationOnce(() => {
-      throw new Error('installer failed')
-    })
-    await service.install('0.2.0')
-    expect(service.getSnapshot()).toMatchObject({ status: 'error', error: 'install' })
-    await service.install('0.2.0')
-    expect(updater.quitAndInstall).toHaveBeenCalledTimes(2)
-    expect(service.getSnapshot().status).toBe('installing')
+    const installing = service.install('0.2.0')
+    updater.emit('error', new Error('installer became unavailable'))
+    finish()
+    await installing
+    await vi.waitFor(() => expect(restartAfterFailedInstall).toHaveBeenCalledOnce())
+    expect(updater.quitAndInstall).not.toHaveBeenCalled()
   })
 })

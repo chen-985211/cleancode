@@ -4,14 +4,18 @@ interface QuitEvent {
 interface QuitApplication {
   on(event: 'before-quit', listener: (event: QuitEvent) => void): unknown
   quit(): void
+  relaunch(options?: { execPath: string }): void
 }
 
 export function bindApplicationQuitLifecycle(input: {
   readonly app: QuitApplication
   readonly shutdown: () => Promise<void>
-}): { prepareUpdate: () => Promise<void> } {
+  readonly relaunchExecutable?: string
+}): { prepareUpdate: () => Promise<void>; recoverFailedUpdate: () => Promise<void> } {
   let ready = false
   let intent: 'quit' | 'update' | null = null
+  let updatePreparation: Promise<void> | undefined
+  let updateRecovery: Promise<void> | undefined
   input.app.on('before-quit', (event) => {
     if (ready) return
     event.preventDefault()
@@ -26,8 +30,26 @@ export function bindApplicationQuitLifecycle(input: {
     async prepareUpdate() {
       if (intent === 'quit') throw new Error('Application shutdown is already in progress.')
       intent = 'update'
-      await input.shutdown()
-      ready = true
+      updatePreparation ??= (async () => {
+        await input.shutdown()
+        ready = true
+      })()
+      await updatePreparation
+    },
+    recoverFailedUpdate() {
+      if (intent !== 'update') return Promise.resolve()
+      const restart = () => {
+        ready = true
+        try {
+          input.app.relaunch(
+            input.relaunchExecutable ? { execPath: input.relaunchExecutable } : undefined
+          )
+        } finally {
+          input.app.quit()
+        }
+      }
+      updateRecovery ??= (updatePreparation ?? Promise.resolve()).then(restart, restart)
+      return updateRecovery
     }
   }
 }

@@ -12,6 +12,7 @@ export interface ApplicationUpdateBackend {
 export function createApplicationUpdateService(input: {
   readonly updater: ApplicationUpdateBackend
   readonly prepareRestart: () => Promise<void>
+  readonly restartAfterFailedInstall: () => Promise<void>
   readonly onFailure?: (stage: 'check' | 'download' | 'install') => void
   readonly unavailableReason?: ApplicationUpdateSnapshot['unavailableReason']
 }) {
@@ -24,6 +25,7 @@ export function createApplicationUpdateService(input: {
   }
   let disposed = false
   let checking: Promise<ApplicationUpdateSnapshot> | undefined
+  let installRecoveryRequested = false
   const listeners = new Set<(value: ApplicationUpdateSnapshot) => void>()
   const update = (next: Omit<ApplicationUpdateSnapshot, 'revision'>) => {
     if (disposed) return
@@ -39,6 +41,12 @@ export function createApplicationUpdateService(input: {
   const fail = (stage: 'check' | 'download' | 'install') => {
     if (disposed || snapshot.status === 'error') return
     update({ status: 'error', version: snapshot.version, percent: null, error: stage })
+    if (stage === 'install') {
+      installRecoveryRequested = true
+      void Promise.resolve()
+        .then(input.restartAfterFailedInstall)
+        .catch(() => input.onFailure?.('install'))
+    }
     input.onFailure?.(stage)
   }
   const available = (info: { version: string }) => {
@@ -130,11 +138,12 @@ export function createApplicationUpdateService(input: {
     async install(version: string): Promise<ApplicationUpdateSnapshot> {
       const canInstall =
         snapshot.status === 'ready' || (snapshot.status === 'error' && snapshot.error === 'install')
-      if (disposed || !canInstall || version !== snapshot.version) return snapshot
+      if (disposed || installRecoveryRequested || !canInstall || version !== snapshot.version)
+        return snapshot
       update({ status: 'installing', version, percent: 100 })
       try {
         await input.prepareRestart()
-        if (!disposed) input.updater.quitAndInstall(true, true)
+        if (!disposed && snapshot.status === 'installing') input.updater.quitAndInstall(true, true)
       } catch {
         fail('install')
       }

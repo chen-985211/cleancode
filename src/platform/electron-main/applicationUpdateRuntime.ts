@@ -11,6 +11,7 @@ import { registerApplicationUpdateIpc } from './applicationUpdateIpc'
 
 export async function configureApplicationUpdates(input: {
   readonly prepareRestart: () => Promise<void>
+  readonly restartAfterFailedInstall: () => Promise<void>
 }): Promise<void> {
   const updater = electronUpdater.autoUpdater
   // Install exclusively after a user confirms the exact verified release.
@@ -34,6 +35,7 @@ export async function configureApplicationUpdates(input: {
     updater,
     unavailableReason,
     prepareRestart: input.prepareRestart,
+    restartAfterFailedInstall: input.restartAfterFailedInstall,
     onFailure: (stage) =>
       consoleLogger.warn({
         scope: 'platform.application-update',
