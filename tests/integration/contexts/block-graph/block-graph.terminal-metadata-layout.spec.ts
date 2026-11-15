@@ -43,6 +43,8 @@ beforeAll(async () => {
   })
   page = await application.firstWindow()
   page.setDefaultTimeout(5_000)
+  // Cold Vite module loading has a separate budget from in-page interactions.
+  page.setDefaultNavigationTimeout(30_000)
   page.on('pageerror', (error) => rendererErrors.push(error.message))
   electronVersion = await application.evaluate(() => process.versions.electron)
   const windowState = await application.evaluate(async ({ BrowserWindow, screen }) => {

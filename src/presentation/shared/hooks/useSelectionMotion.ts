@@ -8,7 +8,7 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 type ElementRefCallback = (element: HTMLElement | null) => void
 
-type SelectionIndicatorMotionRefs = readonly [ElementRefCallback, ElementRefCallback]
+type SelectionIndicatorMotionRefs = readonly [ElementRefCallback, ElementRefCallback, () => void]
 const emptyTarget = { height: 0, width: 0, x: 0, y: 0 }
 
 export function useSelectionIndicatorMotion(selectedKey: string): SelectionIndicatorMotionRefs {
@@ -103,7 +103,10 @@ export function useSelectionIndicatorMotion(selectedKey: string): SelectionIndic
     [controller, project, scheduleProjection]
   )
 
-  return [containerRef, indicatorRef]
+  const refreshLayout = useCallback(() => {
+    project(true)
+  }, [project])
+  return [containerRef, indicatorRef, refreshLayout]
 }
 
 export function useSelectionFeedbackMotion(selected: boolean): ElementRefCallback {
