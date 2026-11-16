@@ -247,9 +247,15 @@ describe('application update Electron UI', () => {
           )
         })
         const bounds = await dialog.boundingBox()
+        // Native window frame extents can make the real viewport larger than requested.
+        const narrowViewport = await page.evaluate(() => ({
+          width: innerWidth,
+          height: innerHeight
+        }))
         expect(bounds!.x).toBeGreaterThanOrEqual(15)
-        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(405)
-        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(480)
+        expect(bounds!.y).toBeGreaterThanOrEqual(15)
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(narrowViewport.width - 15)
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(narrowViewport.height - 15)
         await page.screenshot({ path: join(output, `${theme}-narrow.png`) })
         await dialog.locator('[data-update-install]').click()
         await page.waitForFunction(
