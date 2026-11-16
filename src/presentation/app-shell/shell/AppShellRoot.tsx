@@ -10,6 +10,7 @@ import { NotificationProvider } from '../app-features/notifications/Notification
 import { TooltipProvider } from '../../shared/components/Tooltip'
 import { useNotifications } from '../app-features/notifications/useNotifications'
 import { ApplicationQuitConfirmationBridge } from './lifecycle/ApplicationQuitConfirmationBridge'
+import { ApplicationUpdateProvider } from '../app-features/updates/ApplicationUpdateProvider'
 
 export function AppShellRoot() {
   const nextNavigationRequestIdRef = useRef(0)
@@ -28,13 +29,15 @@ export function AppShellRoot() {
     <I18nProvider>
       <ApplicationQuitConfirmationBridge />
       <TooltipProvider>
-        <NotificationProvider>
-          <NotifiedAppShell
-            navigationRequest={navigationRequest}
-            onAgentActivityNavigate={navigateToAgentActivity}
-            onNavigationHandled={handleAgentActivityNavigation}
-          />
-        </NotificationProvider>
+        <ApplicationUpdateProvider>
+          <NotificationProvider>
+            <NotifiedAppShell
+              navigationRequest={navigationRequest}
+              onAgentActivityNavigate={navigateToAgentActivity}
+              onNavigationHandled={handleAgentActivityNavigation}
+            />
+          </NotificationProvider>
+        </ApplicationUpdateProvider>
       </TooltipProvider>
     </I18nProvider>
   )

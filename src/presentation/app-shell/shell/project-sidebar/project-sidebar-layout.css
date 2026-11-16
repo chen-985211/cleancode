@@ -12,6 +12,10 @@
   overflow: visible;
 }
 
+.project-sidebar-column .project-list {
+  padding-bottom: 6px;
+}
+
 .app-shell--sidebar-collapsed .project-sidebar {
   pointer-events: none;
 }

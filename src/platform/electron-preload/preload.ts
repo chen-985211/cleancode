@@ -13,9 +13,23 @@ import {
 import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChannels'
 import { applicationDiagnosticsChannels } from '../ipc/applicationDiagnosticsChannels'
 import { applicationRepositoryStarsChannel } from '../ipc/applicationRepositoryChannels'
+import {
+  applicationUpdateChannels,
+  type ApplicationUpdateSnapshot
+} from '../ipc/applicationUpdateChannels'
 
 const cleancodeApi = {
   appName: 'cleancode',
+  getApplicationUpdate: () =>
+    invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.get),
+  checkApplicationUpdate: () =>
+    invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.check),
+  installApplicationUpdate: (command: { readonly version: string }) =>
+    invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.install, command),
+  claimApplicationUpdatePrompt: (command: { readonly version: string }) =>
+    invokeCleancode<boolean>(applicationUpdateChannels.claimPrompt, command),
+  onApplicationUpdateChanged: (listener: (event: ApplicationUpdateSnapshot) => void) =>
+    subscribeRendererEvent(applicationUpdateChannels.changed, listener),
   onAgentPeerCreationRequested: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-peer-creation-requested', listener),
   completeAgentPeerCreation: (command: unknown) =>

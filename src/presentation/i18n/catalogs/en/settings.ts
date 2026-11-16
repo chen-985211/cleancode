@@ -1,6 +1,20 @@
 import type { zhCNSettingsMessages } from '../zh-CN/settings'
 
 export const enSettingsMessages = {
+  'update.check': 'Check for updates',
+  'update.retry': 'Update failed. Click to retry',
+  'update.progressLabel': 'Update progress {percent}%',
+  'update.readyTitle': 'Update ready',
+  'update.readyVersion': 'Version {version} is ready',
+  'update.restartDescription':
+    'Version {version} has been downloaded and verified. Restarting will briefly interrupt your work and Agent sessions, and stop running workflows. Restart and update now?',
+  'update.later': 'Later',
+  'update.restart': 'Restart and update',
+  'update.installing': 'Restarting…',
+  'update.installError': 'The update could not be installed. Please try again later.',
+  'update.checkError': 'The update could not be completed. Please try again.',
+  'update.unavailable': 'In-app updates are unavailable in this build.',
+  'update.current': 'Current version',
   'theme.settings': 'Theme settings',
   'theme.description': 'Choose the appearance of cleancode.',
   'theme.close': 'Close theme settings',

@@ -112,10 +112,19 @@ interface WorkbenchSnapshot {
   readonly graph: BlockGraphSnapshot
 }
 
+import type { ApplicationUpdateSnapshot } from './platform/ipc/applicationUpdateChannels'
+
 declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      getApplicationUpdate(): Promise<ApplicationUpdateSnapshot>
+      checkApplicationUpdate(): Promise<ApplicationUpdateSnapshot>
+      claimApplicationUpdatePrompt(command: { readonly version: string }): Promise<boolean>
+      installApplicationUpdate(command: {
+        readonly version: string
+      }): Promise<ApplicationUpdateSnapshot>
+      onApplicationUpdateChanged(listener: (event: ApplicationUpdateSnapshot) => void): () => void
       exportApplicationDiagnostics(
         command: ApplicationDiagnosticsExportCommand
       ): Promise<ApplicationDiagnosticsExportResult>

@@ -61,7 +61,26 @@ probe，且不得跨系统复用。其原生模块、helper 和 Windows 辅助�
 文件运行最小终端 E2E，再生成发行格式。与 `package.json` 版本一致的 `v*` tag 会汇总产物和
 SHA-256 校验文件并创建公开 GitHub Pre-release；手工触发只保留 Actions artifacts。当前
 Preview 的 macOS 应用使用 ad-hoc 签名且不 notarize，Windows 安装程序未签名，发布说明必须明确
-系统安全警告，且不得标记为 Latest。自动更新、正式签名和公证仍未接入。
+系统安全警告，且不得标记为 Latest。
+
+应用内更新使用精确版本的 `electron-updater`，从本仓库 GitHub Releases 检查较新的 Preview，
+后台下载并校验后等待用户确认重启，不允许降级、退出时静默安装或 renderer 指定更新地址。
+确认后的运行时清理不可逆；安装抛异常或发送错误事件时，退出协调器等待清理结束后仅重新启动
+当前版本一次。Linux AppImage 在替换前将旧可执行文件保存在安装目录旁的私有临时目录，优先使用
+硬链接，不支持时复制并保留执行权限；备份失败不得进入安装。安装失败先恢复原路径，再启动旧版本；
+原路径无法恢复时保留并启动备份文件，正常安装退出时清除备份。备份或恢复未完成时不得提前退出。
+恢复不使用挂载目录中的 Electron 路径。
+已提醒版本由更新主进程服务在本次应用会话内保存；renderer 经受校验的精确版本 IPC 原子认领
+自动提醒资格，多个窗口与 renderer 重建共享同一份结果，不把延后选择保存在组件生命周期中。
+构建配置生成更新元数据，发布 workflow 同时上传 `latest*.yml`、alpha/beta 元数据及 blockmap。
+Windows NSIS 与 Linux AppImage 支持应用内安装；DEB、开发运行和其他不支持的目标禁用该能力。
+macOS 必须检测到 Developer ID Application 签名才启用，ad-hoc 包保持禁用。
+
+macOS 发布签名接入使用 Actions secrets `CSC_LINK`（Developer ID 证书）、`CSC_KEY_PASSWORD`
+和 `MAC_CODESIGN_IDENTITY`（证书完整名称）；仅在 macOS job 存在证书时覆盖测试签名并启用
+hardened runtime。配置 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID` 后同时
+启用 notarization。未配置证书时继续生成 ad-hoc Preview，不得把该产物视为自动更新安装验收。
+签名与公证的真实成功仍需要发布环境和证书验证。
 
 打包版与人工测试的发布包继续使用稳定的 `CleanCode` 用户数据目录。未打包的开发运行先规范化
 Electron 实际加载的源码 worktree 目录，再使用不暴露本地路径的稳定摘要选择
@@ -83,6 +102,11 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 第一方通用界面图标统一使用 Phosphor Icons。主画布、顶部工具栏、小地图、节点、节点菜单、快捷执行栏和 Agent 局部状态通过表现层 `WorkbenchIcons` 选择语义角色；Provider 品牌图标和产品专属几何保留为显式例外。
 
 关于页 GitHub Star 按钮使用 `@animate-ui/react` 官方原语提供滚动数字、星标填充、粒子与按压动效，接收 Platform 查询的 Star 数量，不启用原语自身的 GitHub 请求。为保留官方示例的星标形状，该组件局部使用 Hugeicons 的 Star 图形；其他通用界面图标继续使用 Phosphor。组件通过既有 motion preference owner 将减少动态效果偏好传给上游动效上下文。
+
+应用更新入口按产品选型局部复用 Animate UI 官方 Lucide Download 图标；胶囊进度与重启确认使用
+Animate UI 的 Radix 原语，`radix-ui` 是其显式 peer 依赖。该局部图标例外不改变其余界面的
+Phosphor 语义图标登记。更新状态由 Platform 持有并经受校验的 IPC 投影，Presentation 只持有
+确认框、当前进程已提醒版本与可访问焦点状态，不以动画或 renderer 百分比判断安装资格。
 
 表现层只保存选择、悬停、编辑中表单和运行事件投影等临时状态。项目、积木图和 Agent 的已提交状态仍必须通过应用层用例读取和修改。
 

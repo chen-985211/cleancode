@@ -3,6 +3,7 @@ import { readApplicationShortcutBindings } from '../../../src/presentation/app-s
 
 import {
   defaultApplicationShortcutBindings,
+  getDefaultApplicationShortcutBindings,
   type ApplicationShortcutBindings
 } from '../../../src/presentation/app-shell/app-features/shortcuts/applicationShortcuts'
 import {
@@ -207,15 +208,48 @@ describe('application shortcut dispatch', () => {
     expect(actions.quickExecution1.run).not.toHaveBeenCalled()
   })
 
-  it('suspends global actions while a modal dialog is open', () => {
+  it.each([
+    ['dialog', 'mac'],
+    ['alertdialog', 'mac'],
+    ['dialog', 'other'],
+    ['alertdialog', 'other']
+  ] as const)('suspends capture and bubble actions for %s on %s', (role, platform) => {
     const actions = createActions()
-    render(<ShortcutHarness actions={actions} showDialog />)
-
-    fireEvent.keyDown(document, { key: 't', metaKey: true })
-    fireEvent.keyDown(document, { key: ',', metaKey: true })
-
-    expect(actions.createTerminal.run).not.toHaveBeenCalled()
-    expect(actions.openSettings.run).not.toHaveBeenCalled()
+    const bindings = getDefaultApplicationShortcutBindings(platform)
+    const view = render(
+      <ShortcutHarness
+        actions={actions}
+        bindings={bindings}
+        platform={platform}
+        showDialog
+        dialogRole={role}
+      />
+    )
+    const modalButton = screen.getByLabelText('模态框按钮')
+    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+      fireEvent.keyDown(modalButton, {
+        key,
+        metaKey: platform === 'mac',
+        altKey: platform === 'other'
+      })
+    }
+    for (const key of ['t', ',']) {
+      fireEvent.keyDown(document, {
+        key,
+        metaKey: platform === 'mac',
+        ctrlKey: platform === 'other'
+      })
+    }
+    expect(
+      Object.values(actions).every((action) => vi.mocked(action.run).mock.calls.length === 0)
+    ).toBe(true)
+    view.rerender(<ShortcutHarness actions={actions} bindings={bindings} platform={platform} />)
+    fireEvent.keyDown(document, {
+      key: 'ArrowRight',
+      metaKey: platform === 'mac',
+      altKey: platform === 'other'
+    })
+    expect(actions.selectCanvasNodeRight.run).toHaveBeenCalledOnce()
   })
 
   it('suspends directional selection while a shortcut recorder owns the key event', () => {
@@ -237,7 +271,8 @@ function ShortcutHarness({
   platform = 'mac',
   onCanvasNodeArrowKey,
   onTerminalArrowKey,
-  showDialog = false
+  showDialog = false,
+  dialogRole = 'dialog'
 }: {
   readonly actions: ApplicationShortcutActions
   readonly bindings?: ApplicationShortcutBindings
@@ -245,6 +280,7 @@ function ShortcutHarness({
   readonly onCanvasNodeArrowKey?: () => void
   readonly onTerminalArrowKey?: () => void
   readonly showDialog?: boolean
+  readonly dialogRole?: 'dialog' | 'alertdialog'
 }) {
   useApplicationShortcuts({
     actions,
@@ -275,7 +311,15 @@ function ShortcutHarness({
         }}
       />
       <button type="button" aria-label="快捷键录制器" data-shortcut-capture />
-      {showDialog ? <div role="dialog" aria-modal="true" aria-label="测试对话框" /> : null}
+      {showDialog ? (
+        <div role={dialogRole} aria-modal="true" aria-label="测试对话框">
+          <button
+            type="button"
+            aria-label="模态框按钮"
+            onKeyDown={(event) => event.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </>
   )
 }
