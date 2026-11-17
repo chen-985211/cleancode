@@ -1,6 +1,7 @@
 import {
   commonErrorCodes,
-  isCommonErrorCode
+  isCommonErrorCode,
+  isErrorCode
 } from '../../../src/shared-kernel/domain/errors/AppError'
 import {
   createExpectedAppError,
@@ -39,12 +40,50 @@ import {
 } from '../../../src/platform/ipc/applicationErrorCatalog'
 import { registerIpcHandler, type IpcMainLike } from '../../../src/platform/ipc/registerIpcHandler'
 import { legacyApplicationErrorCodes } from '../../fixtures/applicationErrorCodes'
+import { ipcErrorCodes } from '../../../src/platform/ipc/IpcError'
+import type * as ProjectErrorModule from '../../../src/contexts/project/application/errors/ProjectErrors'
+
+// A context may contribute new codes without rewriting the published compatibility baseline.
+vi.mock(
+  '../../../src/contexts/project/application/errors/ProjectErrors',
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof ProjectErrorModule>()
+    return {
+      ...actual,
+      projectErrorCodes: [...actual.projectErrorCodes, 'PROJECT_ADDITIVE_FAILURE'],
+      isProjectErrorCode: (code: unknown) =>
+        code === 'PROJECT_ADDITIVE_FAILURE' || actual.isProjectErrorCode(code)
+    }
+  }
+)
 
 describe('application error catalog composition', () => {
+  it('accepts an additive context code through the composed catalog', () => {
+    expect(isRegisteredApplicationErrorCode('PROJECT_ADDITIVE_FAILURE')).toBe(true)
+  })
+
   it('preserves every published wire code while contexts own their declarations', () => {
-    expect(new Set(registeredApplicationErrorCodes)).toEqual(new Set(legacyApplicationErrorCodes))
-    for (const code of legacyApplicationErrorCodes)
+    for (const code of legacyApplicationErrorCodes) {
+      expect(registeredApplicationErrorCodes).toContain(code)
       expect(isRegisteredApplicationErrorCode(code), code).toBe(true)
+    }
+  })
+
+  it('registers every current declaration with a valid code and matching validator', () => {
+    const declarations = [
+      ...commonErrorCodes,
+      ...projectErrorCodes,
+      ...blockGraphErrorCodes,
+      ...canvasArrangementErrorCodes,
+      ...runErrorCodes,
+      ...agentErrorCodes,
+      ...ipcErrorCodes
+    ]
+    expect(new Set(registeredApplicationErrorCodes)).toEqual(new Set(declarations))
+    for (const code of declarations) {
+      expect(isErrorCode(code), code).toBe(true)
+      expect(isRegisteredApplicationErrorCode(code), code).toBe(true)
+    }
   })
 
   it('keeps context and protocol vocabularies out of the common catalog', () => {
@@ -54,7 +93,7 @@ describe('application error catalog composition', () => {
       ...canvasArrangementErrorCodes,
       ...agentErrorCodes,
       ...runErrorCodes,
-      'INVALID_IPC_COMMAND'
+      ...ipcErrorCodes
     ]
     expect(contextCodes.every((code) => !isCommonErrorCode(code))).toBe(true)
     expect(commonErrorCodes.every(isRegisteredApplicationErrorCode)).toBe(true)
@@ -66,7 +105,9 @@ describe('application error catalog composition', () => {
       ['block-graph', blockGraphErrorCodes],
       ['canvas-arrangement', canvasArrangementErrorCodes],
       ['agent', agentErrorCodes],
-      ['run', runErrorCodes]
+      ['run', runErrorCodes],
+      ['ipc', ipcErrorCodes],
+      ['common', commonErrorCodes]
     ] as const
     const owners = new Map<string, string[]>()
     for (const [context, codes] of declarations) {

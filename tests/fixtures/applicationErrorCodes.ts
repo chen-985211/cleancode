@@ -1,3 +1,4 @@
+// Published compatibility baseline: new codes belong to context declarations, not this list.
 export const legacyApplicationErrorCodes = [
   'AGENT_CREATION_CONFLICT',
   'AGENT_PROVIDER_ARGUMENTS_INVALID',

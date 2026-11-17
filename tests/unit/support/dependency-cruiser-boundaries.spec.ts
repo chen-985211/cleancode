@@ -17,6 +17,44 @@ const dependencyCruiserConfig = require('../../../.dependency-cruiser.cjs') as {
 }
 
 describe('dependency-cruiser architecture boundaries', () => {
+  it.each(['domain', 'application', 'infrastructure', 'presentation'])(
+    'blocks %s from importing a foreign Domain model',
+    (layer) => {
+      expect(
+        dependencyCruiserConfig.forbidden.some(
+          (rule) =>
+            rule.from.path &&
+            rule.to.path &&
+            matchesDependency(rule, {
+              from: `src/contexts/project/${layer}/consumer.ts`,
+              to: 'src/contexts/run/domain/errors/RunDomainError.ts'
+            })
+        )
+      ).toBe(true)
+    }
+  )
+
+  it.each([
+    [
+      'src/contexts/project/application/use-cases/Query.ts',
+      'src/contexts/project/domain/aggregates/Project.ts'
+    ],
+    [
+      'src/contexts/agent/infrastructure/run/Adapter.ts',
+      'src/contexts/run/application/use-cases/TerminalSessionService.ts'
+    ],
+    [
+      'src/contexts/project/application/dto/Details.ts',
+      'src/contexts/agent/application/dto/WorkspaceAgentSnapshot.ts'
+    ]
+  ])('preserves owned models and public contracts: %s → %s', (from, to) => {
+    expect(
+      dependencyCruiserConfig.forbidden.some(
+        (rule) => rule.from.path && rule.to.path && matchesDependency(rule, { from, to })
+      )
+    ).toBe(false)
+  })
+
   it.each([
     [
       'src/contexts/project/domain/aggregates/Project.ts',

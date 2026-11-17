@@ -95,9 +95,9 @@
 
 ## 错误码
 
-应用错误必须使用 `AppError` 和已登记的 `AppErrorCode`。
+业务错误必须使用所属上下文声明的有限错误码类型和错误工厂，并继承通用 `AppError` 结构。`AppErrorCode` 只表示观测到的错误标识，不承担业务码登记或编译期词表约束。
 
-上下文领域规则通过自己的 `domain/errors/<Context>DomainError` 声明错误码、错误类和构造方法；用例协调与外部能力失败由该上下文 `application/errors/<Context>Errors` 声明。基础设施使用所属上下文公开的应用错误契约，不把 Provider、存储和网络故障放入公共领域错误表。 错误类型由规则产生的层级及所选工厂确定；应用层工厂不根据历史码名反推领域错误类型。同码的领域异常在经过应用层时保留原错误类型。
+上下文领域规则通过自己的 `domain/errors/<Context>DomainError` 声明错误码、错误类和构造方法；用例协调与外部能力失败由该上下文 `application/errors/<Context>Errors` 声明。基础设施使用所属上下文公开的应用错误契约，不把 Provider、存储和网络故障放入公共领域错误表。错误类型由规则产生的层级及所选工厂确定；应用层工厂不根据历史码名反推领域错误类型。同码的领域异常在经过应用层时保留原错误类型。
 
 `shared-kernel/domain/errors/AppError` 只拥有通用错误结构、错误标识格式与真正公共的 `INVALID_CANVAS_OBJECT_IDENTITY`、`UNEXPECTED_ERROR`。`AppErrorCode` 是观测错误标识的通用类型，不是集中登记所有业务码的枚举。`shared-kernel/application/errors/AppError` 负责序列化、客户端恢复和结构识别；错误码、details、isExpected、message 和 correlationId 的既有传输字段保持兼容。
 
@@ -124,6 +124,10 @@ IPC 的已知码校验由 Platform `applicationErrorCatalog` 组合各上下文�
 - `UNEXPECTED_ERROR`
 
 新增业务错误时必须先在所属上下文声明错误码与工厂，再在用例或聚合中使用；新增真正公共错误时才修改共享声明。
+
+新增码经上下文公开声明参与 Platform 错误目录组合，并更新相应用户提示和最低有效层测试；不得为新增码改写 `tests/fixtures/applicationErrorCodes.ts` 中的历史兼容基线。契约测试要求全部历史码继续存在，同时校验当前声明集合、格式和校验器一致性；只有显式记录的历史跨上下文同码例外可以重复，新码不继承这些例外。
+
+公共错误使用 Shared Kernel Domain 中受 `CommonErrorCode` 约束的工厂。通用 Application 构造器只在上下文业务层使用已声明的公共字面量码；其他动态错误封装属于传输或表现层恢复。应用层和基础设施层可以用单一原错误展开重建诊断信息，但只能覆盖 `message`、`details`、`correlationId`，不能覆盖 `code` 或 `isExpected`；领域层不使用通用构造器重建业务错误。
 
 ## IPC 错误边界
 
@@ -189,7 +193,9 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 - Electron main 中不得裸用 `ipcMain.handle`。
 - 表现层不得用 `error.message.includes(...)` 判断应用错误。
 - 上下文 `domain` 和 `application` 层不得新增裸 `throw new Error(...)`。
-- 上下文 Domain 不得直接调用通用 `createExpectedAppError` 或 `new AppError` 构造业务错误，必须通过自己的领域错误模块。
+- 使用 TypeScript AST 和绑定符号识别实际调用，覆盖命名导入别名、namespace、静态成员访问及常量别名，忽略注释、字符串和同名局部绑定。
+- 上下文 Domain、Application 和 Infrastructure 不得绕过所属错误工厂创建业务错误；有限公共错误工厂、已声明公共字面量码以及应用/基础设施层保留错误身份的诊断重建按上述规则允许。
+- 门禁从 Shared Kernel 的 `commonErrorCodes` 读取公共字面量码，不维护第二份公共业务词表；普通类型检查继续约束有限公共工厂的参数。
 
 `pnpm pre-commit` 必须包含 `pnpm check:logging`。
 

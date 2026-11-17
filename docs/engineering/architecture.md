@@ -150,6 +150,8 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 
 上下文之间不得直接读取或修改对方内部模型。跨上下文协作只能通过应用层用例、应用层端口或领域事件完成。
 
+`dependency-cruiser` 从实际上下文目录生成规则，禁止上下文各层直接导入其他上下文的内部 `domain` 模型（含错误类和类型导入）；本上下文领域模型、Shared Kernel 和对方公开应用契约保持各自适用的分层约束。跨上下文事件也必须通过明确公开的契约传递，不以直接引用对方内部模型代替事件协作。
+
 ## 跨上下文协作模式
 
 跨上下文协作必须保护上下文边界。
@@ -327,6 +329,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         filesystem/
@@ -348,6 +351,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         registry/
@@ -358,10 +362,12 @@ src/
       domain/
         aggregates/
         services/
+        errors/
       application/
         use-cases/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
       presentation/
@@ -384,6 +390,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         filesystem/
@@ -407,6 +414,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         cli/
@@ -424,6 +432,7 @@ src/
     application/
       ports/
       dto/
+      errors/
   platform/
     electron-main/
     electron-preload/
