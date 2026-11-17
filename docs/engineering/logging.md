@@ -97,7 +97,13 @@
 
 应用错误必须使用 `AppError` 和已登记的 `AppErrorCode`。
 
-共享错误类、错误码、预期/非预期错误构造和错误码校验由 `shared-kernel/domain/errors/AppError` 拥有。领域层只依赖这一内层契约；`WorkspaceInitialization` 恢复时直接校验已登记错误码，不构造传输对象。`shared-kernel/application/errors/AppError` 负责序列化、客户端恢复和传输错误识别，并兼容导出同一个错误类与构造函数，避免改变错误身份、字段和 IPC 返回格式。
+上下文领域规则通过自己的 `domain/errors/<Context>DomainError` 声明错误码、错误类和构造方法；用例协调与外部能力失败由该上下文 `application/errors/<Context>Errors` 声明。基础设施使用所属上下文公开的应用错误契约，不把 Provider、存储和网络故障放入公共领域错误表。 错误类型由规则产生的层级及所选工厂确定；应用层工厂不根据历史码名反推领域错误类型。同码的领域异常在经过应用层时保留原错误类型。
+
+`shared-kernel/domain/errors/AppError` 只拥有通用错误结构、错误标识格式与真正公共的 `INVALID_CANVAS_OBJECT_IDENTITY`、`UNEXPECTED_ERROR`。`AppErrorCode` 是观测错误标识的通用类型，不是集中登记所有业务码的枚举。`shared-kernel/application/errors/AppError` 负责序列化、客户端恢复和结构识别；错误码、details、isExpected、message 和 correlationId 的既有传输字段保持兼容。
+
+IPC 的已知码校验由 Platform `applicationErrorCatalog` 组合各上下文公开声明与 `IpcError` 得到；Provider RPC 使用 Run 自己的错误契约校验。共享内核不得反向导入上下文目录或维护其业务码清单。通用结构识别与边界上的已知码校验分别负责格式和协议范围，未知 IPC 码仍归一化为 `UNEXPECTED_ERROR`。
+
+部分历史协议码被不同上下文复用，例如 Run 的工作流成员缺失和 BlockGraph 的终端缺失都对外使用 `TERMINAL_BLOCK_NOT_FOUND`。这是保留原协议的兼容例外；领域错误以自己的错误类和 `context + code` 区分归属，不导入另一上下文的领域错误模型，也不把同名文本自动提升为共享语义。context 不进入既有序列化结果。
 
 错误码必须稳定、英文大写、以下划线分隔，例如：
 
@@ -117,7 +123,7 @@
 - `SERVICE_ENDPOINT_NOT_OPENABLE`
 - `UNEXPECTED_ERROR`
 
-新增业务错误时必须先登记错误码，再在用例、聚合或平台边界使用。
+新增业务错误时必须先在所属上下文声明错误码与工厂，再在用例或聚合中使用；新增真正公共错误时才修改共享声明。
 
 ## IPC 错误边界
 
@@ -183,6 +189,7 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 - Electron main 中不得裸用 `ipcMain.handle`。
 - 表现层不得用 `error.message.includes(...)` 判断应用错误。
 - 上下文 `domain` 和 `application` 层不得新增裸 `throw new Error(...)`。
+- 上下文 Domain 不得直接调用通用 `createExpectedAppError` 或 `new AppError` 构造业务错误，必须通过自己的领域错误模块。
 
 `pnpm pre-commit` 必须包含 `pnpm check:logging`。
 

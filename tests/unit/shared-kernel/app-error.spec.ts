@@ -1,7 +1,7 @@
 import {
   AppError as DomainAppError,
   createExpectedAppError as createDomainError,
-  isAppErrorCode
+  isCommonErrorCode
 } from '../../../src/shared-kernel/domain/errors/AppError'
 import {
   createClientAppError,
@@ -13,7 +13,7 @@ import {
 
 describe('application errors', () => {
   it('preserves the domain error constructor and diagnostic fields across application serialization', () => {
-    const domainError = createDomainError('BLOCK_GRAPH_NOT_FOUND', 'Graph missing.', {
+    const domainError = createDomainError('INVALID_CANVAS_OBJECT_IDENTITY', 'Graph missing.', {
       workspaceId: 'workspace'
     })
     const restored = createClientAppError(
@@ -21,12 +21,12 @@ describe('application errors', () => {
     )
     expect(restored).toBeInstanceOf(DomainAppError)
     expect(isAppError(domainError)).toBe(true)
-    expect(getAppErrorCode(domainError)).toBe('BLOCK_GRAPH_NOT_FOUND')
+    expect(getAppErrorCode(domainError)).toBe('INVALID_CANVAS_OBJECT_IDENTITY')
     expect(serializeAppError(restored)).toEqual(
       serializeAppError(domainError, { correlationId: 'query-1' })
     )
-    expect(isAppErrorCode('BLOCK_GRAPH_NOT_FOUND')).toBe(true)
-    expect(isAppErrorCode('UNREGISTERED_ERROR')).toBe(false)
+    expect(isCommonErrorCode('BLOCK_GRAPH_NOT_FOUND')).toBe(false)
+    expect(isCommonErrorCode('UNREGISTERED_ERROR')).toBe(false)
   })
 
   it('serializes expected errors with a stable code', () => {

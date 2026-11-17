@@ -39,6 +39,8 @@ Agent 控制台不是 BlockGraph 积木；跨终端、完整流程、终端组�
 
 终端 PTY、输出、退出码、工作流节点状态、端口租约、实际端点和 Agent 运行时不属于本聚合。它们由 Run 或 Agent 上下文拥有。
 
+领域不变量失败经 `BlockGraphDomainError` 构造；存储损坏、仓储版本等应用边界错误由 `BlockGraphErrors` 的应用声明拥有。模板应用冲突保留既有 `WORKSPACE_INITIALIZATION_CONFLICT` 对外码，但错误类与规则 owner 仍是 BlockGraph，不依赖 Project 领域错误。
+
 ## 终端积木规则
 
 1. 新终端默认启动命令为空，执行模式为任务，成功退出码为 `[0]`，无超时。

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { createIpcError } from '../ipc/IpcError'
 
 interface TerminalContainerScope {
   readonly projectDirectory: string
@@ -131,7 +131,7 @@ export function readMoveTerminalWorkflowToGroupCommand(
 }
 
 function throwInvalidTerminalContainerCommand(): never {
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: terminal container command is required.'
   )

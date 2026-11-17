@@ -1,6 +1,6 @@
+import { createAgentError } from '../../../application/errors/AgentErrors'
 import { randomUUID } from 'node:crypto'
 
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import { createAgentMcpConfiguration } from '../../../application/dto/AgentMcpConfiguration'
 import type {
   AgentCapabilityInjector,
@@ -110,7 +110,7 @@ class ClaudeCodeSessionRefCodec implements AgentProviderSessionRefCodec {
   parse(sessionRef: ProviderSessionRefSnapshot): ProviderSessionRefSnapshot {
     const parsed = ProviderSessionRef.create(sessionRef).toSnapshot()
     if (parsed.formatVersion !== 1 || parsed.kind !== 'claude-session' || !isUuid(parsed.value)) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Unsupported Claude Code Provider session reference.',
         { providerId: 'claude-code' }

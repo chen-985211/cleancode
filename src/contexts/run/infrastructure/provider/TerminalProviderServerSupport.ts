@@ -1,9 +1,10 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { timingSafeEqual } from 'node:crypto'
 import type { Socket } from 'node:net'
 
 import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
 import type { StartTerminalProcessCommand } from '../../application/ports/TerminalProcessPort'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import {
   encodeTerminalProviderFrame,
   type TerminalProviderEvent,
@@ -21,13 +22,13 @@ export function authenticateTerminalProviderRequest(
     request.protocolVersion < terminalProviderProtocolVersion - 1 ||
     request.protocolVersion > terminalProviderProtocolVersion
   ) {
-    throw createExpectedAppError(
+    throw createRunError(
       'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
       'Terminal provider protocol version is unsupported.'
     )
   }
   if (!matchesAuthToken(request.authToken, expectedAuthToken)) {
-    throw createExpectedAppError(
+    throw createRunError(
       'TERMINAL_PROVIDER_AUTHENTICATION_FAILED',
       'Terminal provider authentication failed.'
     )
@@ -58,7 +59,7 @@ export function authorizeTerminalProviderController(
   ) {
     return
   }
-  throw createExpectedAppError(
+  throw createRunError(
     'TERMINAL_PROVIDER_UNAVAILABLE',
     'Terminal provider request requires the active application controller.'
   )

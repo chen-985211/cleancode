@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import { analyzeCanvasExecutionSelection } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   TerminalBlockSnapshot,
@@ -15,7 +16,7 @@ export function resolveTerminalRemovalBlockIds(
 ): string[] {
   if (target.type === 'terminal') {
     if (!blocks.some((block) => block.id === target.terminalBlockId)) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
     return [target.terminalBlockId]
   }
@@ -60,7 +61,7 @@ function referencesExactIds(
 }
 
 function removalScopeStale(): never {
-  throw createExpectedAppError(
+  throw createBlockGraphDomainError(
     'TERMINAL_REMOVAL_SCOPE_STALE',
     'Terminal removal scope changed before it could be deleted.'
   )

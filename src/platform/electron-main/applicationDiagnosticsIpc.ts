@@ -1,7 +1,7 @@
+import { createIpcError } from '../ipc/IpcError'
 import { basename, join } from 'node:path'
 import type { SaveDialogOptions } from 'electron'
 
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import {
   applicationDiagnosticsChannels,
   isApplicationDiagnosticsExportCommand,
@@ -113,10 +113,7 @@ function createDiagnosticFileName(generatedAt: string): string {
 }
 
 function invalidDiagnosticsCommand() {
-  return createExpectedAppError(
-    'INVALID_IPC_COMMAND',
-    'Invalid application diagnostics IPC command.'
-  )
+  return createIpcError('INVALID_IPC_COMMAND', 'Invalid application diagnostics IPC command.')
 }
 
 function compactRecord<TRecord extends Record<string, unknown>>(record: TRecord): TRecord {

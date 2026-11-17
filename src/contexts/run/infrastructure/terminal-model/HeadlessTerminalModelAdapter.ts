@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { createRequire } from 'node:module'
 
 import type { SerializeAddon as SerializeAddonInstance } from '@xterm/addon-serialize'
@@ -29,7 +30,7 @@ import {
 } from '../../application/dto/TerminalRuntimeSettings'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalOscColorResponse } from './terminalSourcePalette'
 import { TerminalPaletteCheckpoint } from './TerminalPaletteCheckpoint'
@@ -165,10 +166,10 @@ export class HeadlessTerminalModelAdapter implements TerminalModelRecoveryPort {
   private requireModel(identity: TerminalRunScope): ManagedTerminalModel {
     const model = this.models.get(createModelKey(identity))
     if (!model) {
-      throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+      throw createRunError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
     }
     if (!isSameTerminalRun(model.identity, identity)) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_MODEL_IDENTITY_MISMATCH',
         'Terminal model identity no longer matches the current run.'
       )
@@ -431,7 +432,7 @@ class ManagedTerminalModel {
 
   private assertActive(): void {
     if (this.disposed) {
-      throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+      throw createRunError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
     }
   }
 }

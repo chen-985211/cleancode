@@ -1,3 +1,4 @@
+import { isRegisteredApplicationErrorCode } from './applicationErrorCatalog'
 import {
   createUnexpectedAppError,
   isAppError,
@@ -67,9 +68,10 @@ export function registerIpcHandler<TCommand = unknown, TResult = unknown>({
 
       return { ok: true, value }
     } catch (error) {
-      const appError = isAppError(error)
-        ? error
-        : createUnexpectedAppError('Unexpected application error.')
+      const appError =
+        isAppError(error) && isRegisteredApplicationErrorCode(error.code)
+          ? error
+          : createUnexpectedAppError('Unexpected application error.')
       const serializedError = serializeAppError(appError, { correlationId })
       const logError = resolveLogError(error, serializedError)
 

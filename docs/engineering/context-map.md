@@ -246,6 +246,12 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 
 详细语义见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
+## 错误归属与传递
+
+Project、BlockGraph、CanvasArrangement、Run 和 Agent 分别拥有自己的 Domain 错误类及 Application 错误声明。基础设施使用所属上下文的应用错误工厂；上下文边界继续传递稳定错误码和 DTO，不导入对方领域错误类。共享内核只持有基础结构、公共错误与结构化传输工具；Platform 组合公开错误码声明完成 IPC 已知码校验，Run Provider 则只接受本上下文及公共码。
+
+Project 初始化记录保存外部失败标识并拥有重试、跳过和进度策略，不拥有其他上下文的错误词表。新增外部上下文错误不要求修改 Project 的领域错误清单。
+
 ## 非跨上下文关系
 
 - Presentation 调用应用层用例、订阅 IPC 事件并形成派生视图，不是上下文之间的数据后门。

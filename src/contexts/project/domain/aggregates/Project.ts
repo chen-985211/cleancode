@@ -1,10 +1,10 @@
+import { createProjectDomainError } from '../errors/ProjectDomainError'
 import {
   normalizeIssueRepository,
   normalizeProjectIssue,
   sameProjectIssue,
   type ProjectIssueReference
 } from '../value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 
 type ProjectWorkspaceKind = 'default' | 'linked-worktree'
 
@@ -86,14 +86,17 @@ export class Project {
   linkWorkspaceIssue(workspaceId: string, value: ProjectIssueReference): Project {
     const issue = normalizeProjectIssue(value)
     if (!this.workspaceSnapshots.some((workspace) => workspace.workspaceId === workspaceId))
-      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+      throw createProjectDomainError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
     if (
       this.workspaceSnapshots.some(
         (workspace) =>
           workspace.workspaceId !== workspaceId && sameProjectIssue(workspace.issue, issue)
       )
     )
-      throw createExpectedAppError('PROJECT_ISSUE_ALREADY_LINKED', 'Issue already has a workspace.')
+      throw createProjectDomainError(
+        'PROJECT_ISSUE_ALREADY_LINKED',
+        'Issue already has a workspace.'
+      )
     return new Project(
       this.id,
       this.name,
@@ -113,7 +116,7 @@ export class Project {
     const currentWorkspace = this.workspaceSnapshots.find((workspace) => workspace.isCurrent)
 
     if (!currentWorkspace) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'PROJECT_HAS_NO_CURRENT_WORKSPACE',
         'Project has no current branch workspace.'
       )
@@ -155,7 +158,10 @@ export class Project {
       issue &&
       this.workspaceSnapshots.some((workspace) => sameProjectIssue(workspace.issue, issue))
     ) {
-      throw createExpectedAppError('PROJECT_ISSUE_ALREADY_LINKED', 'Issue already has a workspace.')
+      throw createProjectDomainError(
+        'PROJECT_ISSUE_ALREADY_LINKED',
+        'Issue already has a workspace.'
+      )
     }
     const workspaceId = normalizeRequiredText(
       input.workspaceId ?? createWorkspaceId(),
@@ -172,21 +178,21 @@ export class Project {
     )
 
     if (this.workspaceSnapshots.some((workspace) => workspace.workspaceId === workspaceId)) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'BRANCH_WORKSPACE_ALREADY_EXISTS',
         'Branch workspace already exists.'
       )
     }
 
     if (this.workspaceSnapshots.some((workspace) => workspace.displayName === displayName)) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'BRANCH_WORKSPACE_ALREADY_EXISTS',
         'Branch workspace already exists.'
       )
     }
 
     if (this.workspaceSnapshots.some((workspace) => workspace.gitBranch === gitBranch)) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'GIT_BRANCH_IS_ALREADY_BOUND_TO_WORKSPACE',
         'Git branch is already bound to a workspace.'
       )
@@ -310,7 +316,10 @@ export class Project {
     })
 
     if (!hasWorkspace) {
-      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
+      throw createProjectDomainError(
+        'BRANCH_WORKSPACE_NOT_FOUND',
+        'Branch workspace was not found.'
+      )
     }
 
     return new Project(this.id, this.name, this.directory, workspaces, this.issueRepository)
@@ -327,18 +336,21 @@ export class Project {
     )
 
     if (!archivedWorkspace) {
-      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
+      throw createProjectDomainError(
+        'BRANCH_WORKSPACE_NOT_FOUND',
+        'Branch workspace was not found.'
+      )
     }
 
     if (archivedWorkspace.workspaceKind === 'default') {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED',
         'Main workspace cannot be archived.'
       )
     }
 
     if (archivedWorkspace.workspaceKind !== 'linked-worktree') {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'ONLY_GIT_WORKTREE_WORKSPACES_CAN_BE_ARCHIVED',
         'Only Git worktree workspaces can be archived.'
       )
@@ -467,7 +479,7 @@ function normalizeRequiredText(value: string, emptyMessage: string): string {
   const normalizedValue = value.trim()
 
   if (!normalizedValue) {
-    throw createExpectedAppError('INVALID_CLEANCODE_PROJECT_METADATA', emptyMessage)
+    throw createProjectDomainError('INVALID_CLEANCODE_PROJECT_METADATA', emptyMessage)
   }
 
   return normalizedValue

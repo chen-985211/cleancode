@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
@@ -19,7 +20,6 @@ import type { TerminalSessionSnapshot } from '../../domain/aggregates/TerminalSe
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface TerminalRecoveryRecord {
   readonly schemaVersion: 2
@@ -136,7 +136,7 @@ export class FileTerminalRecoveryStore {
     const sessionDirectory = this.sessionDirectory(identity)
     const checkpointPath = join(sessionDirectory, 'checkpoint.json')
     if (!(await pathExists(checkpointPath))) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_RECOVERY_DATA_CORRUPTED',
         'Terminal recovery output has no checkpoint.'
       )
@@ -592,7 +592,7 @@ async function truncateFileIfPresent(path: string): Promise<void> {
 }
 
 function storageLimitError(kind: string, actualBytes: number, limitBytes: number) {
-  return createExpectedAppError(
+  return createRunError(
     'TERMINAL_RECOVERY_STORAGE_LIMIT',
     'Terminal recovery storage limit was exceeded.',
     { actualBytes, kind, limitBytes }

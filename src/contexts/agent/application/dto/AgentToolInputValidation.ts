@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import { classifyCanvasExecutionStructure } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 import { agentToolDefinitions, type AgentToolInputByName } from './AgentToolProtocol'
@@ -13,7 +14,7 @@ export function parseAgentToolInput<Name extends AgentToolName>(
   const definition = agentToolDefinitions.find((tool) => tool.name === toolName)
 
   if (!definition) {
-    throw createExpectedAppError('AGENT_TOOL_UNAVAILABLE', 'Agent tool is unavailable.', {
+    throw createAgentError('AGENT_TOOL_UNAVAILABLE', 'Agent tool is unavailable.', {
       toolName
     })
   }
@@ -21,7 +22,7 @@ export function parseAgentToolInput<Name extends AgentToolName>(
   const issue = findAgentToolJsonSchemaIssue(definition.inputSchema, input)
 
   if (issue) {
-    throw createExpectedAppError('AGENT_TOOL_INPUT_INVALID', 'Agent tool input is invalid.', {
+    throw createAgentError('AGENT_TOOL_INPUT_INVALID', 'Agent tool input is invalid.', {
       path: issue.path,
       reason: issue.reason
     })
@@ -50,7 +51,7 @@ function assertTerminalStructure(
   })
   if (actualType === expectedType) return
 
-  throw createExpectedAppError('AGENT_TOOL_INPUT_INVALID', 'Agent tool input is invalid.', {
+  throw createAgentError('AGENT_TOOL_INPUT_INVALID', 'Agent tool input is invalid.', {
     path: '$.connections',
     reason:
       expectedType === 'workflow'

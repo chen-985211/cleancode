@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
 import type { TerminalProcessPort } from '../../application/ports/TerminalProcessPort'
 import {
@@ -5,7 +6,6 @@ import {
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalProviderApplicationDetachResult } from './TerminalProviderProtocol'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const defaultShutdownConcurrency = 8
 // Include queued output flushes and durable file sync in the checkpoint budget.
@@ -160,7 +160,7 @@ function withOperationDeadline<T>(
   const deadline = new Promise<never>((_, reject) => {
     timeout = setTimeout(() => {
       reject(
-        createExpectedAppError(
+        createRunError(
           'COMMAND_TIMED_OUT',
           `Terminal provider could not ${operationName} before its deadline.`
         )

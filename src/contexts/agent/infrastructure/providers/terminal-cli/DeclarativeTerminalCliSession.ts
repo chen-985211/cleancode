@@ -1,6 +1,6 @@
+import { createAgentError } from '../../../application/errors/AgentErrors'
 import { randomUUID } from 'node:crypto'
 
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import type {
   AgentFreshSessionStrategy,
   AgentProviderSessionRefCodec,
@@ -33,7 +33,7 @@ export function createClientAssignedTerminalCliSession(input: {
         parsed.kind !== input.sessionKind ||
         !input.validateSessionId(parsed.value)
       ) {
-        throw createExpectedAppError(
+        throw createAgentError(
           'AGENT_SESSION_INVALID',
           `Unsupported ${input.providerId} Provider session reference.`,
           { providerId: input.providerId }

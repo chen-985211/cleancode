@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import { analyzeCanvasExecutionSelection } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   QuickExecutionSlotNumber,
@@ -23,7 +24,7 @@ export function restoreQuickExecutionSlots(
     slots.length !== quickExecutionSlotNumbers.length ||
     slots.some((slot, index) => slot.number !== quickExecutionSlotNumbers[index])
   ) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'QUICK_EXECUTION_SLOT_INVALID',
       'Quick execution slots must contain the fixed slots 1 through 5.'
     )
@@ -44,7 +45,7 @@ export function normalizeQuickExecutionTarget(
   if (target.type === 'combination') {
     const group = terminalGroups.find((candidate) => candidate.id === target.terminalGroupId)
     if (!group || group.memberBlockIds.length === 0) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'QUICK_EXECUTION_TARGET_NOT_FOUND',
         'Quick execution combination was not found.'
       )
@@ -64,7 +65,7 @@ export function normalizeQuickExecutionTarget(
   })
 
   if (analysis.unknownTerminalIds.length > 0) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'QUICK_EXECUTION_TARGET_NOT_FOUND',
       'Quick execution terminal was not found.'
     )
@@ -76,7 +77,7 @@ export function normalizeQuickExecutionTarget(
       analysis.expandedTerminalIds.length !== 1 ||
       analysis.expandedTerminalIds[0] !== target.terminalBlockId
     ) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'QUICK_EXECUTION_TARGET_INVALID',
         'Quick execution terminal must reference one independent terminal.'
       )
@@ -91,7 +92,7 @@ export function normalizeQuickExecutionTarget(
     analysis.expandedTerminalIds.every((terminalId) => requestedTerminalIds.has(terminalId))
 
   if (!referencesCompleteWorkflow) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'QUICK_EXECUTION_TARGET_INVALID',
       'Quick execution workflow must reference one complete workflow.'
     )
@@ -105,7 +106,7 @@ export function normalizeQuickExecutionTarget(
 
 export function requireQuickExecutionSlotNumber(number: number): QuickExecutionSlotNumber {
   if (!quickExecutionSlotNumbers.includes(number as QuickExecutionSlotNumber)) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'QUICK_EXECUTION_SLOT_INVALID',
       'Quick execution slot number must be between 1 and 5.'
     )

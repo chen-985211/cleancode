@@ -1,9 +1,9 @@
+import { isRunErrorCode, createRunError } from '../../application/errors/RunErrors'
 import { randomUUID } from 'node:crypto'
 import { connect, type Socket } from 'node:net'
 
 import {
   createClientAppError,
-  createExpectedAppError,
   isSerializedAppError
 } from '../../../../shared-kernel/application/errors/AppError'
 import {
@@ -101,10 +101,7 @@ export class TerminalProviderRpcConnection {
         this.pending.delete(requestId)
         const error =
           options.disconnectOnTimeout === false
-            ? createExpectedAppError(
-                'COMMAND_TIMED_OUT',
-                `Terminal provider request timed out: ${method}`
-              )
+            ? createRunError('COMMAND_TIMED_OUT', `Terminal provider request timed out: ${method}`)
             : providerUnavailable(`Terminal provider request timed out: ${method}`)
         reject(error)
         if (options.disconnectOnTimeout !== false) this.socket.destroy()
@@ -147,7 +144,8 @@ export class TerminalProviderRpcConnection {
     this.pending.delete(value.requestId)
     clearTimeout(pending.timeout)
     if (value.ok) pending.resolve(value.result)
-    else if (isSerializedAppError(value.error)) pending.reject(createClientAppError(value.error))
+    else if (isSerializedAppError(value.error, isRunErrorCode))
+      pending.reject(createClientAppError(value.error))
     else pending.reject(providerUnavailable('Terminal provider returned an invalid error.'))
   }
 
@@ -167,7 +165,7 @@ function isProviderMessage(value: unknown): value is TerminalProviderMessage {
 }
 
 function providerUnavailable(message: string) {
-  return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
+  return createRunError('TERMINAL_PROVIDER_UNAVAILABLE', message)
 }
 
 function resolveRequestDeadline(value: number | undefined): number {

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import {
   defaultCanvasViewport,
   defaultTerminalExecutionConfig,
@@ -196,7 +197,7 @@ export class BlockGraph {
   addQuickExecutionTarget(target: QuickExecutionTargetSnapshot): void {
     const emptySlot = this.quickExecutionSlotSnapshots.find((slot) => !slot.target)
     if (!emptySlot) {
-      throw createExpectedAppError('QUICK_EXECUTION_BAR_FULL', 'Quick execution bar is full.')
+      throw createBlockGraphDomainError('QUICK_EXECUTION_BAR_FULL', 'Quick execution bar is full.')
     }
     this.bindQuickExecutionSlot(emptySlot.number, target)
   }
@@ -423,7 +424,7 @@ export class BlockGraph {
     const name = input.name.trim()
 
     if (!name) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_GROUP_NAME_EMPTY',
         'Terminal group name cannot be empty.'
       )
@@ -437,7 +438,7 @@ export class BlockGraph {
     const memberBlockIds = [...analysis.expandedTerminalIds]
 
     if (analysis.unknownTerminalIds.length > 0) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
     this.ensureTerminalGroupMembersAreAvailable(memberBlockIds)
 
@@ -459,7 +460,7 @@ export class BlockGraph {
     const name = input.name.trim()
 
     if (!name) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_GROUP_NAME_EMPTY',
         'Terminal group name cannot be empty.'
       )
@@ -478,7 +479,7 @@ export class BlockGraph {
     })
 
     if (!hasUpdatedGroup) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+      throw createBlockGraphDomainError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
     }
   }
 
@@ -525,7 +526,7 @@ export class BlockGraph {
   removeTerminalFromGroup(terminalGroupId: string, blockId: string): void {
     const group = this.requireTerminalGroup(terminalGroupId)
     if (!group.memberBlockIds.includes(blockId)) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_BLOCK_NOT_IN_GROUP',
         'Terminal block does not belong to the group.'
       )
@@ -558,7 +559,7 @@ export class BlockGraph {
       (new Set(expectedBlockIds).size !== movedBlockIds.size ||
         expectedBlockIds.some((id) => !movedBlockIds.has(id)))
     ) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_SCOPE_MOVE_STALE',
         'Terminal workflow scope changed before it could be moved.'
       )
@@ -584,7 +585,7 @@ export class BlockGraph {
     const nextGroups = this.terminalGroupSnapshots.filter((group) => group.id !== terminalGroupId)
 
     if (nextGroups.length === this.terminalGroupSnapshots.length) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+      throw createBlockGraphDomainError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
     }
 
     this.terminalGroupSnapshots = nextGroups
@@ -615,7 +616,7 @@ export class BlockGraph {
 
       const existingGroup = this.findTerminalGroupByBlockId(memberBlockId)
       if (existingGroup && existingGroup.id !== allowedTerminalGroupId) {
-        throw createExpectedAppError(
+        throw createBlockGraphDomainError(
           'TERMINAL_BLOCK_ALREADY_GROUPED',
           'Terminal block already belongs to a group.'
         )
@@ -642,7 +643,7 @@ export class BlockGraph {
     const block = this.blockSnapshots.find((candidateBlock) => candidateBlock.id === blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
 
     return block
@@ -654,7 +655,7 @@ export class BlockGraph {
     )
 
     if (!group) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+      throw createBlockGraphDomainError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
     }
 
     return group

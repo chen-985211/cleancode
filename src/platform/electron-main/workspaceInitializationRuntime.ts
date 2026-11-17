@@ -1,3 +1,5 @@
+import { createBlockGraphError } from '../../contexts/block-graph/application/errors/BlockGraphErrors'
+import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
 import { join } from 'node:path'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type {
@@ -21,7 +23,7 @@ import { FileSystemBlockTemplateRepository } from '../../contexts/block-graph/in
 import type { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
 import type { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import type { TerminalWorkflowService } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import { registerWorkspaceInitializationIpcHandlers } from './workspaceInitializationIpcHandlers'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -83,7 +85,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
         await input.graphs.execute(scope)
         const template = await prepared.find(item.id)
         if (!template)
-          throw createExpectedAppError(
+          throw createBlockGraphError(
             'BLOCK_TEMPLATE_NOT_FOUND',
             'Prepared workspace template was not found.'
           )
@@ -124,7 +126,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     run: async (scope, result) => {
       if (!(await validation.execute(scope))) stale()
       if (!result.executionTarget)
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_INVALID',
           'Initialization has no execution target.'
         )
@@ -209,7 +211,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
 }
 
 function stale(): never {
-  throw createExpectedAppError(
+  throw createProjectError(
     'WORKSPACE_INITIALIZATION_SCOPE_STALE',
     'Workspace initialization scope is stale.'
   )

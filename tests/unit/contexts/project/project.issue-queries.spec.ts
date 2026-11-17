@@ -7,8 +7,41 @@ import { GetProjectIssueUseCase } from '../../../../src/contexts/project/applica
 import { ConfigureProjectIssueRepositoryUseCase } from '../../../../src/contexts/project/application/use-cases/ConfigureProjectIssueRepositoryUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
 import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
+import { createProjectDomainError } from '../../../../src/contexts/project/domain/errors/ProjectDomainError'
+import { createProjectError } from '../../../../src/contexts/project/application/errors/ProjectErrors'
 
 describe('project issue queries and configuration', () => {
+  it.each([
+    [
+      'domain',
+      () =>
+        createProjectDomainError('PROJECT_ISSUE_INVALID', 'Invalid issue.', { source: 'domain' })
+    ],
+    [
+      'application',
+      () =>
+        createProjectError('GITHUB_REQUEST_FAILED', 'Request failed.', { source: 'application' })
+    ]
+  ] as const)(
+    'preserves %s error ownership when adding repository diagnostics',
+    async (_kind, create) => {
+      const f = fixture()
+      const original = create()
+      const before = { ...original.details }
+      f.github.list.mockRejectedValue(original)
+      const failure = await new ListProjectIssuesUseCase(f.scope, f.github)
+        .execute({ projectDirectory: '/project' })
+        .catch((error: unknown) => error)
+      expect(Object.getPrototypeOf(failure)).toBe(Object.getPrototypeOf(original))
+      expect(failure).toMatchObject({
+        code: original.code,
+        message: original.message,
+        details: { ...before, repository: 'owner/repo' }
+      })
+      expect(original.details).toEqual(before)
+    }
+  )
+
   it('keeps provider-read references isolated by project identity and selected source', async () => {
     const f = fixture()
     const cache = new ProjectIssueReadCache()

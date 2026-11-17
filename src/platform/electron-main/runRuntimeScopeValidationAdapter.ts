@@ -1,3 +1,4 @@
+import { createRunError } from '../../contexts/run/application/errors/RunErrors'
 import type { ProjectRegistryRepository } from '../../contexts/project/application/ports/ProjectRegistryRepository'
 import type { ProjectRepository } from '../../contexts/project/application/ports/ProjectRepository'
 import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
@@ -5,7 +6,6 @@ import type {
   RunRuntimeScopeValidationPort,
   ValidateRunRuntimeScopeCommand
 } from '../../contexts/run/application/ports/RunRuntimeScopeValidationPort'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 
 export class RunRuntimeScopeValidationAdapter implements RunRuntimeScopeValidationPort {
   constructor(private readonly validateProjectScope: ValidateProjectWorkspaceScopeUseCase) {}
@@ -15,7 +15,7 @@ export class RunRuntimeScopeValidationAdapter implements RunRuntimeScopeValidati
       return
     }
 
-    throw createExpectedAppError(
+    throw createRunError(
       'RUN_SCOPE_STALE',
       'The terminal runtime scope no longer matches the remembered Project workspace.'
     )

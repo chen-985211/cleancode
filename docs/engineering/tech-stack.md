@@ -181,7 +181,7 @@ Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。
 - `check:deps`：检查精确依赖版本。
 - `check:max-lines`：限制代码文件行数。
-- `check:logging`：检查日志、错误码和 IPC 错误边界。
+- `check:logging`：检查日志、错误码、上下文 Domain 错误构造归属和 IPC 错误边界。
 - `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
 - `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
 - `check:motion`：检查生产 CSS 动效只消费语义时长与曲线 token；持续 spinner、reduced-motion clamp 和登记过的专属 motion owner 作为显式例外。

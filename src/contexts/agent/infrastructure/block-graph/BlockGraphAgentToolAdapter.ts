@@ -1,7 +1,5 @@
-import {
-  createExpectedAppError,
-  createUnexpectedAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../../application/errors/AgentErrors'
+import { createUnexpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { analyzeCanvasExecutionSelection } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   BlockGraphSnapshot,
@@ -228,7 +226,7 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     const block = graph.blocks.find((candidateBlock) => candidateBlock.id === input.blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createAgentError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
 
     if (
@@ -466,7 +464,7 @@ function requireTerminalBlock(
   const block = graph.blocks.find((candidate) => candidate.id === blockId)
 
   if (!block) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createAgentError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
 
   return block

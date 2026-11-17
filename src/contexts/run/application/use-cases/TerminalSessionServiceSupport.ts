@@ -1,11 +1,9 @@
+import { createRunError } from '../errors/RunErrors'
 import type {
   TerminalRunOwner,
   TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
-import {
-  createExpectedAppError,
-  isAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { isAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalModelPort } from '../ports/TerminalModelPort'
 import type { TerminalProcessPort } from '../ports/TerminalProcessPort'
 import type { TerminalModelDiagnosticsSnapshot } from '../dto/TerminalModelSnapshot'
@@ -182,7 +180,7 @@ export async function settleTerminalViewRelease(operation: () => Promise<void>):
 
 export function requireTerminalModelPort(port: TerminalModelPort | undefined): TerminalModelPort {
   if (!port) {
-    throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+    throw createRunError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
   }
   return port
 }
@@ -258,16 +256,13 @@ export function assertCurrentTerminalViewIdentity(
     !matchesCurrentRuntime ||
     (session.status !== 'idle' && session.status !== 'running' && session.status !== 'exited')
   ) {
-    throw createExpectedAppError(
+    throw createRunError(
       'RUN_SCOPE_STALE',
       'Terminal view no longer matches the current runtime scope.'
     )
   }
 
   if (session.status === 'idle') {
-    throw createExpectedAppError(
-      'TERMINAL_RUNTIME_NOT_READY',
-      'Terminal runtime is still starting.'
-    )
+    throw createRunError('TERMINAL_RUNTIME_NOT_READY', 'Terminal runtime is still starting.')
   }
 }

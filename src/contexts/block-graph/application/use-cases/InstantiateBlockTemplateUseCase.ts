@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import type { BlockPositionSnapshot } from '../../domain/aggregates/BlockGraphTypes'
 import { BlockTemplateLibrary } from '../../domain/aggregates/BlockTemplateLibrary'
 import type {
@@ -38,21 +39,21 @@ export class InstantiateBlockTemplateUseCase {
       frozenTemplate ??
       BlockTemplateLibrary.restore(await this.templateRepository.get()).find(command.templateId)
     if (!template) {
-      throw createExpectedAppError('BLOCK_TEMPLATE_NOT_FOUND', 'Block template was not found.')
+      throw createBlockGraphError('BLOCK_TEMPLATE_NOT_FOUND', 'Block template was not found.')
     }
     const transaction = await executeDefaultGraphTransaction(
       this.graphRepository,
       command,
       (graph) => {
         if (template.scope.type === 'project' && template.scope.projectId !== graph.projectId) {
-          throw createExpectedAppError(
+          throw createBlockGraphError(
             'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID',
             'Project template cannot be applied to another project.'
           )
         }
 
         if (template.id !== command.templateId) {
-          throw createExpectedAppError(
+          throw createBlockGraphError(
             'WORKSPACE_INITIALIZATION_CONFLICT',
             'Template operation conflicts with its recorded content.'
           )

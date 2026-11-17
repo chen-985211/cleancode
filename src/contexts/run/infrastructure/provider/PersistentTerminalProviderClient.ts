@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -35,7 +36,7 @@ import {
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import {
   type TerminalProviderEvent,
   terminalProviderApplicationDetachProtocolVersion,
@@ -496,7 +497,7 @@ export class PersistentTerminalProviderClient
         readonly controllerState: 'unclaimed' | 'active' | 'releasing'
       }>('health')
       if (health.instanceId !== metadata.instanceId) {
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_PROVIDER_IDENTITY_MISMATCH',
           'Terminal provider identity did not match its authenticated metadata.'
         )
@@ -506,7 +507,7 @@ export class PersistentTerminalProviderClient
         health.protocolVersion < terminalProviderMinimumCompatibleProtocolVersion ||
         health.protocolVersion > terminalProviderProtocolVersion
       ) {
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
           'Terminal provider protocol version is unsupported.'
         )

@@ -47,6 +47,8 @@ Project 上下文拥有以下聚合根：
 
 `Project.create` 总是创建一个具有随机稳定 `workspaceId`、`workspaceKind = default`、显示名 `main` 的当前工作区；其目录等于项目目录，初始 Git 绑定为 `null`。打开项目或执行同步后，应用层再根据真实 Git 状态更新绑定与 worktree 列表。`main` 是显示名而不是身份。
 
+Project 领域错误由 `ProjectDomainError` 拥有，应用与 GitHub/文件系统/系统能力失败经 `ProjectErrors` 构造。初始化项的 `errorCode` 是外部失败的观测标识；恢复时校验其非空大写标识格式，不枚举其他上下文的错误词表，新增外部错误不改变 Project 记录格式。模板失效清理仍只识别既有端口契约明确的不可用结果。
+
 ## 项目与工作区不变量
 
 1. 当前创建、同步和归档用例始终保留默认工作区；默认工作区不能被归档。

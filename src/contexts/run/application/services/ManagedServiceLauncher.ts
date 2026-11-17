@@ -1,3 +1,4 @@
+import { createRunError } from '../errors/RunErrors'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type { TcpListenerInspectionPort } from '../ports/TcpListenerInspectionPort'
@@ -133,7 +134,7 @@ export class ManagedServiceLauncher {
           this.activeServices.get(result.service.session.id) !== result.service
         ) {
           await this.ensureStopped(result.service)
-          throw createExpectedAppError(
+          throw createRunError(
             'RUN_START_BLOCKED',
             'Run scope changed before the managed service could become active.'
           )
@@ -160,7 +161,7 @@ export class ManagedServiceLauncher {
 
       if (result.inspection === 'unknown') {
         await this.runCleanup(result.service, () => this.quarantineUnverified(result.service))
-        throw createExpectedAppError(
+        throw createRunError(
           'SERVICE_LISTENER_OWNERSHIP_UNVERIFIED',
           'The local listener could not be proven to belong to this terminal run.',
           createRunAttemptDetails(result.service.session, result.service.allocation.endpoint.port)
@@ -169,7 +170,7 @@ export class ManagedServiceLauncher {
 
       await this.runCleanup(result.service, () => this.releaseMismatchedAttempt(result.service))
       if (intent.policy.type === 'fixed' || attempt === this.maxActivationAttempts - 1) {
-        throw createExpectedAppError(
+        throw createRunError(
           'SERVICE_LISTENER_OWNERSHIP_MISMATCH',
           'The ready local listener belongs to another process.',
           createRunAttemptDetails(result.service.session, result.service.allocation.endpoint.port)
@@ -177,7 +178,7 @@ export class ManagedServiceLauncher {
       }
     }
 
-    throw createExpectedAppError(
+    throw createRunError(
       'SERVICE_PORT_ALLOCATION_EXHAUSTED',
       'Unable to activate a local service after bounded attempts.',
       {
@@ -316,7 +317,7 @@ export class ManagedServiceLauncher {
     const timeoutId = setTimeout(
       () =>
         readinessController.abort(
-          createExpectedAppError('COMMAND_TIMED_OUT', 'Managed service readiness timed out.')
+          createRunError('COMMAND_TIMED_OUT', 'Managed service readiness timed out.')
         ),
       command.readinessTimeoutMs
     )
@@ -378,7 +379,7 @@ export class ManagedServiceLauncher {
         onStartedWithinGate: (startedSession) => {
           const allocation = attemptState.allocation
           if (!allocation) {
-            throw createExpectedAppError(
+            throw createRunError(
               'SERVICE_PORT_ALLOCATION_EXHAUSTED',
               'Managed service did not receive a local port allocation.'
             )
@@ -417,7 +418,7 @@ export class ManagedServiceLauncher {
     if (!allocation) {
       clearTimeout(timeoutId)
       this.activationControllers.delete(readinessController)
-      throw createExpectedAppError(
+      throw createRunError(
         'SERVICE_PORT_ALLOCATION_EXHAUSTED',
         'Managed service did not receive a local port allocation.'
       )
@@ -437,7 +438,7 @@ export class ManagedServiceLauncher {
       this.activationControllers.delete(readinessController)
       await this.sessions.terminateProcess(session.id)
       await releaseUnusedAllocation(allocation)
-      throw createExpectedAppError(
+      throw createRunError(
         'RUN_START_BLOCKED',
         'Run scope changed before the managed service could become active.'
       )
@@ -535,7 +536,7 @@ export class ManagedServiceLauncher {
       quarantineIfReleasing(service.allocation.lease, getErrorMessage(error))
       this.reportPortState(service, 'quarantined')
       this.removeActive(service)
-      throw createExpectedAppError(
+      throw createRunError(
         'SERVICE_PORT_CLEANUP_FAILED',
         'The managed service listener did not close after its terminal process exited.',
         createRunAttemptDetails(service.session, service.allocation.endpoint.port)

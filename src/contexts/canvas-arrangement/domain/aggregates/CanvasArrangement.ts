@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createCanvasArrangementDomainError } from '../errors/CanvasArrangementDomainError'
+
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot,
@@ -133,7 +134,10 @@ export class CanvasArrangement {
   removeStack(stackId: string): CanvasStackSnapshot {
     const index = this.stacks.findIndex((stack) => stack.id === stackId)
     if (index === -1) {
-      throw createExpectedAppError('CANVAS_STACK_NOT_FOUND', 'Canvas stack was not found.')
+      throw createCanvasArrangementDomainError(
+        'CANVAS_STACK_NOT_FOUND',
+        'Canvas stack was not found.'
+      )
     }
 
     const stack = this.stacks[index]
@@ -150,7 +154,10 @@ export class CanvasArrangement {
     }
     const index = this.stacks.findIndex((stack) => stack.id === stackId)
     if (index === -1) {
-      throw createExpectedAppError('CANVAS_STACK_NOT_FOUND', 'Canvas stack was not found.')
+      throw createCanvasArrangementDomainError(
+        'CANVAS_STACK_NOT_FOUND',
+        'Canvas stack was not found.'
+      )
     }
     const previous = this.stacks[index]
     const moved = Object.freeze({
@@ -265,5 +272,5 @@ function requireText(value: string, fieldName: string): string {
 }
 
 function invalid(message: string): never {
-  throw createExpectedAppError('CANVAS_ARRANGEMENT_INVALID', message)
+  throw createCanvasArrangementDomainError('CANVAS_ARRANGEMENT_INVALID', message)
 }

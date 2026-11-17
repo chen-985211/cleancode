@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type { ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
 import type { AgentToolExecutionOperations } from './AgentToolApprovalCoordinator'
 
@@ -22,7 +23,7 @@ export class AgentToolInvocationCoordinator implements AgentToolExecutionOperati
   runSessionToolCall<Result>(sessionId: string, operation: () => Promise<Result>): Promise<Result> {
     if (!this.isSessionOpen(sessionId)) {
       return Promise.reject(
-        createExpectedAppError(
+        createAgentError(
           'AGENT_SESSION_NOT_FOUND',
           'Agent session is no longer accepting MCP tool calls.'
         )

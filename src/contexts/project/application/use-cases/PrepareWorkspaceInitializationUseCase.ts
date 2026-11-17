@@ -1,3 +1,4 @@
+import { createProjectError } from '../errors/ProjectErrors'
 import {
   sameProjectIssue,
   type ProjectIssueReference
@@ -21,10 +22,7 @@ import {
   type WorkspaceDefaultsResolution,
   type WorkspaceDefaults
 } from '../../domain/value-objects/WorkspaceDefaults'
-import {
-  createExpectedAppError,
-  getAppErrorCode
-} from '../../../../shared-kernel/application/errors/AppError'
+import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateInitializedWorkspaceCommand {
   readonly selectWorkspace?: boolean
@@ -116,7 +114,7 @@ export class PrepareWorkspaceInitializationUseCase {
         mode: 'empty-canvas'
       })
       if (!(await this.dependencies.content.isEmpty(operation.toSnapshot()))) {
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_CANVAS_NOT_EMPTY',
           'The canvas already contains objects.'
         )
@@ -125,7 +123,7 @@ export class PrepareWorkspaceInitializationUseCase {
         await this.dependencies.repository.list(project.id, workspace.workspaceId)
       ).find((item) => item.stage !== 'complete' && item.stage !== 'cancelled')
       if (active)
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_CONFLICT',
           'This workspace already has an unfinished initialization.'
         )
@@ -178,7 +176,7 @@ export class PrepareWorkspaceInitializationUseCase {
     if (!snapshot) {
       const inspection = await this.dependencies.git.inspectRepository(project.directory)
       if (inspection.localBranches.includes(command.branchName.trim())) {
-        throw createExpectedAppError('GIT_BRANCH_ALREADY_EXISTS', 'Git branch already exists.')
+        throw createProjectError('GIT_BRANCH_ALREADY_EXISTS', 'Git branch already exists.')
       }
       const workspaceDirectory = this.dependencies.directories.resolveBranchWorkspaceDirectory({
         projectDirectory: project.directory,
@@ -208,7 +206,7 @@ export class PrepareWorkspaceInitializationUseCase {
       (command.baseRef !== undefined && snapshot.baseRef !== command.baseRef) ||
       (command.issue && !sameProjectIssue(snapshot.issue, command.issue))
     ) {
-      throw createExpectedAppError(
+      throw createProjectError(
         'WORKSPACE_INITIALIZATION_CONFLICT',
         'Workspace creation request has different contents.'
       )
@@ -223,7 +221,7 @@ export class PrepareWorkspaceInitializationUseCase {
       )
       if (matching) {
         if (!snapshot.worktreeCreated)
-          throw createExpectedAppError(
+          throw createProjectError(
             'WORKSPACE_INITIALIZATION_CONFLICT',
             'An existing worktree has no creation receipt for this request.'
           )
@@ -236,7 +234,7 @@ export class PrepareWorkspaceInitializationUseCase {
           const rebound = WorkspaceInitialization.restore(snapshot)
           rebound.rebindDiscoveredWorkspace(discovered.workspaceId)
           if (!(await this.dependencies.content.isEmpty(rebound.toSnapshot())))
-            throw createExpectedAppError(
+            throw createProjectError(
               'WORKSPACE_INITIALIZATION_CANVAS_NOT_EMPTY',
               'The discovered workspace already contains objects.'
             )
@@ -306,7 +304,7 @@ export class PrepareWorkspaceInitializationUseCase {
       if (
         project.workspaces.some((workspace) => workspace.directory === snapshot.workspaceDirectory)
       ) {
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_CONFLICT',
           'The worktree is already registered with another identity.'
         )
@@ -351,10 +349,10 @@ export class PrepareWorkspaceInitializationUseCase {
 
   private async requireProject(directory: string): Promise<ProjectSnapshot> {
     const project = await this.dependencies.projects.findByDirectory(directory)
-    if (!project) throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
+    if (!project) throw createProjectError('PROJECT_NOT_FOUND', 'Project was not found.')
     const registry = await this.dependencies.registry.get()
     if (!registry.projectDirectories.includes(project.directory))
-      throw createExpectedAppError('PROJECT_NOT_REMEMBERED', 'Project is no longer remembered.')
+      throw createProjectError('PROJECT_NOT_REMEMBERED', 'Project is no longer remembered.')
     return project
   }
   private assertRequest(
@@ -373,7 +371,7 @@ export class PrepareWorkspaceInitializationUseCase {
 }
 
 function stale(): never {
-  throw createExpectedAppError(
+  throw createProjectError(
     'WORKSPACE_INITIALIZATION_SCOPE_STALE',
     'Workspace initialization scope is stale.'
   )

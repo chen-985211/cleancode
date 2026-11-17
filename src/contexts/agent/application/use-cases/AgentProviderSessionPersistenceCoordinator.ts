@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
@@ -81,7 +82,7 @@ export class AgentProviderSessionPersistenceCoordinator {
     this.persist(session, null, session.providerLaunchGeneration)
     await this.lanes.get(session)?.tail
     if (session.runtime.binding.status === 'persistence_failed') {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Unable to clear the missing Provider conversation reference.'
       )

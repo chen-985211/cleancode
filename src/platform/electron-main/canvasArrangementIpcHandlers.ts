@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot
@@ -6,7 +7,7 @@ import type { CreateCanvasStackCommand } from '../../contexts/canvas-arrangement
 import type { RemoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/RemoveCanvasStackUseCase'
 import type { MoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/MoveCanvasStackUseCase'
 import type { SaveCanvasLayerOrderCommand } from '../../contexts/canvas-arrangement/application/use-cases/SaveCanvasLayerOrderUseCase'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -213,5 +214,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function invalidCommand(): never {
-  throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid canvas arrangement IPC command.')
+  throw createIpcError('INVALID_IPC_COMMAND', 'Invalid canvas arrangement IPC command.')
 }

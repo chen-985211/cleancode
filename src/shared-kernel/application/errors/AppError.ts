@@ -1,14 +1,14 @@
 import {
   AppError,
   isAppError,
-  isAppErrorCode,
+  isErrorCode,
   type AppErrorCode,
+  type AppErrorDetails,
   type CreateAppErrorInput as DomainAppErrorInput
 } from '../../domain/errors/AppError'
 
 export {
   AppError,
-  createExpectedAppError,
   createUnexpectedAppError,
   isAppError,
   type AppErrorCode,
@@ -16,6 +16,15 @@ export {
 } from '../../domain/errors/AppError'
 
 export type SerializedAppError = DomainAppErrorInput
+
+/** Builds or reconstructs an application-boundary envelope, without declaring business codes. */
+export function createExpectedAppError<TCode extends string>(
+  code: TCode,
+  message: string,
+  details?: AppErrorDetails
+): AppError<TCode> {
+  return new AppError({ code, message, details, isExpected: true })
+}
 
 export function createClientAppError(error: SerializedAppError): AppError {
   return new AppError(error)
@@ -34,11 +43,14 @@ export function serializeAppError(
   }
 }
 
-export function isSerializedAppError(error: unknown): error is SerializedAppError {
+export function isSerializedAppError(
+  error: unknown,
+  acceptsCode: (code: unknown) => boolean = isErrorCode
+): error is SerializedAppError {
   return (
     isRecord(error) &&
     typeof error.code === 'string' &&
-    isAppErrorCode(error.code) &&
+    acceptsCode(error.code) &&
     typeof error.message === 'string' &&
     typeof error.isExpected === 'boolean' &&
     (error.correlationId === undefined || typeof error.correlationId === 'string')

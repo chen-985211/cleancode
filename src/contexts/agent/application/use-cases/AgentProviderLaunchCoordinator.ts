@@ -1,5 +1,6 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentExecutionDirectoryPort } from '../ports/AgentExecutionDirectoryPort'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import type { AgentTerminalRuntimePort } from '../ports/AgentTerminalRuntimePort'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import type { AgentRuntimeScopeValidationPort } from '../ports/AgentRuntimeScopeValidationPort'
@@ -75,7 +76,7 @@ export class AgentProviderLaunchCoordinator {
       executionDirectory: session.executionDirectory ?? session.workspaceDirectory
     })
     if (!resolved)
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Agent execution directory is no longer available.'
       )

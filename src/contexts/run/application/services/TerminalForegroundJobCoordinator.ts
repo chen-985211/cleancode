@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import { ForegroundJob, type ForegroundJobSnapshot } from '../../domain/aggregates/ForegroundJob'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
@@ -27,27 +28,24 @@ export class TerminalForegroundJobCoordinator {
   launch(command: LaunchForegroundJobCommand): ForegroundJobSnapshot {
     const session = this.requireSession(command.sessionId)
     if (session.status !== 'running') {
-      throw createExpectedAppError(
-        'TERMINAL_SESSION_NOT_RUNNING',
-        'Terminal session is not running.'
-      )
+      throw createRunError('TERMINAL_SESSION_NOT_RUNNING', 'Terminal session is not running.')
     }
     if (resolveTerminalOwnerRef(session.scope).kind !== 'agent') {
-      throw createExpectedAppError(
+      throw createRunError(
         'RUN_START_BLOCKED',
         'Foreground Agent jobs require an Agent-owned terminal.'
       )
     }
     const launch = this.terminalProcessPort.launchForegroundJob
     if (!launch) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
         'Terminal runtime does not support foreground jobs.'
       )
     }
     const previous = this.jobs.get(session.id)
     if (previous && (previous.status === 'launching' || previous.status === 'running')) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_PROVIDER_CONTROLLER_BUSY',
         'A foreground job is already active in this Agent terminal.'
       )

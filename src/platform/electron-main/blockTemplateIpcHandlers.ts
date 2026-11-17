@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import type { DeleteBlockTemplateCommand } from '../../contexts/block-graph/application/use-cases/DeleteBlockTemplateUseCase'
 import type {
@@ -8,7 +9,7 @@ import type { ListBlockTemplatesQuery } from '../../contexts/block-graph/applica
 import type { MoveBlockTemplateCommand } from '../../contexts/block-graph/application/use-cases/MoveBlockTemplateUseCase'
 import type { SaveBlockTemplateCommand } from '../../contexts/block-graph/application/use-cases/SaveBlockTemplateUseCase'
 import type { UpdateBlockTemplateCommand } from '../../contexts/block-graph/application/use-cases/UpdateBlockTemplateUseCase'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -190,5 +191,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function invalidCommand(): never {
-  throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid block template IPC command.')
+  throw createIpcError('INVALID_IPC_COMMAND', 'Invalid block template IPC command.')
 }

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
+
 import type { ActualServiceEndpoint } from '../value-objects/ActualServiceEndpoint'
 import type { TerminalRunScope } from '../value-objects/TerminalRunScope'
 
@@ -90,7 +91,7 @@ export class ServicePortLeaseRegistry {
 
   reserve(owner: TerminalRunScope, endpoint: ActualServiceEndpoint): ServicePortLease {
     if (this.activeLeasesByPort.has(endpoint.port)) {
-      throw createExpectedAppError(
+      throw createRunDomainError(
         'TERMINAL_WORKFLOW_STATE_INVALID',
         'Service port already has an active lease.',
         { port: endpoint.port }
@@ -162,7 +163,7 @@ export class ServicePortLeaseRegistry {
 }
 
 function invalidLeaseTransition(leaseId: string): never {
-  throw createExpectedAppError(
+  throw createRunDomainError(
     'TERMINAL_WORKFLOW_STATE_INVALID',
     'Service port lease transition is invalid.',
     { leaseId }

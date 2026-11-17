@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
+
 import type { ActualServiceEndpoint } from '../value-objects/ActualServiceEndpoint'
 import type {
   WorkflowRunFailureSnapshot,
@@ -197,7 +198,7 @@ export class WorkflowRun {
   private requireNode(blockId: string): MutableWorkflowRunNode {
     const node = this.nodes.find((candidate) => candidate.plan.blockId === blockId)
     if (!node) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createRunDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
     return node
   }
@@ -221,7 +222,7 @@ function freezePlan(plan: WorkflowRunPlanSnapshot): WorkflowRunPlanSnapshot {
 }
 
 function throwInvalidTransition(blockId: string): never {
-  throw createExpectedAppError(
+  throw createRunDomainError(
     'TERMINAL_WORKFLOW_STATE_INVALID',
     'Terminal workflow state transition is invalid.',
     { blockId }

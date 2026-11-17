@@ -1,3 +1,4 @@
+import { createAgentError } from '../../application/errors/AgentErrors'
 import { randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
@@ -6,7 +7,7 @@ import { basename, dirname, join } from 'node:path'
 import type { AgentSessionRepository } from '../../application/ports/AgentSessionRepository'
 import type { AgentCreationRepository } from '../../application/ports/AgentCreationRepository'
 import { toWorkspaceAgentSnapshot } from '../../application/dto/WorkspaceAgentSnapshot'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import type {
   AgentWorkspaceInitializer,
   InitializeAgentWorkspaceCommand
@@ -88,7 +89,7 @@ export class FileSystemAgentSessionRepository
             receipt.agent.agentId !== snapshot.agentId ||
             receipt.agent.providerId !== snapshot.providerId
           ) {
-            throw createExpectedAppError(
+            throw createAgentError(
               'AGENT_CREATION_CONFLICT',
               'Agent creation receipt conflicts with the requested Agent.'
             )

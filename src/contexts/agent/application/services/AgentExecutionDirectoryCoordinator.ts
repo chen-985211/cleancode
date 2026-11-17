@@ -1,6 +1,6 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentExecutionDirectoryPort } from '../ports/AgentExecutionDirectoryPort'
 import type { ManagedAgentSession } from '../use-cases/AgentSessionRuntimeState'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 interface DirectoryBlock {
   readonly directory: string
@@ -67,7 +67,7 @@ export class AgentExecutionDirectoryCoordinator implements AgentExecutionDirecto
           !ownsDirectory(session) &&
           occupiedDirectories.some((directory) => containsDirectory(canonical, directory))
         ) {
-          throw createExpectedAppError(
+          throw createAgentError(
             'WORKSPACE_DIRECTORY_IN_USE',
             'Workspace directory is used by an Agent from another workspace.',
             { agentId: session.agentId, workspaceId: session.workspaceId }

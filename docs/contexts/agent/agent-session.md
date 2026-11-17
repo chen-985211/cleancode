@@ -60,6 +60,8 @@ Codex 恢复前通过同一 executable、启动参数和环境下的独立 `app-
 
 工作区默认内容通过既有 `CreateWorkspaceAgentUseCase` 创建新身份、固定 Provider 和新会话，不复制其他 Agent 的 session ref 或自动发送提示词。内部初始化项 ID 与 Agent 创建凭据在当前 schema 的同一次 Agent 仓储写入中提交；凭据在 Agent 被删除后继续保留，用于拒绝重复创建。首次列表查询仍只初始化空列表，不能据默认配置创建 Agent。Provider 可用性、停用偏好和 Project 作用域校验沿用正常创建流程。
 
+Agent 身份、会话引用与消息不变量失败归 `AgentDomainError`；Provider 可用性、调用参数、会话编排及技术能力失败由 `AgentErrors` 的应用声明拥有。Provider 适配器通过应用错误契约报告失败，公共层不维护 Agent 专属错误清单。
+
 ## Provider contribution
 
 `AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：

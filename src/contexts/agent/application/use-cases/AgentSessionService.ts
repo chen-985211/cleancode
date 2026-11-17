@@ -1,3 +1,4 @@
+import { createAgentError } from '../errors/AgentErrors'
 import { createAgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type {
   AgentSessionSnapshot,
@@ -19,7 +20,7 @@ import {
 } from '../ports/AgentProviderPreferencesRepository'
 import type { AgentSession } from '../../domain/aggregates/AgentSession'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import {
   AgentToolApprovalCoordinator,
@@ -241,7 +242,7 @@ export class AgentSessionService {
       })
     }
     if (workspaceAgent && command.providerId && workspaceAgent.providerId !== command.providerId) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_PROVIDER_MISMATCH',
         'The Agent Provider cannot be changed after the Agent is created.',
         {
@@ -357,14 +358,11 @@ export class AgentSessionService {
 
   async executeMcpTool(command: AgentMcpToolCallCommand): Promise<AgentToolExecutionResult> {
     if (this.isApplicationShuttingDown) {
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'Agent session service is shutting down.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
     }
     const session = requireManagedAgentSession(this.sessions.values(), command.sessionId)
     if (!session.mcpConfiguration?.tools.some((tool) => tool.name === command.toolName)) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_TOOL_UNAVAILABLE',
         'This tool category is disabled for the current Agent launch.'
       )
@@ -567,25 +565,19 @@ export class AgentSessionService {
 
   private async startManagedProcess(session: ManagedAgentSession): Promise<void> {
     if (this.isApplicationShuttingDown) {
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'Agent session service is shutting down.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
     }
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     await this.providerAvailability.inspect(session.providerId, { refresh: true })
     if (this.isApplicationShuttingDown) {
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'Agent session service is shutting down.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
     }
     const directory = await this.executionDirectories.resolve({
       workspaceDirectory: session.workspaceDirectory,
       executionDirectory: session.executionDirectory ?? session.workspaceDirectory
     })
     if (!directory)
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Agent execution directory is no longer available.'
       )

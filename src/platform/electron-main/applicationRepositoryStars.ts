@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
+
 import { applicationRepository } from '../ipc/applicationRepositoryChannels'
 
 const cacheDurationMs = 10 * 60 * 1000
@@ -50,7 +51,7 @@ async function queryRepositoryStars(request: typeof fetch): Promise<number> {
     }
     return count
   } catch {
-    throw createExpectedAppError(
+    throw createProjectError(
       'GITHUB_REQUEST_FAILED',
       'Application repository stars are unavailable.'
     )

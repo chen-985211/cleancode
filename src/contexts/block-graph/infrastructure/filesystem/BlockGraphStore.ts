@@ -1,7 +1,5 @@
-import {
-  createExpectedAppError,
-  getAppErrorCode
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../../application/errors/BlockGraphErrors'
+import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 import { BlockGraph } from '../../domain/aggregates/BlockGraph'
 import type {
   BlockGraphSnapshot,
@@ -33,7 +31,7 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
     parsed.version !== 4 &&
     parsed.version !== 5
   ) {
-    throw createExpectedAppError(
+    throw createBlockGraphError(
       'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED',
       'Persisted block graph snapshot version is unsupported.',
       { path }
@@ -252,7 +250,7 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function throwCorruptedStore(path: string): never {
-  throw createExpectedAppError(
+  throw createBlockGraphError(
     'BLOCK_GRAPH_SNAPSHOT_CORRUPTED',
     'Persisted block graph snapshot is corrupted.',
     { path }

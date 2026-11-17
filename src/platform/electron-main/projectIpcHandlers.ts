@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import { ProjectRegistryTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type {
@@ -9,7 +10,7 @@ import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
 } from '../../contexts/project/application/dto/WorkspaceExternalOpen'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { CreateInitializedWorkspaceCommand } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { normalizeWorkspaceDefaults } from '../../contexts/project/domain/value-objects/WorkspaceDefaults'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
@@ -265,10 +266,7 @@ async function loadAndSelectWorkbench(
 
 function readStringField(command: unknown, fieldName: string): string {
   if (!isRecord(command) || typeof command[fieldName] !== 'string') {
-    throw createExpectedAppError(
-      'INVALID_IPC_COMMAND',
-      `Invalid IPC command: ${fieldName} is required.`
-    )
+    throw createIpcError('INVALID_IPC_COMMAND', `Invalid IPC command: ${fieldName} is required.`)
   }
 
   return command[fieldName]
@@ -279,7 +277,7 @@ function readNullableStringField(command: unknown, fieldName: string): string | 
     !isRecord(command) ||
     (typeof command[fieldName] !== 'string' && command[fieldName] !== null)
   ) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       `Invalid IPC command: ${fieldName} must be a string or null.`
     )
@@ -300,7 +298,7 @@ function readLockedWorktreeConfirmation(
     !isRecord(confirmation) ||
     (typeof confirmation.lockReason !== 'string' && confirmation.lockReason !== null)
   ) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       'Invalid IPC command: lockedWorktreeConfirmation.lockReason must be a string or null.'
     )
@@ -311,7 +309,7 @@ function readLockedWorktreeConfirmation(
 
 function readWorkspaceExternalOpenTarget(command: unknown): WorkspaceExternalOpenTarget {
   if (!isRecord(command) || (command.target !== 'vscode' && command.target !== 'folder')) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       'Invalid IPC command: target must be vscode or folder.'
     )

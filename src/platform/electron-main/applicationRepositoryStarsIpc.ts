@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { createIpcError } from '../ipc/IpcError'
+
 import { applicationRepositoryStarsChannel } from '../ipc/applicationRepositoryChannels'
 import { registerIpcHandler, type IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -13,7 +14,7 @@ export function registerApplicationRepositoryStarsIpc(input: {
     channel: applicationRepositoryStarsChannel,
     handler: (command, event) => {
       if (command !== undefined || !input.isTrustedSender(event)) {
-        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid repository stars IPC query.')
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid repository stars IPC query.')
       }
       return input.read()
     },

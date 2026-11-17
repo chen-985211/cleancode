@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
+
 import { resolveTerminalOwnerRef, type TerminalRunScope } from '../value-objects/TerminalRunScope'
 
 export type TerminalSessionStatus = 'idle' | 'running' | 'stopping' | 'exited' | 'failed'
@@ -71,14 +72,14 @@ export class TerminalSession {
   static revive(input: ReviveTerminalSessionInput): TerminalSession {
     assertRetentionAllowed(input.scope, input.kind, input.retentionPolicy)
     if (input.recoveryKind === 'warm' && input.processId === null) {
-      throw createExpectedAppError(
+      throw createRunDomainError(
         'TERMINAL_SESSION_NOT_RUNNING',
         'A warm terminal recovery requires a live process.'
       )
     }
 
     if (input.recoveryKind === 'historical' && input.processId !== null) {
-      throw createExpectedAppError(
+      throw createRunDomainError(
         'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
         'Historical terminal recovery cannot claim a live process.'
       )
@@ -141,10 +142,7 @@ export class TerminalSession {
 
   recordInput(input: string): void {
     if (this.statusValue !== 'running') {
-      throw createExpectedAppError(
-        'TERMINAL_SESSION_NOT_RUNNING',
-        'Terminal session is not running.'
-      )
+      throw createRunDomainError('TERMINAL_SESSION_NOT_RUNNING', 'Terminal session is not running.')
     }
 
     this.recordedInput.push(input)
@@ -152,10 +150,7 @@ export class TerminalSession {
 
   setRetentionPolicy(policy: TerminalRetentionPolicy): void {
     if (this.statusValue !== 'running') {
-      throw createExpectedAppError(
-        'TERMINAL_SESSION_NOT_RUNNING',
-        'Terminal session is not running.'
-      )
+      throw createRunDomainError('TERMINAL_SESSION_NOT_RUNNING', 'Terminal session is not running.')
     }
 
     assertRetentionAllowed(this.scope, this.kind, policy)
@@ -208,13 +203,13 @@ function assertRetentionAllowed(
 ): void {
   if (policy !== 'keep-after-application-exit') return
   if (kind === 'workflow') {
-    throw createExpectedAppError(
+    throw createRunDomainError(
       'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
       'Workflow terminal sessions cannot survive application exit.'
     )
   }
   if (resolveTerminalOwnerRef(scope).kind === 'agent') {
-    throw createExpectedAppError(
+    throw createRunDomainError(
       'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
       'Agent terminal sessions cannot survive application exit.'
     )

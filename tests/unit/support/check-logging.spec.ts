@@ -5,6 +5,22 @@ import { join } from 'node:path'
 import { collectLoggingViolations } from '../../../scripts/check-logging.mjs'
 
 describe('logging quality gate', () => {
+  it('rejects domain business errors constructed without their context owner', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-error-owner-'))
+    try {
+      await mkdir(join(directory, 'src', 'contexts', 'project', 'domain'), { recursive: true })
+      await writeFile(
+        join(directory, 'src', 'contexts', 'project', 'domain', 'bad.ts'),
+        "throw createExpectedAppError('PROJECT_NOT_FOUND', 'Missing project.')\n"
+      )
+      expect(await collectLoggingViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ rule: 'no-unowned-domain-error' })
+      ])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('flags direct console usage outside the logging sink', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'cleancode-logging-'))
 

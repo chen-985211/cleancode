@@ -1,3 +1,4 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
@@ -14,7 +15,6 @@ import {
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { AgentWorkspaceTransactionCoordinator } from '../services/AgentWorkspaceTransactionCoordinator'
 import { AgentSession, defaultAgentLayoutSize } from '../../domain/aggregates/AgentSession'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateWorkspaceAgentCommand {
   readonly agentId: string
@@ -46,7 +46,7 @@ export class CreateWorkspaceAgentUseCase {
     return this.transactions.run(command.projectId, command.workspaceId, async () => {
       if (operationId) {
         if (!this.creations)
-          throw createExpectedAppError(
+          throw createAgentError(
             'AGENT_CREATION_CONFLICT',
             'Agent creation receipt repository is required.'
           )
@@ -57,7 +57,7 @@ export class CreateWorkspaceAgentUseCase {
         )
         if (receipt) {
           if (receipt.providerId !== command.providerId || receipt.agentId !== command.agentId) {
-            throw createExpectedAppError(
+            throw createAgentError(
               'AGENT_CREATION_CONFLICT',
               'Agent initialization was committed to different content.'
             )
@@ -72,7 +72,7 @@ export class CreateWorkspaceAgentUseCase {
       )
       if (existing) {
         if (existing.providerId !== command.providerId) {
-          throw createExpectedAppError(
+          throw createAgentError(
             'AGENT_CREATION_CONFLICT',
             'Agent creation intent is already committed to another Provider.',
             {
@@ -87,7 +87,7 @@ export class CreateWorkspaceAgentUseCase {
 
       const preferences = await this.preferences.load()
       if (preferences.disabledProviderIds.includes(command.providerId)) {
-        throw createExpectedAppError(
+        throw createAgentError(
           'AGENT_PROVIDER_DISABLED',
           `Agent Provider "${command.providerId}" is disabled.`,
           { providerId: command.providerId }
@@ -95,7 +95,7 @@ export class CreateWorkspaceAgentUseCase {
       }
       const availability = await this.availability.inspect(command.providerId, { refresh: true })
       if (availability.status !== 'installed') {
-        throw createExpectedAppError(
+        throw createAgentError(
           'AGENT_PROVIDER_UNAVAILABLE',
           `Agent Provider "${command.providerId}" is unavailable.`,
           {

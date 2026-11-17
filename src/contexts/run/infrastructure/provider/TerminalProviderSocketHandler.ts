@@ -1,7 +1,7 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import type { Socket } from 'node:net'
 
 import {
-  createExpectedAppError,
   createUnexpectedAppError,
   isAppError,
   serializeAppError
@@ -161,8 +161,5 @@ function logSlowRequest(
 }
 
 function providerRequestDeadlineExceeded() {
-  return createExpectedAppError(
-    'COMMAND_TIMED_OUT',
-    'Terminal provider request exceeded its deadline.'
-  )
+  return createRunError('COMMAND_TIMED_OUT', 'Terminal provider request exceeded its deadline.')
 }

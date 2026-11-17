@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type {
   IssueWorkspacePhase,
   PrepareIssueWorkspaceQuery,
@@ -9,7 +10,6 @@ import type { IpcMainInvokeEvent } from 'electron'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 
 export function registerProjectIssueIpcHandlers(input: {
   readonly ipcMain: IpcMainLike
@@ -117,5 +117,5 @@ function text(value: Record<string, unknown>, key: string, empty = false): strin
   return item
 }
 function invalid(): never {
-  throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid project issue command.')
+  throw createIpcError('INVALID_IPC_COMMAND', 'Invalid project issue command.')
 }

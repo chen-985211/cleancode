@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { execFile } from 'node:child_process'
 import { accessSync, chmodSync, constants, existsSync } from 'node:fs'
 import { readlink, realpath } from 'node:fs/promises'
@@ -9,7 +10,6 @@ import { promisify } from 'node:util'
 import type { IPty } from 'node-pty'
 import { spawn as spawnPtyProcess } from 'node-pty'
 
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   LaunchForegroundJobProcessCommand,
   StartTerminalProcessCommand,
@@ -226,14 +226,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
     const terminalProcess = this.requireProcess(command.sessionId)
     if (!supportsForegroundJobShell(this.runtimePlatform, terminalProcess.shell)) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_SHELL_UNSUPPORTED',
         'Agent foreground jobs on Windows require PowerShell or PowerShell Core.',
         { shell: terminalProcess.shell }
       )
     }
     if (terminalProcess.foregroundJob) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_PROVIDER_CONTROLLER_BUSY',
         'A foreground job is already active in this terminal process.'
       )
@@ -322,7 +322,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const ptyProcess = this.processes.get(sessionId)
 
     if (!ptyProcess) {
-      throw createExpectedAppError('TERMINAL_PROCESS_NOT_FOUND', 'Terminal process was not found.')
+      throw createRunError('TERMINAL_PROCESS_NOT_FOUND', 'Terminal process was not found.')
     }
 
     return ptyProcess

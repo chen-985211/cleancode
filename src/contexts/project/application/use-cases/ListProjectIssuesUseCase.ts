@@ -1,3 +1,8 @@
+import {
+  ProjectDomainError,
+  createProjectDomainError
+} from '../../domain/errors/ProjectDomainError'
+import { createProjectError, isProjectErrorCode } from '../errors/ProjectErrors'
 import type { ProjectIssueScope } from '../services/ProjectIssueScope'
 import { ProjectIssueReadCache } from '../services/ProjectIssueReadCache'
 import type { GitHubIssuePort } from '../ports/GitHubIssuePort'
@@ -24,6 +29,18 @@ export class ListProjectIssuesUseCase {
       return { repository, issues: issues.slice(0, limit), hasMore: issues.length > limit }
     } catch (error) {
       if (!isAppError(error)) throw error
+      if (error instanceof ProjectDomainError) {
+        throw createProjectDomainError(error.code, error.message, {
+          ...error.details,
+          repository: repository.name
+        })
+      }
+      if (isProjectErrorCode(error.code) && error.isExpected) {
+        throw createProjectError(error.code, error.message, {
+          ...error.details,
+          repository: repository.name
+        })
+      }
       throw new AppError({
         ...error,
         message: error.message,

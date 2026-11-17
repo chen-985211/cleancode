@@ -1,3 +1,4 @@
+import { createProjectError } from '../../application/errors/ProjectErrors'
 import type { WorkspaceInitializationRepository } from '../../application/ports/WorkspaceInitializationRepository'
 import {
   WorkspaceInitialization,
@@ -7,7 +8,7 @@ import {
   normalizeWorkspaceDefaults,
   type WorkspaceDefaults
 } from '../../domain/value-objects/WorkspaceDefaults'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import { readFile } from 'node:fs/promises'
 import { mutateProjectStateFile, writeProjectStateFile } from './ProjectStateFile'
 
@@ -66,7 +67,7 @@ export class FileSystemWorkspaceInitializationRepository implements WorkspaceIni
             )) ||
           (existing.stage === 'cancelled' && snapshot.stage !== 'cancelled'))
       ) {
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_SCOPE_STALE',
           'Initialization record is no longer writable.'
         )
@@ -126,7 +127,7 @@ export class FileSystemWorkspaceInitializationRepository implements WorkspaceIni
         )
       }
     } catch {
-      throw createExpectedAppError(
+      throw createProjectError(
         'WORKSPACE_INITIALIZATION_INVALID',
         'Persisted workspace initialization is invalid.'
       )

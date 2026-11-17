@@ -1,3 +1,4 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { chmod, rm } from 'node:fs/promises'
 import { createServer, type Server, type Socket } from 'node:net'
 
@@ -24,7 +25,7 @@ import {
   terminalProviderMaxOutputChunkBytes,
   terminalProviderProtocolVersion
 } from './TerminalProviderProtocol'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import {
   createProviderSessionSnapshot,
   getErrorMessage,
@@ -231,7 +232,7 @@ export class TerminalProviderServer {
         const existingIdentity = this.modelIdentities.get(identity.sessionId)
         if (existingIdentity) {
           if (isSameTerminalRun(existingIdentity, identity)) return null
-          throw createExpectedAppError('RUN_SCOPE_STALE', 'Terminal model identity is stale.')
+          throw createRunError('RUN_SCOPE_STALE', 'Terminal model identity is stale.')
         }
         this.models.create({
           ...input.command,
@@ -345,7 +346,7 @@ export class TerminalProviderServer {
       case 'beginApplicationDetach': {
         const release = this.controllerLifecycle.beginRelease('application-detach')
         if (!release) {
-          throw createExpectedAppError(
+          throw createRunError(
             'TERMINAL_PROVIDER_UNAVAILABLE',
             'Terminal provider controller release is unavailable.'
           )
@@ -358,7 +359,7 @@ export class TerminalProviderServer {
         await this.controllerLifecycle.releaseController('application-detach')
         return null
       default:
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
           'Terminal provider method is unsupported.'
         )
@@ -371,7 +372,7 @@ export class TerminalProviderServer {
     const existing = this.sessions.get(command.scope.sessionId)
     if (existing) {
       if (existing.quarantined) {
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_PROVIDER_CONTROLLER_BUSY',
           'Terminal session is quarantined after an incomplete controller release.'
         )
@@ -384,16 +385,16 @@ export class TerminalProviderServer {
         return { processId: existing.snapshot.processId }
       }
       if (isSameTerminalRun(existing.snapshot, command.scope) && existing.starting) {
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_PROVIDER_CONTROLLER_BUSY',
           'Terminal session is still starting.',
           { retryAfterMs: 50 }
         )
       }
-      throw createExpectedAppError('RUN_SCOPE_STALE', 'Terminal session identity is stale.')
+      throw createRunError('RUN_SCOPE_STALE', 'Terminal session identity is stale.')
     }
     if (countLiveProviderSessions(this.sessions.values()) >= maxRetainedLiveSessions) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_RECOVERY_STORAGE_LIMIT',
         'Terminal provider live-session limit was exceeded.'
       )
@@ -485,7 +486,7 @@ export class TerminalProviderServer {
   ): Promise<void> {
     const session = this.requireSession(sessionId)
     if (session.snapshot.kind === 'workflow' && retentionPolicy === 'keep-after-application-exit') {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
         'Workflow terminal sessions cannot survive application exit.'
       )
@@ -631,10 +632,10 @@ export class TerminalProviderServer {
   private requireSession(sessionId: string): ProviderTerminalSession {
     const session = this.sessions.get(sessionId)
     if (!session) {
-      throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
+      throw createRunError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
     }
     if (session.quarantined) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_PROVIDER_UNAVAILABLE',
         'Terminal session is quarantined after an incomplete controller release.'
       )
@@ -687,7 +688,7 @@ function isControllerProcessAlive(processId: number): boolean {
 }
 
 function providerSessionRetiredDuringStart() {
-  return createExpectedAppError(
+  return createRunError(
     'TERMINAL_PROVIDER_UNAVAILABLE',
     'Terminal session was retired while its process was starting.'
   )

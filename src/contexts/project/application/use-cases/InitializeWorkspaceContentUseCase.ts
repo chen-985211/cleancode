@@ -1,3 +1,4 @@
+import { createProjectError } from '../errors/ProjectErrors'
 import { WorkspaceInitialization } from '../../domain/aggregates/WorkspaceInitialization'
 import type { WorkspaceInitializationSnapshot } from '../../domain/aggregates/WorkspaceInitialization'
 import type { WorkspaceInitializationRepository } from '../ports/WorkspaceInitializationRepository'
@@ -5,10 +6,7 @@ import type {
   WorkspaceInitializationContentPort,
   WorkspaceInitializationScope
 } from '../ports/WorkspaceInitializationContentPort'
-import {
-  createExpectedAppError,
-  getAppErrorCode
-} from '../../../../shared-kernel/application/errors/AppError'
+import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface InitializeWorkspaceContentCommand {
   readonly initializationId: string
@@ -50,7 +48,7 @@ export class InitializeWorkspaceContentUseCase {
   ): Promise<WorkspaceInitializationSnapshot> {
     const snapshot = await this.repository.find(command.initializationId)
     if (!snapshot)
-      throw createExpectedAppError(
+      throw createProjectError(
         'WORKSPACE_INITIALIZATION_NOT_FOUND',
         'Workspace initialization was not found.'
       )
@@ -93,7 +91,7 @@ export class InitializeWorkspaceContentUseCase {
     }
     if ((snapshot.mode === 'empty-canvas' || snapshot.requiresEmptyCanvas) && !snapshot.admitted) {
       if (!(await this.content.isEmpty(snapshot)))
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_CANVAS_NOT_EMPTY',
           'The canvas already contains objects.'
         )
@@ -104,7 +102,7 @@ export class InitializeWorkspaceContentUseCase {
         .toSnapshot()
         .items.find((candidate) => candidate.id === position.itemId)
       if (!item)
-        throw createExpectedAppError(
+        throw createProjectError(
           'WORKSPACE_INITIALIZATION_INVALID',
           'Unknown initialization item position.'
         )
@@ -116,7 +114,7 @@ export class InitializeWorkspaceContentUseCase {
       await this.requireScope(operation)
       try {
         if (!original.position)
-          throw createExpectedAppError(
+          throw createProjectError(
             'WORKSPACE_INITIALIZATION_INVALID',
             'Initialization placement is required.'
           )
@@ -208,7 +206,7 @@ export class InitializeWorkspaceContentUseCase {
 }
 
 function stale(): never {
-  throw createExpectedAppError(
+  throw createProjectError(
     'WORKSPACE_INITIALIZATION_SCOPE_STALE',
     'Workspace initialization target is no longer active.'
   )

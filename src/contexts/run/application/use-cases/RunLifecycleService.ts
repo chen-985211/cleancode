@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type { AppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   TerminalRuntimeAvailabilitySnapshot,
@@ -384,7 +385,7 @@ export class RunLifecycleService {
   private assertStartAllowed(owner: TerminalRunOwner): void {
     if (this.isShuttingDown) startBlocked()
     if (this.runtimePhase !== 'ready') {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_RUNTIME_NOT_READY',
         'Terminal runtime reconciliation has not completed.'
       )
@@ -440,10 +441,7 @@ function createInactiveRunStartGateLease(): RunStartGateLease {
 }
 
 function startBlocked(): never {
-  throw createExpectedAppError(
-    'RUN_START_BLOCKED',
-    'Run scope changed before the terminal could start.'
-  )
+  throw createRunError('RUN_START_BLOCKED', 'Run scope changed before the terminal could start.')
 }
 
 function projectQuarantinePrefix(projectDirectory: string): string {

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createProjectDomainError } from '../errors/ProjectDomainError'
 
 export interface ProjectRegistrySnapshot {
   readonly currentProjectDirectory: string | null
@@ -67,7 +67,7 @@ export class ProjectRegistry {
     const normalizedDirectory = directory.trim()
 
     if (!this.projectDirectories.includes(normalizedDirectory)) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'PROJECT_NOT_REMEMBERED',
         'Cannot select an unremembered project.'
       )
@@ -94,7 +94,7 @@ export class ProjectRegistry {
     const normalizedDirectory = directory.trim()
 
     if (!this.projectDirectories.includes(normalizedDirectory)) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'PROJECT_NOT_REMEMBERED',
         'Cannot reorder an unremembered project.'
       )
@@ -106,7 +106,7 @@ export class ProjectRegistry {
       normalizedBeforeDirectory !== null &&
       !this.projectDirectories.includes(normalizedBeforeDirectory)
     ) {
-      throw createExpectedAppError(
+      throw createProjectDomainError(
         'PROJECT_NOT_REMEMBERED',
         'Cannot reorder before an unremembered project.'
       )

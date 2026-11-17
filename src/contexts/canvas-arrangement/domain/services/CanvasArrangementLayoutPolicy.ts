@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
+import { createCanvasArrangementDomainError } from '../errors/CanvasArrangementDomainError'
 
 export interface CanvasArrangementLayoutItem {
   readonly key: string
@@ -292,5 +292,5 @@ function sum(values: readonly number[]): number {
 }
 
 function invalid(message: string): never {
-  throw createExpectedAppError('CANVAS_ARRANGEMENT_INVALID', message)
+  throw createCanvasArrangementDomainError('CANVAS_ARRANGEMENT_INVALID', message)
 }

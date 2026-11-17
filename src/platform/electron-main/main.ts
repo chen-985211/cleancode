@@ -1,3 +1,4 @@
+import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
 import { FindProjectByDirectoryUseCase } from '../../contexts/project/application/use-cases/FindProjectByDirectoryUseCase'
 import { FindDefaultGraphSnapshotUseCase } from '../../contexts/block-graph/application/use-cases/FindDefaultGraphSnapshotUseCase'
 import { createAgentSessionRuntime } from './createAgentSessionRuntime'
@@ -68,7 +69,7 @@ import {
 import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 import { BlockGraphTerminalLaunchPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalLaunchPlanAdapter'
 import { BlockGraphTerminalWorkflowPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalWorkflowPlanAdapter'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { createAgentLifecycle, disposeRuntime } from './agentRuntimeLifecycleAdapter'
@@ -544,7 +545,7 @@ async function selectProjectDirectory(): Promise<string | null> {
 async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapshot> {
   const currentWorkspace = project.workspaces.find((workspace) => workspace.isCurrent)
   if (!currentWorkspace) {
-    throw createExpectedAppError(
+    throw createProjectError(
       'PROJECT_HAS_NO_CURRENT_WORKSPACE',
       'Project has no current branch workspace.'
     )

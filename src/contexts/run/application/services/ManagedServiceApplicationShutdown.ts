@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
 
 interface ManagedServiceApplicationShutdownOperations {
   readonly abortInFlightWork: () => void
@@ -77,5 +77,5 @@ export class ManagedServiceApplicationShutdown {
 }
 
 function applicationShutdownBlocked() {
-  return createExpectedAppError('RUN_START_BLOCKED', 'Managed services are shutting down.')
+  return createRunError('RUN_START_BLOCKED', 'Managed services are shutting down.')
 }

@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type {
   StartTerminalWorkflowCommand,
@@ -5,7 +6,7 @@ import type {
   TerminalWorkflowService,
   TerminalWorkflowScopeCommand
 } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -59,7 +60,7 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
 function readStopWorkflowCommand(command: unknown): StopTerminalWorkflowCommand {
   const scope = readWorkflowScopeCommand(command)
   if (!isRecord(command) || !isNonEmptyString(command.runId)) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow stop command.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal workflow stop command.')
   }
   return { ...scope, runId: command.runId }
 }
@@ -70,7 +71,7 @@ function readWorkflowScopeCommand(command: unknown): TerminalWorkflowScopeComman
     !isNonEmptyString(command.projectDirectory) ||
     !isNonEmptyString(command.workspaceId)
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow scope.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal workflow scope.')
   }
   return { projectDirectory: command.projectDirectory, workspaceId: command.workspaceId }
 }
@@ -89,7 +90,7 @@ function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCom
     !isOptionalPositiveInteger(command.columns) ||
     !isOptionalPositiveInteger(command.rows)
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow command.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal workflow command.')
   }
 
   return command as unknown as StartTerminalWorkflowIpcCommand

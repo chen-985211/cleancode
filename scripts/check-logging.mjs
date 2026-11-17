@@ -18,6 +18,7 @@ const directConsolePattern = /\bconsole\.(log|debug|info|warn|error)\s*\(/
 const bareIpcMainHandlePattern = /\bipcMain\.handle\s*\(/
 const rendererErrorMessageParsingPattern = /\berror\.message\.includes\s*\(/
 const bareContextApplicationErrorPattern = /\bthrow\s+new\s+Error\s*\(/
+const unownedDomainErrorPattern = /\b(?:createExpectedAppError|new\s+AppError)\s*\(/
 
 export async function collectLoggingViolations({ cwd = process.cwd() } = {}) {
   const violations = []
@@ -57,7 +58,19 @@ export async function collectLoggingViolations({ cwd = process.cwd() } = {}) {
       violations.push({
         filePath,
         rule: 'no-bare-context-application-error',
-        message: 'Use AppError with a registered code in context domain and application layers.'
+        message:
+          'Use the owning context error factory with a declared code in domain and application layers.'
+      })
+    }
+
+    if (
+      /^src\/contexts\/[^/]+\/domain\//.test(filePath) &&
+      unownedDomainErrorPattern.test(source)
+    ) {
+      violations.push({
+        filePath,
+        rule: 'no-unowned-domain-error',
+        message: 'Construct business errors through the owning context Domain error module.'
       })
     }
   }

@@ -1,9 +1,9 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type {
   AgentPeerCreatedSnapshot,
   CreatePeerAgentInput
 } from '../dto/AgentCollaborationProtocol'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 interface AgentIdentity {
   readonly agentId: string
@@ -132,5 +132,5 @@ function snapshot(intent: CreationIntent): AgentPeerCreatedSnapshot {
 }
 
 function conflict(message: string) {
-  return createExpectedAppError('AGENT_CREATION_CONFLICT', message)
+  return createAgentError('AGENT_CREATION_CONFLICT', message)
 }

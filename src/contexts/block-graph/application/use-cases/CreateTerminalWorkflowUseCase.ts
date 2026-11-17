@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import type {
   BlockGraphSnapshot,
   TerminalBlockSizeSnapshot,
@@ -136,7 +137,7 @@ function indexTerminalInputs(
   terminals: readonly CreateTerminalWorkflowTerminalInput[]
 ): ReadonlyMap<string, CreateTerminalWorkflowTerminalInput> {
   if (terminals.length === 0) {
-    throw createExpectedAppError(
+    throw createBlockGraphError(
       'TERMINAL_WORKFLOW_DEFINITION_INVALID',
       'Terminal workflow must define at least one terminal.'
     )
@@ -145,7 +146,7 @@ function indexTerminalInputs(
   const inputsByRef = new Map<string, CreateTerminalWorkflowTerminalInput>()
   for (const terminal of terminals) {
     if (!terminal.ref || inputsByRef.has(terminal.ref)) {
-      throw createExpectedAppError(
+      throw createBlockGraphError(
         'TERMINAL_WORKFLOW_DEFINITION_INVALID',
         'Terminal workflow refs must be non-empty and unique.',
         { ref: terminal.ref }
@@ -167,7 +168,7 @@ function validateReferences(
 
   for (const ref of referencedRefs) {
     if (!inputsByRef.has(ref)) {
-      throw createExpectedAppError(
+      throw createBlockGraphError(
         'TERMINAL_WORKFLOW_DEFINITION_INVALID',
         'Terminal workflow references an unknown terminal ref.',
         { ref }
@@ -179,7 +180,7 @@ function validateReferences(
 function requireBlockId(blockIdByRef: ReadonlyMap<string, string>, ref: string): string {
   const blockId = blockIdByRef.get(ref)
   if (!blockId) {
-    throw createExpectedAppError(
+    throw createBlockGraphError(
       'TERMINAL_WORKFLOW_DEFINITION_INVALID',
       'Terminal workflow references an unknown terminal ref.',
       { ref }

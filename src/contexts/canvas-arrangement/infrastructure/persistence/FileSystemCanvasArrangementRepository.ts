@@ -1,9 +1,9 @@
+import { createCanvasArrangementError } from '../../application/errors/CanvasArrangementErrors'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   CanvasArrangementRepository,
   CanvasArrangementScope
@@ -138,7 +138,7 @@ async function replaceFile(sourcePath: string, targetPath: string): Promise<void
 }
 
 function scopeMismatch(path: string): never {
-  throw createExpectedAppError(
+  throw createCanvasArrangementError(
     'CANVAS_ARRANGEMENT_SCOPE_MISMATCH',
     'Canvas arrangement workspace identity does not match its storage scope.',
     { path }
