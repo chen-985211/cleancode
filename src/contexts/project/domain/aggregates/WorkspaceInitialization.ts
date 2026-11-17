@@ -1,9 +1,9 @@
 import { normalizeProjectIssue, type ProjectIssueReference } from '../value-objects/ProjectIssue'
 import {
   createExpectedAppError,
-  getAppErrorCode,
+  isAppErrorCode,
   type AppErrorCode
-} from '../../../../shared-kernel/application/errors/AppError'
+} from '../../../../shared-kernel/domain/errors/AppError'
 import {
   normalizeWorkspaceDefaults,
   type WorkspaceDefaults
@@ -132,8 +132,7 @@ export class WorkspaceInitialization {
           : !validText(item.providerId) ||
             item.templateId !== null ||
             item.runStatus !== 'disabled') ||
-        (item.errorCode !== null &&
-          getAppErrorCode({ code: item.errorCode, message: '', isExpected: true }) === null) ||
+        (item.errorCode !== null && !isAppErrorCode(item.errorCode)) ||
         (item.runId !== null && !validText(item.runId)) ||
         (item.result !== null && !validResult(item.result)) ||
         (item.status === 'created' && !item.result) ||

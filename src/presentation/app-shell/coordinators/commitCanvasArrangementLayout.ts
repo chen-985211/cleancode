@@ -1,17 +1,27 @@
 import type { WorkspaceAgentSnapshot } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import type { CanvasArrangementSnapshot } from '../../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type {
+  CanvasArrangementSnapshot,
+  CanvasStackSnapshot
+} from '../../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { CanvasObjectPosition } from '../../../contexts/canvas-arrangement/application/ports/CanvasLayoutCommitPort'
-import { CommitCanvasLayoutUseCase } from '../../../contexts/canvas-arrangement/application/use-cases/CommitCanvasLayoutUseCase'
+import {
+  CommitCanvasLayoutUseCase,
+  type CanvasLayoutRelationChange
+} from '../../../contexts/canvas-arrangement/application/use-cases/CommitCanvasLayoutUseCase'
 import type { CanvasArrangementSelectionItem } from '../../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import { findCanvasArrangementStacks } from '../../../contexts/canvas-arrangement/presentation/view-models/canvasArrangementSelection'
 import type { CanvasArrangementGridPlan } from '../projections/workbenchCanvasArrangementGridPlanning'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
+
+export type CanvasArrangementCommitPlan = Pick<CanvasArrangementGridPlan, 'layouts'> &
+  Partial<Pick<CanvasArrangementGridPlan, 'nodePositionsById'>>
 
 export async function commitCanvasArrangementLayout({
   api,
   arrangement,
   items,
   plan,
+  relation,
   workbench,
   workspaceId,
   moveWorkspaceAgent,
@@ -21,7 +31,8 @@ export async function commitCanvasArrangementLayout({
   readonly api: NonNullable<Window['cleancode']>
   readonly arrangement: CanvasArrangementSnapshot
   readonly items: readonly CanvasArrangementSelectionItem[]
-  readonly plan: CanvasArrangementGridPlan
+  readonly plan: CanvasArrangementCommitPlan
+  readonly relation?: CanvasLayoutRelationChange
   readonly workbench: WorkbenchSnapshot
   readonly workspaceId: string
   readonly moveWorkspaceAgent: (
@@ -55,7 +66,7 @@ export async function commitCanvasArrangementLayout({
         const reference = { kind: 'terminal', terminalId: nodeId } as const
         positions.push({
           reference,
-          position: plan.nodePositionsById.get(nodeId) ?? {
+          position: plan.nodePositionsById?.get(nodeId) ?? {
             x: block.position.x + target.x - item.position.x,
             y: block.position.y + target.y - item.position.y
           }
@@ -71,7 +82,23 @@ export async function commitCanvasArrangementLayout({
     workspaceId
   }
   const graphScope = { projectDirectory: workbench.project.directory, workspaceId }
+  const createStack = async (stack: CanvasStackSnapshot): Promise<void> => {
+    setCurrentArrangement(
+      await api.createCanvasStack({
+        ...scope,
+        stackId: stack.id,
+        anchor: stack.anchor,
+        items: stack.items
+      })
+    )
+  }
   const useCase = new CommitCanvasLayoutUseCase({
+    createStack,
+    async moveStack(stack) {
+      setCurrentArrangement(
+        await api.moveCanvasStack({ ...scope, stackId: stack.id, anchor: stack.anchor })
+      )
+    },
     async moveObjects(moves) {
       const results = await Promise.allSettled(
         moves.map(async ({ reference, position }) => {
@@ -99,26 +126,23 @@ export async function commitCanvasArrangementLayout({
             result.status === 'fulfilled' && Boolean(result.value)
         )?.value
       if (latestGraph) setCurrentGraph(latestGraph)
-      const failed = results.find((result) => result.status === 'rejected')
-      if (failed?.status === 'rejected') throw failed.reason
+      const failures = results
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map((result) => result.reason as unknown)
+      if (failures.length > 1) throw new AggregateError(failures, 'Canvas position writes failed.')
+      if (failures.length === 1) throw failures[0]
     },
     async removeStack(stack) {
       setCurrentArrangement(await api.removeCanvasStack({ ...scope, stackId: stack.id }))
     },
-    async restoreStack(stack) {
-      setCurrentArrangement(
-        await api.createCanvasStack({
-          ...scope,
-          stackId: stack.id,
-          anchor: stack.anchor,
-          items: stack.items
-        })
-      )
-    }
+    restoreStack: createStack
   })
   await useCase.execute({
     positions,
     previousPositions,
-    stacks: findCanvasArrangementStacks(arrangement, items)
+    relation: relation ?? {
+      type: 'remove-stacks',
+      stacks: findCanvasArrangementStacks(arrangement, items)
+    }
   })
 }

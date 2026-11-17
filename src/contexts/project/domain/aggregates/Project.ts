@@ -4,7 +4,7 @@ import {
   sameProjectIssue,
   type ProjectIssueReference
 } from '../value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 
 type ProjectWorkspaceKind = 'default' | 'linked-worktree'
 

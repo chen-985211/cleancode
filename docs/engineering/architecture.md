@@ -469,6 +469,8 @@ src/
 
 `src/shared-kernel` 只放多个上下文共同使用且稳定的领域概念和应用层契约。共享内核不得成为跨上下文复用杂物的目录。
 
+共享错误的基础契约、错误码和校验位于 Shared Kernel Domain；序列化与客户端恢复位于 Shared Kernel Application。领域层不得依赖共享应用层；共享内核任何层均不得反向依赖消费它的上下文或 Platform。
+
 当前画布执行语义契约属于 Shared Kernel 的稳定领域策略：它只计算终端依赖的完整弱连通流程、顶层执行单元、组合资格和规范说明，不读取仓储或修改 BlockGraph。产品定义以[画布语义契约](../product/canvas-semantic-contract.md)为唯一维护入口。
 
 `src/platform` 只放应用启动、依赖装配、Electron 入口、IPC、配置和系统级连接代码。平台层不得包含业务规则。

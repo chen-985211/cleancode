@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 
 export interface ProjectRegistrySnapshot {
   readonly currentProjectDirectory: string | null
@@ -78,6 +78,16 @@ export class ProjectRegistry {
       normalizedDirectory,
       this.projectPickerDirectory
     )
+  }
+
+  recoverCurrentProject(loadableDirectories: readonly string[]): ProjectRegistry {
+    const loadable = new Set(loadableDirectories)
+    const current = this.currentProjectDirectory
+    const directory =
+      current !== null && loadable.has(current)
+        ? current
+        : (this.projectDirectories.find((candidate) => loadable.has(candidate)) ?? null)
+    return directory === current ? this : this.selectCurrentProject(directory)
   }
 
   moveProjectBefore(directory: string, beforeDirectory: string | null): ProjectRegistry {

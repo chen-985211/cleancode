@@ -7,7 +7,7 @@ import {
 import {
   createExpectedAppError,
   createUnexpectedAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+} from '../../../../shared-kernel/domain/errors/AppError'
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,

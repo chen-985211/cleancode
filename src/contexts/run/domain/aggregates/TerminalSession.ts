@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import { resolveTerminalOwnerRef, type TerminalRunScope } from '../value-objects/TerminalRunScope'
 
 export type TerminalSessionStatus = 'idle' | 'running' | 'stopping' | 'exited' | 'failed'

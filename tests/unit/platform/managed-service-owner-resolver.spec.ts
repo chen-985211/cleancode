@@ -1,6 +1,4 @@
-import type { BlockGraphRepository } from '../../../src/contexts/block-graph/application/ports/BlockGraphRepository'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { ProjectRepository } from '../../../src/contexts/project/application/ports/ProjectRepository'
 import type { ProjectSnapshot } from '../../../src/contexts/project/application/dto/ProjectSnapshot'
 import {
   createManagedServiceOwnerResolver,
@@ -19,8 +17,8 @@ const owner: ManagedServiceOwnerReference = {
 
 describe('Managed service owner resolver', () => {
   it('resolves user-facing labels from read-only Project and BlockGraph snapshots', async () => {
-    const projects = createProjectRepository(createProjectSnapshot())
-    const graphs = createBlockGraphRepository(createGraphSnapshot())
+    const projects = createProjectQuery(createProjectSnapshot())
+    const graphs = createGraphQuery(createGraphSnapshot())
 
     await expect(createManagedServiceOwnerResolver(projects, graphs)(owner)).resolves.toEqual({
       identity: {
@@ -37,15 +35,11 @@ describe('Managed service owner resolver', () => {
       terminalName: 'Development server'
     })
 
-    expect(projects.findByDirectory).toHaveBeenCalledWith(owner.projectDirectory)
-    expect(graphs.findDefaultGraphSnapshot).toHaveBeenCalledWith(
-      owner.projectDirectory,
-      owner.workspaceId
-    )
-    expect(projects.save).not.toHaveBeenCalled()
-    expect(graphs.initializeDefaultGraph).not.toHaveBeenCalled()
-    expect(graphs.findDefaultGraph).not.toHaveBeenCalled()
-    expect(graphs.transactDefaultGraph).not.toHaveBeenCalled()
+    expect(projects.execute).toHaveBeenCalledWith({ directory: owner.projectDirectory })
+    expect(graphs.execute).toHaveBeenCalledWith({
+      projectDirectory: owner.projectDirectory,
+      workspaceId: owner.workspaceId
+    })
   })
 
   it.each([
@@ -57,8 +51,8 @@ describe('Managed service owner resolver', () => {
     ]
   ])('falls back to the block id when %s', async (_scenario, graph) => {
     const resolver = createManagedServiceOwnerResolver(
-      createProjectRepository(createProjectSnapshot()),
-      createBlockGraphRepository(graph)
+      createProjectQuery(createProjectSnapshot()),
+      createGraphQuery(graph)
     )
 
     await expect(resolver(owner)).resolves.toMatchObject({
@@ -70,11 +64,11 @@ describe('Managed service owner resolver', () => {
     ['the project is missing', null],
     ['the project id does not match', createProjectSnapshot({ id: 'other-project' })]
   ])('returns null without reading the graph when %s', async (_scenario, project) => {
-    const graphs = createBlockGraphRepository(createGraphSnapshot())
-    const resolver = createManagedServiceOwnerResolver(createProjectRepository(project), graphs)
+    const graphs = createGraphQuery(createGraphSnapshot())
+    const resolver = createManagedServiceOwnerResolver(createProjectQuery(project), graphs)
 
     await expect(resolver(owner)).resolves.toBeNull()
-    expect(graphs.findDefaultGraphSnapshot).not.toHaveBeenCalled()
+    expect(graphs.execute).not.toHaveBeenCalled()
   })
 })
 
@@ -111,18 +105,10 @@ function createGraphSnapshot(overrides: Partial<BlockGraphSnapshot> = {}): Block
   }
 }
 
-function createProjectRepository(project: ProjectSnapshot | null): ProjectRepository {
-  return {
-    findByDirectory: vi.fn(async () => project),
-    save: vi.fn(async () => undefined)
-  }
+function createProjectQuery(project: ProjectSnapshot | null) {
+  return { execute: vi.fn(async () => project) }
 }
 
-function createBlockGraphRepository(graph: BlockGraphSnapshot | null): BlockGraphRepository {
-  return {
-    findDefaultGraphSnapshot: vi.fn(async () => graph),
-    initializeDefaultGraph: vi.fn(),
-    findDefaultGraph: vi.fn(),
-    transactDefaultGraph: vi.fn()
-  }
+function createGraphQuery(graph: BlockGraphSnapshot | null) {
+  return { execute: vi.fn(async () => graph) }
 }

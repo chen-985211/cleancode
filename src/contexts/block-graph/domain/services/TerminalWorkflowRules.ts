@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import {
   defaultTerminalExecutionConfig,
   type ConnectTerminalBlocksInput,

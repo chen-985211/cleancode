@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export interface AgentConversationScopeSnapshot {

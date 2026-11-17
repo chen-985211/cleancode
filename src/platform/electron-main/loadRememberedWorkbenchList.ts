@@ -1,64 +1,35 @@
-import type { ProjectRegistrySnapshot } from '../../contexts/project/application/dto/ProjectRegistrySnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
+import type { ProjectRepository } from '../../contexts/project/application/ports/ProjectRepository'
+import type { ProjectRegistryRepository } from '../../contexts/project/application/ports/ProjectRegistryRepository'
+import type { CreateOrOpenProjectUseCase } from '../../contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
+import type { ProjectRegistryTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
+import { RestoreRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/RestoreRememberedProjectsUseCase'
 
 interface WorkbenchWithProject {
   readonly project: ProjectSnapshot
 }
 
-interface LoadRememberedWorkbenchListInput<TWorkbench extends WorkbenchWithProject> {
-  readonly findProject: (directory: string) => Promise<ProjectSnapshot | null>
-  readonly listRememberedProjects: () => Promise<ProjectRegistrySnapshot>
+export async function loadRememberedWorkbenchList<TWorkbench extends WorkbenchWithProject>(input: {
+  readonly projects: ProjectRepository
+  readonly registry: ProjectRegistryRepository
+  readonly openProject: Pick<CreateOrOpenProjectUseCase, 'execute'>
+  readonly registryTransactions: ProjectRegistryTransactionCoordinator
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<TWorkbench>
-  readonly openProject: (command: {
-    readonly directory: string
-    readonly name: string
-  }) => Promise<ProjectSnapshot>
-  readonly selectCurrentProject: (directory: string | null) => Promise<unknown>
-}
-
-export async function loadRememberedWorkbenchList<TWorkbench extends WorkbenchWithProject>(
-  input: LoadRememberedWorkbenchListInput<TWorkbench>
-): Promise<Array<TWorkbench & { readonly isCurrentProject: boolean }>> {
-  const registry = await input.listRememberedProjects()
-  const workbenches: TWorkbench[] = []
-
-  for (const directory of registry.projectDirectories) {
-    try {
-      const rememberedProject = await input.findProject(directory)
-
-      if (rememberedProject) {
-        const project = await input.openProject({
-          directory: rememberedProject.directory,
-          name: rememberedProject.name
-        })
-
-        workbenches.push(await input.loadWorkbench(project))
+}): Promise<Array<TWorkbench & { readonly isCurrentProject: boolean }>> {
+  const workbenches = new Map<string, TWorkbench>()
+  const restored = await new RestoreRememberedProjectsUseCase(
+    input.projects,
+    input.registry,
+    input.openProject,
+    {
+      async load(project) {
+        workbenches.set(project.directory, await input.loadWorkbench(project))
       }
-    } catch {
-      // A remembered project may have been moved or corrupted outside cleancode.
-    }
-  }
-
-  const currentProjectDirectory = resolveCurrentProjectDirectory(
-    workbenches,
-    registry.currentProjectDirectory
-  )
-
-  if (currentProjectDirectory !== registry.currentProjectDirectory) {
-    await input.selectCurrentProject(currentProjectDirectory)
-  }
-
-  return workbenches.map((workbench) => ({
-    ...workbench,
-    isCurrentProject: workbench.project.directory === currentProjectDirectory
+    },
+    input.registryTransactions
+  ).execute()
+  return restored.projectDirectories.map((directory) => ({
+    ...workbenches.get(directory)!,
+    isCurrentProject: directory === restored.currentProjectDirectory
   }))
-}
-
-function resolveCurrentProjectDirectory(
-  workbenches: readonly WorkbenchWithProject[],
-  persistedDirectory: string | null
-): string | null {
-  return workbenches.some((workbench) => workbench.project.directory === persistedDirectory)
-    ? persistedDirectory
-    : (workbenches[0]?.project.directory ?? null)
 }

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import type { ActualServiceEndpoint } from '../value-objects/ActualServiceEndpoint'
 import type { TerminalRunScope } from '../value-objects/TerminalRunScope'
 

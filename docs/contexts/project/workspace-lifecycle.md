@@ -147,6 +147,8 @@ Issue 仓库配置与工作区引用是 Project 快照的可选字段；缺少�
 
 初始化用例由 [`PrepareWorkspaceInitializationUseCase`](../../../src/contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase.ts) 和 [`InitializeWorkspaceContentUseCase`](../../../src/contexts/project/application/use-cases/InitializeWorkspaceContentUseCase.ts) 实现，跨上下文适配在 [`workspaceInitializationRuntime`](../../../src/platform/electron-main/workspaceInitializationRuntime.ts) 中装配。
 
+项目启动恢复由 `RestoreRememberedProjectsUseCase` 编排，`ProjectRegistry.recoverCurrentProject` 决定保留当前可加载项目、回退首个可加载登记项或清空选择。Project 拥有 `RememberedProjectLoadPort`，Platform 适配器只加载其他上下文内容并组装工作台投影。外部加载不持有登记簿事务；最终使用与显式选择共用的协调器重新读取登记簿，保留期间发生的新选择，并过滤已经移除的项目。只读项目查询通过 `FindProjectByDirectoryUseCase` 返回 DTO，不创建项目或修改登记簿。
+
 ## 实现入口
 
 | 层级           | 入口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |

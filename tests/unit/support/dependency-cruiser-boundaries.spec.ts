@@ -16,7 +16,50 @@ const dependencyCruiserConfig = require('../../../.dependency-cruiser.cjs') as {
   readonly forbidden: readonly DependencyRule[]
 }
 
-describe('dependency-cruiser presentation boundaries', () => {
+describe('dependency-cruiser architecture boundaries', () => {
+  it.each([
+    [
+      'src/contexts/project/domain/aggregates/Project.ts',
+      'src/shared-kernel/application/errors/AppError.ts'
+    ],
+    [
+      'src/shared-kernel/domain/value-objects/CanvasObjectIdentity.ts',
+      'src/shared-kernel/application/errors/AppError.ts'
+    ],
+    [
+      'src/shared-kernel/domain/errors/AppError.ts',
+      'src/contexts/project/domain/aggregates/Project.ts'
+    ],
+    ['src/shared-kernel/application/errors/AppError.ts', 'src/platform/ipc/registerIpcHandler.ts']
+  ])('rejects the outward dependency %s → %s', (from, to) => {
+    expect(
+      dependencyCruiserConfig.forbidden.some(
+        (rule) => rule.from.path && rule.to.path && matchesDependency(rule, { from, to })
+      )
+    ).toBe(true)
+  })
+
+  it.each([
+    [
+      'src/contexts/project/domain/aggregates/Project.ts',
+      'src/shared-kernel/domain/errors/AppError.ts'
+    ],
+    [
+      'src/shared-kernel/application/errors/AppError.ts',
+      'src/shared-kernel/domain/errors/AppError.ts'
+    ],
+    [
+      'src/contexts/project/application/use-cases/SelectCurrentProjectUseCase.ts',
+      'src/shared-kernel/application/errors/AppError.ts'
+    ]
+  ])('allows the inward dependency %s → %s', (from, to) => {
+    expect(
+      dependencyCruiserConfig.forbidden.some(
+        (rule) => rule.from.path && rule.to.path && matchesDependency(rule, { from, to })
+      )
+    ).toBe(false)
+  })
+
   it('blocks every Context Presentation from every Context Infrastructure', () => {
     const rule = getRule('context-presentation-must-not-depend-on-infrastructure')
 

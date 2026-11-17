@@ -11,6 +11,8 @@ export interface CanvasObjectPosition {
 export interface CanvasLayoutCommitPort {
   /** Settle every submitted write before returning or rejecting. */
   moveObjects(positions: readonly CanvasObjectPosition[]): Promise<void>
+  createStack(stack: CanvasStackSnapshot): Promise<void>
+  moveStack(stack: CanvasStackSnapshot): Promise<void>
   removeStack(stack: CanvasStackSnapshot): Promise<void>
   restoreStack(stack: CanvasStackSnapshot): Promise<void>
 }

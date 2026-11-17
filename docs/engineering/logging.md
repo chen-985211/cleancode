@@ -97,6 +97,8 @@
 
 应用错误必须使用 `AppError` 和已登记的 `AppErrorCode`。
 
+共享错误类、错误码、预期/非预期错误构造和错误码校验由 `shared-kernel/domain/errors/AppError` 拥有。领域层只依赖这一内层契约；`WorkspaceInitialization` 恢复时直接校验已登记错误码，不构造传输对象。`shared-kernel/application/errors/AppError` 负责序列化、客户端恢复和传输错误识别，并兼容导出同一个错误类与构造函数，避免改变错误身份、字段和 IPC 返回格式。
+
 错误码必须稳定、英文大写、以下划线分隔，例如：
 
 - `GIT_BRANCH_ALREADY_EXISTS`

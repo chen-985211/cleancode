@@ -41,10 +41,17 @@ module.exports = {
       name: 'domain-must-not-depend-on-outer-layers',
       severity: 'error',
       comment: 'Domain is the innermost DDD/Clean layer and must not depend on outer layers.',
-      from: { path: '^src/contexts/[^/]+/domain' },
+      from: { path: '^src/(contexts/[^/]+|shared-kernel)/domain(?:/|$)' },
       to: {
-        path: '^src/(contexts/[^/]+/(application|infrastructure|presentation)|platform|presentation)'
+        path: '^src/((contexts/[^/]+|shared-kernel)/(application|infrastructure|presentation)|platform|presentation)'
       }
+    },
+    {
+      name: 'shared-kernel-must-not-depend-on-consumers',
+      severity: 'error',
+      comment: 'Shared Kernel contracts remain independent of contexts and platform consumers.',
+      from: { path: '^src/shared-kernel/' },
+      to: { path: '^src/(contexts|platform|presentation)/' }
     },
     {
       name: 'application-must-not-depend-on-outer-layers',

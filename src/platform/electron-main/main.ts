@@ -1,3 +1,5 @@
+import { FindProjectByDirectoryUseCase } from '../../contexts/project/application/use-cases/FindProjectByDirectoryUseCase'
+import { FindDefaultGraphSnapshotUseCase } from '../../contexts/block-graph/application/use-cases/FindDefaultGraphSnapshotUseCase'
 import { createAgentSessionRuntime } from './createAgentSessionRuntime'
 import { registerProjectIssuesRuntime } from './projectIssuesRuntime'
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
@@ -163,9 +165,11 @@ const canvasArrangementRuntime = createCanvasArrangementRuntime(appStateDirector
 const blockTemplateRepository = new FileSystemBlockTemplateRepository(
   join(appStateDirectoryPath, 'block-template-library.json')
 )
+const findProjectByDirectoryUseCase = new FindProjectByDirectoryUseCase(projectRepository)
+const findDefaultGraphSnapshotUseCase = new FindDefaultGraphSnapshotUseCase(graphRepository)
 const resolveManagedServiceOwner = createManagedServiceOwnerResolver(
-  projectRepository,
-  graphRepository
+  findProjectByDirectoryUseCase,
+  findDefaultGraphSnapshotUseCase
 )
 const gitWorkspaceAdapter = new GitCliWorkspaceAdapter()
 const branchWorkspaceDirectoryResolver = new FileSystemBranchWorkspaceDirectoryResolver()
@@ -335,7 +339,8 @@ const {
   createOrOpenProjectUseCase,
   projectIpcHandlers,
   rememberProjectUseCase,
-  selectCurrentProjectUseCase
+  selectCurrentProjectUseCase,
+  registryTransactions
 } = createProjectLifecycleUseCases({
   agentLifecycle: workspaceAgentLifecycleAdapter,
   runLifecycle: workspaceRuns,
@@ -579,7 +584,9 @@ async function getDefaultGraphForAgent(command: {
   readonly projectDirectory: string
   readonly workspaceId: string
 }): Promise<BlockGraphSnapshot> {
-  const project = await projectRepository.findByDirectory(command.projectDirectory)
+  const project = await findProjectByDirectoryUseCase.execute({
+    directory: command.projectDirectory
+  })
 
   return getDefaultGraphUseCase.execute({
     projectDirectory: command.projectDirectory,
@@ -601,12 +608,11 @@ async function selectCurrentProject(directory: string | null): Promise<void> {
 
 async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
   return loadRememberedWorkbenchList({
-    findProject: (directory) => projectRepository.findByDirectory(directory),
-    listRememberedProjects: () =>
-      new ListRememberedProjectsUseCase(getProjectRegistryRepository()).execute(),
+    projects: projectRepository,
+    registry: getProjectRegistryRepository(),
+    registryTransactions,
     loadWorkbench,
-    openProject: (command) => createOrOpenProjectUseCase.execute(command),
-    selectCurrentProject
+    openProject: createOrOpenProjectUseCase
   })
 }
 

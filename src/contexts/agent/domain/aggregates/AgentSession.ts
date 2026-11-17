@@ -3,7 +3,7 @@ import {
   ProviderSessionRef,
   type ProviderSessionRefSnapshot
 } from '../value-objects/ProviderSessionRef'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 
 export interface AgentLayoutSnapshot {
   readonly position: { readonly x: number; readonly y: number }

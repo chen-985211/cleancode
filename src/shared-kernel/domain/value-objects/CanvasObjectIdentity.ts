@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../application/errors/AppError'
+import { createExpectedAppError } from '../errors/AppError'
 
 type CanvasObjectKind = 'terminal' | 'terminal-group' | 'agent'
 
