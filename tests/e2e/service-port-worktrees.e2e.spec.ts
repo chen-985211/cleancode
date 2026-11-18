@@ -21,7 +21,7 @@ import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
-  readTerminalSessionId
+  waitForTerminalShellReady
 } from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
@@ -159,7 +159,7 @@ describe('service port management across worktrees e2e', () => {
       )
       await branchTerminal.waitFor({ state: 'detached' })
 
-      await launchConfiguredTerminal(page, mainTerminal)
+      await launchConfiguredTerminal(mainTerminal)
       await page.getByText('启动命令失败', { exact: true }).waitFor()
       await page.getByRole('button', { name: '关闭“启动命令失败”通知' }).click()
 
@@ -196,7 +196,7 @@ describe('service port management across worktrees e2e', () => {
       )
       await branchTerminal.waitFor({ state: 'detached' })
 
-      await launchConfiguredTerminal(page, mainTerminal)
+      await launchConfiguredTerminal(mainTerminal)
       await expectActualServiceAddress(mainTerminal, `http://127.0.0.1:${fixedPort}`)
       expect(await page.getByText('启动命令失败', { exact: true }).count()).toBe(0)
     },
@@ -279,11 +279,18 @@ async function createHttpServiceTerminal(
   await page.reload()
   const terminal = page.locator(`[data-terminal-block-id="${blockId}"]`)
   await terminal.waitFor()
-  if (shouldStart) await launchConfiguredTerminal(page, terminal)
+  const shellSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
+  await waitForLocatorAttribute(
+    terminal.getByLabel('Terminal 1 文本输出', { exact: true }),
+    'data-terminal-session-id',
+    shellSessionId,
+    'the prepared service terminal to own the ready shell'
+  )
+  if (shouldStart) await launchConfiguredTerminal(terminal)
   return terminal
 }
 
-async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {
+async function launchConfiguredTerminal(terminal: Locator): Promise<void> {
   const launchAction = terminal.getByRole('button', { name: 'Terminal 1 启动命令' })
   await waitForLocatorAttribute(
     launchAction,
@@ -291,18 +298,21 @@ async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<
     'configured',
     'service terminal launch command to become configured'
   )
-  const previousSessionId = await readTerminalSessionId(page, 'Terminal 1')
-  await launchAction.click()
-  await page.waitForFunction(
-    ({ previousSessionId }) => {
-      const currentSessionId = document
-        .querySelector('[aria-label="Terminal 1 文本输出"]')
-        ?.getAttribute('data-terminal-session-id')
-
-      return Boolean(currentSessionId && currentSessionId !== previousSessionId)
-    },
-    { previousSessionId }
-  )
+  const output = terminal.getByLabel('Terminal 1 文本输出', { exact: true })
+  const readSessionId = () => output.getAttribute('data-terminal-session-id')
+  const previousSessionId = await pollUntilState({
+    description: 'service terminal to have an existing session',
+    observe: readSessionId,
+    accept: Boolean,
+    timeoutMs: 10_000
+  })
+  await launchAction.press('Space')
+  await pollUntilState({
+    description: `service terminal to replace session ${previousSessionId}`,
+    observe: readSessionId,
+    accept: (sessionId) => Boolean(sessionId && sessionId !== previousSessionId),
+    timeoutMs: 30_000
+  })
 }
 
 async function waitForActualServiceAddress(terminal: Locator): Promise<string> {

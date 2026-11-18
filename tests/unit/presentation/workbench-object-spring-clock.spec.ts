@@ -70,4 +70,81 @@ describe('workbench shell frame clock', () => {
       }
     }
   )
+
+  it.each([0, 40, 120])(
+    'keeps a settling shell and an already moving neighbor in sync after a %s ms frame gap',
+    (frameGap) => {
+      let now = 0
+      let nextFrame = 0
+      const callbacks = new Map<number, FrameRequestCallback>()
+      const scheduler = {
+        now: () => now,
+        requestFrame: (callback: FrameRequestCallback) => {
+          callbacks.set(++nextFrame, callback)
+          return nextFrame
+        },
+        cancelFrame: (id: number) => {
+          callbacks.delete(id)
+        }
+      }
+      const renderFrame = () => {
+        now += 1000 / 60
+        const pending = [...callbacks.values()]
+        callbacks.clear()
+        pending.forEach((callback) => callback(now))
+      }
+      const first = document.createElement('div')
+      const second = document.createElement('div')
+      const firstController = createWorkbenchObjectSpringController({ scheduler })
+      const secondController = createWorkbenchObjectSpringController({ scheduler })
+      const expanded = { x: 0, y: 0, width: 420, height: 280 }
+      const collapsed = { ...expanded, width: 220, height: 44 }
+      const neighborCollapsed = { ...collapsed, x: 484 }
+      const neighborExpanded = { ...expanded, x: 484 }
+      const reflow = (id: string, from: typeof expanded, to: typeof expanded) => ({
+        id,
+        kind: 'group-reflow' as const,
+        offset: { x: 0, y: 0 },
+        shellRect: { from, to }
+      })
+      const read = (surface: HTMLElement, property: string) =>
+        parseFloat(surface.style.getPropertyValue(`--workbench-object-motion-shell-${property}`))
+      const complete = () => undefined
+
+      try {
+        secondController.motionChanged(
+          second,
+          reflow('expand-neighbor', neighborCollapsed, neighborExpanded),
+          false,
+          complete
+        )
+        renderFrame()
+        const neighborWidth = read(second, 'width')
+        now += frameGap
+
+        firstController.motionChanged(
+          first,
+          reflow('collapse', expanded, collapsed),
+          false,
+          complete
+        )
+        secondController.motionChanged(
+          second,
+          reflow('make-space', neighborExpanded, { ...neighborExpanded, x: 284 }),
+          false,
+          complete
+        )
+
+        expect(read(second, 'width')).toBe(neighborWidth)
+        for (let frame = 0; frame < 36; frame++) {
+          renderFrame()
+          const gap = 284 + read(second, 'x') - read(first, 'width')
+          expect(gap, `gap on frame ${frame}`).toBeCloseTo(64, 3)
+        }
+      } finally {
+        firstController.dispose()
+        secondController.dispose()
+      }
+    }
+  )
 })
