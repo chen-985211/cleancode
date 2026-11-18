@@ -1,5 +1,26 @@
+const { readdirSync } = require('node:fs')
+const { join } = require('node:path')
+
+const contextDomainRules = readdirSync(join(__dirname, 'src', 'contexts'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map(({ name }) => {
+    const context = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return {
+      name: `no-foreign-domain-from-${name}`,
+      severity: 'error',
+      comment:
+        'Consume foreign contexts through public application contracts, never internal Domain models.',
+      from: { path: `^src/contexts/${context}/` },
+      to: {
+        path: '^src/contexts/[^/]+/domain(?:/|$)',
+        pathNot: `^src/contexts/${context}/`
+      }
+    }
+  })
+
 module.exports = {
   forbidden: [
+    ...contextDomainRules,
     {
       name: 'no-circular',
       severity: 'error',
@@ -41,16 +62,23 @@ module.exports = {
       name: 'domain-must-not-depend-on-outer-layers',
       severity: 'error',
       comment: 'Domain is the innermost DDD/Clean layer and must not depend on outer layers.',
-      from: { path: '^src/contexts/[^/]+/domain' },
+      from: { path: '^src/(contexts/[^/]+|shared-kernel)/domain(?:/|$)' },
       to: {
-        path: '^src/(contexts/[^/]+/(application|infrastructure|presentation)|platform|presentation)'
+        path: '^src/((contexts/[^/]+|shared-kernel)/(application|infrastructure|presentation)|platform|presentation)'
       }
+    },
+    {
+      name: 'shared-kernel-must-not-depend-on-consumers',
+      severity: 'error',
+      comment: 'Shared Kernel contracts remain independent of contexts and platform consumers.',
+      from: { path: '^src/shared-kernel/' },
+      to: { path: '^src/(contexts|platform|presentation)/' }
     },
     {
       name: 'application-must-not-depend-on-outer-layers',
       severity: 'error',
       comment:
-        'Application use cases may depend on domain ports, but not on adapters or UI/runtime layers.',
+        'Application use cases may depend on Domain and application ports, but not on adapters or UI/runtime layers.',
       from: { path: '^src/contexts/[^/]+/application' },
       to: {
         path: '^src/(contexts/[^/]+/(infrastructure|presentation)|platform|presentation)'

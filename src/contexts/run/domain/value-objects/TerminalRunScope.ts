@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
+
 import {
   createCanvasObjectIdentity,
   createCanvasObjectIdentityKey,
@@ -48,7 +49,7 @@ export function resolveTerminalOwnerRef(owner: TerminalRunOwner): TerminalOwnerR
   const ownerRef = owner.owner ?? { id: owner.blockId, kind: 'block' as const }
   const id = ownerRef.id.trim()
   if (!id) {
-    throw createExpectedAppError('TERMINAL_OWNER_INVALID', 'Terminal owner id cannot be empty.')
+    throw createRunDomainError('TERMINAL_OWNER_INVALID', 'Terminal owner id cannot be empty.')
   }
   return { id, kind: ownerRef.kind }
 }

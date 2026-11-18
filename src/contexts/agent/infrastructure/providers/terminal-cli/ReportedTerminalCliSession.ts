@@ -1,6 +1,6 @@
+import { createAgentError } from '../../../application/errors/AgentErrors'
 import { isAbsolute, win32 } from 'node:path'
 
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import type {
   AgentProviderSessionRefCodec,
   AgentResumeStrategy
@@ -21,7 +21,7 @@ export function createReportedTerminalCliSession(providerId: 'pi' | 'hermes'): {
             !/[\r\n\0]/.test(ref.value)
           : /^\d{8}_\d{6}_[a-f0-9]{6,8}$/.test(ref.value)
       if (ref.formatVersion !== 1 || ref.kind !== `${providerId}-session` || !validValue) {
-        throw createExpectedAppError(
+        throw createAgentError(
           'AGENT_SESSION_INVALID',
           `Unsupported ${providerId} session reference.`,
           { providerId }

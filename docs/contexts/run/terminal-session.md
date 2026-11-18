@@ -49,6 +49,8 @@ idle -> running -> stopping -> exited
 
 终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块。Windows Agent 前台启动和普通终端内被稳定 shim 捕获的 Codex 单次启动可以为了 Win32 默认色探测短暂选择 ConsoleColor 索引，但这项技术状态不得成为 xterm palette、普通 shell 生命周期或 Provider 用户主题；设置与恢复产生的 transport 字节必须在进入权威模型前被消费。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
 
+Run 会话、前台任务、工作流状态和端口意图的不变量失败归 `RunDomainError`；Provider 协议、恢复存储、PTY 和运行编排失败由 `RunErrors` 的应用声明拥有。Provider RPC 只接受 Run 声明与公共错误码；历史兼容的终端引用缺失码继续保持原文本，但不引入 BlockGraph 领域错误依赖。
+
 ## 会话身份与隔离
 
 每次启动都会创建新的 `sessionId`、`runId` 和单调递增的 `generation`。完整 `TerminalRunScope` 还包含项目 ID、稳定工作区 ID、项目/工作区目录、Git 分支启动元数据、兼容 block ID 和类型化 `owner`。`TerminalSessionService` 使用 Shared Kernel 规范身份 `projectId + workspaceId + objectKind + objectId` 识别当前槽位：

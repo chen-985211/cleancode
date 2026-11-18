@@ -1,13 +1,11 @@
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
 import {
   groupBlocksByDependencyLayer,
   resolveWeaklyConnectedTerminalUnits,
   createTerminalExecutionUnitLayout,
   createTerminalFlowRowLayouts
 } from './TerminalDependencyLayout'
-import {
-  createExpectedAppError,
-  createUnexpectedAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createUnexpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
@@ -196,7 +194,7 @@ function resolveScopedBlocks(
   const blockIds = Array.from(new Set(requestedBlockIds))
 
   if (blockIds.length === 0) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_LAYOUT_SCOPE_EMPTY',
       'Terminal layout scope cannot be empty.'
     )
@@ -208,7 +206,7 @@ function resolveScopedBlocks(
     const block = blocksById.get(blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
 
     return block
@@ -226,7 +224,7 @@ function resolveScopedGroups(
     ).length
 
     if (selectedMemberCount > 0 && selectedMemberCount < group.memberBlockIds.length) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_LAYOUT_PARTIAL_GROUP',
         'Terminal layout scope must contain every member of an included group.'
       )
@@ -379,7 +377,7 @@ function requireUnitRank(unitRankByBlockId: ReadonlyMap<string, number>, blockId
   const rank = unitRankByBlockId.get(blockId)
 
   if (rank === undefined) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
 
   return rank
@@ -397,7 +395,7 @@ function createLayoutUnitRegion(
     const block = graph.blocks.find((candidate) => candidate.id === blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
 
     return { ...block, position: positionsByBlockId.get(blockId) ?? block.position }
@@ -446,7 +444,7 @@ function requireLayout(
   const layout = layoutsByBlockId.get(blockId)
 
   if (!layout) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
 
   return layout

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createCanvasArrangementError } from '../../application/errors/CanvasArrangementErrors'
+
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot,
@@ -29,7 +30,7 @@ export function parseCanvasArrangementStore(
     parsed.version !== 3 &&
     parsed.version !== 4
   ) {
-    throw createExpectedAppError(
+    throw createCanvasArrangementError(
       'CANVAS_ARRANGEMENT_VERSION_UNSUPPORTED',
       'Unsupported canvas arrangement store version.',
       { path }
@@ -173,7 +174,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function corrupted(path: string): never {
-  throw createExpectedAppError(
+  throw createCanvasArrangementError(
     'CANVAS_ARRANGEMENT_CORRUPTED',
     'Persisted canvas arrangement is corrupted.',
     { path }

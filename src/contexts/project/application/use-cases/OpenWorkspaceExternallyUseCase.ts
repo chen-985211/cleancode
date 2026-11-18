@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createProjectError } from '../errors/ProjectErrors'
+
 import type { WorkspaceExternalOpenTarget } from '../dto/WorkspaceExternalOpen'
 import type { ProjectRepository } from '../ports/ProjectRepository'
 import type { WorkspaceExternalOpenPort } from '../ports/WorkspaceExternalOpenPort'
@@ -19,7 +20,7 @@ export class OpenWorkspaceExternallyUseCase {
     const project = await this.projects.findByDirectory(command.projectDirectory)
 
     if (!project) {
-      throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
+      throw createProjectError('PROJECT_NOT_FOUND', 'Project was not found.')
     }
 
     const workspace = project.workspaces.find(
@@ -27,7 +28,7 @@ export class OpenWorkspaceExternallyUseCase {
     )
 
     if (!workspace) {
-      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+      throw createProjectError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
     }
 
     await this.externalOpen.open({

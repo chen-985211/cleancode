@@ -1,3 +1,4 @@
+import { createRunError } from '../errors/RunErrors'
 import { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import type { ForegroundJobSnapshot } from '../../domain/aggregates/ForegroundJob'
 import {
@@ -6,7 +7,7 @@ import {
   isBlockTerminalOwner,
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type {
   TerminalModelDiagnosticsSnapshot,
@@ -247,7 +248,7 @@ export class TerminalSessionService {
   recordManagedServiceEndpoint(sessionId: string, endpoint: ActualServiceEndpoint): Promise<void> {
     const session = this.requireSession(sessionId)
     if (!isBlockTerminalOwner(session.scope)) {
-      throw createExpectedAppError(
+      throw createRunError(
         'RUN_START_BLOCKED',
         'Agent-owned terminals cannot own managed service endpoints.'
       )
@@ -286,7 +287,7 @@ export class TerminalSessionService {
         gitBranch: owner.gitBranch
       })
     } catch {
-      throw createExpectedAppError(
+      throw createRunError(
         'RUN_SCOPE_STALE',
         'Project no longer owns the requested terminal runtime scope.'
       )
@@ -486,7 +487,7 @@ export class TerminalSessionService {
         gitBranch: session.scope.gitBranch
       })
     } catch {
-      throw createExpectedAppError(
+      throw createRunError(
         'RUN_SCOPE_STALE',
         'Project no longer owns the requested terminal runtime scope.'
       )
@@ -602,7 +603,7 @@ export class TerminalSessionService {
     const session = this.sessions.get(sessionId)
 
     if (!session) {
-      throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
+      throw createRunError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
     }
 
     return session

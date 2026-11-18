@@ -1,5 +1,5 @@
-import type { BlockGraphRepository } from '../../contexts/block-graph/application/ports/BlockGraphRepository'
-import type { ProjectRepository } from '../../contexts/project/application/ports/ProjectRepository'
+import type { FindDefaultGraphSnapshotUseCase } from '../../contexts/block-graph/application/use-cases/FindDefaultGraphSnapshotUseCase'
+import type { FindProjectByDirectoryUseCase } from '../../contexts/project/application/use-cases/FindProjectByDirectoryUseCase'
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity
@@ -14,17 +14,20 @@ export type ManagedServiceOwnerResolver = (
 ) => Promise<ManagedTerminalServiceOwner | null>
 
 export function createManagedServiceOwnerResolver(
-  projects: ProjectRepository,
-  graphs: BlockGraphRepository
+  projects: Pick<FindProjectByDirectoryUseCase, 'execute'>,
+  graphs: Pick<FindDefaultGraphSnapshotUseCase, 'execute'>
 ): ManagedServiceOwnerResolver {
   return async (owner) => {
-    const project = await projects.findByDirectory(owner.projectDirectory)
+    const project = await projects.execute({ directory: owner.projectDirectory })
 
     if (!project || project.id !== owner.projectId) {
       return null
     }
 
-    const graph = await graphs.findDefaultGraphSnapshot(owner.projectDirectory, owner.workspaceId)
+    const graph = await graphs.execute({
+      projectDirectory: owner.projectDirectory,
+      workspaceId: owner.workspaceId
+    })
     const workspace = project.workspaces.find(
       (candidate) => candidate.workspaceId === owner.workspaceId
     )

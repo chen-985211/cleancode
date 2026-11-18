@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import { WorkflowRun } from '../../domain/aggregates/WorkflowRun'
 import type {
   WorkflowRunFailureSnapshot,
@@ -62,7 +63,7 @@ export class TerminalWorkflowService {
     })
 
     if (plan.nodes.length === 0) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_WORKFLOW_EMPTY',
         'Terminal workflow has no configured commands.'
       )
@@ -97,7 +98,7 @@ export class TerminalWorkflowService {
       )
       if (conflictingRun) {
         const conflictingBlockIds = findSharedBlockIds(activeRun, conflictingRun)
-        throw createExpectedAppError(
+        throw createRunError(
           'TERMINAL_WORKFLOW_SCOPE_CONFLICT',
           'Terminal workflow overlaps an active run.',
           {
@@ -267,7 +268,7 @@ export class TerminalWorkflowService {
       node.executionConfig.mode !== 'service' ||
       !node.executionConfig.port
     ) {
-      throw createExpectedAppError(
+      throw createRunError(
         'SERVICE_PORT_MANAGEMENT_UNSUPPORTED',
         'Managed local service launching is unavailable.'
       )

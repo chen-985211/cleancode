@@ -453,6 +453,13 @@ export function createWorkbenchObjectSpringController({
         if (motion) retargetMotion(nextMotion)
         else initializeMotion(nextMotion)
         motion = nextMotion
+
+        // A shell joining the reflow and one already moving must start applying
+        // the new layout at the same frame time. Otherwise the moving shell can
+        // spend time from the previous frame advancing toward the new target.
+        if (nextMotion.kind === 'group-reflow' && nextMotion.shellRect) {
+          lastFrameTimestamp = scheduler.now()
+        }
       }
 
       if (reducedMotion) {
@@ -473,8 +480,8 @@ export function createWorkbenchObjectSpringController({
       }
 
       present()
-      // Seed only a new animation. Successive frames share RAF's timestamp;
-      // resetting to now() would subtract callback work differently per shell.
+      // Start a new animation on RAF's shared clock. Keep the timestamp across
+      // renders of the same motion so they cannot pause or desynchronize it.
       if (animationFrameId === null) lastFrameTimestamp = scheduler.now()
       scheduleFrame()
     }

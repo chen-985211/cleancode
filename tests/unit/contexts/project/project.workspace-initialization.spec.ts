@@ -2,6 +2,29 @@ import { WorkspaceInitialization } from '../../../../src/contexts/project/domain
 import { normalizeWorkspaceDefaults } from '../../../../src/contexts/project/domain/value-objects/WorkspaceDefaults'
 
 describe('workspace initialization', () => {
+  it('records an external failure identifier without owning the external error catalog', () => {
+    const operation = create({ templates: [], agents: [{ providerId: 'provider', count: 1 }] })
+    const item = operation.toSnapshot().items[0]!
+    operation.fail(item.id, 'NEW_CONTEXT_OPERATION_FAILED')
+    expect(
+      WorkspaceInitialization.restore(operation.toSnapshot()).toSnapshot().items[0]
+    ).toMatchObject({
+      status: 'failed',
+      errorCode: 'NEW_CONTEXT_OPERATION_FAILED'
+    })
+  })
+
+  it.each(['', 'not-an-error-code', 'CODE\0INVALID'])(
+    'rejects a malformed external failure identifier %j',
+    (errorCode) => {
+      const operation = create({ templates: [], agents: [{ providerId: 'provider', count: 1 }] })
+      operation.fail(operation.toSnapshot().items[0]!.id, errorCode)
+      expect(() => WorkspaceInitialization.restore(operation.toSnapshot())).toThrow(
+        expect.objectContaining({ code: 'WORKSPACE_INITIALIZATION_INVALID' })
+      )
+    }
+  )
+
   it.each(['prepared', 'created', 'agent', 'transient'])(
     'preserves %s items during automatic cleanup',
     (state) => {

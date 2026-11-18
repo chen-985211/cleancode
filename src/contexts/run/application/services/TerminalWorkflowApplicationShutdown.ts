@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type { ActiveWorkflowRun } from './TerminalWorkflowRuntimeState'
 
 interface TerminalWorkflowApplicationShutdownOperations {
@@ -22,7 +23,7 @@ export class TerminalWorkflowApplicationShutdown {
   runStart<T>(operation: () => Promise<T>): Promise<T> {
     if (this.shuttingDown) {
       return Promise.reject(
-        createExpectedAppError('RUN_START_BLOCKED', 'Terminal workflows are shutting down.')
+        createRunError('RUN_START_BLOCKED', 'Terminal workflows are shutting down.')
       )
     }
     let result: Promise<T>

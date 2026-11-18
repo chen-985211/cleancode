@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
@@ -29,7 +30,7 @@ export class CreateTerminalBlockUseCase {
       command,
       (graph) => {
         if (!command.position && !command.canvasRegions) {
-          throw createExpectedAppError(
+          throw createBlockGraphError(
             'TERMINAL_LAYOUT_ANCHOR_REQUIRED',
             'Automatic terminal placement requires canvas regions.'
           )

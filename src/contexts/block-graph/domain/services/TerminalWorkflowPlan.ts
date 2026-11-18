@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import {
   defaultTerminalExecutionConfig,
   type BlockGraphSnapshot,
@@ -37,10 +38,10 @@ export function buildTerminalLaunchPlan(
   const block = graph.blocks.find((candidate) => candidate.id === blockId)
 
   if (!block) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
   if (!block.launchCommand) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_WORKFLOW_COMMAND_MISSING',
       'The selected terminal must have a launch command.',
       { blockId }
@@ -73,10 +74,10 @@ export function buildTerminalWorkflowPlan(
     const block = blockById.get(blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
     if (!block.launchCommand) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_WORKFLOW_COMMAND_MISSING',
         'Every terminal in a workflow must have a launch command.',
         { blockId }
@@ -92,7 +93,7 @@ export function buildTerminalWorkflowPlan(
     const block = blockById.get(blockId)
 
     if (!block) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
 
     return Object.freeze({
@@ -139,10 +140,10 @@ function resolveIncludedBlockIds(
     const terminalGroup = graph.terminalGroups.find((group) => group.id === scope.terminalGroupId)
 
     if (!terminalGroup) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+      throw createBlockGraphDomainError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
     }
     if (terminalGroup.memberBlockIds.length === 0) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_WORKFLOW_EMPTY',
         'Terminal workflow has no configured commands.'
       )
@@ -154,21 +155,24 @@ function resolveIncludedBlockIds(
   if (scope.type === 'block-set') {
     const blockIds = new Set(scope.blockIds)
     if (blockIds.size === 0) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'TERMINAL_WORKFLOW_EMPTY',
         'Terminal workflow has no configured commands.'
       )
     }
     for (const blockId of blockIds) {
       if (!graph.blocks.some((block) => block.id === blockId)) {
-        throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+        throw createBlockGraphDomainError(
+          'TERMINAL_BLOCK_NOT_FOUND',
+          'Terminal block was not found.'
+        )
       }
     }
     return blockIds
   }
 
   if (!graph.blocks.some((block) => block.id === scope.blockId)) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
 
   const included = new Set<string>()
@@ -213,7 +217,10 @@ function topologicallyOrderBlocks(
     )
 
     if (!nextBlockId) {
-      throw createExpectedAppError('TERMINAL_WORKFLOW_CYCLE', 'Terminal workflow contains a cycle.')
+      throw createBlockGraphDomainError(
+        'TERMINAL_WORKFLOW_CYCLE',
+        'Terminal workflow contains a cycle.'
+      )
     }
 
     ordered.push(nextBlockId)

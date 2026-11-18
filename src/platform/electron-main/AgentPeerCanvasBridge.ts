@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../../contexts/agent/application/errors/AgentErrors'
+
 import type {
   AgentPeerCanvasRequest,
   AgentPeerCanvasResponse
@@ -51,7 +52,7 @@ export class AgentPeerCanvasBridge {
 }
 
 function unavailable() {
-  return createExpectedAppError(
+  return createAgentError(
     'AGENT_TOOL_UNAVAILABLE',
     'The canvas did not complete peer creation. Retry with the same agentId when its workspace is open.'
   )

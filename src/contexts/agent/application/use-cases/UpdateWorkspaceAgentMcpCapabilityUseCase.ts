@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type { AgentSessionSnapshot } from '../dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
@@ -30,12 +31,12 @@ export class UpdateWorkspaceAgentMcpCapabilityUseCase {
       command.agentId
     )
     if (!agent) {
-      throw createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent was not found.')
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent was not found.')
     }
 
     const provider = this.providers.require(agent.providerId)
     if (command.cleancodeMcpEnabled && !provider.descriptor.capabilities.cleancodeMcp) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_TOOL_UNAVAILABLE',
         'CleanCode MCP is unavailable for this Agent Provider.',
         { providerId: agent.providerId }

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import { classifyCanvasExecutionStructure } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   BlockTemplateConnectionSnapshot,
@@ -337,5 +338,5 @@ function freezeExecutionConfig(
 }
 
 function invalidTemplate(message: string): never {
-  throw createExpectedAppError('BLOCK_TEMPLATE_INVALID', message)
+  throw createBlockGraphDomainError('BLOCK_TEMPLATE_INVALID', message)
 }

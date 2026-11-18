@@ -176,12 +176,12 @@ Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 
 - Unit 测试通过 Vitest projects 按运行时需求分组：Presentation 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境，避免为不消费 DOM 的文件重复创建浏览器模拟环境。
 - Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台只等待自身 build，再按已审查的平台历史耗时分到 Linux 4、macOS 6、Windows 6 个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
-- dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
+- dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向；领域规则包含 Shared Kernel 的分层边界，且共享内核不能反向依赖上下文或平台消费者。按实际上下文目录自动生成跨上下文 Domain 隔离规则，禁止各层直接导入其他上下文内部领域模型，允许符合分层规则的公开应用契约。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。
 - `check:deps`：检查精确依赖版本。
 - `check:max-lines`：限制代码文件行数。
-- `check:logging`：检查日志、错误码和 IPC 错误边界。
+- `check:logging`：使用 TypeScript AST 检查日志、错误构造归属和 IPC 错误边界；绑定符号覆盖导入别名、namespace 与常量别名，避免注释、字符串和局部同名误报。上下文 domain/application/infrastructure 的业务错误使用所属工厂，公共错误与保留错误身份的诊断重建遵循日志规范。
 - `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
 - `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
 - `check:motion`：检查生产 CSS 动效只消费语义时长与曲线 token；持续 spinner、reduced-motion clamp 和登记过的专属 motion owner 作为显式例外。

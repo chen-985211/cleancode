@@ -1,3 +1,4 @@
+import { ProjectRegistryTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import { setImmediate } from 'node:timers/promises'
 import { createDeferred } from '../../../fixtures/deferred'
 import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
@@ -227,7 +228,8 @@ function fixture() {
     createWorkspace: (value, receipt) => create.execute(value, receipt)
   })
   const switchWorkspace = new SwitchBranchWorkspaceUseCase(projects, transactions)
-  const select = new SelectCurrentProjectUseCase(registry)
+  const registryTransactions = new ProjectRegistryTransactionCoordinator()
+  const select = new SelectCurrentProjectUseCase(registry, registryTransactions)
   const selectCurrentProject = async (directory: string | null) => {
     await select.execute({ directory })
   }
@@ -258,11 +260,11 @@ function fixture() {
   })
   const loadRememberedWorkbenches = () =>
     loadRememberedWorkbenchList({
-      findProject: projects.findByDirectory,
-      listRememberedProjects: registry.get,
-      openProject: async ({ directory }) => project(directory),
-      loadWorkbench,
-      selectCurrentProject
+      projects,
+      registry,
+      registryTransactions,
+      openProject: { execute: async ({ directory }) => project(directory) },
+      loadWorkbench
     })
   registerProjectIssuesRuntime({
     projects,

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentDomainError } from '../errors/AgentDomainError'
 
 export interface ProviderSessionRefSnapshot {
   readonly formatVersion: number
@@ -52,7 +52,7 @@ export class ProviderSessionRef {
   forProvider(providerId: string): ProviderSessionRef {
     const normalizedProviderId = requireSessionRefText(providerId, 'providerId', 100)
     if (this.owningProviderId && this.owningProviderId !== normalizedProviderId) {
-      throw createExpectedAppError(
+      throw createAgentDomainError(
         'AGENT_PROVIDER_MISMATCH',
         'Agent Provider session reference belongs to a different Provider.',
         {
@@ -114,7 +114,7 @@ function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown
 }
 
 function invalidProviderSessionRef(fieldName: string) {
-  return createExpectedAppError(
+  return createAgentDomainError(
     'AGENT_SESSION_INVALID',
     'Agent Provider session reference is invalid.',
     { fieldName }

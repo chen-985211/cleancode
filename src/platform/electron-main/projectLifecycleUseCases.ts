@@ -111,6 +111,7 @@ export function createProjectLifecycleUseCases(input: {
     createBranchWorkspaceUseCase: createBranchWorkspace,
     createOrOpenProjectUseCase,
     projectIpcHandlers,
+    registryTransactions,
     rememberProjectUseCase,
     selectCurrentProjectUseCase
   }

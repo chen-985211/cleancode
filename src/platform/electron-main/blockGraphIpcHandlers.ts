@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type {
   BlockGraphSnapshot,
   CanvasViewportSnapshot,
@@ -5,7 +6,7 @@ import type {
   QuickExecutionTargetSnapshot,
   TerminalExecutionConfigSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -489,7 +490,7 @@ function readTerminalDefinitionCommand(command: unknown): TerminalDefinitionIpcC
     typeof command.launchCommand !== 'string' ||
     !isRecord(command.executionConfig)
   ) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       'Invalid IPC command: complete terminal definition is required.'
     )
@@ -606,7 +607,7 @@ function isQuickExecutionTarget(value: unknown): value is QuickExecutionTargetSn
 }
 
 function throwInvalidQuickExecutionSlotCommand(): never {
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: quick execution slot command is required.'
   )

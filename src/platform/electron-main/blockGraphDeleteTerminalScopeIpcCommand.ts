@@ -1,5 +1,5 @@
+import { createIpcError } from '../ipc/IpcError'
 import type { BatchTerminalRemovalTargetSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 
 export interface DeleteTerminalScopeIpcCommand {
   readonly projectDirectory: string
@@ -17,7 +17,7 @@ export function readDeleteTerminalScopeCommand(command: unknown): DeleteTerminal
     command.workspaceId.length === 0 ||
     !isBatchTerminalRemovalTarget(command.target)
   ) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       'Invalid IPC command: complete terminal removal scope is required.'
     )

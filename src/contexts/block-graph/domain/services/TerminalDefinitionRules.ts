@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import type {
   UpdateTerminalBlockMetadataInput,
   UpdateTerminalDefinitionInput
@@ -27,7 +28,7 @@ function normalizeTerminalBlockName(name: string): string {
   const normalizedName = name.trim()
 
   if (!normalizedName) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_BLOCK_NAME_EMPTY',
       'Terminal block name cannot be empty.'
     )

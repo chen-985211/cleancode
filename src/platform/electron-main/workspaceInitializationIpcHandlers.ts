@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type {
   WorkspaceInitializationDetails,
   WorkspaceInitializationResult,
@@ -7,7 +8,7 @@ import type {
 import type { InitializeWorkspaceContentCommand } from '../../contexts/project/application/use-cases/InitializeWorkspaceContentUseCase'
 import type { BeginEmptyCanvasInitializationCommand } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { normalizeWorkspaceDefaults } from '../../contexts/project/domain/value-objects/WorkspaceDefaults'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import { registerIpcHandler, type IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
 
@@ -147,5 +148,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
 }
 function invalid(): never {
-  throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid workspace initialization command.')
+  throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace initialization command.')
 }

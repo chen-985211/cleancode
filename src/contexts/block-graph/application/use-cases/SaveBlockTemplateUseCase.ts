@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import type { BlockTemplateScope } from '../../domain/aggregates/BlockTemplateTypes'
 import { createBlockTemplate } from '../../domain/services/BlockTemplateProjection'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
@@ -37,10 +38,10 @@ export class SaveBlockTemplateUseCase {
       command.workspaceId
     )
     if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
+      throw createBlockGraphError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
     }
     if (command.scope.type === 'project' && command.scope.projectId !== graph.projectId) {
-      throw createExpectedAppError(
+      throw createBlockGraphError(
         'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID',
         'Project template scope does not match the source project.'
       )

@@ -1,3 +1,4 @@
+import { createProjectError } from '../errors/ProjectErrors'
 import { Project } from '../../domain/aggregates/Project'
 import type { ProjectIssueScope } from '../services/ProjectIssueScope'
 import { ProjectIssueReadCache } from '../services/ProjectIssueReadCache'
@@ -16,7 +17,7 @@ import {
   sameProjectIssue,
   type ProjectIssueReference
 } from '../../domain/value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import {
   isValidNewBranchName,
   normalizeNewBranchName
@@ -62,7 +63,7 @@ export class StartIssueWorkspaceUseCase {
       selectedRepository = resolved.name
     }
     if (selectedRepository.toLowerCase() !== repository.toLowerCase())
-      throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
+      throw createProjectError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
     const operations = await preparation.list(project.directory)
     const matchesQuery = (issue?: ProjectIssueReference) =>
       Boolean(
@@ -119,7 +120,7 @@ export class StartIssueWorkspaceUseCase {
       latest.id !== project.id ||
       (latest.issueRepository ?? selectedRepository).toLowerCase() !== repository.toLowerCase()
     )
-      throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
+      throw createProjectError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
     progress?.('creating')
     const created = await preparation.create({
       selectWorkspace: false,
@@ -130,8 +131,7 @@ export class StartIssueWorkspaceUseCase {
       issue: pending?.issue ?? issue
     })
     const target = created.workspaces.find((workspace) => sameProjectIssue(workspace.issue, issue))
-    if (!target)
-      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+    if (!target) throw createProjectError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
     return Project.fromSnapshot(created).switchCurrentWorkspace(target.workspaceId).toSnapshot()
   }
 }

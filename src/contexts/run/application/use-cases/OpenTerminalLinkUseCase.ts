@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type { OpenTerminalLinkCommand, TerminalLinkOpenResult } from '../dto/TerminalLink'
 import type {
   TerminalLinkContextPort,
@@ -20,16 +21,13 @@ export class OpenTerminalLinkUseCase {
       try {
         await this.opener.openExternal(externalAddress)
       } catch {
-        throw createExpectedAppError(
-          'TERMINAL_LINK_NOT_OPENABLE',
-          'The terminal link could not be opened.'
-        )
+        throw createRunError('TERMINAL_LINK_NOT_OPENABLE', 'The terminal link could not be opened.')
       }
       return { kind: 'external', target: externalAddress }
     }
 
     if (hasUriScheme(target)) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_LINK_NOT_ALLOWED',
         'Only HTTP and HTTPS terminal links can be opened.'
       )
@@ -37,7 +35,7 @@ export class OpenTerminalLinkUseCase {
 
     const localTarget = readLocalTarget(target)
     if (!localTarget) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_LINK_NOT_ALLOWED',
         'The terminal link is not an allowed local path.'
       )
@@ -51,14 +49,11 @@ export class OpenTerminalLinkUseCase {
         rawPath: localTarget.path
       })
     } catch {
-      throw createExpectedAppError(
-        'TERMINAL_LINK_NOT_FOUND',
-        'The local terminal link no longer exists.'
-      )
+      throw createRunError('TERMINAL_LINK_NOT_FOUND', 'The local terminal link no longer exists.')
     }
 
     if (resolved.relativeSegments[0] === '..' || resolved.kind === 'other') {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_LINK_NOT_ALLOWED',
         'The local terminal link is outside the current workspace.'
       )
@@ -72,7 +67,7 @@ export class OpenTerminalLinkUseCase {
     try {
       await this.opener.openLocal(openCommand)
     } catch {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_LINK_NOT_OPENABLE',
         'The local terminal link could not be opened.'
       )

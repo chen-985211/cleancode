@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { createIpcError } from '../ipc/IpcError'
+
 import { applicationUpdateChannels } from '../ipc/applicationUpdateChannels'
 import { registerIpcHandler, type IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -41,5 +42,5 @@ export function registerApplicationUpdateIpc(input: {
 }
 
 function invalidCommand() {
-  return createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid application update command.')
+  return createIpcError('INVALID_IPC_COMMAND', 'Invalid application update command.')
 }

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
 
 export type ForegroundJobStatus = 'launching' | 'running' | 'exited' | 'failed'
 
@@ -21,7 +21,7 @@ export class ForegroundJob {
 
   static start(identity: ForegroundJobIdentity): ForegroundJob {
     if (!identity.launchId.trim() || !identity.sessionId.trim() || identity.generation <= 0) {
-      throw createExpectedAppError(
+      throw createRunDomainError(
         'TERMINAL_FOREGROUND_JOB_INVALID',
         'Foreground job identity is invalid.'
       )

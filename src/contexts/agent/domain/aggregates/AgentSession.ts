@@ -1,9 +1,9 @@
+import { createAgentDomainError } from '../errors/AgentDomainError'
 import type { AgentConversationScope } from '../value-objects/AgentConversationScope'
 import {
   ProviderSessionRef,
   type ProviderSessionRefSnapshot
 } from '../value-objects/ProviderSessionRef'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface AgentLayoutSnapshot {
   readonly position: { readonly x: number; readonly y: number }
@@ -111,7 +111,7 @@ export class AgentSession {
     const sessionRef = explicitSessionRef ?? (scopeOrSessionRef as ProviderSessionRef)
 
     if (!scope) {
-      throw createExpectedAppError(
+      throw createAgentDomainError(
         'AGENT_SESSION_INVALID',
         'An Agent conversation scope is required before binding a Provider session.'
       )
@@ -188,7 +188,7 @@ export class AgentSession {
       snapshot.projectId !== this.projectId ||
       snapshot.workspaceId !== this.workspaceId
     ) {
-      throw createExpectedAppError(
+      throw createAgentDomainError(
         'AGENT_SESSION_INVALID',
         'Agent conversation scope does not belong to this Agent.'
       )
@@ -200,7 +200,7 @@ function requireValue(value: string, fieldName: string): string {
   const normalized = value.trim()
 
   if (!normalized) {
-    throw createExpectedAppError('AGENT_SESSION_INVALID', `Agent ${fieldName} cannot be empty.`, {
+    throw createAgentDomainError('AGENT_SESSION_INVALID', `Agent ${fieldName} cannot be empty.`, {
       fieldName
     })
   }
@@ -216,7 +216,7 @@ function normalizeLayout(layout: AgentLayoutSnapshot): AgentLayoutSnapshot {
   const values = [layout.position.x, layout.position.y, layout.size.width, layout.size.height]
 
   if (!values.every(Number.isFinite) || layout.size.width <= 0 || layout.size.height <= 0) {
-    throw createExpectedAppError('AGENT_SESSION_INVALID', 'Agent layout is invalid.')
+    throw createAgentDomainError('AGENT_SESSION_INVALID', 'Agent layout is invalid.')
   }
 
   return copyLayout(layout)
@@ -236,7 +236,7 @@ function normalizeExecutionDirectory(directory: string | null | undefined): stri
     directory.includes('\0') ||
     !/^(?:\/|[a-z]:[\\/]|\\\\)/i.test(directory)
   ) {
-    throw createExpectedAppError(
+    throw createAgentDomainError(
       'AGENT_SESSION_INVALID',
       'Agent execution directory must be absolute.'
     )

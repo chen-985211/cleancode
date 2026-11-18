@@ -1,7 +1,7 @@
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
 import type { BlockTemplateRepository } from '../ports/BlockTemplateRepository'
 import type { BlockTemplateSnapshot } from '../dto/BlockTemplateSnapshot'
 import { BlockTemplateLibrary } from '../../domain/aggregates/BlockTemplateLibrary'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export class PrepareBlockTemplateUseCase {
   constructor(
@@ -19,12 +19,12 @@ export class PrepareBlockTemplateUseCase {
         existing ??
         BlockTemplateLibrary.restore(await this.templates.get()).find(command.templateId)
       if (!source)
-        throw createExpectedAppError(
+        throw createBlockGraphError(
           'BLOCK_TEMPLATE_NOT_FOUND',
           'Selected workspace template was not found.'
         )
       if (source.scope.type === 'project' && source.scope.projectId !== command.projectId) {
-        throw createExpectedAppError(
+        throw createBlockGraphError(
           'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID',
           'Workspace template belongs to another project.'
         )

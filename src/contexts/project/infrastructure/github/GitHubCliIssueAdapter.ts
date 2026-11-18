@@ -1,3 +1,4 @@
+import { createProjectError } from '../../application/errors/ProjectErrors'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { GitHubIssuePort } from '../../application/ports/GitHubIssuePort'
@@ -9,7 +10,6 @@ import {
   normalizeIssueRepository,
   normalizeProjectIssue
 } from '../../domain/value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const execute = promisify(execFile)
 const fields = 'id,number,title,state,labels,assignees'
@@ -117,27 +117,21 @@ export class GitHubCliIssueAdapter implements GitHubIssuePort {
       return JSON.parse(stdout)
     } catch (error) {
       if (isCode(error, 'ENOENT'))
-        throw createExpectedAppError('GITHUB_CLI_UNAVAILABLE', 'GitHub CLI is unavailable.')
+        throw createProjectError('GITHUB_CLI_UNAVAILABLE', 'GitHub CLI is unavailable.')
       if (isCode(error, 4))
-        throw createExpectedAppError('GITHUB_AUTH_REQUIRED', 'GitHub authentication is required.')
+        throw createProjectError('GITHUB_AUTH_REQUIRED', 'GitHub authentication is required.')
       const stderr =
         record(error) && typeof error.stderr === 'string' ? error.stderr.toLowerCase() : ''
       if (stderr.includes('has disabled issues'))
-        throw createExpectedAppError('GITHUB_ISSUES_DISABLED', 'GitHub Issues are disabled.')
+        throw createProjectError('GITHUB_ISSUES_DISABLED', 'GitHub Issues are disabled.')
       if (stderr.includes('rate limit'))
-        throw createExpectedAppError('GITHUB_RATE_LIMITED', 'GitHub request limit was reached.')
+        throw createProjectError('GITHUB_RATE_LIMITED', 'GitHub request limit was reached.')
       if (stderr.includes('http 401') || stderr.includes('bad credentials'))
-        throw createExpectedAppError('GITHUB_AUTH_REQUIRED', 'GitHub authentication is required.')
+        throw createProjectError('GITHUB_AUTH_REQUIRED', 'GitHub authentication is required.')
       if (stderr.includes('http 403') || stderr.includes('resource not accessible'))
-        throw createExpectedAppError(
-          'GITHUB_PERMISSION_DENIED',
-          'GitHub read permission is required.'
-        )
+        throw createProjectError('GITHUB_PERMISSION_DENIED', 'GitHub read permission is required.')
       if (stderr.includes('http 404') || stderr.includes('could not resolve to a repository'))
-        throw createExpectedAppError(
-          'GITHUB_RESOURCE_UNAVAILABLE',
-          'GitHub resource is unavailable.'
-        )
+        throw createProjectError('GITHUB_RESOURCE_UNAVAILABLE', 'GitHub resource is unavailable.')
       failed()
     }
   }
@@ -184,5 +178,5 @@ function isCode(error: unknown, code: string | number): boolean {
   return record(error) && error.code === code
 }
 function failed(): never {
-  throw createExpectedAppError('GITHUB_REQUEST_FAILED', 'GitHub request failed.')
+  throw createProjectError('GITHUB_REQUEST_FAILED', 'GitHub request failed.')
 }

@@ -6,8 +6,7 @@ import type {
 } from '../../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import {
   createSpreadCanvasLayout,
-  createStackedCanvasLayout,
-  type CanvasArrangementLayout
+  createStackedCanvasLayout
 } from '../../../contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
 import type { WorkspaceAgentSnapshot } from '../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { WorkbenchSnapshot } from '../types/workbenchSnapshot'
@@ -21,7 +20,11 @@ import {
   type CanvasArrangementMotionChoreography
 } from '../../../contexts/canvas-arrangement/presentation/motion/canvasArrangementMotion'
 import { createCanvasArrangementGridPlan } from '../projections/workbenchCanvasArrangementGridPlanning'
-import { commitCanvasArrangementLayout } from './commitCanvasArrangementLayout'
+import {
+  commitCanvasArrangementLayout,
+  type CanvasArrangementCommitPlan
+} from './commitCanvasArrangementLayout'
+import type { CanvasLayoutRelationChange } from '../../../contexts/canvas-arrangement/application/use-cases/CommitCanvasLayoutUseCase'
 
 interface UseCanvasArrangementActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -90,104 +93,26 @@ export function useCanvasArrangementActions({
     },
     []
   )
-  const commitLayouts = useCallback(
+  const commitPlan = useCallback(
     async (
-      selectedItems: readonly CanvasArrangementSelectionItem[],
-      layouts: readonly CanvasArrangementLayout[],
-      nodePositionsById: ReadonlyMap<string, { readonly x: number; readonly y: number }> = new Map()
-    ): Promise<void> => {
-      if (!currentWorkbench || !currentWorkspace || !window.cleancode) return
-      const layoutsByKey = new Map(layouts.map((layout) => [layout.key, layout.position]))
-      const graphPromises: Promise<WorkbenchSnapshot['graph']>[] = []
-      const agentPromises: Promise<void>[] = []
-      const blocksById = new Map(currentWorkbench.graph.blocks.map((block) => [block.id, block]))
-      const agentsById = new Map(
-        (currentWorkbench.agents ?? []).map((agent) => [agent.agentId, agent])
-      )
-
-      for (const item of selectedItems) {
-        const target = layoutsByKey.get(item.key)
-        if (!target) continue
-        const delta = { x: target.x - item.position.x, y: target.y - item.position.y }
-
-        if (item.reference.kind === 'combination') {
-          graphPromises.push(
-            window.cleancode.moveTerminalGroup({
-              projectDirectory: currentWorkbench.project.directory,
-              terminalGroupId: item.reference.terminalGroupId,
-              workspaceId: currentWorkspace.workspaceId,
-              position: target
-            })
-          )
-          continue
-        }
-
-        if (item.reference.kind === 'agent') {
-          const agent = agentsById.get(item.reference.agentId)
-          if (!agent) continue
-          agentPromises.push(
-            moveWorkspaceAgent(
-              agent,
-              {
-                x: agent.layout.position.x + delta.x,
-                y: agent.layout.position.y + delta.y
-              },
-              agent.layout.size
-            )
-          )
-          continue
-        }
-
-        for (const nodeId of item.nodeIds) {
-          const block = blocksById.get(nodeId)
-          if (!block) continue
-          graphPromises.push(
-            window.cleancode.moveBlock({
-              blockId: block.id,
-              projectDirectory: currentWorkbench.project.directory,
-              workspaceId: currentWorkspace.workspaceId,
-              position: nodePositionsById.get(nodeId) ?? {
-                x: block.position.x + delta.x,
-                y: block.position.y + delta.y
-              }
-            })
-          )
-        }
-      }
-
-      const [graphResults, agentResults] = await Promise.all([
-        Promise.allSettled(graphPromises),
-        Promise.allSettled(agentPromises)
-      ])
-      const failed = [...graphResults, ...agentResults].find(
-        (result): result is PromiseRejectedResult => result.status === 'rejected'
-      )
-      if (failed) throw failed.reason
-      const latestGraph = [...graphResults]
-        .reverse()
-        .find(
-          (result): result is PromiseFulfilledResult<WorkbenchSnapshot['graph']> =>
-            result.status === 'fulfilled'
-        )?.value
-      if (latestGraph) setCurrentGraph(latestGraph)
+      items: readonly CanvasArrangementSelectionItem[],
+      plan: CanvasArrangementCommitPlan,
+      relation?: CanvasLayoutRelationChange
+    ) => {
+      await commitCanvasArrangementLayout({
+        api: window.cleancode!,
+        arrangement: currentWorkbench!.canvasArrangement ?? emptyArrangement(currentWorkbench!),
+        items,
+        plan,
+        relation,
+        workbench: currentWorkbench!,
+        workspaceId: currentWorkspace!.workspaceId,
+        moveWorkspaceAgent,
+        setCurrentArrangement,
+        setCurrentGraph
+      })
     },
-    [currentWorkbench, currentWorkspace, moveWorkspaceAgent, setCurrentGraph]
-  )
-  const commitLayoutsWithRollback = useCallback(
-    async (
-      selectedItems: readonly CanvasArrangementSelectionItem[],
-      layouts: readonly CanvasArrangementLayout[],
-      rollbackLayouts: readonly CanvasArrangementLayout[],
-      nodePositionsById?: ReadonlyMap<string, { readonly x: number; readonly y: number }>
-    ): Promise<void> => {
-      try {
-        await commitLayouts(selectedItems, layouts, nodePositionsById)
-      } catch (error) {
-        await commitLayouts(selectedItems, rollbackLayouts).catch(() => undefined)
-        throw error
-      }
-    },
-    [commitLayouts]
+    [currentWorkbench, currentWorkspace, moveWorkspaceAgent, setCurrentArrangement, setCurrentGraph]
   )
 
   const commitGridPlan = useCallback(
@@ -199,20 +124,10 @@ export function useCanvasArrangementActions({
           'grid'
         )
       )
-      await commitCanvasArrangementLayout({
-        api: window.cleancode!,
-        arrangement: currentWorkbench!.canvasArrangement ?? emptyArrangement(currentWorkbench!),
-        items,
-        plan,
-        workbench: currentWorkbench!,
-        workspaceId: currentWorkspace!.workspaceId,
-        moveWorkspaceAgent,
-        setCurrentArrangement,
-        setCurrentGraph
-      })
+      await commitPlan(items, plan)
       return plan.bounds
     },
-    [currentWorkbench, currentWorkspace, moveWorkspaceAgent, setCurrentArrangement, setCurrentGraph]
+    [currentWorkbench, commitPlan]
   )
 
   const organize = useCallback(
@@ -267,7 +182,6 @@ export function useCanvasArrangementActions({
       if (!api) return
       const arrangement = currentWorkbench.canvasArrangement ?? emptyArrangement(currentWorkbench)
       const existingStack = findCanvasArrangementStack(arrangement, items)
-      const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
       let completedSuccessfully = false
 
       clearMotionChoreography()
@@ -283,32 +197,21 @@ export function useCanvasArrangementActions({
             )
           )
           const plan = createStackedCanvasLayout(items)
-          await commitLayoutsWithRollback(items, plan.layouts, previousLayouts)
-          try {
-            const updated = await api.createCanvasStack({
+          await commitPlan(items, plan, {
+            type: 'create-stack',
+            stack: {
+              id: createStackId(),
               anchor: plan.anchor,
-              items: items.map((item) => item.reference),
-              projectDirectory: currentWorkbench.project.directory,
-              projectId: currentWorkbench.project.id,
-              stackId: createStackId(),
-              workspaceId: currentWorkspace.workspaceId
-            })
-            setCurrentArrangement(updated)
-            completedSuccessfully = true
-          } catch (error) {
-            await commitLayouts(items, previousLayouts)
-            throw error
-          }
+              items: items.map((item) => item.reference)
+            }
+          })
+          completedSuccessfully = true
           return
         }
 
         if (action === 'detach-stack') {
           if (!existingStack) return
           const stackItems = orderItemsForStack(items, existingStack)
-          const stackPreviousLayouts = stackItems.map((item) => ({
-            key: item.key,
-            position: item.position
-          }))
           setMotionChoreography(
             createCanvasArrangementMotionChoreography(
               withCombinationMembers(stackItems, currentWorkbench.graph),
@@ -316,20 +219,8 @@ export function useCanvasArrangementActions({
             )
           )
           const plan = createSpreadCanvasLayout(stackItems, existingStack.anchor)
-          await commitLayoutsWithRollback(stackItems, plan.layouts, stackPreviousLayouts)
-          try {
-            const updated = await api.removeCanvasStack({
-              projectDirectory: currentWorkbench.project.directory,
-              projectId: currentWorkbench.project.id,
-              stackId: existingStack.id,
-              workspaceId: currentWorkspace.workspaceId
-            })
-            setCurrentArrangement(updated)
-            completedSuccessfully = true
-          } catch (error) {
-            await commitLayouts(stackItems, stackPreviousLayouts)
-            throw error
-          }
+          await commitPlan(stackItems, plan, { type: 'remove-stacks', stacks: [existingStack] })
+          completedSuccessfully = true
           return
         }
 
@@ -347,8 +238,7 @@ export function useCanvasArrangementActions({
     [
       currentWorkbench,
       currentWorkspace,
-      commitLayouts,
-      commitLayoutsWithRollback,
+      commitPlan,
       clearMotionChoreography,
       failureMessage,
       failureTitle,
@@ -377,25 +267,18 @@ export function useCanvasArrangementActions({
         key: item.key,
         position: { x: item.position.x + delta.x, y: item.position.y + delta.y }
       }))
-      const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
 
       pendingRef.current = true
       setIsPending(true)
       try {
-        await commitLayoutsWithRollback(items, layouts, previousLayouts)
-        try {
-          const updated = await window.cleancode.moveCanvasStack({
-            anchor: nextAnchor,
-            projectDirectory: currentWorkbench.project.directory,
-            projectId: currentWorkbench.project.id,
-            stackId,
-            workspaceId: currentWorkspace.workspaceId
-          })
-          setCurrentArrangement(updated)
-        } catch (error) {
-          await commitLayouts(items, previousLayouts)
-          throw error
-        }
+        await commitPlan(
+          items,
+          { layouts },
+          {
+            type: 'move-stack',
+            stack: { id: stackId, anchor: nextAnchor, items: items.map((item) => item.reference) }
+          }
+        )
         return true
       } catch {
         notify({ kind: 'error', message: failureMessage, title: failureTitle })
@@ -406,8 +289,7 @@ export function useCanvasArrangementActions({
       }
     },
     [
-      commitLayouts,
-      commitLayoutsWithRollback,
+      commitPlan,
       currentWorkbench,
       currentWorkspace,
       failureMessage,

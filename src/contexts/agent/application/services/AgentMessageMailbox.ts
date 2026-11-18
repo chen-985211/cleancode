@@ -1,9 +1,10 @@
+import { createAgentError } from '../errors/AgentErrors'
 import {
   AgentMessageLog,
   type AgentMessage,
   type AgentMessageInput
 } from '../../domain/entities/AgentMessageLog'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import { AgentInboxDelivery } from './AgentInboxDelivery'
 import type {
   AgentMessageDeliveryLease,
@@ -77,7 +78,7 @@ export class AgentMessageMailbox {
   ): Promise<AgentMessageWaitResult> {
     const key = this.inboxKey(caller)
     if (this.waiters.has(key)) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_TOOL_INPUT_INVALID',
         'This Agent already has a pending message wait.'
       )
@@ -89,7 +90,7 @@ export class AgentMessageMailbox {
       requestedTimeoutMs < 0 ||
       requestedTimeoutMs > 45_000
     ) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_TOOL_INPUT_INVALID',
         'Message wait timeout must be between 0 and 45000 ms.'
       )

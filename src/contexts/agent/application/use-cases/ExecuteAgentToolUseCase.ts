@@ -1,8 +1,6 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentBlockGraphSnapshot } from '../dto/AgentBlockGraphProtocol'
-import {
-  createExpectedAppError,
-  createUnexpectedAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createUnexpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { AgentAuditRecord } from '../../domain/entities/AgentAuditRecord'
 import { AgentToolApprovalPolicy } from '../../domain/policies/AgentToolApprovalPolicy'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
@@ -131,10 +129,7 @@ export class ExecuteAgentToolUseCase {
       case 'send_agent_message':
       case 'wait_agent_message':
         if (!this.collaboration)
-          throw createExpectedAppError(
-            'AGENT_TOOL_UNAVAILABLE',
-            'Agent collaboration is unavailable.'
-          )
+          throw createAgentError('AGENT_TOOL_UNAVAILABLE', 'Agent collaboration is unavailable.')
         return {
           status: 'completed',
           graphChanged: false,
@@ -328,10 +323,7 @@ export class ExecuteAgentToolUseCase {
     const activeAgent = agents.find((agent) => agent.id === command.agentId)
 
     if (!activeAgent) {
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'The active Agent layout was not found.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'The active Agent layout was not found.')
     }
 
     return {

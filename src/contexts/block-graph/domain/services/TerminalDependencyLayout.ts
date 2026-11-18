@@ -1,4 +1,4 @@
-import { createUnexpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createUnexpectedAppError } from '../../../../shared-kernel/domain/errors/AppError'
 import { terminalBlockVisibleSize, type TerminalBlockSnapshot } from '../aggregates/BlockGraphTypes'
 import {
   terminalLayoutGap,

@@ -1,3 +1,4 @@
+import { isRegisteredApplicationErrorCode } from '../ipc/applicationErrorCatalog'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 import {
@@ -302,7 +303,11 @@ function isIpcSuccessResult<TResult>(
 function isIpcFailureResult<TResult>(
   result: IpcInvokeResult<TResult> | unknown
 ): result is Extract<IpcInvokeResult<TResult>, { readonly ok: false }> {
-  return isRecord(result) && result.ok === false && isSerializedAppError(result.error)
+  return (
+    isRecord(result) &&
+    result.ok === false &&
+    isSerializedAppError(result.error, isRegisteredApplicationErrorCode)
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

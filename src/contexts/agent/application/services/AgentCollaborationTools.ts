@@ -1,3 +1,4 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type {
   AgentCollaborationOutput,
   CreatePeerAgentInput
@@ -9,7 +10,6 @@ import type { AgentProviderAvailabilityService } from './AgentProviderAvailabili
 import type { AgentProviderPreferencesRepository } from '../ports/AgentProviderPreferencesRepository'
 import { AgentMessageMailbox, type WaitAgentMessageInput } from './AgentMessageMailbox'
 import type { ExecuteAgentToolCommand } from '../dto/AgentToolInvocation'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export class AgentCollaborationTools {
   constructor(
@@ -111,5 +111,5 @@ export class AgentCollaborationTools {
 }
 
 function unavailable(message: string) {
-  return createExpectedAppError('AGENT_TOOL_UNAVAILABLE', message)
+  return createAgentError('AGENT_TOOL_UNAVAILABLE', message)
 }

@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createProjectDomainError } from '../errors/ProjectDomainError'
 
 export const MAX_WORKSPACE_DEFAULT_AGENTS = 100
 
@@ -60,7 +60,10 @@ export function normalizeWorkspaceDefaults(value: unknown): WorkspaceDefaults {
 }
 
 function invalid(): never {
-  throw createExpectedAppError('WORKSPACE_DEFAULTS_INVALID', 'Invalid workspace default contents.')
+  throw createProjectDomainError(
+    'WORKSPACE_DEFAULTS_INVALID',
+    'Invalid workspace default contents.'
+  )
 }
 
 export interface WorkspaceDefaultsResolution {

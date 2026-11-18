@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import { buildTerminalLaunchPlan } from '../../domain/services/TerminalWorkflowPlan'
 import type { TerminalLaunchPlanSnapshot } from '../dto/TerminalLaunchPlanSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
@@ -19,7 +20,7 @@ export class GetTerminalLaunchPlanUseCase {
     )
 
     if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
+      throw createBlockGraphError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
     }
 
     return buildTerminalLaunchPlan(graph.toSnapshot(), query.blockId)

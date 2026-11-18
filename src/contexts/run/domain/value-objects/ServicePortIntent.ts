@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunDomainError } from '../errors/RunDomainError'
 
 export type ServiceProtocol = 'http' | 'https' | 'tcp'
 
@@ -112,5 +112,5 @@ function validatePort(port: number): void {
 }
 
 function invalid(message: string): never {
-  throw createExpectedAppError('TERMINAL_EXECUTION_CONFIG_INVALID', message)
+  throw createRunDomainError('TERMINAL_EXECUTION_CONFIG_INVALID', message)
 }

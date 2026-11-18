@@ -1,10 +1,14 @@
 import type { CanvasStackSnapshot } from '../dto/CanvasArrangementSnapshot'
 import type { CanvasLayoutCommitPort, CanvasObjectPosition } from '../ports/CanvasLayoutCommitPort'
 
+export type CanvasLayoutRelationChange =
+  | { readonly type: 'remove-stacks'; readonly stacks: readonly CanvasStackSnapshot[] }
+  | { readonly type: 'create-stack' | 'move-stack'; readonly stack: CanvasStackSnapshot }
+
 export interface CommitCanvasLayoutCommand {
   readonly positions: readonly CanvasObjectPosition[]
   readonly previousPositions: readonly CanvasObjectPosition[]
-  readonly stacks: readonly CanvasStackSnapshot[]
+  readonly relation: CanvasLayoutRelationChange
 }
 
 export class CommitCanvasLayoutUseCase {
@@ -14,9 +18,19 @@ export class CommitCanvasLayoutUseCase {
     const removedStacks: CanvasStackSnapshot[] = []
     try {
       await this.port.moveObjects(command.positions)
-      for (const stack of command.stacks) {
-        await this.port.removeStack(stack)
-        removedStacks.push(stack)
+      const relation = command.relation
+      switch (relation.type) {
+        case 'create-stack':
+          await this.port.createStack(relation.stack)
+          break
+        case 'move-stack':
+          await this.port.moveStack(relation.stack)
+          break
+        case 'remove-stacks':
+          for (const stack of relation.stacks) {
+            await this.port.removeStack(stack)
+            removedStacks.push(stack)
+          }
       }
     } catch (error) {
       const failures: unknown[] = [error]

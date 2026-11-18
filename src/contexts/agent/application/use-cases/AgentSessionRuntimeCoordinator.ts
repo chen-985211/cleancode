@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export interface AgentSessionRuntimeOwner {
@@ -35,7 +36,7 @@ export class AgentSessionRuntimeCoordinator {
   runAttach<T>(owner: AgentSessionRuntimeOwner, operation: () => Promise<T>): Promise<T> {
     if (this.isStopped || [...this.blockers].some((blocker) => blocker(owner))) {
       return Promise.reject(
-        createExpectedAppError(
+        createAgentError(
           'AGENT_SESSION_NOT_FOUND',
           'Agent session lifecycle changed before attachment completed.'
         )
@@ -48,7 +49,7 @@ export class AgentSessionRuntimeCoordinator {
   runLifecycle<T>(owner: AgentSessionRuntimeOwner, operation: () => Promise<T>): Promise<T> {
     if (this.isStopped) {
       return Promise.reject(
-        createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
+        createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
       )
     }
 
@@ -91,10 +92,7 @@ export class AgentSessionRuntimeCoordinator {
 
   blockAttaches(predicate: OwnerPredicate): () => void {
     if (this.isStopped) {
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'Agent session service is shutting down.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
     }
 
     this.blockers.add(predicate)
@@ -138,10 +136,7 @@ export class AgentSessionRuntimeCoordinator {
     if (this.isStopped) {
       unblockAttaches()
       finishLease()
-      throw createExpectedAppError(
-        'AGENT_SESSION_NOT_FOUND',
-        'Agent session service is shutting down.'
-      )
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session service is shutting down.')
     }
 
     const wasQuarantined = this.hasQuarantinedBlocker(quarantineKey, resolvesQuarantinePrefix)

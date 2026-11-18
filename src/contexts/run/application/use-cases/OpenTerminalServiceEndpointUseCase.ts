@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import type { ManagedServiceRunSnapshot } from '../services/ManagedServiceLauncher'
 import type { ServiceEndpointOpenerPort } from '../ports/ServiceEndpointOpenerPort'
@@ -29,7 +30,7 @@ export class OpenTerminalServiceEndpointUseCase {
       !run.endpoint.openable ||
       (run.endpoint.protocol !== 'http' && run.endpoint.protocol !== 'https')
     ) {
-      throw createExpectedAppError(
+      throw createRunError(
         'SERVICE_ENDPOINT_NOT_OPENABLE',
         'The local service endpoint is not available for this terminal run.'
       )

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentDomainError } from '../errors/AgentDomainError'
+
 import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export interface AgentConversationScopeSnapshot {
@@ -36,7 +37,7 @@ function requireValue(value: string, fieldName: string): string {
   const normalizedValue = value.trim()
 
   if (!normalizedValue) {
-    throw createExpectedAppError(
+    throw createAgentDomainError(
       'AGENT_SESSION_INVALID',
       `Agent conversation scope ${fieldName} cannot be empty.`,
       { fieldName }

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../../application/errors/AgentErrors'
+
 import type {
   AgentTerminalRuntimePort,
   OpenAgentTerminalCommand
@@ -48,7 +49,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
       workingDirectory: command.workingDirectory ?? command.workspaceDirectory
     })
     if (terminal.status !== 'running' || terminal.processId === null) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'TERMINAL_RUNTIME_NOT_READY',
         terminal.failureReason ?? 'Agent terminal failed to start.'
       )
@@ -139,7 +140,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {
     const terminal = this.terminals.get(sessionId)
     if (!terminal) {
-      throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Agent terminal was not found.')
+      throw createAgentError('TERMINAL_SESSION_NOT_FOUND', 'Agent terminal was not found.')
     }
     return terminal
   }

@@ -1,9 +1,9 @@
+import { createProjectError } from '../errors/ProjectErrors'
 import type { ProjectIssueScope } from '../services/ProjectIssueScope'
 import { ProjectIssueReadCache } from '../services/ProjectIssueReadCache'
 import type { GitHubIssuePort } from '../ports/GitHubIssuePort'
 import type { ProjectIssueQuery } from '../dto/ProjectIssues'
 import { normalizeIssueRepository } from '../../domain/value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export class GetProjectIssueUseCase {
   constructor(
@@ -18,7 +18,7 @@ export class GetProjectIssueUseCase {
       project.issueRepository &&
       project.issueRepository.toLowerCase() !== repository.toLowerCase()
     )
-      throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
+      throw createProjectError('PROJECT_ISSUE_INVALID', 'Repository selection changed.')
     const issue = await this.github.issue(project.directory, repository, query.number)
     this.cache.rememberIssue(project, issue)
     return issue

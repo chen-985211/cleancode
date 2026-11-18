@@ -1,15 +1,12 @@
-import {
-  createExpectedAppError,
-  isAppError,
-  type AppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../../application/errors/RunErrors'
+import { isAppError, type AppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export function getProviderErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
 export function createProviderUnavailableError(message: string) {
-  return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
+  return createRunError('TERMINAL_PROVIDER_UNAVAILABLE', message)
 }
 
 export function isRuntimeInvalidatingProviderError(error: unknown): error is AppError {

@@ -1,6 +1,6 @@
+import { createAgentError } from '../../../application/errors/AgentErrors'
 import { pathToFileURL } from 'node:url'
 
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import { agentInboxWakeupPrompt } from '../../../application/ports/AgentMessageDeliveryPort'
 import { createAgentMcpConfiguration } from '../../../application/dto/AgentMcpConfiguration'
 import type {
@@ -100,7 +100,7 @@ class OpenCodeSessionRefCodec implements AgentProviderSessionRefCodec {
       parsed.kind !== 'opencode-session' ||
       !isOpenCodeSessionId(parsed.value)
     ) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Unsupported OpenCode Provider session reference.',
         { providerId: 'opencode' }

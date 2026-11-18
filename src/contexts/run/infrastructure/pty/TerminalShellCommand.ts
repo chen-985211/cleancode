@@ -1,6 +1,6 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { platform } from 'node:os'
 
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalLaunchMode } from '../../application/ports/TerminalProcessPort'
 import { createWindowsPowerShellLaunchArguments } from './PowerShellUtf8Bootstrap'
 
@@ -78,7 +78,7 @@ function createTerminalShellCommandArguments(
     return ['/d', '/s', '/c', launchCommand]
   }
 
-  throw createExpectedAppError(
+  throw createRunError(
     'TERMINAL_SHELL_UNSUPPORTED',
     'The selected shell cannot run terminal workflow commands.',
     { shell }

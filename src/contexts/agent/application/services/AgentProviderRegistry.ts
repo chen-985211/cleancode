@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type {
   AgentProviderAvailability,
   AgentProviderContribution,
@@ -18,7 +19,7 @@ export class AgentProviderRegistry implements AgentProviderRegistryPort {
       validateContribution(contribution)
       const providerId = contribution.descriptor.id
       if (this.contributions.has(providerId)) {
-        throw createExpectedAppError(
+        throw createAgentError(
           'AGENT_PROVIDER_DUPLICATE',
           `Agent Provider "${providerId}" is registered more than once.`,
           { providerId }
@@ -35,7 +36,7 @@ export class AgentProviderRegistry implements AgentProviderRegistryPort {
   require(providerId: string): AgentProviderContribution {
     const contribution = this.contributions.get(providerId)
     if (!contribution) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_PROVIDER_NOT_FOUND',
         `Agent Provider "${providerId}" is not registered.`,
         { providerId }
@@ -51,7 +52,7 @@ export class AgentProviderRegistry implements AgentProviderRegistryPort {
   parseSessionRef(providerId: string, sessionRef: ProviderSessionRefSnapshot): ProviderSessionRef {
     const codec = this.require(providerId).sessionRefCodec
     if (!codec) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         `Agent Provider "${providerId}" does not support session references.`,
         { providerId }
@@ -87,7 +88,7 @@ function validateContribution(contribution: AgentProviderContribution): void {
     (capabilities.launchInstructions && !contribution.cleancodeCapability)
 
   if (invalid) {
-    throw createExpectedAppError(
+    throw createAgentError(
       'AGENT_PROVIDER_INVALID',
       `Agent Provider "${id || '<empty>'}" has an invalid capability contribution.`,
       { providerId: id || '<empty>' }

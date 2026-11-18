@@ -1,3 +1,4 @@
+import { createIpcError } from '../ipc/IpcError'
 import type {
   AgentGraphUpdatedEvent,
   AgentRuntimeChangedEvent,
@@ -17,7 +18,7 @@ import type {
 } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentLayoutSnapshot } from '../../contexts/agent/domain/aggregates/AgentSession'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -127,7 +128,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => vo
         typeof command.requestId !== 'string' ||
         typeof command.created !== 'boolean'
       ) {
-        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid peer creation response.')
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid peer creation response.')
       }
       return peerCanvas.complete(readIpcSender(event), {
         requestId: command.requestId,
@@ -357,7 +358,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => vo
     channel: 'cleancode:update-workspace-agent-mcp-capability',
     handler: (command) => {
       if (typeof command.cleancodeMcpEnabled !== 'boolean') {
-        throw createExpectedAppError(
+        throw createIpcError(
           'INVALID_IPC_COMMAND',
           'Invalid IPC command: cleancodeMcpEnabled must be a boolean.'
         )
@@ -432,7 +433,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): () => vo
     channel: 'cleancode:replay-agent-tool-approvals',
     handler: (command) => {
       if (!isRecord(command)) {
-        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Agent approval scope is required.')
+        throw createIpcError('INVALID_IPC_COMMAND', 'Agent approval scope is required.')
       }
       input.replayAgentToolApprovals({
         projectDirectory: readRequiredString(command.projectDirectory, 'projectDirectory'),
@@ -471,7 +472,7 @@ function readAgentTerminalSourceTheme(value: unknown): AgentTerminalSourceTheme 
     return value
   }
 
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: terminalSourceTheme must be light or dark.'
   )
@@ -479,7 +480,7 @@ function readAgentTerminalSourceTheme(value: unknown): AgentTerminalSourceTheme 
 
 function readProviderId(value: unknown): string {
   if (typeof value === 'string' && value.trim() === value && value.length > 0) return value
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: providerId must be a non-empty string.'
   )
@@ -496,7 +497,7 @@ function readCreateWorkspaceAgentCommand(command: unknown): {
   readonly workspaceId: string
 } {
   if (!isRecord(command)) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid Agent creation command.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid Agent creation command.')
   }
   return {
     agentId: readRequiredString(command.agentId, 'agentId'),
@@ -519,7 +520,7 @@ function readAgentInitialPosition(value: unknown): { readonly x: number; readonl
     }
   }
 
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: initialPosition must contain finite x and y coordinates.'
   )
@@ -527,7 +528,7 @@ function readAgentInitialPosition(value: unknown): { readonly x: number; readonl
 
 function readRequiredString(value: unknown, fieldName: string): string {
   if (typeof value === 'string' && value.trim() === value && value.length > 0) return value
-  throw createExpectedAppError(
+  throw createIpcError(
     'INVALID_IPC_COMMAND',
     `Invalid IPC command: ${fieldName} must be a non-empty string.`
   )
@@ -536,17 +537,14 @@ function readRequiredString(value: unknown, fieldName: string): string {
 function readDiscoveryOptions(value: unknown): { readonly refresh?: boolean } {
   if (value === undefined) return {}
   if (!isRecord(value) || (value.refresh !== undefined && typeof value.refresh !== 'boolean')) {
-    throw createExpectedAppError(
-      'INVALID_IPC_COMMAND',
-      'Invalid IPC command: refresh must be a boolean.'
-    )
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid IPC command: refresh must be a boolean.')
   }
   return value.refresh === undefined ? {} : { refresh: value.refresh }
 }
 
 function readAgentProviderPreferencesPatch(value: unknown): UpdateAgentProviderPreferencesCommand {
   if (!isRecord(value)) {
-    throw createExpectedAppError(
+    throw createIpcError(
       'INVALID_IPC_COMMAND',
       'Invalid IPC command: Agent Provider preferences patch is required.'
     )
@@ -632,7 +630,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 }
 
 function invalidPreferencesPatch(message: string) {
-  return createExpectedAppError('INVALID_IPC_COMMAND', `Invalid IPC command: ${message}`)
+  return createIpcError('INVALID_IPC_COMMAND', `Invalid IPC command: ${message}`)
 }
 
 function sendIfAlive(sender: IpcSender, channel: string, event: unknown): void {
@@ -643,13 +641,13 @@ function sendIfAlive(sender: IpcSender, channel: string, event: unknown): void {
 
 function readIpcSender(event: unknown): IpcSender {
   if (!isRecord(event) || !isRecord(event.sender)) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is required.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is required.')
   }
 
   const sender = event.sender
 
   if (typeof sender.isDestroyed !== 'function' || typeof sender.send !== 'function') {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is invalid.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is invalid.')
   }
 
   return sender as unknown as IpcSender

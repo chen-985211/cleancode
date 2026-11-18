@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../../../application/errors/AgentErrors'
 
 type OpenCodeConfig = Readonly<Record<string, unknown>>
 
@@ -76,5 +76,5 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 function invalidOpenCodeConfig(message: string) {
-  return createExpectedAppError('AGENT_SESSION_INVALID', message, { providerId: 'opencode' })
+  return createAgentError('AGENT_SESSION_INVALID', message, { providerId: 'opencode' })
 }

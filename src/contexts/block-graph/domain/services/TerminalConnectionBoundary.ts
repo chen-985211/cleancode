@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import type {
   TerminalConnectionSnapshot,
   TerminalGroupSnapshot
@@ -35,7 +36,7 @@ export function assertTerminalConnectionsWithinGroupBoundary(
         )
     )
   ) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_CONNECTION_SCOPE_MISMATCH',
       'Connections cannot cross terminal group boundaries. Move the complete workflow together.'
     )

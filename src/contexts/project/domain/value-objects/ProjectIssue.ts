@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createProjectDomainError } from '../errors/ProjectDomainError'
 
 export interface ProjectIssueReference {
   readonly id: string
@@ -14,7 +14,7 @@ export function normalizeIssueRepository(value: string): string {
     !/^[a-zA-Z0-9][a-zA-Z0-9-]*\/[a-zA-Z0-9_.-]+$/.test(repository) ||
     /\/\.{1,2}$/.test(repository)
   ) {
-    throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Invalid GitHub repository.')
+    throw createProjectDomainError('PROJECT_ISSUE_INVALID', 'Invalid GitHub repository.')
   }
   return repository
 }
@@ -29,7 +29,7 @@ export function normalizeProjectIssue(value: ProjectIssueReference): ProjectIssu
     value.number < 1 ||
     typeof value.title !== 'string'
   ) {
-    throw createExpectedAppError('PROJECT_ISSUE_INVALID', 'Invalid GitHub issue.')
+    throw createProjectDomainError('PROJECT_ISSUE_INVALID', 'Invalid GitHub issue.')
   }
   const repository = normalizeIssueRepository(value.repository)
   return {

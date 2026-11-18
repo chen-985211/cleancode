@@ -1,9 +1,6 @@
+import { createProjectDomainError } from '../errors/ProjectDomainError'
 import { normalizeProjectIssue, type ProjectIssueReference } from '../value-objects/ProjectIssue'
-import {
-  createExpectedAppError,
-  getAppErrorCode,
-  type AppErrorCode
-} from '../../../../shared-kernel/application/errors/AppError'
+import { isErrorCode, type AppErrorCode } from '../../../../shared-kernel/domain/errors/AppError'
 import {
   normalizeWorkspaceDefaults,
   type WorkspaceDefaults
@@ -132,8 +129,7 @@ export class WorkspaceInitialization {
           : !validText(item.providerId) ||
             item.templateId !== null ||
             item.runStatus !== 'disabled') ||
-        (item.errorCode !== null &&
-          getAppErrorCode({ code: item.errorCode, message: '', isExpected: true }) === null) ||
+        (item.errorCode !== null && !isErrorCode(item.errorCode)) ||
         (item.runId !== null && !validText(item.runId)) ||
         (item.result !== null && !validResult(item.result)) ||
         (item.status === 'created' && !item.result) ||
@@ -317,13 +313,13 @@ function validPosition(position: { readonly x: number; readonly y: number }): bo
   )
 }
 function invalid(): never {
-  throw createExpectedAppError(
+  throw createProjectDomainError(
     'WORKSPACE_INITIALIZATION_INVALID',
     'Invalid workspace initialization.'
   )
 }
 function conflict(): never {
-  throw createExpectedAppError(
+  throw createProjectDomainError(
     'WORKSPACE_INITIALIZATION_CONFLICT',
     'Workspace initialization action conflicts with committed progress.'
   )

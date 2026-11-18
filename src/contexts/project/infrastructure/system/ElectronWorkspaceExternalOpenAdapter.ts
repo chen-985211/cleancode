@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createProjectError } from '../../application/errors/ProjectErrors'
+
 import type {
   WorkspaceExternalOpenCapabilitiesSnapshot,
   WorkspaceExternalOpenTarget
@@ -50,7 +51,7 @@ export class ElectronWorkspaceExternalOpenAdapter implements WorkspaceExternalOp
 
   private async openVsCode(directory: string): Promise<void> {
     if (!this.hasVsCodeProtocolHandler()) {
-      throw createExpectedAppError(
+      throw createProjectError(
         'WORKSPACE_OPEN_TARGET_UNAVAILABLE',
         'VS Code is not registered as a protocol handler.',
         { target: 'vscode' }
@@ -99,7 +100,7 @@ export function createVsCodeWorkspaceUri(
 }
 
 function createExternalOpenFailedError(target: WorkspaceExternalOpenTarget) {
-  return createExpectedAppError(
+  return createProjectError(
     'WORKSPACE_EXTERNAL_OPEN_FAILED',
     'The workspace could not be opened by the operating system.',
     { target }

@@ -1,7 +1,5 @@
-import {
-  createExpectedAppError,
-  isAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../../application/errors/BlockGraphErrors'
+import { isAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { BlockTemplateLibrary } from '../../domain/aggregates/BlockTemplateLibrary'
 import type { BlockTemplateLibrarySnapshot } from '../../domain/aggregates/BlockTemplateTypes'
 
@@ -40,9 +38,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function throwInvalidStore(path: string): never {
-  throw createExpectedAppError(
-    'BLOCK_TEMPLATE_INVALID',
-    'Block template library file is invalid.',
-    { path }
-  )
+  throw createBlockGraphError('BLOCK_TEMPLATE_INVALID', 'Block template library file is invalid.', {
+    path
+  })
 }

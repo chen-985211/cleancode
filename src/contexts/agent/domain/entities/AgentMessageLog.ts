@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentDomainError } from '../errors/AgentDomainError'
 
 export interface AgentMessageInput {
   readonly messageId: string
@@ -81,5 +81,5 @@ export class AgentMessageLog {
 }
 
 function invalidMessage(message: string) {
-  return createExpectedAppError('AGENT_TOOL_INPUT_INVALID', message)
+  return createAgentDomainError('AGENT_TOOL_INPUT_INVALID', message)
 }

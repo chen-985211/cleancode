@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import type {
   BlockTemplateSnapshot,
   InstantiatedBlockTemplateSnapshot
@@ -10,7 +11,7 @@ export class BlockTemplateApplications {
 
   constructor(records: readonly BlockTemplateApplicationSnapshot[] = []) {
     if (!Array.isArray(records))
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'BLOCK_TEMPLATE_INVALID',
         'Invalid template application records.'
       )
@@ -23,7 +24,7 @@ export class BlockTemplateApplications {
         new Set(record.blockIds).size !== record.blockIds.length ||
         record.blockIds.some((id: unknown) => typeof id !== 'string' || !id.trim())
       ) {
-        throw createExpectedAppError(
+        throw createBlockGraphDomainError(
           'BLOCK_TEMPLATE_INVALID',
           'Invalid template application record.'
         )
@@ -34,7 +35,7 @@ export class BlockTemplateApplications {
         terminalGroupId !== null &&
         (typeof terminalGroupId !== 'string' || !terminalGroupId.trim())
       ) {
-        throw createExpectedAppError(
+        throw createBlockGraphDomainError(
           'BLOCK_TEMPLATE_INVALID',
           'Invalid template application group.'
         )
@@ -47,7 +48,7 @@ export class BlockTemplateApplications {
       }
     })
     if (new Set(this.records.map((record) => record.operationId)).size !== this.records.length) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'BLOCK_TEMPLATE_INVALID',
         'Duplicate template application record.'
       )
@@ -64,11 +65,11 @@ export class BlockTemplateApplications {
     create: () => InstantiatedBlockTemplateSnapshot
   ): InstantiatedBlockTemplateSnapshot {
     if (!operationId.trim())
-      throw createExpectedAppError('BLOCK_TEMPLATE_INVALID', 'Empty template operation.')
+      throw createBlockGraphDomainError('BLOCK_TEMPLATE_INVALID', 'Empty template operation.')
     const existing = this.find(operationId)
     if (existing) {
       if (existing.templateId !== template.id) {
-        throw createExpectedAppError(
+        throw createBlockGraphDomainError(
           'WORKSPACE_INITIALIZATION_CONFLICT',
           'Template operation already committed.'
         )

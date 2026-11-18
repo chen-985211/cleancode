@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type {
   ServicePortLease,
   ServicePortLeaseRegistry,
@@ -114,7 +115,7 @@ export class LocalPortAllocator {
       return this.createAllocation(command, requestedPort, reservation)
     }
 
-    throw createExpectedAppError(
+    throw createRunError(
       'SERVICE_PORT_ALLOCATION_EXHAUSTED',
       'Unable to allocate a local service port after bounded attempts.',
       {
@@ -189,7 +190,7 @@ function fixedConflict(
   managedLease: ServicePortLeaseSnapshot | null
 ): never {
   const managedOwner = managedLease?.owner ?? null
-  throw createExpectedAppError(
+  throw createRunError(
     'SERVICE_PORT_FIXED_CONFLICT',
     'The fixed local service port is already occupied.',
     {

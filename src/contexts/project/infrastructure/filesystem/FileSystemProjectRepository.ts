@@ -1,3 +1,4 @@
+import { createProjectError } from '../../application/errors/ProjectErrors'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
@@ -6,7 +7,6 @@ import { writeProjectStateFile } from './ProjectStateFile'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { ProjectRepository } from '../../application/ports/ProjectRepository'
 import type { Project } from '../../domain/aggregates/Project'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const projectsDirectoryName = 'projects'
 const metadataFileName = 'project.json'
@@ -49,7 +49,7 @@ function parseProjectSnapshot(metadata: string, directory: string): ProjectSnaps
   const parsed = JSON.parse(metadata) as Partial<ProjectSnapshot>
 
   if (!parsed.id || !parsed.name || !Array.isArray(parsed.workspaces)) {
-    throw createExpectedAppError(
+    throw createProjectError(
       'INVALID_CLEANCODE_PROJECT_METADATA',
       'Invalid cleancode project metadata.'
     )

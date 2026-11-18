@@ -3,6 +3,31 @@ import type { WorkbenchSnapshot } from '../../../../src/presentation/app-shell/t
 import { commitCanvasArrangementLayout } from '../../../../src/presentation/app-shell/coordinators/commitCanvasArrangementLayout'
 
 describe('canvas layout commit port', () => {
+  it.each(['create-stack', 'move-stack'] as const)(
+    'routes %s through the same owner position port',
+    async (type) => {
+      const input = createInput()
+      const stack = { ...input.arrangement.stacks[0]!, anchor: { x: 500, y: 0 } }
+      await commitCanvasArrangementLayout({ ...input, relation: { type, stack } })
+      const commit =
+        type === 'create-stack' ? input.api.createCanvasStack : input.api.moveCanvasStack
+      expect(commit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'project',
+          workspaceId: 'workspace',
+          stackId: stack.id,
+          anchor: stack.anchor
+        })
+      )
+      expect(input.moveWorkspaceAgent).toHaveBeenCalledWith(
+        input.workbench.agents![0],
+        { x: -400, y: 0 },
+        { width: 720, height: 460 }
+      )
+      expect(input.api.removeCanvasStack).not.toHaveBeenCalled()
+    }
+  )
+
   it('routes every position to its owner while preserving agent dimensions and combination membership', async () => {
     const input = createInput()
     await commitCanvasArrangementLayout(input)
@@ -32,45 +57,54 @@ describe('canvas layout commit port', () => {
     })
   })
 
-  it('settles a slow successful write before compensating a failed peer write', async () => {
-    const input = createInput()
-    const failure = new Error('agent layout unavailable')
-    let complete!: () => void
-    input.api.moveBlock = vi
-      .fn(
-        () =>
-          new Promise<WorkbenchSnapshot['graph']>((resolve) => {
-            complete = () => resolve(input.workbench.graph)
-          })
+  it.each(['remove-stacks', 'create-stack', 'move-stack'] as const)(
+    'settles every write before compensating a failed peer during %s',
+    async (type) => {
+      const input = createInput()
+      const failure = new Error('agent layout unavailable')
+      let complete!: () => void
+      input.api.moveBlock = vi
+        .fn(
+          () =>
+            new Promise<WorkbenchSnapshot['graph']>((resolve) => {
+              complete = () => resolve(input.workbench.graph)
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<WorkbenchSnapshot['graph']>((resolve) => {
+              complete = () => resolve(input.workbench.graph)
+            })
+        )
+        .mockImplementation(async () => input.workbench.graph)
+      input.moveWorkspaceAgent.mockRejectedValueOnce(failure)
+      const stack = input.arrangement.stacks[0]!
+      const result = commitCanvasArrangementLayout({
+        ...input,
+        relation: type === 'remove-stacks' ? { type, stacks: [stack] } : { type, stack }
+      })
+      const rejection = expect(result).rejects.toBe(failure)
+      await Promise.resolve()
+      expect(input.api.removeCanvasStack).not.toHaveBeenCalled()
+      expect(input.api.createCanvasStack).not.toHaveBeenCalled()
+      expect(input.api.moveCanvasStack).not.toHaveBeenCalled()
+      expect(input.moveWorkspaceAgent).toHaveBeenCalledOnce()
+      complete()
+      await rejection
+      expect(input.api.moveBlock).toHaveBeenCalledTimes(2)
+      expect(input.api.moveBlock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ position: { x: 20, y: 30 } })
       )
-      .mockImplementationOnce(
-        () =>
-          new Promise<WorkbenchSnapshot['graph']>((resolve) => {
-            complete = () => resolve(input.workbench.graph)
-          })
+      expect(input.api.moveTerminalGroup).toHaveBeenLastCalledWith(
+        expect.objectContaining({ position: { x: 200, y: 30 } })
       )
-      .mockImplementation(async () => input.workbench.graph)
-    input.moveWorkspaceAgent.mockRejectedValueOnce(failure)
-    const result = commitCanvasArrangementLayout(input)
-    const rejection = expect(result).rejects.toBe(failure)
-    await Promise.resolve()
-    expect(input.api.removeCanvasStack).not.toHaveBeenCalled()
-    expect(input.moveWorkspaceAgent).toHaveBeenCalledOnce()
-    complete()
-    await rejection
-    expect(input.api.moveBlock).toHaveBeenCalledTimes(2)
-    expect(input.api.moveBlock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ position: { x: 20, y: 30 } })
-    )
-    expect(input.api.moveTerminalGroup).toHaveBeenLastCalledWith(
-      expect.objectContaining({ position: { x: 200, y: 30 } })
-    )
-    expect(input.moveWorkspaceAgent).toHaveBeenLastCalledWith(
-      input.workbench.agents![0],
-      { x: 800, y: 20 },
-      { width: 720, height: 460 }
-    )
-  })
+      expect(input.moveWorkspaceAgent).toHaveBeenLastCalledWith(
+        input.workbench.agents![0],
+        { x: 800, y: 20 },
+        { width: 720, height: 460 }
+      )
+    }
+  )
 })
 
 function createInput() {
@@ -112,7 +146,8 @@ function createInput() {
     moveBlock: vi.fn(async () => workbench.graph),
     moveTerminalGroup: vi.fn(async () => workbench.graph),
     removeCanvasStack: vi.fn(async () => ({ ...arrangement, stacks: [] })),
-    createCanvasStack: vi.fn(async () => arrangement)
+    createCanvasStack: vi.fn(async () => arrangement),
+    moveCanvasStack: vi.fn(async () => arrangement)
   }
   return {
     api: api as typeof api & NonNullable<Window['cleancode']>,

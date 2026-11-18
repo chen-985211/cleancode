@@ -1,3 +1,5 @@
+import { createIpcError } from '../ipc/IpcError'
+import { createRunError } from '../../contexts/run/application/errors/RunErrors'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { TerminalRetentionPolicy } from '../../contexts/run/domain/aggregates/TerminalSession'
@@ -27,7 +29,7 @@ import type {
   AttachTerminalViewCommand,
   TerminalViewIdentityCommand
 } from '../../contexts/run/application/use-cases/TerminalSessionService'
-import { createExpectedAppError, isAppError } from '../../shared-kernel/application/errors/AppError'
+import { isAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -371,13 +373,10 @@ export function registerTerminalIpcHandlers(
         (command.retentionPolicy !== 'terminate-on-application-exit' &&
           command.retentionPolicy !== 'keep-after-application-exit')
       ) {
-        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal retention command.')
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal retention command.')
       }
       if (!input.setTerminalRetention) {
-        throw createExpectedAppError(
-          'TERMINAL_PROVIDER_UNAVAILABLE',
-          'Terminal retention is unavailable.'
-        )
+        throw createRunError('TERMINAL_PROVIDER_UNAVAILABLE', 'Terminal retention is unavailable.')
       }
       return input.setTerminalRetention(command.sessionId, command.retentionPolicy)
     },
@@ -438,7 +437,7 @@ export function registerTerminalIpcHandlers(
     channel: 'cleancode:update-terminal-scrollback',
     handler: (command) => {
       if (!isRecord(command) || !isTerminalScrollbackRows(command.scrollbackRows)) {
-        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal scrollback budget.')
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal scrollback budget.')
       }
       input.updateTerminalScrollback(command.scrollbackRows)
     },
@@ -528,7 +527,7 @@ function readRunIdentityCommand(command: unknown): {
     !Number.isSafeInteger(command.generation) ||
     Number(command.generation) < 1
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal run identity.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal run identity.')
   }
   return command as unknown as {
     readonly runId: string
@@ -539,13 +538,13 @@ function readRunIdentityCommand(command: unknown): {
 
 function readIpcSender(event: unknown): IpcSender {
   if (!isRecord(event) || !isRecord(event.sender)) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is required.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is required.')
   }
 
   const sender = event.sender
 
   if (typeof sender.isDestroyed !== 'function' || typeof sender.send !== 'function') {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is invalid.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid IPC command: sender is invalid.')
   }
 
   return sender as unknown as IpcSender
@@ -555,7 +554,7 @@ function readTerminalViewIpcSender(event: unknown): TerminalViewIpcSender {
   const sender = readIpcSender(event)
   const candidate = sender as IpcSender & Partial<TerminalViewIpcSender>
   if (typeof candidate.once !== 'function' || typeof candidate.removeListener !== 'function') {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view IPC sender.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal view IPC sender.')
   }
   return candidate as TerminalViewIpcSender
 }
@@ -576,7 +575,7 @@ function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand 
     Number(command.generation) < 1 ||
     !isNonEmptyString(command.viewId)
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view identity.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal view identity.')
   }
   if (
     command.owner !== undefined &&
@@ -584,7 +583,7 @@ function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand 
       (command.owner.kind !== 'block' && command.owner.kind !== 'agent') ||
       !isNonEmptyString(command.owner.id))
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view owner.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal view owner.')
   }
   return command as unknown as TerminalViewIdentityCommand
 }
@@ -597,7 +596,7 @@ function readTerminalLinkCommand(command: unknown): OpenTerminalLinkCommand {
     command.rawTarget.trim().length === 0 ||
     command.rawTarget.length > 4_096
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal link target.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal link target.')
   }
   return { ...identity, rawTarget: command.rawTarget }
 }
@@ -616,7 +615,7 @@ function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {
     !isOptionalPositiveInteger(command.columns) ||
     !isOptionalPositiveInteger(command.rows)
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal start command.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal start command.')
   }
 
   return command as unknown as StartTerminalIpcCommand
@@ -641,7 +640,7 @@ function readSessionIds(command: unknown): readonly string[] {
     command.sessionIds.length > 1_000 ||
     !command.sessionIds.every(isNonEmptyString)
   ) {
-    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal session query.')
+    throw createIpcError('INVALID_IPC_COMMAND', 'Invalid terminal session query.')
   }
   return command.sessionIds
 }

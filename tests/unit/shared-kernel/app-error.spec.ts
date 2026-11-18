@@ -1,4 +1,9 @@
 import {
+  AppError as DomainAppError,
+  createExpectedAppError as createDomainError,
+  isCommonErrorCode
+} from '../../../src/shared-kernel/domain/errors/AppError'
+import {
   createClientAppError,
   createExpectedAppError,
   getAppErrorCode,
@@ -7,6 +12,23 @@ import {
 } from '../../../src/shared-kernel/application/errors/AppError'
 
 describe('application errors', () => {
+  it('preserves the domain error constructor and diagnostic fields across application serialization', () => {
+    const domainError = createDomainError('INVALID_CANVAS_OBJECT_IDENTITY', 'Graph missing.', {
+      workspaceId: 'workspace'
+    })
+    const restored = createClientAppError(
+      serializeAppError(domainError, { correlationId: 'query-1' })
+    )
+    expect(restored).toBeInstanceOf(DomainAppError)
+    expect(isAppError(domainError)).toBe(true)
+    expect(getAppErrorCode(domainError)).toBe('INVALID_CANVAS_OBJECT_IDENTITY')
+    expect(serializeAppError(restored)).toEqual(
+      serializeAppError(domainError, { correlationId: 'query-1' })
+    )
+    expect(isCommonErrorCode('BLOCK_GRAPH_NOT_FOUND')).toBe(false)
+    expect(isCommonErrorCode('UNREGISTERED_ERROR')).toBe(false)
+  })
+
   it('serializes expected errors with a stable code', () => {
     const error = createExpectedAppError(
       'GIT_BRANCH_ALREADY_EXISTS',

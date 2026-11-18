@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../../../application/errors/AgentErrors'
+
 import type {
   AgentCapabilityInjector,
   AgentLaunchPlanner,
@@ -177,7 +178,7 @@ class CodexSessionRefCodec implements AgentProviderSessionRefCodec {
       parsed.kind !== 'codex-thread' ||
       !isCodexThreadUuid(parsed.value)
     ) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Unsupported Codex Provider session reference.',
         { providerId: 'codex' }

@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import type {
   BlockGraphSnapshot,
   TerminalBlockSnapshot,
@@ -65,7 +66,7 @@ export function assertTerminalGroupMembershipMoveFitsCanvas({
   )
 
   if (hasConflict) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_GROUP_LAYOUT_CONFLICT',
       'The terminal workflow would overlap another canvas object at the requested group anchor.',
       { targetTerminalGroupId }

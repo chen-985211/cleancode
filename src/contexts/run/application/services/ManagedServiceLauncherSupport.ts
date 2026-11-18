@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../errors/RunErrors'
+
 import type { ServicePortLease } from '../../domain/services/ServicePortLeaseRegistry'
 import type { LocalPortAllocation } from './LocalPortAllocator'
 import { createRunAttemptDetails } from './RunFailureDetails'
@@ -12,7 +13,7 @@ export async function releaseUnusedAllocation(
   } catch (error) {
     markReleasing(allocation.lease)
     quarantineIfReleasing(allocation.lease, getErrorMessage(error))
-    throw createExpectedAppError(
+    throw createRunError(
       'SERVICE_PORT_CLEANUP_FAILED',
       'The local port reservation could not be released.',
       createRunAttemptDetails(allocation.lease.toSnapshot().owner, allocation.endpoint.port)
@@ -30,7 +31,7 @@ export async function releaseReservationForActivation(
   } catch (error) {
     markReleasing(allocation.lease)
     quarantineIfReleasing(allocation.lease, getErrorMessage(error))
-    throw createExpectedAppError(
+    throw createRunError(
       'SERVICE_PORT_CLEANUP_FAILED',
       'The local port reservation could not be released before service activation.',
       createRunAttemptDetails(allocation.lease.toSnapshot().owner, allocation.endpoint.port)
@@ -92,10 +93,7 @@ export async function waitWithTimeout(
   const timeoutId = setTimeout(
     () =>
       controller.abort(
-        createExpectedAppError(
-          'SERVICE_PORT_CLEANUP_FAILED',
-          'Timed out waiting for listener closure.'
-        )
+        createRunError('SERVICE_PORT_CLEANUP_FAILED', 'Timed out waiting for listener closure.')
       ),
     timeoutMs
   )

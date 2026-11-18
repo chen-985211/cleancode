@@ -47,6 +47,8 @@ Project 上下文拥有以下聚合根：
 
 `Project.create` 总是创建一个具有随机稳定 `workspaceId`、`workspaceKind = default`、显示名 `main` 的当前工作区；其目录等于项目目录，初始 Git 绑定为 `null`。打开项目或执行同步后，应用层再根据真实 Git 状态更新绑定与 worktree 列表。`main` 是显示名而不是身份。
 
+Project 领域错误由 `ProjectDomainError` 拥有，应用与 GitHub/文件系统/系统能力失败经 `ProjectErrors` 构造。初始化项的 `errorCode` 是外部失败的观测标识；恢复时校验其非空大写标识格式，不枚举其他上下文的错误词表，新增外部错误不改变 Project 记录格式。模板失效清理仍只识别既有端口契约明确的不可用结果。
+
 ## 项目与工作区不变量
 
 1. 当前创建、同步和归档用例始终保留默认工作区；默认工作区不能被归档。
@@ -146,6 +148,8 @@ Issue 仓库配置与工作区引用是 Project 快照的可选字段；缺少�
 默认内容与初始化记录使用独立的 `workspace-initialization.json` schema v2；读取 v1 时将单个 `providerId` 转为数量 1，空值转为空列表。底层仓储读取不重写文件，应用层清理或下次保存时升级 v2，既有初始化请求项及创建凭据保持原身份。缺失按无默认内容处理，畸形或未知版本拒绝读取且不覆盖。Project 元数据与初始化记录均使用临时文件、文件同步和原子重命名。BlockGraph 拥有的冻结模板保存在独立私有模板库中，不把模板正文复制到 Project。
 
 初始化用例由 [`PrepareWorkspaceInitializationUseCase`](../../../src/contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase.ts) 和 [`InitializeWorkspaceContentUseCase`](../../../src/contexts/project/application/use-cases/InitializeWorkspaceContentUseCase.ts) 实现，跨上下文适配在 [`workspaceInitializationRuntime`](../../../src/platform/electron-main/workspaceInitializationRuntime.ts) 中装配。
+
+项目启动恢复由 `RestoreRememberedProjectsUseCase` 编排，`ProjectRegistry.recoverCurrentProject` 决定保留当前可加载项目、回退首个可加载登记项或清空选择。Project 拥有 `RememberedProjectLoadPort`，Platform 适配器只加载其他上下文内容并组装工作台投影。外部加载不持有登记簿事务；最终使用与显式选择共用的协调器重新读取登记簿，保留期间发生的新选择，并过滤已经移除的项目。只读项目查询通过 `FindProjectByDirectoryUseCase` 返回 DTO，不创建项目或修改登记簿。
 
 ## 实现入口
 

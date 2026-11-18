@@ -1,7 +1,7 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import { randomUUID } from 'node:crypto'
 import type { Socket } from 'node:net'
 
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalProviderApplicationDetachResult } from './TerminalProviderProtocol'
 import type {
   ProviderControllerRelease,
@@ -35,7 +35,7 @@ export class TerminalProviderControllerLifecycle {
     readonly controllerLeaseId: string
   } {
     if (!controllerId || !Number.isSafeInteger(processId) || processId <= 0) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_PROVIDER_AUTHENTICATION_FAILED',
         'Terminal provider controller evidence is invalid.'
       )
@@ -160,7 +160,7 @@ export class TerminalProviderControllerLifecycle {
 }
 
 function controllerBusy() {
-  return createExpectedAppError(
+  return createRunError(
     'TERMINAL_PROVIDER_CONTROLLER_BUSY',
     'Terminal provider controller is active or releasing.',
     { retryAfterMs: 50 }
@@ -168,7 +168,7 @@ function controllerBusy() {
 }
 
 function controllerUnavailable() {
-  return createExpectedAppError(
+  return createRunError(
     'TERMINAL_PROVIDER_UNAVAILABLE',
     'Terminal provider controller release is unavailable.'
   )

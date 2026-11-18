@@ -1,6 +1,7 @@
+import { createProjectError } from '../../application/errors/ProjectErrors'
 import type { IssueWorkspaceBasePort } from '../../application/ports/IssueWorkspaceBasePort'
 import { normalizeIssueRepository } from '../../domain/value-objects/ProjectIssue'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import { runGit } from './GitProcess'
 
 const freshnessMs = 30_000
@@ -77,10 +78,7 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
         false
       )
     } catch {
-      throw createExpectedAppError(
-        'GITHUB_BASE_UNAVAILABLE',
-        'Issue workspace base is unavailable.'
-      )
+      throw createProjectError('GITHUB_BASE_UNAVAILABLE', 'Issue workspace base is unavailable.')
     }
   }
 

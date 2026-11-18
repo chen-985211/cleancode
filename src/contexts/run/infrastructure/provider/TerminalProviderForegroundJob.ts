@@ -1,8 +1,9 @@
+import { createRunError } from '../../application/errors/RunErrors'
 import type {
   LaunchForegroundJobProcessCommand,
   TerminalProcessPort
 } from '../../application/ports/TerminalProcessPort'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import type { TerminalProviderEvent } from './TerminalProviderProtocol'
 import type { ProviderTerminalSession } from './TerminalProviderServerTypes'
 
@@ -18,14 +19,14 @@ export function launchTerminalProviderForegroundJob(
 ): null {
   const session = input.sessions.get(input.command.sessionId)
   if (!session) {
-    throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
+    throw createRunError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
   }
   if (session.snapshot.status !== 'running') {
-    throw createExpectedAppError('TERMINAL_SESSION_NOT_RUNNING', 'Terminal session is not running.')
+    throw createRunError('TERMINAL_SESSION_NOT_RUNNING', 'Terminal session is not running.')
   }
   const launch = input.processes.launchForegroundJob
   if (!launch) {
-    throw createExpectedAppError(
+    throw createRunError(
       'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
       'Terminal runtime does not support foreground jobs.'
     )

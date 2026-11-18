@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphError } from '../errors/BlockGraphErrors'
+
 import {
   buildTerminalWorkflowPlan,
   type TerminalWorkflowPlanScope,
@@ -22,7 +23,7 @@ export class BuildTerminalWorkflowPlanUseCase {
     )
 
     if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
+      throw createBlockGraphError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
     }
 
     return buildTerminalWorkflowPlan(graph.toSnapshot(), query.scope)

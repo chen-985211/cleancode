@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type {
   AgentProviderLaunchConfiguration,
   AgentProviderLaunchProfile
@@ -60,7 +61,7 @@ export function resolveAgentProviderLaunchProfile(input: {
 }): AgentProviderLaunchProfile {
   const tokenization = tokenizeAgentArguments(input.override?.argumentsText ?? '')
   if (!tokenization.ok) {
-    throw createExpectedAppError(
+    throw createAgentError(
       'AGENT_PROVIDER_ARGUMENTS_INVALID',
       'Agent Provider arguments contain an unclosed quote.'
     )

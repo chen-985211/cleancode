@@ -150,6 +150,8 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 
 上下文之间不得直接读取或修改对方内部模型。跨上下文协作只能通过应用层用例、应用层端口或领域事件完成。
 
+`dependency-cruiser` 从实际上下文目录生成规则，禁止上下文各层直接导入其他上下文的内部 `domain` 模型（含错误类和类型导入）；本上下文领域模型、Shared Kernel 和对方公开应用契约保持各自适用的分层约束。跨上下文事件也必须通过明确公开的契约传递，不以直接引用对方内部模型代替事件协作。
+
 ## 跨上下文协作模式
 
 跨上下文协作必须保护上下文边界。
@@ -327,6 +329,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         filesystem/
@@ -348,6 +351,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         registry/
@@ -358,10 +362,12 @@ src/
       domain/
         aggregates/
         services/
+        errors/
       application/
         use-cases/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
       presentation/
@@ -384,6 +390,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         filesystem/
@@ -407,6 +414,7 @@ src/
         queries/
         ports/
         dto/
+        errors/
       infrastructure/
         persistence/
         cli/
@@ -424,6 +432,7 @@ src/
     application/
       ports/
       dto/
+      errors/
   platform/
     electron-main/
     electron-preload/
@@ -468,6 +477,8 @@ src/
 `src/contexts` 是业务代码的根目录。每个限界上下文必须在自己的目录内表达领域层、应用层、基础设施层和表现层。
 
 `src/shared-kernel` 只放多个上下文共同使用且稳定的领域概念和应用层契约。共享内核不得成为跨上下文复用杂物的目录。
+
+上下文业务错误由自己的 Domain 错误模块拥有，用例及外部能力错误由自己的 Application 错误契约拥有。Shared Kernel Domain 只提供通用错误结构与真正公共的错误，序列化与客户端恢复位于 Shared Kernel Application；全应用已知错误码由外层组合各上下文公开声明，不在共享内核集中定义。领域层不得依赖共享应用层；共享内核任何层均不得反向依赖消费它的上下文或 Platform。
 
 当前画布执行语义契约属于 Shared Kernel 的稳定领域策略：它只计算终端依赖的完整弱连通流程、顶层执行单元、组合资格和规范说明，不读取仓储或修改 BlockGraph。产品定义以[画布语义契约](../product/canvas-semantic-contract.md)为唯一维护入口。
 

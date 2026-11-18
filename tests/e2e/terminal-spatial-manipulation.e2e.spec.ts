@@ -15,6 +15,7 @@ import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment } from '../support/e2eTerminal'
 import { settle, readGeometry, expectRect, recordEdgeFrames } from '../support/e2eTerminalGeometry'
+import { setElectronContentSize } from '../support/e2eWindow'
 
 describe('terminal spatial manipulation', () => {
   let page: Page
@@ -28,9 +29,7 @@ describe('terminal spatial manipulation', () => {
     resources.electronApp = app
     page = await app.firstWindow()
     resources.page = page
-    await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]!.setContentSize(2200, 1400)
-    )
+    await setElectronContentSize(app, { width: 2200, height: 1400 })
     await page.waitForFunction(() => innerWidth >= 2200 && innerHeight >= 1400)
     await mkdir('test-results/terminal-spatial', { recursive: true })
   }, electronLaunchTimeoutMs)

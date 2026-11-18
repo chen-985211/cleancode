@@ -1,6 +1,6 @@
+import { createProjectError } from '../errors/ProjectErrors'
 import type { ProjectRepository } from '../ports/ProjectRepository'
 import type { ProjectRegistryRepository } from '../ports/ProjectRegistryRepository'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export class ProjectIssueScope {
   constructor(
@@ -9,9 +9,9 @@ export class ProjectIssueScope {
   ) {}
   async require(directory: string) {
     const project = await this.projects.findByDirectory(directory)
-    if (!project) throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
+    if (!project) throw createProjectError('PROJECT_NOT_FOUND', 'Project was not found.')
     if (!(await this.registry.get()).projectDirectories.includes(project.directory))
-      throw createExpectedAppError('PROJECT_NOT_REMEMBERED', 'Project is no longer remembered.')
+      throw createProjectError('PROJECT_NOT_REMEMBERED', 'Project is no longer remembered.')
     return project
   }
 }

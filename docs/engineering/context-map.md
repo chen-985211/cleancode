@@ -78,7 +78,7 @@ Presentation successful canvas drag
   -> SaveCanvasLayerOrderUseCase
   -> CanvasArrangement workspace repository
 
-Presentation canvas organization / grid
+Presentation canvas stack / detach / stack drag / organization / grid
   -> CommitCanvasLayoutUseCase
   -> CanvasLayoutCommitPort
   -> existing BlockGraph / Agent layout and CanvasArrangement stack use cases
@@ -97,7 +97,13 @@ Agent application
 
 模板库虽然是应用级持久化数据，领域事实仍由 BlockGraph 上下文拥有。Platform 只提供独立 JSON 仓储和 IPC 装配；Presentation 只投影选择、放置与管理交互。Run 不读取模板，只接收模板实例化后由 BlockGraph 生成的既有工作流计划。
 
-CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对象身份，不读取两侧聚合或仓储。用户提交整理时，先通过各 owner 的应用入口提交对象位置，再提交或移除视觉堆叠关系；整理动作部分失败时执行补偿并只保留 owner 已提交事实。成功拖动在位置提交后通过独立层级用例保存该工作区的稳定对象顺序；层级写入失败只撤销临时提升，不回滚已保存位置。全画布整理与网格的提交和补偿由 `CommitCanvasLayoutUseCase` 统一编排，调用方 CanvasArrangement 拥有 `CanvasLayoutCommitPort`；App Shell 将公开 DTO 和布局计划转换为精确对象位置，并把端口操作适配到已经由 Platform 装配的 BlockGraph、Agent 和堆叠用例入口，不新增 IPC 或访问仓储。位置写入批次全部结束后才能补偿，恢复包含流程每个终端的原始坐标。工作台恢复时，Platform 把当前 BlockGraph 与 Agent DTO 投影为仍有效的规范对象键，CanvasArrangement 在自己的事务中清理失效堆叠与层级引用，并解散不足两个成员的堆叠；层级引用包含流程与折叠组合中的存活终端。详细规则见[画布视觉整理](../contexts/canvas-arrangement/canvas-arrangement.md)。
+CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对象身份，不读取两侧聚合或仓储。用户提交整理时，先通过各 owner 的应用入口提交对象位置，再提交或移除视觉堆叠关系；整理动作部分失败时执行补偿并只保留 owner 已提交事实。成功拖动在位置提交后通过独立层级用例保存该工作区的稳定对象顺序；层级写入失败只撤销临时提升，不回滚已保存位置。吸附、解除吸附、堆叠拖动、全画布整理与网格的提交和补偿由 `CommitCanvasLayoutUseCase` 统一编排，调用方 CanvasArrangement 拥有 `CanvasLayoutCommitPort`；App Shell 将公开 DTO 和布局计划转换为精确对象位置，并把端口操作适配到已经由 Platform 装配的 BlockGraph、Agent 和堆叠用例入口，不新增 IPC 或访问仓储。位置写入批次全部结束后才能补偿，恢复包含流程每个终端的原始坐标。工作台恢复时，Platform 把当前 BlockGraph 与 Agent DTO 投影为仍有效的规范对象键，CanvasArrangement 在自己的事务中清理失效堆叠与层级引用，并解散不足两个成员的堆叠；层级引用包含流程与折叠组合中的存活终端。详细规则见[画布视觉整理](../contexts/canvas-arrangement/canvas-arrangement.md)。
+
+## Project 启动恢复与服务 owner 只读投影
+
+Project 的 `RestoreRememberedProjectsUseCase` 拥有恢复编排，通过 `RememberedProjectLoadPort` 接入 Platform 的工作台加载适配器；ProjectRegistry 拥有当前项目回退策略。加载不持有登记簿事务，最终重读并串行提交选择修复，保留加载期间的新选择和项目移除结果。工作台 DTO 留在 Platform，不进入 Project 的领域或应用契约。
+
+服务端口冲突的 owner 名称由 Platform 适配器消费 `FindProjectByDirectoryUseCase` 和 BlockGraph 的 `FindDefaultGraphSnapshotUseCase` 返回的 DTO 投影，不直接查询两侧仓储。图查询只读取既有快照；不得复用会初始化缺失图的 `GetDefaultGraphUseCase`。
 
 ## Project 到 BlockGraph、Agent 与 Run：工作区默认内容
 
@@ -239,6 +245,12 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 | 禁止              | MCP/JSON-RPC 适配器直接写图 JSON、调用聚合、决定布局规则或修改 React 状态                                                                                  |
 
 详细语义见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
+
+## 错误归属与传递
+
+Project、BlockGraph、CanvasArrangement、Run 和 Agent 分别拥有自己的 Domain 错误类及 Application 错误声明。基础设施使用所属上下文的应用错误工厂；上下文边界继续传递稳定错误码和 DTO，不导入对方领域错误类。共享内核只持有基础结构、公共错误与结构化传输工具；Platform 组合公开错误码声明完成 IPC 已知码校验，Run Provider 则只接受本上下文及公共码。
+
+Project 初始化记录保存外部失败标识并拥有重试、跳过和进度策略，不拥有其他上下文的错误词表。新增外部上下文错误不要求修改 Project 的领域错误清单。
 
 ## 非跨上下文关系
 

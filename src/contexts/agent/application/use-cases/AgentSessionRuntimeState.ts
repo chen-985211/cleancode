@@ -1,3 +1,4 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentMcpConfiguration } from '../dto/AgentMcpConfiguration'
 import type {
   AgentGraphUpdatedEvent,
@@ -31,7 +32,7 @@ import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/Prov
 import type { AgentProviderContribution } from '../ports/AgentProviderContribution'
 import type { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
 import type { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 import {
   isOwnedAgentSession,
   type AgentSessionRuntimeOwner
@@ -395,7 +396,7 @@ export async function validateAgentProviderAvailability(
     ? await availabilityService.inspect(provider.descriptor.id, { refresh })
     : await provider.detector.inspect()
   if (availability.status === 'installed') return
-  throw createExpectedAppError(
+  throw createAgentError(
     'AGENT_PROVIDER_UNAVAILABLE',
     `Agent Provider "${provider.descriptor.id}" is unavailable.`,
     {
@@ -427,10 +428,7 @@ async function assertAgentRuntimeScope(
 ): Promise<void> {
   const isValid = await validation.isValid(command)
   if (!isValid) {
-    throw createExpectedAppError(
-      'AGENT_SESSION_NOT_FOUND',
-      'Agent runtime scope is no longer active.'
-    )
+    throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent runtime scope is no longer active.')
   }
 }
 
@@ -563,7 +561,7 @@ export function requireManagedAgentSession(
 ): ManagedAgentSession {
   const session = [...sessions].find((candidate) => candidate.sessionId === sessionId)
   if (!session) {
-    throw createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent session was not found.')
+    throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent session was not found.')
   }
   return session
 }

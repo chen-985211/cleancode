@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createAgentError } from '../errors/AgentErrors'
+
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
@@ -19,7 +20,7 @@ export class UpdateWorkspaceAgentLayoutUseCase {
       command.agentId
     )
     if (!agent) {
-      throw createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent was not found.')
+      throw createAgentError('AGENT_SESSION_NOT_FOUND', 'Agent was not found.')
     }
     agent.updateLayout(command.layout)
     await this.repository.save(agent)

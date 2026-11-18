@@ -1,5 +1,5 @@
+import { createAgentError } from '../errors/AgentErrors'
 import type { AgentRuntimeArtifact } from '../ports/AgentProviderContribution'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface AgentLaunchArtifactCleanupFailure {
   readonly error: unknown
@@ -36,19 +36,19 @@ export class AgentLaunchArtifactScope {
 
   track<TArtifact extends AgentRuntimeArtifact>(label: string, artifact: TArtifact): TArtifact {
     if (this.sealed) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Agent launch artifact scope is already sealed.'
       )
     }
     if (!label.trim()) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Agent launch artifact label cannot be empty.'
       )
     }
     if (this.artifactIdentities.has(artifact)) {
-      throw createExpectedAppError(
+      throw createAgentError(
         'AGENT_SESSION_INVALID',
         'Agent launch artifact is already tracked by this scope.'
       )

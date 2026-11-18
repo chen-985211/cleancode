@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import { normalizeBlockTemplate } from '../services/BlockTemplateProjection'
 import type {
   BlockTemplateLibrarySnapshot,
@@ -15,13 +16,13 @@ export class BlockTemplateLibrary {
 
   static restore(snapshot: BlockTemplateLibrarySnapshot): BlockTemplateLibrary {
     if (snapshot.version !== 1) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'BLOCK_TEMPLATE_VERSION_UNSUPPORTED',
         'Block template library version is unsupported.'
       )
     }
     if (!Array.isArray(snapshot.templates)) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'BLOCK_TEMPLATE_INVALID',
         'Block template library must contain a template list.'
       )
@@ -31,7 +32,7 @@ export class BlockTemplateLibrary {
     const templateIds = new Set<string>()
     for (const template of templates) {
       if (templateIds.has(template.id)) {
-        throw createExpectedAppError(
+        throw createBlockGraphDomainError(
           'BLOCK_TEMPLATE_ALREADY_EXISTS',
           'Block template ids must be unique.'
         )
@@ -45,7 +46,7 @@ export class BlockTemplateLibrary {
   add(sourceTemplate: BlockTemplateSnapshot): BlockTemplateSnapshot {
     const template = normalizeBlockTemplate(sourceTemplate)
     if (this.templates.some((candidate) => candidate.id === template.id)) {
-      throw createExpectedAppError(
+      throw createBlockGraphDomainError(
         'BLOCK_TEMPLATE_ALREADY_EXISTS',
         'Block template already exists.'
       )
@@ -117,7 +118,7 @@ export class BlockTemplateLibrary {
     const normalizedId = templateId.trim()
     const template = this.templates.find((candidate) => candidate.id === normalizedId)
     if (!template) {
-      throw createExpectedAppError('BLOCK_TEMPLATE_NOT_FOUND', 'Block template was not found.')
+      throw createBlockGraphDomainError('BLOCK_TEMPLATE_NOT_FOUND', 'Block template was not found.')
     }
     return template
   }

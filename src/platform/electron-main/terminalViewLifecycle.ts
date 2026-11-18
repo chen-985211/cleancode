@@ -1,5 +1,6 @@
+import { createRunError } from '../../contexts/run/application/errors/RunErrors'
 import type { TerminalViewIdentityCommand } from '../../contexts/run/application/use-cases/TerminalSessionService'
-import { createExpectedAppError, isAppError } from '../../shared-kernel/application/errors/AppError'
+import { isAppError } from '../../shared-kernel/application/errors/AppError'
 import type { LogEvent, Logger } from '../logging/Logger'
 
 export interface TerminalViewIpcSender {
@@ -121,7 +122,7 @@ export function createTerminalViewLifecycle(input: {
     sender: TerminalViewIpcSender
   ): void => {
     if (isShuttingDown) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_RUNTIME_NOT_READY',
         'Terminal views cannot attach while the application is shutting down.'
       )

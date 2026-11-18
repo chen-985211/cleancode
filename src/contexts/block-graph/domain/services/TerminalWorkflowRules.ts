@@ -1,4 +1,5 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createBlockGraphDomainError } from '../errors/BlockGraphDomainError'
+
 import {
   defaultTerminalExecutionConfig,
   type ConnectTerminalBlocksInput,
@@ -26,7 +27,7 @@ export function addTerminalConnection(
   requireTerminalBlock(blocks, input.targetBlockId)
 
   if (input.sourceBlockId === input.targetBlockId) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_CONNECTION_INVALID',
       'A terminal cannot depend on itself.'
     )
@@ -39,14 +40,14 @@ export function addTerminalConnection(
         connection.targetBlockId === input.targetBlockId
     )
   ) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_CONNECTION_DUPLICATE',
       'Terminal connection already exists.'
     )
   }
 
   if (wouldCreateTerminalWorkflowCycle(connections, input.sourceBlockId, input.targetBlockId)) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_WORKFLOW_CYCLE',
       'Terminal connection would create a workflow cycle.'
     )
@@ -68,7 +69,7 @@ export function removeTerminalConnection(
   const remainingConnections = connections.filter((connection) => connection.id !== connectionId)
 
   if (remainingConnections.length === connections.length) {
-    throw createExpectedAppError(
+    throw createBlockGraphDomainError(
       'TERMINAL_CONNECTION_NOT_FOUND',
       'Terminal connection was not found.'
     )
@@ -273,7 +274,7 @@ function isOptionalPositiveInteger(value: number | null): boolean {
 }
 
 function throwInvalidExecutionConfig(): never {
-  throw createExpectedAppError(
+  throw createBlockGraphDomainError(
     'TERMINAL_EXECUTION_CONFIG_INVALID',
     'Terminal execution configuration is invalid.'
   )
@@ -281,6 +282,6 @@ function throwInvalidExecutionConfig(): never {
 
 function requireTerminalBlock(blocks: readonly TerminalBlockSnapshot[], blockId: string): void {
   if (!blocks.some((block) => block.id === blockId)) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    throw createBlockGraphDomainError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
   }
 }

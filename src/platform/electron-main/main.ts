@@ -1,3 +1,6 @@
+import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
+import { FindProjectByDirectoryUseCase } from '../../contexts/project/application/use-cases/FindProjectByDirectoryUseCase'
+import { FindDefaultGraphSnapshotUseCase } from '../../contexts/block-graph/application/use-cases/FindDefaultGraphSnapshotUseCase'
 import { createAgentSessionRuntime } from './createAgentSessionRuntime'
 import { registerProjectIssuesRuntime } from './projectIssuesRuntime'
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
@@ -66,7 +69,7 @@ import {
 import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 import { BlockGraphTerminalLaunchPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalLaunchPlanAdapter'
 import { BlockGraphTerminalWorkflowPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalWorkflowPlanAdapter'
-import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { createAgentLifecycle, disposeRuntime } from './agentRuntimeLifecycleAdapter'
@@ -163,9 +166,11 @@ const canvasArrangementRuntime = createCanvasArrangementRuntime(appStateDirector
 const blockTemplateRepository = new FileSystemBlockTemplateRepository(
   join(appStateDirectoryPath, 'block-template-library.json')
 )
+const findProjectByDirectoryUseCase = new FindProjectByDirectoryUseCase(projectRepository)
+const findDefaultGraphSnapshotUseCase = new FindDefaultGraphSnapshotUseCase(graphRepository)
 const resolveManagedServiceOwner = createManagedServiceOwnerResolver(
-  projectRepository,
-  graphRepository
+  findProjectByDirectoryUseCase,
+  findDefaultGraphSnapshotUseCase
 )
 const gitWorkspaceAdapter = new GitCliWorkspaceAdapter()
 const branchWorkspaceDirectoryResolver = new FileSystemBranchWorkspaceDirectoryResolver()
@@ -335,7 +340,8 @@ const {
   createOrOpenProjectUseCase,
   projectIpcHandlers,
   rememberProjectUseCase,
-  selectCurrentProjectUseCase
+  selectCurrentProjectUseCase,
+  registryTransactions
 } = createProjectLifecycleUseCases({
   agentLifecycle: workspaceAgentLifecycleAdapter,
   runLifecycle: workspaceRuns,
@@ -539,7 +545,7 @@ async function selectProjectDirectory(): Promise<string | null> {
 async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapshot> {
   const currentWorkspace = project.workspaces.find((workspace) => workspace.isCurrent)
   if (!currentWorkspace) {
-    throw createExpectedAppError(
+    throw createProjectError(
       'PROJECT_HAS_NO_CURRENT_WORKSPACE',
       'Project has no current branch workspace.'
     )
@@ -579,7 +585,9 @@ async function getDefaultGraphForAgent(command: {
   readonly projectDirectory: string
   readonly workspaceId: string
 }): Promise<BlockGraphSnapshot> {
-  const project = await projectRepository.findByDirectory(command.projectDirectory)
+  const project = await findProjectByDirectoryUseCase.execute({
+    directory: command.projectDirectory
+  })
 
   return getDefaultGraphUseCase.execute({
     projectDirectory: command.projectDirectory,
@@ -601,12 +609,11 @@ async function selectCurrentProject(directory: string | null): Promise<void> {
 
 async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
   return loadRememberedWorkbenchList({
-    findProject: (directory) => projectRepository.findByDirectory(directory),
-    listRememberedProjects: () =>
-      new ListRememberedProjectsUseCase(getProjectRegistryRepository()).execute(),
+    projects: projectRepository,
+    registry: getProjectRegistryRepository(),
+    registryTransactions,
     loadWorkbench,
-    openProject: (command) => createOrOpenProjectUseCase.execute(command),
-    selectCurrentProject
+    openProject: createOrOpenProjectUseCase
   })
 }
 

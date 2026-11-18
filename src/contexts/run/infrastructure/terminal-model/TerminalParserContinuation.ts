@@ -1,4 +1,4 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createRunError } from '../../application/errors/RunErrors'
 
 type ParserState =
   | 'ground'
@@ -63,7 +63,7 @@ export class TerminalParserContinuation {
 
   read(): string {
     if (this.overflow) {
-      throw createExpectedAppError(
+      throw createRunError(
         'TERMINAL_RECOVERY_STORAGE_LIMIT',
         'Unfinished terminal control sequence exceeds the recovery limit.'
       )
