@@ -5,6 +5,42 @@ import { dirname, join } from 'node:path'
 import { collectLoggingViolations } from '../../../scripts/check-logging.mjs'
 
 describe('logging quality gate', () => {
+  it.each([
+    [
+      'run/application',
+      "import { createAgentError } from '../../agent/application/errors/AgentErrors'; throw createAgentError('TERMINAL_RUNTIME_NOT_READY', 'Not ready')"
+    ],
+    [
+      'run/infrastructure',
+      "import { createAgentError as fail } from '../../agent/application/errors/AgentErrors'; throw fail('TERMINAL_RUNTIME_NOT_READY', 'Not ready')"
+    ],
+    [
+      'agent/infrastructure',
+      "import * as errors from '../../run/application/errors/RunErrors'; const fail = errors.createRunError; throw fail('TERMINAL_RUNTIME_NOT_READY', 'Not ready')"
+    ],
+    [
+      'project/domain',
+      "import * as errors from '../../agent/domain/errors/AgentDomainError'; throw new errors['AgentDomainError']('AGENT_SESSION_INVALID', 'Invalid')"
+    ]
+  ])('rejects foreign error construction in %s', async (scope, source) => {
+    const filePath = `src/contexts/${scope}/failure.ts`
+    await withGateSource(filePath, source, async (directory) => {
+      expect(await collectLoggingViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ filePath, rule: 'no-foreign-context-error' })
+      ])
+    })
+  })
+
+  it('allows context boundaries to observe and forward existing errors', async () => {
+    await withGateSource(
+      'src/contexts/run/infrastructure/forward.ts',
+      "import { isAgentErrorCode } from '../../agent/application/errors/AgentErrors'; async function forward(port) { try { return await port() } catch (error) { if (isAgentErrorCode(error.code)) throw error } }",
+      async (directory) => {
+        expect(await collectLoggingViolations({ cwd: directory })).toEqual([])
+      }
+    )
+  })
+
   it('reads common literal codes from their owner instead of a gate-local vocabulary', async () => {
     await withGateSource(
       'src/contexts/project/application/common.ts',

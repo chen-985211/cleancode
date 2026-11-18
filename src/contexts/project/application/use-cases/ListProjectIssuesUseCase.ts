@@ -29,22 +29,17 @@ export class ListProjectIssuesUseCase {
       return { repository, issues: issues.slice(0, limit), hasMore: issues.length > limit }
     } catch (error) {
       if (!isAppError(error)) throw error
+      const details = { ...error.details, repository: repository.name }
       if (error instanceof ProjectDomainError) {
-        throw createProjectDomainError(error.code, error.message, {
-          ...error.details,
-          repository: repository.name
-        })
+        throw createProjectDomainError(error.code, error.message, details, error.correlationId)
       }
       if (isProjectErrorCode(error.code) && error.isExpected) {
-        throw createProjectError(error.code, error.message, {
-          ...error.details,
-          repository: repository.name
-        })
+        throw createProjectError(error.code, error.message, details, error.correlationId)
       }
       throw new AppError({
         ...error,
         message: error.message,
-        details: { ...error.details, repository: repository.name }
+        details
       })
     }
   }

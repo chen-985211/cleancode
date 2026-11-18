@@ -36,9 +36,10 @@ export class AppError<TCode extends string = AppErrorCode> extends Error {
 export function createExpectedAppError(
   code: CommonErrorCode,
   message: string,
-  details?: AppErrorDetails
+  details?: AppErrorDetails,
+  correlationId?: string
 ): AppError<CommonErrorCode> {
-  return new AppError({ code, details, isExpected: true, message })
+  return new AppError({ code, details, correlationId, isExpected: true, message })
 }
 
 export function createUnexpectedAppError(

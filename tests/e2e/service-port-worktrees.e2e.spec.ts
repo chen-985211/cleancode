@@ -306,7 +306,8 @@ async function launchConfiguredTerminal(terminal: Locator): Promise<void> {
     accept: Boolean,
     timeoutMs: 10_000
   })
-  await launchAction.press('Space')
+  // A restored session ID may be visible while recovery still disables launch.
+  await launchAction.and(terminal.locator('button:enabled')).press('Space')
   await pollUntilState({
     description: `service terminal to replace session ${previousSessionId}`,
     observe: readSessionId,

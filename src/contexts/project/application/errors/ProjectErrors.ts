@@ -63,9 +63,10 @@ export class ProjectApplicationError extends AppError<
   constructor(
     code: ProjectApplicationErrorCode | ProjectDomainErrorCode,
     message: string,
-    details?: AppErrorDetails
+    details?: AppErrorDetails,
+    correlationId?: string
   ) {
-    super({ code, message, details, isExpected: true })
+    super({ code, message, details, correlationId, isExpected: true })
     this.name = 'ProjectApplicationError'
   }
 }
@@ -73,8 +74,9 @@ export class ProjectApplicationError extends AppError<
 export function createProjectError(
   code: ProjectErrorCode,
   message: string,
-  details?: AppErrorDetails
+  details?: AppErrorDetails,
+  correlationId?: string
 ): AppError<ProjectErrorCode> {
-  if (isCommonErrorCode(code)) return createExpectedAppError(code, message, details)
-  return new ProjectApplicationError(code, message, details)
+  if (isCommonErrorCode(code)) return createExpectedAppError(code, message, details, correlationId)
+  return new ProjectApplicationError(code, message, details, correlationId)
 }

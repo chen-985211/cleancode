@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 
 const checkedExtensions = new Set(['.ts', '.tsx'])
+const sharedErrorModule = /^src\/shared-kernel\/(?:domain|application)\/errors\/AppError$/
+const contextErrorModule = /^src\/contexts\/([^/]+)\/(?:domain|application)\/errors\//
 const ignoredDirectories = new Set([
   'node_modules',
   'out',
@@ -37,7 +39,8 @@ export async function collectLoggingViolations({ cwd = process.cwd() } = {}) {
   for (const filePath of files) {
     const sourceFile = program.getSourceFile(resolve(cwd, filePath))
     const reported = new Set()
-    const layer = /^src\/contexts\/[^/]+\/(domain|application|infrastructure)\//.exec(filePath)?.[1]
+    const [, context, layer] =
+      /^src\/contexts\/([^/]+)\/(domain|application|infrastructure)\//.exec(filePath) ?? []
     function report(node, rule, message) {
       if (reported.has(rule)) return
       reported.add(rule)
@@ -78,7 +81,21 @@ export async function collectLoggingViolations({ cwd = process.cwd() } = {}) {
       }
       if (layer && (ts.isCallExpression(node) || ts.isNewExpression(node))) {
         const binding = errorBinding(node.expression, checker, filePath)
-        if (binding && isUnownedConstruction(node, binding, layer, commonCodes)) {
+        if (
+          binding?.context &&
+          binding.context !== context &&
+          isContextConstruction(node, binding.name)
+        ) {
+          report(
+            node,
+            'no-foreign-context-error',
+            `Construct ${context} business errors through its own error module instead of ${binding.context}'s.`
+          )
+        } else if (
+          binding &&
+          !binding.context &&
+          isUnownedConstruction(node, binding, layer, commonCodes)
+        ) {
           report(
             node,
             layer === 'domain' ? 'no-unowned-domain-error' : 'no-unowned-context-error',
@@ -111,6 +128,12 @@ export async function collectLoggingViolations({ cwd = process.cwd() } = {}) {
   }
 
   return violations
+}
+
+function isContextConstruction(node, name) {
+  return ts.isNewExpression(node)
+    ? /^[A-Z]\w*Error$/.test(name ?? '')
+    : /^create[A-Z]\w*Error$/.test(name ?? '')
 }
 
 function isUnownedConstruction(node, binding, layer, commonCodes) {
@@ -160,10 +183,11 @@ function errorBinding(expression, checker, filePath, seen = new Set()) {
         const module = posix
           .normalize(posix.join(posix.dirname(filePath), specifier.text))
           .replace(/\.(?:ts|tsx|js)$/, '')
-        if (!/^src\/shared-kernel\/(?:domain|application)\/errors\/AppError$/.test(module))
-          return null
+        const context = contextErrorModule.exec(module)?.[1]
+        if (!context && !sharedErrorModule.test(module)) return null
         return {
           module,
+          context,
           name: ts.isImportSpecifier(declaration)
             ? (declaration.propertyName ?? declaration.name).text
             : null
@@ -184,7 +208,7 @@ function errorBinding(expression, checker, filePath, seen = new Set()) {
     const name = ts.isPropertyAccessExpression(node)
       ? node.name.text
       : literalText(node.argumentExpression)
-    return base && base.name === null ? { module: base.module, name } : null
+    return base && base.name === null ? { ...base, name } : null
   }
   return null
 }

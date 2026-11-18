@@ -26,8 +26,13 @@ export function isProjectDomainErrorCode(code: unknown): code is ProjectDomainEr
 
 export class ProjectDomainError extends AppError<ProjectDomainErrorCode> {
   readonly context = 'project'
-  constructor(code: ProjectDomainErrorCode, message: string, details?: AppErrorDetails) {
-    super({ code, message, details, isExpected: true })
+  constructor(
+    code: ProjectDomainErrorCode,
+    message: string,
+    details?: AppErrorDetails,
+    correlationId?: string
+  ) {
+    super({ code, message, details, correlationId, isExpected: true })
     this.name = 'ProjectDomainError'
   }
 }
@@ -35,7 +40,8 @@ export class ProjectDomainError extends AppError<ProjectDomainErrorCode> {
 export function createProjectDomainError(
   code: ProjectDomainErrorCode,
   message: string,
-  details?: AppErrorDetails
+  details?: AppErrorDetails,
+  correlationId?: string
 ): ProjectDomainError {
-  return new ProjectDomainError(code, message, details)
+  return new ProjectDomainError(code, message, details, correlationId)
 }

@@ -129,6 +129,8 @@ IPC 的已知码校验由 Platform `applicationErrorCatalog` 组合各上下文�
 
 公共错误使用 Shared Kernel Domain 中受 `CommonErrorCode` 约束的工厂。通用 Application 构造器只在上下文业务层使用已声明的公共字面量码；其他动态错误封装属于传输或表现层恢复。应用层和基础设施层可以用单一原错误展开重建诊断信息，但只能覆盖 `message`、`details`、`correlationId`，不能覆盖 `code` 或 `isExpected`；领域层不使用通用构造器重建业务错误。
 
+用例补充诊断详情时保留原有 `correlationId`，以便将失败与上游日志关联。
+
 ## IPC 错误边界
 
 Electron main 进程不得直接裸用 `ipcMain.handle`。
@@ -194,7 +196,7 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 - 表现层不得用 `error.message.includes(...)` 判断应用错误。
 - 上下文 `domain` 和 `application` 层不得新增裸 `throw new Error(...)`。
 - 使用 TypeScript AST 和绑定符号识别实际调用，覆盖命名导入别名、namespace、静态成员访问及常量别名，忽略注释、字符串和同名局部绑定。
-- 上下文 Domain、Application 和 Infrastructure 不得绕过所属错误工厂创建业务错误；有限公共错误工厂、已声明公共字面量码以及应用/基础设施层保留错误身份的诊断重建按上述规则允许。
+- 上下文 Domain、Application 和 Infrastructure 不得绕过所属错误工厂创建业务错误。门禁按错误模块路径识别归属，拦截其他上下文的构造调用，同名历史错误码也适用。已有错误可以跨边界传递，有限公共错误工厂、已声明公共字面量码以及保留错误身份的诊断重建按上述规则允许。
 - 门禁从 Shared Kernel 的 `commonErrorCodes` 读取公共字面量码，不维护第二份公共业务词表；普通类型检查继续约束有限公共工厂的参数。
 
 `pnpm pre-commit` 必须包含 `pnpm check:logging`。

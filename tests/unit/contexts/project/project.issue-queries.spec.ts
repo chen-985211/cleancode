@@ -6,7 +6,7 @@ import { ListProjectIssuesUseCase } from '../../../../src/contexts/project/appli
 import { GetProjectIssueUseCase } from '../../../../src/contexts/project/application/use-cases/GetProjectIssueUseCase'
 import { ConfigureProjectIssueRepositoryUseCase } from '../../../../src/contexts/project/application/use-cases/ConfigureProjectIssueRepositoryUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
-import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
+import { createClientAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 import { createProjectDomainError } from '../../../../src/contexts/project/domain/errors/ProjectDomainError'
 import { createProjectError } from '../../../../src/contexts/project/application/errors/ProjectErrors'
 
@@ -21,12 +21,19 @@ describe('project issue queries and configuration', () => {
       'application',
       () =>
         createProjectError('GITHUB_REQUEST_FAILED', 'Request failed.', { source: 'application' })
+    ],
+    [
+      'common',
+      () =>
+        createProjectError('INVALID_CANVAS_OBJECT_IDENTITY', 'Invalid identity.', {
+          source: 'common'
+        })
     ]
   ] as const)(
-    'preserves %s error ownership when adding repository diagnostics',
-    async (_kind, create) => {
+    'preserves %s error ownership and correlation when adding repository diagnostics',
+    async (kind, create) => {
       const f = fixture()
-      const original = create()
+      const original = Object.assign(create(), { correlationId: `issue-query-${kind}` })
       const before = { ...original.details }
       f.github.list.mockRejectedValue(original)
       const failure = await new ListProjectIssuesUseCase(f.scope, f.github)
@@ -36,6 +43,8 @@ describe('project issue queries and configuration', () => {
       expect(failure).toMatchObject({
         code: original.code,
         message: original.message,
+        isExpected: original.isExpected,
+        correlationId: original.correlationId,
         details: { ...before, repository: 'owner/repo' }
       })
       expect(original.details).toEqual(before)
@@ -83,12 +92,18 @@ describe('project issue queries and configuration', () => {
   it('retains the resolved repository when listing issues fails', async () => {
     const f = fixture()
     f.github.list.mockRejectedValue(
-      createExpectedAppError('GITHUB_REQUEST_FAILED', 'Request failed')
+      createClientAppError({
+        code: 'GITHUB_REQUEST_FAILED',
+        message: 'Request failed',
+        isExpected: true,
+        correlationId: 'github-list-request'
+      })
     )
     await expect(
       new ListProjectIssuesUseCase(f.scope, f.github).execute({ projectDirectory: '/project' })
     ).rejects.toMatchObject({
       code: 'GITHUB_REQUEST_FAILED',
+      correlationId: 'github-list-request',
       details: { repository: 'owner/repo' }
     })
   })
