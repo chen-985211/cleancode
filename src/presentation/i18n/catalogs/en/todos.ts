@@ -1,0 +1,28 @@
+import type { zhCNTodosMessages } from '../zh-CN/todos'
+
+export const enTodosMessages = {
+  'todo.open': 'Open to-do list',
+  'todo.close': 'Close to-do list',
+  'todo.list': 'To-do list',
+  'todo.quick': 'Add a to-do',
+  'todo.content': 'To-do text',
+  'todo.note': 'Note',
+  'todo.pasteHint': 'Add a note or paste a link or screenshot',
+  'todo.remove': 'Delete item',
+  'todo.removeImage': 'Remove screenshot',
+  'todo.removeLink': 'Remove link',
+  'todo.image': 'Pasted screenshot',
+  'todo.imageUnavailable': 'Screenshot unavailable',
+  'todo.pasteFailed': 'Could not read this image. Paste it again.',
+  'todo.count': '{completed} of {total} complete',
+  'todo.resize': 'Resize to-do list',
+  'todo.loading': 'Loading to-dos…',
+  'todo.loadFailed': 'Could not load this list.',
+  'todo.saveFailed': 'Changes have not been saved.',
+  'todo.retry': 'Retry',
+  'todo.todo': 'To do',
+  'todo.active': 'In progress',
+  'todo.done': 'Completed',
+  'todo.changeState': '{name}, {from}. Change to {to}',
+  'todo.references': 'View notes and attachments for {name}'
+} as const satisfies Record<keyof typeof zhCNTodosMessages, string>

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useWorkbenchNodeDragSession } from './nodes/useWorkbenchNodeDragSession'
 import { useTerminalObjectMotionWorkload } from '../context-adapters/run/useTerminalObjectMotionWorkload'
 import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
@@ -24,6 +25,7 @@ import { CanvasArrangementSelectionOverlay } from '../../../contexts/canvas-arra
 import { projectCanvasArrangementSelectionOntoNodes } from '../projections/workbenchCanvasArrangementSelection'
 import { useWorkbenchCanvasArrangement } from '../context-adapters/canvas-arrangement/useWorkbenchCanvasArrangement'
 import { useCanvasObjectContextMenu } from './menus/useCanvasObjectContextMenu'
+import { ProjectTodoDrawer } from '../../../contexts/todo/presentation/ProjectTodoDrawer'
 import { WorkbenchCanvasBottomControls } from './WorkbenchCanvasBottomControls'
 import { toQuickExecutionTarget } from '../../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
@@ -141,6 +143,7 @@ export function WorkbenchCanvas({
   const { t } = useI18n()
   const nodes = useWorkbenchNodes(nodeStore)
   useTerminalObjectMotionWorkload(nodes, terminalZoomRasterCoordinator)
+  const [navigationLayer, setNavigationLayer] = useState<HTMLDivElement | null>(null)
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const edges = useWorkbenchCanvasEdges({
@@ -606,30 +609,34 @@ export function WorkbenchCanvas({
               zoomOnScroll={false}
               proOptions={{ hideAttribution: true }}
             >
-              <Panel className="canvas-minimap-panel" position="bottom-right">
-                <CanvasMinimap
-                  isCollapsed={isMinimapCollapsed}
-                  nodes={minimapNodes}
-                  canvasSize={canvasSize}
-                  viewportStore={viewportStore}
-                  shortcutTooltips={shortcutTooltips}
-                  minimapNodeInteraction={minimapNodeInteraction}
-                  onToggleCollapsed={onToggleMinimap}
-                  onZoomOut={onZoomCanvasOut}
-                  onZoomIn={onZoomCanvasIn}
-                  onFitCanvas={onFitCanvas}
-                  onMinimapNodeClick={onMinimapNodeClick}
-                  onViewportCenterPreview={(center) =>
-                    moveCanvasViewportToMinimapCenter(center, false)
-                  }
-                  onViewportCenterCommit={(center) =>
-                    moveCanvasViewportToMinimapCenter(center, true)
-                  }
-                  getMiniMapNodeColor={getMiniMapNodeColor}
-                  getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
-                  getMiniMapNodeClassName={getMiniMapNodeClassName}
-                />
-              </Panel>
+              {navigationLayer &&
+                createPortal(
+                  <Panel className="canvas-minimap-panel" position="bottom-right">
+                    <CanvasMinimap
+                      isCollapsed={isMinimapCollapsed}
+                      nodes={minimapNodes}
+                      canvasSize={canvasSize}
+                      viewportStore={viewportStore}
+                      shortcutTooltips={shortcutTooltips}
+                      minimapNodeInteraction={minimapNodeInteraction}
+                      onToggleCollapsed={onToggleMinimap}
+                      onZoomOut={onZoomCanvasOut}
+                      onZoomIn={onZoomCanvasIn}
+                      onFitCanvas={onFitCanvas}
+                      onMinimapNodeClick={onMinimapNodeClick}
+                      onViewportCenterPreview={(center) =>
+                        moveCanvasViewportToMinimapCenter(center, false)
+                      }
+                      onViewportCenterCommit={(center) =>
+                        moveCanvasViewportToMinimapCenter(center, true)
+                      }
+                      getMiniMapNodeColor={getMiniMapNodeColor}
+                      getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
+                      getMiniMapNodeClassName={getMiniMapNodeClassName}
+                    />
+                  </Panel>,
+                  navigationLayer
+                )}
             </ReactFlow>
             {placementTemplate && templateInteraction.placementOrigin ? (
               <LiveBlockTemplatePlacementPreview
@@ -671,6 +678,10 @@ export function WorkbenchCanvas({
           {paneContextMenu.menu}
           {connectionInteraction.menu}
         </div>
+        <div ref={setNavigationLayer} className="workbench-navigation-layer" />
+        {currentWorkbench && window.cleancode?.listTodos && (
+          <ProjectTodoDrawer projectId={currentWorkbench.project.id} api={window.cleancode} />
+        )}
         <CanvasStatusbar
           quickExecutionRef={setQuickExecutionContainer}
           motionRef={statusbarMotionRef}

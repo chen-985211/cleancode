@@ -265,3 +265,10 @@
   margin: 0 2px;
   background: var(--cc-divider);
 }
+
+.workbench-navigation-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+}

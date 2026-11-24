@@ -19,7 +19,11 @@ import {
   type ApplicationUpdateSnapshot
 } from '../ipc/applicationUpdateChannels'
 
+import { todoChannels } from '../ipc/todoChannels'
 const cleancodeApi = {
+  listTodos: (projectId: string) => invokeCleancode(todoChannels.list, projectId),
+  saveTodo: (command: unknown) => invokeCleancode(todoChannels.save, command),
+  readTodoImage: (command: unknown) => invokeCleancode(todoChannels.image, command),
   appName: 'cleancode',
   getApplicationUpdate: () =>
     invokeCleancode<ApplicationUpdateSnapshot>(applicationUpdateChannels.get),
