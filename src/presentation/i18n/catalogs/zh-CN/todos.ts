@@ -22,5 +22,7 @@ export const zhCNTodosMessages = {
   'todo.active': '进行中',
   'todo.done': '已完成',
   'todo.changeState': '{name}，当前{from}，改为{to}',
-  'todo.references': '查看「{name}」的备注和附件'
+  'todo.edit': '编辑“{name}”',
+  'todo.collapseGesture': '单击折叠',
+  'todo.itemGesture': '单击展开'
 } as const

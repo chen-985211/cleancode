@@ -1,71 +1,87 @@
 .canvas-minimap__navigation-row {
   anchor-name: --todo-navigation;
 }
+
 .todo-opener {
   position: absolute;
   z-index: 12;
   right: 178px;
   bottom: calc(var(--cc-statusbar-height) + var(--cc-statusbar-bottom) + 12px);
+  box-sizing: border-box;
   min-width: 64px;
   height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--cc-border);
+  padding: 0 10px;
+  border: 1px solid var(--cc-statusbar-border);
   border-radius: 999px;
-  background: var(--cc-chrome-translucent);
-  color: var(--cc-foreground);
-  box-shadow: var(--cc-shadow-xs);
+  background: color-mix(in srgb, var(--cc-chrome-raised) 90%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    var(--cc-shadow-xs),
+    inset 0 1px var(--cc-highlight-inset);
+  color: var(--cc-canvas-node-menu-foreground);
   font:
-    600 12px/1 ui-monospace,
+    500 12px/1 ui-monospace,
     monospace;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 @supports (right: anchor(left)) {
   .todo-opener {
     position-anchor: --todo-navigation;
     right: calc(anchor(left) + 8px);
     bottom: anchor(bottom);
+    height: anchor-size(height, 28px);
   }
 }
-.todo-opener:hover,
-.todo-opener[aria-expanded='true'] {
-  background: var(--cc-surface-raised);
+.todo-opener:is(:hover, [aria-expanded='true']) {
+  background: var(--cc-chrome-raised);
+}
+.todo-opener:active {
+  background: var(--cc-canvas-node-menu-hover);
+}
+.todo-count {
+  display: inline-block;
+}
+.todo-count-divider {
+  opacity: 0.6;
 }
 .project-todo-drawer {
+  --todo-ink: var(--cc-canvas-node-menu-foreground);
+  --todo-quiet: color-mix(in srgb, var(--todo-ink) 62%, var(--cc-canvas-node-menu-surface));
+  --todo-wash: color-mix(in srgb, var(--todo-ink) 4%, var(--cc-canvas-node-menu-surface));
+  --todo-gutter: clamp(12px, 5.6cqi, 24px);
+  container-type: inline-size;
+  --todo-row-radius: calc(15px * var(--cc-corner-radius-scale));
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
+  inset: 0 0 0 auto;
+  /* The shell utilities (50), minimap and count sit behind this surface. */
+  z-index: 51;
   box-sizing: border-box;
   width: var(--todo-width);
   max-width: calc((100% - var(--cc-canvas-sidebar-inset, 0px)) * 0.64);
   display: flex;
   flex-direction: column;
-  padding: calc(var(--cc-shell-control-inset) + var(--cc-shell-settings-height) + 20px) 0
-    calc(var(--cc-statusbar-height) + var(--cc-statusbar-bottom) + 52px);
-  border-left: 1px solid var(--cc-border);
-  background: var(--cc-canvas-node-menu-surface);
-  box-shadow: var(--cc-shadow-sm);
-  color: var(--cc-foreground);
+  --todo-header-height: 64px;
+  color: var(--todo-ink);
+  background: color-mix(in srgb, var(--cc-canvas-node-menu-surface) 68%, var(--cc-surface));
+  border-left: 1px solid var(--cc-statusbar-border);
+  box-shadow: -4px 0 20px color-mix(in srgb, var(--cc-shadow-color) 45%, transparent);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .project-todo-drawer {
-    animation: todo-drawer-in var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-  }
-  @keyframes todo-drawer-in {
-    from {
-      transform: translateX(100%);
-    }
-    to {
-      transform: translateX(0);
-    }
-  }
+.project-todo-drawer::before {
+  content: '';
+  position: absolute;
+  inset: var(--todo-header-height) var(--todo-gutter) 0;
+  background: var(--cc-canvas-node-menu-surface);
+  pointer-events: none;
+}
+.project-todo-drawer.anchored-surface-motion[data-surface-spring-preset] {
+  opacity: 1;
 }
 .todo-resize {
   position: absolute;
-  left: -5px;
-  top: 0;
-  bottom: 0;
+  z-index: 1;
+  inset: 0 auto 0 -5px;
   width: 10px;
   cursor: ew-resize;
   touch-action: none;
@@ -73,177 +89,338 @@
 .todo-resize::after {
   content: '';
   position: absolute;
-  left: 3px;
   top: 50%;
+  left: 3px;
   width: 3px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--cc-divider);
+  height: 32px;
+  border-radius: 99px;
+  background: var(--todo-quiet);
+  opacity: 0;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-enter);
 }
-.todo-resize:is(:hover, :focus-visible)::after {
-  background: var(--cc-muted-strong);
+.todo-resize:is(:hover, :focus-visible, :active)::after {
+  opacity: 0.65;
 }
 .todo-scroll {
   overflow: auto;
   min-height: 0;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.todo-scroll:is(:hover, :focus-within) {
   scrollbar-color: var(--cc-scrollbar) transparent;
 }
 .todo-groups {
-  padding: 0 14px;
+  position: relative;
+  padding: 16px var(--todo-gutter) 12px;
+}
+.todo-groups section {
+  display: grid;
+  gap: 4px;
 }
 .todo-groups section + section {
-  margin-top: 18px;
-}
-.todo-row,
-.todo-edit,
-.todo-new {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 6px;
-  border-radius: 8px;
-}
-.todo-row:hover,
-.todo-new:hover {
-  background: var(--cc-canvas-node-menu-hover);
+  margin-top: 12px;
 }
 .project-todo-drawer button {
   border: 0;
-  background: none;
+  background: transparent;
   color: inherit;
   cursor: pointer;
   font: inherit;
 }
-.todo-title,
-.todo-fields {
-  align-self: center;
-  min-width: 0;
-  flex: 1;
+.todo-drawer-header {
+  display: flex;
+  flex: 0 0 var(--todo-header-height);
+  align-items: center;
+  justify-content: flex-end;
+  padding-inline: calc(var(--todo-gutter) + 12px);
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--todo-ink) 6%, transparent);
 }
-.project-todo-drawer .todo-title {
-  padding: 4px 0;
-  text-align: start;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  line-height: 20px;
-}
-[data-todo-history] .todo-title {
-  text-decoration: line-through;
-  color: var(--cc-muted-strong);
-}
-.todo-status,
-.todo-ref,
-.todo-remove,
-.todo-attachment button {
+.project-todo-drawer .todo-close {
   display: grid;
   place-items: center;
-  min-width: 24px;
-  min-height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-}
-.todo-dot {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  box-sizing: border-box;
-  border: 1.5px solid var(--cc-muted-strong);
   border-radius: 50%;
-  display: grid;
-  place-items: center;
+  background: var(--cc-canvas-node-menu-hover);
+  transition: background-color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+  -webkit-app-region: no-drag;
 }
-.todo-dot--active {
-  border-color: var(--cc-warning);
-  background: linear-gradient(90deg, var(--cc-warning) 50%, transparent 50%);
+.project-todo-drawer .todo-close:is(:hover, :active) {
+  background: color-mix(in srgb, var(--todo-ink) 8%, var(--cc-canvas-node-menu-hover));
 }
-.todo-dot--done {
-  background: var(--cc-foreground);
-  border-color: var(--cc-foreground);
-  color: var(--cc-surface);
-  font: 600 11px/1 system-ui;
+.todo-row,
+.todo-new {
+  display: flex;
+  align-items: flex-start;
+  box-sizing: border-box;
+  min-height: 50px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--todo-row-radius);
+  corner-shape: var(--cc-corner-shape);
 }
-.todo-edit > .todo-dot {
-  margin: 6px 4px;
+.todo-row,
+.todo-new,
+.todo-link-row a {
+  transition: background-color var(--cc-motion-duration-feedback) var(--cc-easing-enter);
 }
-.todo-fields input,
-.todo-fields textarea {
+.todo-row:hover,
+.project-todo-drawer .todo-new:hover,
+.todo-row:has(.todo-title:focus-visible) {
+  background: var(--cc-canvas-node-menu-hover);
+}
+.todo-row {
+  position: relative;
+}
+.todo-row.todo-expanded {
+  z-index: 1;
+  background: var(--cc-canvas-node-menu-hover);
+  box-shadow: var(--cc-shadow-sm), var(--cc-shadow-xs);
+}
+.todo-fields {
+  flex: 1;
+  min-width: 0;
+}
+.project-todo-drawer .todo-title,
+.todo-fields :is(input, textarea) {
+  appearance: none;
   display: block;
   box-sizing: border-box;
   width: 100%;
-  padding: 4px 0;
+  padding: 5px 0;
   border: 0;
   background: transparent;
-  color: var(--cc-foreground);
+  color: var(--todo-ink);
+  text-align: start;
+  overflow-wrap: anywhere;
   font: inherit;
+  font-size: 14px;
   line-height: 20px;
+}
+.todo-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.project-todo-drawer .todo-edit-action {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--todo-quiet);
+}
+.project-todo-drawer .todo-edit-action:is(:hover, :focus-visible) {
+  color: var(--todo-ink);
+  background: var(--todo-wash);
+}
+.todo-title {
+  flex: 1;
+  min-width: 0;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-todo-history] .todo-caption {
+  text-decoration: line-through;
+  text-decoration-color: currentColor;
+}
+.todo-status,
+.todo-asset-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  min-height: 30px;
+  padding: 0;
+}
+.todo-dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 1px solid color-mix(in srgb, var(--todo-ink) 32%, var(--cc-canvas-node-menu-surface));
+  background-color: color-mix(in srgb, var(--todo-ink) 5%, var(--cc-canvas-node-menu-surface));
+  border-radius: 50%;
+  transition: transform var(--cc-motion-duration-press) var(--cc-easing-standard);
+}
+.todo-dot--active {
+  border-color: var(--todo-ink);
+  background: linear-gradient(90deg, var(--todo-ink) 50%, transparent 50%);
+}
+.todo-dot--done {
+  border-color: var(--todo-ink);
+  background: var(--todo-ink);
+  color: var(--cc-canvas-node-menu-surface);
+  font: 600 11px/1 system-ui;
+}
+.todo-status:active .todo-dot {
+  transform: scale(0.88);
 }
 .todo-fields textarea {
   field-sizing: content;
   max-height: 10em;
   resize: none;
-  font-size: 12px;
 }
-.todo-fields .todo-edit-title {
+.todo-detail {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.todo-expanded .todo-detail {
+  grid-template-rows: 1fr;
+}
+.todo-detail-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.todo-note,
+.todo-fields .todo-detail textarea {
+  padding: 5px 0 7px;
+  color: var(--todo-quiet);
   font-size: 14px;
-  line-height: 20px;
+  line-height: 21px;
 }
-.todo-fields :is(input, textarea):focus-visible {
+.todo-note {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.todo-fields textarea:focus-visible {
   outline: none;
-  box-shadow: inset 0 -1px var(--cc-ring);
-  border-radius: 0;
 }
-.todo-fields :is(input, textarea)::placeholder {
-  color: var(--cc-muted-strong);
+.todo-fields textarea:focus-visible::placeholder {
+  color: var(--todo-ink);
 }
-.todo-fields {
-  font-size: 14px;
+.todo-fields textarea::placeholder {
+  color: var(--todo-quiet);
 }
 .project-todo-drawer .todo-new {
   align-items: center;
   width: 100%;
-  min-height: 38px;
-  color: var(--cc-muted-strong);
+  min-height: 50px;
+  color: var(--todo-quiet);
   font-size: 13px;
-  text-align: left;
+  text-align: start;
 }
 .todo-new svg {
-  margin: 0 4px;
-}
-.todo-ref,
-.todo-remove,
-.todo-attachments {
-  color: var(--cc-muted-strong);
+  margin: 0 5.5px;
 }
 .todo-attachments {
   display: grid;
   gap: 5px;
+  padding: 3px 0;
 }
-.todo-attachment {
+.todo-link-row,
+.todo-image-row {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
+}
+.todo-image-row {
+  align-items: flex-start;
+}
+.project-todo-drawer .todo-image-preview {
   min-width: 0;
+  overflow: hidden;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  background: var(--todo-wash);
 }
-.todo-attachment img {
-  max-width: calc(100% - 29px);
-  max-height: 112px;
-  border-radius: 6px;
-  object-fit: contain;
+.todo-link-row a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 30px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+  color: var(--todo-quiet);
+  text-decoration: none;
 }
-.todo-attachment a {
+.todo-link-row svg {
+  flex: none;
+}
+.todo-link-address {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--cc-link);
+  font: inherit;
   font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  line-height: 17px;
 }
-.todo-attachment button {
-  margin-left: auto;
+.todo-link-address strong {
+  font-weight: 550;
+  color: var(--todo-ink);
+}
+.project-todo-drawer .todo-image-preview {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+}
+.todo-thumbnail {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 32px;
+}
+.todo-thumbnail img {
+  display: block;
+  max-width: 100%;
+  max-height: 176px;
+  object-fit: contain;
+}
+.project-todo-drawer .todo-asset-remove {
+  color: var(--todo-quiet);
+  border-radius: 50%;
+}
+.todo-asset-remove {
+  opacity: 0;
+}
+.todo-expanded :is(.todo-link-row, .todo-image-row):is(:hover, :focus-within) .todo-asset-remove {
+  opacity: 1;
+}
+.project-todo-drawer .todo-asset-remove:hover {
+  color: var(--todo-ink);
+  background: var(--todo-wash);
+}
+.todo-item-menu {
+  z-index: 52;
+  min-width: 116px;
+  padding: 4px;
+  border: 1px solid var(--cc-border);
+  border-radius: calc(9px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  color: var(--cc-canvas-node-menu-foreground);
+  background: var(--cc-canvas-node-menu-surface);
+  box-shadow: var(--cc-shadow-sm);
+  font-size: 13px;
+}
+.todo-item-menu [role='menuitem'] {
+  padding: 6px 10px;
+  border-radius: calc(6px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  cursor: pointer;
+}
+.todo-item-menu [data-highlighted] {
+  background: var(--cc-canvas-node-menu-hover);
+  outline: none;
 }
 .todo-feedback {
+  position: relative;
   margin: 8px 20px;
   color: var(--cc-muted-strong);
   font-size: 13px;
@@ -255,4 +432,41 @@
 .project-todo-drawer :is(button, a, [role='separator']):focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: -2px;
+}
+.project-todo-drawer .todo-title:focus-visible {
+  outline: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .todo-row {
+    transition:
+      background-color var(--cc-motion-duration-feedback) var(--cc-easing-enter),
+      box-shadow var(--cc-motion-duration-surface) var(--cc-easing-enter);
+  }
+  .todo-count {
+    animation: todo-count-in var(--cc-motion-duration-feedback) var(--cc-easing-enter);
+  }
+  @keyframes todo-count-in {
+    from {
+      transform: translateY(2px);
+      opacity: 0.6;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  .todo-detail {
+    transition: grid-template-rows var(--cc-motion-duration-surface)
+      var(--cc-easing-terminal-feedback);
+  }
+  @starting-style {
+    .todo-expanded .todo-detail {
+      grid-template-rows: 0fr;
+    }
+  }
+}
+@media (hover: none) {
+  .todo-asset-remove {
+    opacity: 1;
+  }
 }

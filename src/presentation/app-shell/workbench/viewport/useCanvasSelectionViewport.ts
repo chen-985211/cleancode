@@ -68,13 +68,13 @@ export function useCanvasSelectionViewport({
   )
 
   const returnToGlobalCanvasView = useCallback(
-    (anchorNodeId: string | null): void => {
+    (anchorNodeId: string | null, mode?: 'preserve-viewport'): void => {
       cancelSelectedNodeInput()
       onUserAction()
       const instance = reactFlowInstanceRef.current
       if (!instance) return
 
-      if (!zoomOnBlankClick) {
+      if (mode === 'preserve-viewport' || !zoomOnBlankClick) {
         overviewRequestRef.current = null
         cancelWorkbenchViewportMotion(instance)
         cancelWorkbenchDirectZoom(instance)

@@ -67,7 +67,7 @@ describe('workbench node selection', () => {
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
     expect(input.setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(input.setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
-    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith('backend-terminal')
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith('backend-terminal', undefined)
   })
 
   it.each([
@@ -80,7 +80,7 @@ describe('workbench node selection', () => {
       result.current.clearWorkbenchSelection()
     })
 
-    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(expectedNodeId)
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(expectedNodeId, undefined)
   })
 
   it('does not choose an arbitrary return anchor from terminal-group candidates', () => {
@@ -93,7 +93,7 @@ describe('workbench node selection', () => {
       result.current.clearWorkbenchSelection()
     })
 
-    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(null)
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(null, undefined)
   })
 
   it('selects a terminal group only from its title and clears Agent selection', () => {

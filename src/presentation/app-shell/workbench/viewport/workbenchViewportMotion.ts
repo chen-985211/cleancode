@@ -80,6 +80,7 @@ export type WorkbenchViewportMotionCompletionListener = (
 export type WorkbenchViewportMotionPresentationListener = (viewport: Viewport) => void
 
 export interface WorkbenchViewportMotionController {
+  readonly isActive: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => boolean
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
   readonly readPresentation: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => Viewport
   readonly readTargetZoom: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => number
@@ -581,6 +582,7 @@ export function createWorkbenchViewportMotionController(
 
   return {
     cancel,
+    isActive: (instance) => activeMotion?.instance === instance,
     readPresentation,
     readTargetZoom,
     setReducedMotion,
@@ -602,17 +604,9 @@ export function transitionWorkbenchViewport(
   return browserViewportMotionController.transition(instance, command)
 }
 
-export function readWorkbenchViewportPresentation(
-  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-): Viewport {
-  return browserViewportMotionController.readPresentation(instance)
-}
-
-export function readWorkbenchViewportTargetZoom(
-  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-): number {
-  return browserViewportMotionController.readTargetZoom(instance)
-}
+export const isWorkbenchViewportMotionActive = browserViewportMotionController.isActive
+export const readWorkbenchViewportPresentation = browserViewportMotionController.readPresentation
+export const readWorkbenchViewportTargetZoom = browserViewportMotionController.readTargetZoom
 
 export function cancelWorkbenchViewportMotion(
   instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>

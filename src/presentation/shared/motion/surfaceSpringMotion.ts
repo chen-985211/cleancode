@@ -16,6 +16,7 @@ export type SurfaceSpringPreset =
   | 'bottom-control'
   | 'directional-menu'
   | 'drawer-right'
+  | 'sliding-panel-right'
   | 'fullscreen-right'
   | 'fullscreen-bottom'
   | 'page-right'
@@ -79,6 +80,10 @@ function presentSurface(
   progress: number
 ): void {
   const remaining = 1 - progress
+  if (preset === 'sliding-panel-right') {
+    root.style.setProperty('--cc-panel-slide-x', `${round(100 * remaining)}%`)
+    return
+  }
   const presentation = resolvePresentation(preset, remaining)
   root.style.setProperty(opacityProperty, `${round(presentation.opacity)}`)
   root.style.setProperty(contentOpacityProperty, `${round(presentation.contentOpacity)}`)
@@ -181,11 +186,13 @@ function responseForPreset(preset: SurfaceSpringPreset): number {
   if (preset === 'anchored-bottom-left' || preset === 'anchored-top-left') return 0.18
   if (preset === 'anchored-top-right') return 0.24
   if (preset === 'bottom-control') return 0.16
+  if (preset === 'sliding-panel-right') return 0.26
   if (preset === 'drawer-right') return 0.34
   return 0.36
 }
 
 function clearPresentation(root: SurfaceSpringMotionRoot): void {
+  root.style.removeProperty('--cc-panel-slide-x')
   root.style.removeProperty(opacityProperty)
   root.style.removeProperty(contentOpacityProperty)
   root.style.removeProperty(translationXProperty)

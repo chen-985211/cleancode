@@ -1,5 +1,7 @@
 import {
   useEffect,
+  useImperativeHandle,
+  type Ref,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -7,25 +9,40 @@ import {
   useSyncExternalStore,
   type CSSProperties
 } from 'react'
-import { Paperclip, Plus } from '@phosphor-icons/react'
+import { ArrowRight, Plus } from '@phosphor-icons/react'
 import { useI18n } from '../../../presentation/i18n/useI18n'
+import { AnchoredSurfaceMotion } from '../../../presentation/shared/components/SurfaceMotion'
+import { useOutsidePointerDismiss } from '../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { TooltipLabel } from '../../../presentation/shared/components/Tooltip'
 import type { TodoApi } from '../application/ProjectTodos'
-import {
-  todoStates,
-  type TodoDraft,
-  type TodoItem,
-  type TodoState
-} from '../domain/ProjectTodoList'
+import { todoStates, type TodoDraft, type TodoItem } from '../domain/ProjectTodoList'
 import { blankTodo, TodoSession } from './TodoSession'
-import { TodoEditor } from './TodoEditor'
+import { TodoRow } from './TodoRow'
+import { useTodoReorderMotion } from './useTodoReorderMotion'
 import './project-todos.css'
 
 const widthKey = 'cleancode.todo.drawerWidth'
-export function ProjectTodoDrawer({ projectId, api }: { projectId: string; api: TodoApi }) {
+const defaultDrawerWidth = 428
+export interface ProjectTodoDrawerHandle {
+  readonly open: boolean
+  close: () => void
+}
+
+export function ProjectTodoDrawer({
+  projectId,
+  api,
+  ref
+}: {
+  projectId: string
+  api: TodoApi
+  ref?: Ref<ProjectTodoDrawerHandle>
+}) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const [width, setWidth] = useState(() => Number(window.localStorage.getItem(widthKey)) || 336)
+  useImperativeHandle(ref, () => ({ open, close: () => setOpen(false) }), [open])
+  const [width, setWidth] = useState(
+    () => Number(window.localStorage.getItem(widthKey)) || defaultDrawerWidth
+  )
   const [sessions] = useState(() => new Map<string, TodoSession>())
   const session = useMemo(() => {
     let found = sessions.get(projectId)
@@ -40,11 +57,19 @@ export function ProjectTodoDrawer({ projectId, api }: { projectId: string; api: 
     session.start()
   }, [session])
   const toggle = useRef<HTMLButtonElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => {
+    if (open) closeButton.current?.focus({ preventScroll: true })
+  }, [open])
+  function closeFromDrawer() {
+    setOpen(false)
+    toggle.current?.focus({ preventScroll: true })
+  }
   const completed = state.items.filter((item) => item.status === 'done').length
   const label = t(open ? 'todo.close' : 'todo.open')
   return (
     <>
-      <TooltipLabel content={label}>
+      <TooltipLabel content={label} disabled={open}>
         <button
           ref={toggle}
           type="button"
@@ -52,50 +77,67 @@ export function ProjectTodoDrawer({ projectId, api }: { projectId: string; api: 
           aria-label={label}
           aria-expanded={open}
           aria-controls="project-todo-drawer"
+          tabIndex={open ? -1 : 0}
           aria-description={t('todo.count', { completed, total: state.items.length })}
           onClick={() => setOpen((v) => !v)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && open) {
-              e.stopPropagation()
-              setOpen(false)
-            }
-          }}
         >
-          {state.loading || state.loadFailed
-            ? '…'
-            : [completed, state.items.length].map((n) => String(n).padStart(2, '0')).join('/')}
+          {state.loading || state.loadFailed ? (
+            '…'
+          ) : (
+            <>
+              <span className="todo-count" key={`done-${completed}`}>
+                {String(completed).padStart(2, '0')}
+              </span>
+              <span className="todo-count-divider">/</span>
+              <span className="todo-count" key={`total-${state.items.length}`}>
+                {String(state.items.length).padStart(2, '0')}
+              </span>
+            </>
+          )}
         </button>
       </TooltipLabel>
-      {open && (
-        <aside
-          id="project-todo-drawer"
-          className="project-todo-drawer"
-          aria-label={t('todo.list')}
-          style={{ '--todo-width': width + 'px' } as CSSProperties}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && !e.defaultPrevented) {
-              setOpen(false)
-              toggle.current?.focus()
-            }
-          }}
-        >
-          <ResizeHandle width={width} onWidth={setWidth} />
-          {state.loading && !state.loadFailed ? (
-            <span role="status" className="todo-feedback">
-              {t('todo.loading')}
-            </span>
-          ) : null}
-          {!state.loading && !state.loadFailed && (
-            <TodoRows session={session} key={projectId} items={state.items} />
-          )}
-          {(state.loadFailed || state.saveFailed) && (
-            <div role="alert" className="todo-feedback">
-              {t(state.loadFailed ? 'todo.loadFailed' : 'todo.saveFailed')}{' '}
-              <button onClick={() => session.retry()}>{t('todo.retry')}</button>
-            </div>
-          )}
-        </aside>
-      )}
+      <AnchoredSurfaceMotion
+        open={open}
+        springPreset="sliding-panel-right"
+        role="complementary"
+        id="project-todo-drawer"
+        className="project-todo-drawer anchored-surface-motion"
+        aria-label={t('todo.list')}
+        style={{ '--todo-width': width + 'px' } as CSSProperties}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && !e.defaultPrevented) {
+            e.stopPropagation()
+            closeFromDrawer()
+          }
+        }}
+      >
+        <div className="todo-drawer-header">
+          <button
+            type="button"
+            className="todo-close"
+            aria-label={t('todo.close')}
+            ref={closeButton}
+            onClick={closeFromDrawer}
+          >
+            <ArrowRight aria-hidden="true" size={16} weight="bold" />
+          </button>
+        </div>
+        <ResizeHandle width={width} onWidth={setWidth} />
+        {state.loading && !state.loadFailed ? (
+          <span role="status" className="todo-feedback">
+            {t('todo.loading')}
+          </span>
+        ) : null}
+        {!state.loading && !state.loadFailed && (
+          <TodoRows session={session} key={projectId} items={state.items} />
+        )}
+        {(state.loadFailed || state.saveFailed) && (
+          <div role="alert" className="todo-feedback">
+            {t(state.loadFailed ? 'todo.loadFailed' : 'todo.saveFailed')}{' '}
+            <button onClick={() => session.retry()}>{t('todo.retry')}</button>
+          </div>
+        )}
+      </AnchoredSurfaceMotion>
     </>
   )
 }
@@ -134,7 +176,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) 
       onLostPointerCapture={() => {
         start.current = null
       }}
-      onDoubleClick={() => resize(336)}
+      onDoubleClick={() => resize(defaultDrawerWidth)}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           e.preventDefault()
@@ -148,8 +190,11 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) 
 function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] }) {
   const { t } = useI18n()
   const [draft, setDraft] = useState<TodoDraft | null>(null)
+  const [expandedIds, setExpandedIds] = useState(() => new Set<string>())
   const scroll = useRef<HTMLDivElement>(null),
     groups = useRef<HTMLDivElement>(null)
+  const capturePositions = useTodoReorderMotion(scroll)
+  const focusAfterEdit = useRef<string | null>(null)
   const newButton = useRef<HTMLButtonElement>(null)
   const newLine = draft && !('createdAt' in draft)
   const editing =
@@ -165,104 +210,73 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     const body = scroll.current!,
       content = groups.current!
     function measure() {
-      const fourth = content.querySelector('[data-todo-history] > :nth-child(4)')
-      body.style.maxHeight = fourth
-        ? Math.ceil(
-            fourth.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
-          ) + 'px'
-        : ''
+      const fourth = content.querySelector<HTMLElement>('[data-todo-history] > :nth-child(4)')
+      body.style.maxHeight = fourth ? fourth.offsetTop + 'px' : ''
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(content)
     return () => observer.disconnect()
   }, [items, draft])
-  useEffect(() => {
-    if (!draft) return
-    function outside(e: MouseEvent) {
-      const target = e.target
-      if (
-        target instanceof Element &&
-        !target.closest('.todo-edit, .todo-resize, .todo-row, .todo-new')
-      )
-        setDraft(null)
-    }
-    document.addEventListener('click', outside)
-    return () => document.removeEventListener('click', outside)
-  }, [draft])
-  function finish() {
-    const id = draft?.id
-    setDraft(null)
-    requestAnimationFrame(() => {
-      const target =
-        groups.current?.querySelector<HTMLButtonElement>('[data-todo-edit="' + id + '"]') ??
-        newButton.current
-      target?.focus({ preventScroll: true })
+  useOutsidePointerDismiss({
+    active: draft !== null,
+    isInside: (target) =>
+      target instanceof Element &&
+      (!target.closest('#project-todo-drawer') ||
+        Boolean(target.closest('.todo-row, .todo-resize, .todo-new, .todo-close'))),
+    onDismiss: () => edit(null),
+    pointerPolicy: 'passthrough'
+  })
+  useLayoutEffect(() => {
+    const selector = focusAfterEdit.current
+    if (!selector) return
+    focusAfterEdit.current = null
+    const target = groups.current?.querySelector<HTMLButtonElement>(selector) ?? newButton.current
+    target?.focus({ preventScroll: true })
+  }, [draft, items, expandedIds])
+  function setExpanded(itemId: string, expanded: boolean) {
+    setExpandedIds((current) => {
+      const next = new Set(current)
+      if (expanded) next.add(itemId)
+      else next.delete(itemId)
+      return next
     })
   }
-  function edit(item: TodoDraft) {
+  function edit(item: TodoDraft | null) {
+    if (draft && session.find(draft.id)) setExpanded(draft.id, true)
+    setDraft(item)
+  }
+  function finish(itemId: string) {
+    focusAfterEdit.current = `[data-todo-edit="${itemId}"]`
+    setExpanded(itemId, draft?.id === itemId && !!session.find(itemId))
+    if (draft?.id === itemId) setDraft(null)
+  }
+  function startNew() {
+    edit(blankTodo())
+  }
+  function row(item: TodoDraft) {
     return (
-      <TodoEditor
+      <TodoRow
         key={item.id}
         item={item}
         session={session}
-        onFinish={finish}
-        onNext={() => setDraft(blankTodo())}
+        expanded={draft?.id === item.id || expandedIds.has(item.id)}
+        editing={draft?.id === item.id}
+        onExpand={() => {
+          edit(null)
+          setExpanded(item.id, true)
+        }}
+        onEdit={() => edit(item)}
+        onFinish={() => finish(item.id)}
+        onNext={startNew}
+        onStatus={(status) => {
+          capturePositions()
+          edit(null)
+          setExpanded(item.id, false)
+          focusAfterEdit.current = `[data-todo-status="${item.id}"]`
+          session.change({ ...item, status })
+        }}
       />
-    )
-  }
-  function row(item: TodoItem) {
-    if (editing?.id === item.id) return edit(editing)
-    const next: TodoState = todoStates[(todoStates.indexOf(item.status) + 1) % todoStates.length]
-    const name =
-      item.text.trim() ||
-      item.note.trim().split('\n')[0] ||
-      (item.links[0] && new URL(item.links[0]).host) ||
-      t('todo.image')
-    return (
-      <div className="todo-row" key={item.id}>
-        <button
-          type="button"
-          className="todo-status"
-          aria-label={t('todo.changeState', {
-            name,
-            from: t(`todo.${item.status}`),
-            to: t(`todo.${next}`)
-          })}
-          onClick={() => {
-            setDraft(null)
-            session.change({ ...item, status: next })
-            requestAnimationFrame(() =>
-              groups.current
-                ?.querySelector<HTMLButtonElement>('[data-todo-status="' + item.id + '"]')
-                ?.focus({ preventScroll: true })
-            )
-          }}
-          data-todo-status={item.id}
-        >
-          <span aria-hidden="true" className={'todo-dot todo-dot--' + item.status}>
-            {item.status === 'done' ? '✓' : ''}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="todo-title"
-          data-todo-edit={item.id}
-          onClick={() => setDraft(item)}
-        >
-          {name}
-        </button>
-        {(item.links.length > 0 || item.images.length > 0 || item.note) && (
-          <button
-            className="todo-ref"
-            type="button"
-            aria-label={t('todo.references', { name })}
-            onClick={() => setDraft(item)}
-          >
-            <Paperclip size={15} />
-          </button>
-        )}
-      </div>
     )
   }
   return (
@@ -283,13 +297,14 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
               {rows.map(row)}
               {status === 'todo' &&
                 (editing && (newLine || !items.some((item) => item.id === editing.id)) ? (
-                  edit(editing)
+                  row(editing)
                 ) : (
                   <button
                     type="button"
                     ref={newButton}
                     className="todo-new"
-                    onClick={() => setDraft(blankTodo())}
+                    data-todo-position="new"
+                    onClick={startNew}
                   >
                     <Plus aria-hidden="true" size={15} />
                     {t('todo.quick')}

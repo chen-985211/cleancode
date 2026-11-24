@@ -326,6 +326,18 @@ describe('canvas selection viewport', () => {
     }
   )
 
+  it('holds the viewport for a drawer interaction even when blank-click zoom is enabled', () => {
+    const node = createNode('selected', { x: 80, y: 120 }, { width: 400, height: 300 })
+    const viewport = { x: 25, y: -48, zoom: 0.85 }
+    const { instance, setViewport } = createReactFlowInstance([node], viewport)
+    const { result } = renderSelectionViewportHook(instance)
+
+    act(() => result.current.returnToGlobalCanvasView(node.id, 'preserve-viewport'))
+
+    expect(setViewport).not.toHaveBeenCalled()
+    expect(instance.getViewport()).toEqual(viewport)
+  })
+
   it.each(['terminal', 'agentConsole'] as const)(
     'stops an in-flight selection and its pending %s input activation when disabled',
     async (type) => {
