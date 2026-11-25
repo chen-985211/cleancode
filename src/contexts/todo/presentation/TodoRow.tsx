@@ -26,7 +26,7 @@ export function TodoRow({
   onStatus: (status: TodoState) => void
   item: TodoDraft
   session: TodoSession
-  onFinish: () => void
+  onFinish: (itemId: string) => void
   onNext: () => void
 }) {
   const { t } = useI18n()
@@ -96,7 +96,7 @@ export function TodoRow({
   function remove() {
     removed.current = true
     session.change({ ...item, text: '', note: '', links: [], images: [] })
-    onFinish()
+    onFinish(item.id)
   }
   const gestureHint = t(expanded ? 'todo.collapseGesture' : 'todo.itemGesture')
   const saved = 'createdAt' in item
@@ -117,7 +117,7 @@ export function TodoRow({
           data-todo-position={item.id}
           onClick={(e) => {
             if (editing || !isRowSurface(e.target)) return
-            if (expanded) onFinish()
+            if (expanded) onFinish(item.id)
             else onExpand()
           }}
           onKeyDown={(e) => {
@@ -142,7 +142,7 @@ export function TodoRow({
             }
             if (expanded && e.key === 'Escape') {
               e.stopPropagation()
-              onFinish()
+              onFinish(item.id)
             }
             if (
               editing &&

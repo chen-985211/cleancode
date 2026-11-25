@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { pollUntilState } from '../support/e2ePolling'
 import {
   closeElectronApp,
   createE2eWorkbench,
@@ -57,7 +58,12 @@ describe('project to-do list', () => {
       await page.mouse.down()
       await page.mouse.move(x + 48, y + 32, { steps: 8 })
       await page.mouse.up()
-      await expect.poll(position).not.toBe(before)
+      await pollUntilState({
+        description: 'the dragged terminal to move away from its starting position',
+        observe: position,
+        accept: (current) => current !== before,
+        timeoutMs: 5000
+      })
       await header.click()
       await page.locator('.react-flow__node-terminal.selected').waitFor()
       expect(await title.inputValue()).toBe('核对终端操作')
@@ -184,6 +190,41 @@ describe('project to-do list', () => {
       expect(
         await page.locator('.todo-detail').evaluate((el) => el.getBoundingClientRect().height)
       ).toBe(0)
+      for (const preference of ['reduce', 'no-preference'] as const) {
+        await page.emulateMedia({ reducedMotion: preference })
+        await page.waitForFunction(
+          (value) => matchMedia('(prefers-reduced-motion: ' + value + ')').matches,
+          preference
+        )
+        for (const opening of [true, false]) {
+          const motion = await savedTitle.evaluate(async (button) => {
+            const detail = document.getElementById(button.getAttribute('aria-controls')!)!
+            const height = () => detail.getBoundingClientRect().height
+            const start = height()
+            if (!(button instanceof HTMLButtonElement)) throw new Error('Expected a to-do button')
+            button.click()
+            await new Promise(requestAnimationFrame)
+            const reveal = detail
+              .getAnimations()
+              .find(
+                (animation) =>
+                  animation instanceof CSSTransition &&
+                  animation.transitionProperty === 'grid-template-rows'
+              )
+            if (!reveal) throw new Error('Missing to-do disclosure transition')
+            const duration = Number(reveal.effect!.getTiming().duration)
+            reveal.pause()
+            reveal.currentTime = duration / 2
+            const middle = height()
+            reveal.finish()
+            return { start, middle, end: height(), duration }
+          })
+          expect(motion.duration).toBe(260)
+          expect(motion.end > motion.start).toBe(opening)
+          expect(motion.middle).toBeGreaterThan(Math.min(motion.start, motion.end))
+          expect(motion.middle).toBeLessThan(Math.max(motion.start, motion.end))
+        }
+      }
       await savedTitle.click()
       expect(await page.getByRole('link', { name: /example.org/ }).getAttribute('href')).toBe(
         'https://example.org/filter'
@@ -195,34 +236,51 @@ describe('project to-do list', () => {
       expect(await img.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBe(1)
       await page.mouse.move(8, 8)
       const pencil = page.getByRole('button', { name: '编辑“调整筛选栏”' })
-      const pencilOpacity = () => pencil.evaluate((el) => getComputedStyle(el).opacity)
-      await expect.poll(pencilOpacity).toBe('0')
+      const waitForPencilOpacity = (opacity: string) =>
+        pollUntilState({
+          description: 'the edit pencil to reach opacity ' + opacity,
+          observe: () => pencil.evaluate((el) => getComputedStyle(el).opacity),
+          accept: (current) => current === opacity,
+          timeoutMs: 5000
+        })
+      await waitForPencilOpacity('0')
       expect(
         await page.locator('.todo-expanded').evaluate((el) => getComputedStyle(el).boxShadow)
       ).not.toBe('none')
       const address = page.getByRole('link', { name: /example.org/ })
       await address.hover()
-      await expect.poll(pencilOpacity).toBe('1')
+      await waitForPencilOpacity('1')
       const clipBox = (await address.locator('svg').boundingBox())!
       const addressBox = (await address.locator('strong').boundingBox())!
       expect(clipBox.x + clipBox.width).toBeLessThanOrEqual(addressBox.x)
       expect(await address.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('none')
-      // Observe the actual click after React's delegated handler, before native navigation.
-      await address.evaluate((link) => {
-        document.addEventListener(
-          'click',
-          (event) => {
-            link.setAttribute('data-navigation-prevented', String(event.defaultPrevented))
-            event.preventDefault()
-          },
-          { once: true }
-        )
+      const opened = await resources.electronApp!.evaluateHandle(({ shell }) => {
+        const urls: string[] = []
+        shell.openExternal = async (url) => {
+          urls.push(url)
+        }
+        return urls
       })
-      await address.click()
-      expect(await page.locator('.todo-link-row a').getAttribute('data-navigation-prevented')).toBe(
-        'true'
-      )
-      await expect.poll(() => savedTitle.getAttribute('aria-expanded')).toBe('false')
+      const waitForOpenedUrls = (count: number) =>
+        pollUntilState({
+          description: 'the external link handler to receive ' + count + ' calls',
+          observe: () => opened.jsonValue(),
+          accept: (urls) => urls.length >= count,
+          timeoutMs: 5000
+        })
+      await address.locator('strong').click()
+      expect(await waitForOpenedUrls(1)).toEqual(['https://example.org/filter'])
+      expect(await savedTitle.getAttribute('aria-expanded')).toBe('true')
+      await address.press('Enter')
+      expect(await waitForOpenedUrls(2)).toEqual([
+        'https://example.org/filter',
+        'https://example.org/filter'
+      ])
+      await opened.dispose()
+      const linkRow = page.locator('.todo-link-row')
+      const rowBox = (await linkRow.boundingBox())!
+      await linkRow.click({ position: { x: rowBox.width - 2, y: rowBox.height / 2 } })
+      await savedTitle.and(page.locator('[aria-expanded="false"]')).waitFor()
       expect(await page.getByRole('textbox', { name: '待办内容' }).count()).toBe(0)
       await savedTitle.dblclick()
       expect(await savedTitle.getAttribute('aria-expanded')).toBe('false')
@@ -231,7 +289,7 @@ describe('project to-do list', () => {
       await page.mouse.move(8, 8)
       await savedTitle.press('Tab')
       expect(await pencil.evaluate((el) => el === document.activeElement)).toBe(true)
-      await expect.poll(pencilOpacity).toBe('1')
+      await waitForPencilOpacity('1')
       const titleBox = (await savedTitle.boundingBox())!
       const pencilBox = (await pencil.boundingBox())!
       expect(pencilBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width)

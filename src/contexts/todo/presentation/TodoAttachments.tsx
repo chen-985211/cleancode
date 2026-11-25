@@ -45,10 +45,7 @@ export function TodoAttachments({
               target="_blank"
               rel="noreferrer"
               title={link}
-              onClick={(event) => {
-                if (event.metaKey || event.ctrlKey) event.stopPropagation()
-                else event.preventDefault()
-              }}
+              onClick={(event) => event.stopPropagation()}
             >
               <Paperclip aria-hidden="true" size={14} />
               <span className="todo-link-address">

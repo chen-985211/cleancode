@@ -110,6 +110,7 @@
   overflow: auto;
   min-height: 0;
   overscroll-behavior: contain;
+  overflow-anchor: none;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -172,21 +173,20 @@
 .todo-link-row a {
   transition: background-color var(--cc-motion-duration-feedback) var(--cc-easing-enter);
 }
-.todo-row:hover,
-.project-todo-drawer .todo-new:hover,
-.todo-row:has(.todo-title:focus-visible) {
+.todo-row:where(:hover, :has(.todo-title:focus-visible)),
+.project-todo-drawer .todo-new:hover {
   background: var(--cc-canvas-node-menu-hover);
 }
 .todo-row {
   position: relative;
 }
+.todo-row:active,
+.todo-row.todo-expanded {
+  background: var(--cc-todo-row-selected);
+}
 .todo-row.todo-expanded {
   z-index: 1;
-  background: var(--cc-canvas-node-menu-hover);
   box-shadow: var(--cc-shadow-sm), var(--cc-shadow-xs);
-}
-.todo-row[data-editing] {
-  background: color-mix(in srgb, var(--cc-canvas-node-menu-hover) 65%, var(--cc-surface));
 }
 .todo-fields {
   flex: 1;
@@ -376,6 +376,7 @@
   gap: 3px;
 }
 .todo-link-row a {
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -433,7 +434,9 @@
 .todo-asset-remove {
   opacity: 0;
 }
-.todo-expanded :is(.todo-link-row, .todo-image-preview):is(:hover, :focus-within) .todo-asset-remove {
+.todo-expanded
+  :is(.todo-link-row, .todo-image-preview):is(:hover, :focus-within)
+  .todo-asset-remove {
   opacity: 1;
 }
 .project-todo-drawer .todo-asset-remove:hover {
@@ -493,17 +496,47 @@
 .project-todo-drawer .todo-title:focus-visible {
   outline: none;
 }
+/* Disclosure keeps its application timing even under the renderer-wide duration override. */
+.todo-row {
+  transition-property: background-color, box-shadow;
+  transition-duration:
+    var(--cc-motion-duration-surface), var(--cc-motion-duration-todo-disclosure) !important;
+  transition-timing-function: var(--cc-easing-enter), var(--cc-easing-todo-disclosure);
+}
+.todo-title-slot {
+  transition-property: height;
+  transition-duration: var(--cc-motion-duration-todo-disclosure) !important;
+  transition-timing-function: var(--cc-easing-todo-disclosure);
+}
+.todo-detail {
+  opacity: 0;
+  transition-property: grid-template-rows, opacity;
+  transition-duration:
+    var(--cc-motion-duration-todo-disclosure), var(--cc-motion-duration-feedback) !important;
+  transition-timing-function: var(--cc-easing-todo-disclosure), var(--cc-easing-exit);
+}
+.todo-expanded .todo-detail {
+  opacity: 1;
+  transition-timing-function: var(--cc-easing-todo-disclosure), var(--cc-easing-enter);
+}
+/* The pinned capture grows from the button's existing title line. */
+.todo-capture > .todo-row {
+  max-height: calc(100dvh - var(--todo-header-height) - 32px);
+  overflow-y: auto;
+}
+@starting-style {
+  .todo-capture > .todo-expanded {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .todo-capture .todo-expanded .todo-detail {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .todo-edit-action {
     transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-enter);
-  }
-  .todo-row {
-    transition:
-      background-color var(--cc-motion-duration-surface) var(--cc-easing-enter),
-      box-shadow var(--cc-motion-duration-surface) var(--cc-easing-enter);
-  }
-  .todo-title-slot {
-    transition: height var(--cc-motion-duration-surface) var(--cc-easing-standard);
   }
   .todo-note-slot > *,
   .todo-heading,
@@ -523,29 +556,9 @@
       opacity: 1;
     }
   }
-  .todo-detail {
-    opacity: 0;
-    transition:
-      grid-template-rows var(--cc-motion-duration-surface) var(--cc-easing-standard),
-      opacity var(--cc-motion-duration-surface) var(--cc-easing-enter);
-  }
-  .todo-expanded .todo-detail {
-    opacity: 1;
-  }
-  @starting-style {
-    .todo-expanded .todo-detail {
-      grid-template-rows: 0fr;
-      opacity: 0;
-    }
-  }
 }
 @media (hover: none) {
   .todo-asset-remove {
     opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .todo-row {
-    transition: none;
   }
 }

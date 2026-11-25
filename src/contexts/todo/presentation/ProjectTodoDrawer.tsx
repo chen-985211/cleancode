@@ -268,7 +268,7 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
           setExpanded(item.id, true)
         }}
         onEdit={() => edit(item)}
-        onFinish={() => finish(item.id)}
+        onFinish={finish}
         onNext={startNew}
         onStatus={(status) => {
           capturePositions()
@@ -283,10 +283,14 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
   return (
     <>
       <div className="todo-capture">
-        <button type="button" className="todo-new" ref={newButton} onClick={startNew}>
-          <Plus aria-hidden="true" size={15} />
-          {t('todo.quick')}
-        </button>
+        {newLine && editing ? (
+          row(editing)
+        ) : (
+          <button type="button" className="todo-new" ref={newButton} onClick={startNew}>
+            <Plus aria-hidden="true" size={15} />
+            {t('todo.quick')}
+          </button>
+        )}
       </div>
       <div className="todo-scroll" ref={scroll}>
         <div className="todo-groups" ref={groups}>
@@ -297,9 +301,12 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
             const draftRow =
               status === 'todo' &&
               editing &&
-              (newLine || !items.some((item) => item.id === editing.id))
+              !newLine &&
+              !items.some((item) => item.id === editing.id)
                 ? editing
                 : null
+            // The list retains insertion order when an existing item is edited.
+            if (status === 'todo') rows.reverse()
             if (status === 'done') rows.sort((a, b) => b.completedAt! - a.completedAt!)
             if (!rows.length && !draftRow) return null
             return (
