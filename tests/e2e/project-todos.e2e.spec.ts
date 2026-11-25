@@ -489,9 +489,10 @@ describe('project to-do list', () => {
       const address = page.getByRole('link', { name: /example.org/ })
       await address.hover()
       await waitForPencilOpacity('1')
-      const clipBox = (await address.locator('svg').boundingBox())!
-      const addressBox = (await address.locator('strong').boundingBox())!
-      expect(clipBox.x + clipBox.width).toBeLessThanOrEqual(addressBox.x)
+      const hostLabel = address.getByText('example.org', { exact: true })
+      const iconBox = (await address.locator('.todo-link-icon').boundingBox())!
+      const addressBox = (await hostLabel.boundingBox())!
+      expect(iconBox.x + iconBox.width).toBeLessThanOrEqual(addressBox.x)
       expect(await address.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('none')
       const opened = await resources.electronApp!.evaluateHandle(({ shell }) => {
         const urls: string[] = []
@@ -507,7 +508,7 @@ describe('project to-do list', () => {
           accept: (urls) => urls.length >= count,
           timeoutMs: 5000
         })
-      await address.locator('strong').click()
+      await hostLabel.click()
       expect(await waitForOpenedUrls(1)).toEqual(['https://example.org/filter'])
       expect(await savedTitle.getAttribute('aria-expanded')).toBe('true')
       await address.press('Enter')

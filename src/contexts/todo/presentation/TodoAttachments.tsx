@@ -1,6 +1,7 @@
-import { Paperclip, X } from '@phosphor-icons/react'
+import { GlobeSimple, X } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../../../presentation/i18n/useI18n'
+import { GitHubMarkIcon } from '../../../presentation/shared/components/GitHubMarkIcon'
 import type { TodoDraft } from '../domain/ProjectTodoList'
 import type { TodoSession } from './TodoSession'
 
@@ -37,21 +38,18 @@ export function TodoAttachments({
       ))}
       {item.links.map((link) => {
         const url = new URL(link)
-        const path = (url.pathname === '/' ? '' : url.pathname) + url.search + url.hash
         return (
           <div className="todo-link-row" key={link}>
             <a
               href={link}
               target="_blank"
               rel="noreferrer"
+              aria-label={link}
               title={link}
               onClick={(event) => event.stopPropagation()}
             >
-              <Paperclip aria-hidden="true" size={14} />
-              <span className="todo-link-address">
-                <strong>{url.host}</strong>
-                {path && <span>{path}</span>}
-              </span>
+              <SiteIcon hostname={url.hostname} />
+              <span className="todo-link-address">{url.host}</span>
             </a>
             {onChange && (
               <button
@@ -67,6 +65,17 @@ export function TodoAttachments({
         )
       })}
     </div>
+  )
+}
+
+function SiteIcon({ hostname }: { hostname: string }) {
+  const site = hostname.replace(/^www\./, '').replace(/\.$/, '')
+  const isGitHub = site === 'github.com' || site.endsWith('.github.com')
+  const initial = site.match(/^[a-z]/i)?.[0].toUpperCase()
+  return (
+    <span className="todo-link-icon" aria-hidden="true">
+      {isGitHub ? <GitHubMarkIcon size={14} /> : (initial ?? <GlobeSimple size={13} />)}
+    </span>
   )
 }
 

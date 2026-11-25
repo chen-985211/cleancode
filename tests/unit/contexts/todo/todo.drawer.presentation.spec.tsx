@@ -166,7 +166,6 @@ describe('project to-do drawer', () => {
       Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
     expect(before(refs.getByRole('img'), address)).toBe(true)
     expect(before(address, refs.getByRole('paragraph'))).toBe(true)
-    expect(address.firstElementChild?.tagName).toBe('svg')
     expect(refs.getByRole('paragraph')).toHaveTextContent('填写备注，或粘贴链接、图片')
     expect(fireEvent.click(address)).toBe(true)
     expect(heading).toHaveAttribute('aria-expanded', 'true')
@@ -176,7 +175,6 @@ describe('project to-do drawer', () => {
     expect(heading).toHaveAttribute('aria-expanded', 'true')
     expect(refs.queryByRole('textbox')).toBeNull()
     expect(refs.queryByRole('button', { name: '移除链接' })).toBeNull()
-    expect(refs.getByRole('link').querySelectorAll('svg')).toHaveLength(1)
     fireEvent.click(heading)
     expect(heading).toHaveAttribute('aria-expanded', 'false')
     for (const detail of [1, 2, 3]) {
@@ -197,6 +195,31 @@ describe('project to-do drawer', () => {
     expect(refs.queryByRole('img')).toBeNull()
     expect(opener).toHaveTextContent('00/01')
     expect(api.saveTodo).not.toHaveBeenCalled()
+  })
+
+  it('shows just the host of each attachment and keeps same-site destinations distinct', async () => {
+    const links = [
+      'https://github.com/primer/octicons',
+      'https://github.com/primer/design/issues?q=is%3Aopen#results',
+      'http://localhost:5173/preview'
+    ]
+    const item = { ...blankTodo(), text: '设计参考', links, createdAt: 1, completedAt: null }
+    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    fireEvent.click(await screen.findByRole('button', { name: item.text }))
+
+    const attachments = screen.getAllByRole('link')
+    expect(attachments).toHaveLength(links.length)
+    for (const [index, attachment] of attachments.entries()) {
+      const href = links[index]
+      const url = new URL(href)
+      expect(within(attachment).getByText(url.host, { exact: true })).toBeVisible()
+      expect(attachment).not.toHaveTextContent(url.pathname)
+      expect(attachment).toHaveAccessibleName(href)
+      expect(attachment).toHaveAttribute('href', href)
+      expect(attachment).toHaveAttribute('title', href)
+    }
   })
 
   it('keeps previously opened items visible when another item is opened', async () => {
