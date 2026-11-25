@@ -245,6 +245,63 @@ describe('project to-do drawer', () => {
     expect(scroller().scrollTop).toBe(84)
   })
 
+  it.each(['new', 'existing'] as const)(
+    'leaves Shift+Enter to the title textarea and confirms the multiline %s item with Enter',
+    async (mode) => {
+      const item = { ...blankTodo(), text: '甲乙', createdAt: 1, completedAt: null }
+      const api = {
+        listTodos: vi.fn(async () => (mode === 'existing' ? [item] : [])),
+        saveTodo: vi.fn(),
+        readTodoImage: vi.fn()
+      }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      const opener = screen.getByRole('button', { name: '打开待办清单' })
+      fireEvent.click(opener)
+      fireEvent.click(
+        await screen.findByRole('button', { name: mode === 'new' ? '记一条' : '编辑“甲乙”' })
+      )
+      const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
+      if (mode === 'new') fireEvent.change(title, { target: { value: item.text } })
+      title.setSelectionRange(1, 1)
+      expect(fireEvent.keyDown(title, { key: 'Enter', shiftKey: true })).toBe(true)
+      expect(title).toHaveFocus()
+      expect(title).toHaveValue('甲乙')
+      fireEvent.change(title, { target: { value: '甲\n乙' } })
+      expect(api.saveTodo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ draft: expect.objectContaining({ text: '甲\n乙', note: '' }) })
+      )
+      fireEvent.keyDown(title, { key: 'Enter' })
+      expect(screen.getByRole('button', { name: /^甲\s+乙$/ })).toBeVisible()
+      expect(opener).toHaveTextContent('00/01')
+      if (mode === 'new') expect(title).toHaveValue('')
+      else expect(screen.queryByRole('textbox', { name: '待办内容' })).toBeNull()
+    }
+  )
+
+  it('preserves title line breaks when pasting a reference at the caret', async () => {
+    const item = { ...blankTodo(), text: '甲\n乙', note: '备注', createdAt: 1, completedAt: null }
+    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^编辑“甲\s+乙”$/ }))
+    const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
+    title.setSelectionRange(2, 2)
+    const reference = '参考 https://example.org/\r\n补充'
+    fireEvent.paste(title, {
+      clipboardData: {
+        files: [],
+        getData: (format: string) => (format === 'text/plain' ? reference : '')
+      }
+    })
+    const text = '甲\n参考 https://example.org/\n补充乙'
+    expect(title).toHaveValue(text)
+    expect(api.saveTodo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ draft: expect.objectContaining({ text, note: item.note }) })
+    )
+    expect(screen.getByRole('textbox', { name: '备注' })).toHaveValue('备注')
+    expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.org/')
+  })
+
   it('can complete a pending item directly from its context menu', async () => {
     const item = { ...blankTodo(), text: '检查按钮', createdAt: 1, completedAt: null }
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }

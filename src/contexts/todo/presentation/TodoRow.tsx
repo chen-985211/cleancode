@@ -81,23 +81,25 @@ export function TodoRow({
         .forEach((a) => anchors.push(a.getAttribute('href')!))
     }
     const { links, text } = classifyTodoPaste(
-      data.getData('text/plain'),
+      data.getData('text/plain').replace(/\r\n?/g, '\n'),
       data.getData('text/uri-list'),
       anchors
     )
-    if (!links.length && !files.length && !(field === 'text' && /[\r\n]/.test(text))) return
-    event.preventDefault()
     const control = event.currentTarget
+    const splitPastedTitle =
+      field === 'text' && !control.value.includes('\n') && text.includes('\n')
+    if (!links.length && !files.length && !splitPastedTitle) return
+    event.preventDefault()
     const start = control.selectionStart ?? control.value.length
     const end = control.selectionEnd ?? start
     const next = { ...item, links: [...new Set([...item.links, ...links])] }
     if (text) {
       const combined = control.value.slice(0, start) + text + control.value.slice(end)
-      if (field === 'text') {
-        const [first, ...lines] = combined.replace(/\r\n?/g, '\n').split('\n')
+      if (splitPastedTitle) {
+        const [first, ...lines] = combined.split('\n')
         next.text = first
         next.note = [lines.join('\n'), next.note].filter(Boolean).join('\n')
-      } else next.note = combined
+      } else next[field] = combined
       requestAnimationFrame(() =>
         control.setSelectionRange(start + text.length, start + text.length)
       )
@@ -178,7 +180,7 @@ export function TodoRow({
             if (
               editing &&
               e.key === 'Enter' &&
-              (e.target === title.current || e.metaKey || e.ctrlKey)
+              ((e.target === title.current && !e.shiftKey) || e.metaKey || e.ctrlKey)
             ) {
               e.preventDefault()
               if (capture) onNext()
