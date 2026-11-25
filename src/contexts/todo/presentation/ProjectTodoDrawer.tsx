@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type CSSProperties
 } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowRight, Plus } from '@phosphor-icons/react'
 import { useI18n } from '../../../presentation/i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../../presentation/shared/components/SurfaceMotion'
@@ -68,6 +69,7 @@ export function ProjectTodoDrawer({
   }, [session])
   const toggle = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
+  const [header, setHeader] = useState<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     if (open) closeButton.current?.focus({ preventScroll: true })
   }, [open])
@@ -121,7 +123,7 @@ export function ProjectTodoDrawer({
           }
         }}
       >
-        <div className="todo-drawer-header">
+        <div className="todo-drawer-header" ref={setHeader}>
           <button
             type="button"
             className="todo-close"
@@ -142,7 +144,9 @@ export function ProjectTodoDrawer({
           <TodoRows
             session={session}
             key={projectId}
+            header={header}
             items={state.items}
+            showCompleted={state.showCompleted}
             expandedIds={state.expanded}
           />
         )}
@@ -204,11 +208,15 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) 
 
 function TodoRows({
   session,
+  header,
   items,
+  showCompleted,
   expandedIds
 }: {
   session: TodoSession
+  header: HTMLDivElement | null
   items: TodoItem[]
+  showCompleted: boolean
   expandedIds: ReadonlySet<string>
 }) {
   const { t } = useI18n()
@@ -224,6 +232,7 @@ function TodoRows({
   const newLine = editor?.capture
   const listed = newLine ? items.filter((item) => item.id !== draft?.id) : items
   const sections = todoStates
+    .filter((status) => showCompleted || status !== 'done')
     .map((status) => ({ status, rows: todosInStatus(listed, status) }))
     .filter(({ rows }) => rows.length > 0)
   useTodoReadingPosition(scroll, groups, session.reading)
@@ -301,25 +310,46 @@ function TodoRows({
         onFinish={finish}
         onNext={startNew}
         onStatus={(status) => {
+          const willHide = status === 'done' && !showCompleted
           if (captureRow) {
             change({ ...item, status })
-            return
-          }
-          capturePositions(item.id)
-          if (editor?.item.id === item.id) {
-            setEditor({ ...editor, item: { ...editor.item, status } })
-          } else if (editor) {
+            if (!willHide) return
             edit(null)
+          } else {
+            capturePositions(item.id)
+            if (editor?.item.id === item.id && !willHide) {
+              setEditor({ ...editor, item: { ...editor.item, status } })
+            } else if (editor) {
+              edit(null)
+            }
+            const saved = session.find(item.id)
+            if (saved) session.change({ ...saved, status })
           }
           focusAfterEdit.current = `[data-todo-status="${item.id}"]`
-          const saved = session.find(item.id)
-          if (saved) session.change({ ...saved, status })
         }}
       />
     )
   }
   return (
     <>
+      {header &&
+        !newLine &&
+        items.some((item) => item.status === 'done') &&
+        createPortal(
+          <button
+            type="button"
+            className="todo-completed-toggle"
+            aria-label={t(showCompleted ? 'todo.hideCompleted' : 'todo.showCompleted')}
+            aria-expanded={showCompleted}
+            onClick={() => {
+              if (draft) edit(null)
+              session.setShowCompleted(!showCompleted)
+            }}
+          >
+            {t(showCompleted ? 'todo.hide' : 'todo.show')}
+          </button>,
+          header
+        )}
       <div className="todo-capture" ref={capture}>
         {newLine && draft ? (
           row(draft, true)

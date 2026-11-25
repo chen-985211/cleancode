@@ -146,6 +146,7 @@ export function TodoRow({
       <ContextMenu.Trigger asChild disabled={!saved}>
         <div
           className={expanded ? 'todo-row todo-expanded' : 'todo-row'}
+          data-status={item.status}
           data-editing={editing || undefined}
           data-todo-position={item.id}
           onClick={(e) => {

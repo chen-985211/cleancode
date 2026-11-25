@@ -12,6 +12,7 @@ export function blankTodo(): TodoDraft {
 type SessionState = {
   items: TodoItem[]
   expanded: ReadonlySet<string>
+  showCompleted: boolean
   loading: boolean
   loadFailed: boolean
   saveFailed: boolean
@@ -24,6 +25,7 @@ export class TodoSession {
   private state: SessionState = {
     items: [],
     expanded: new Set(),
+    showCompleted: true,
     loading: true,
     loadFailed: false,
     saveFailed: false
@@ -64,6 +66,9 @@ export class TodoSession {
   }
   find(id: string) {
     return this.state.items.find((item) => item.id === id)
+  }
+  setShowCompleted(showCompleted: boolean) {
+    this.publish({ showCompleted })
   }
   setExpanded(id: string, expanded: boolean) {
     if (this.state.expanded.has(id) === expanded) return

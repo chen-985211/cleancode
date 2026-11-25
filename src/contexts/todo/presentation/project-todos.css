@@ -62,7 +62,7 @@
   max-width: calc((100% - var(--cc-canvas-sidebar-inset, 0px)) * 0.64);
   display: flex;
   flex-direction: column;
-  --todo-header-height: 64px;
+  --todo-header-height: 72px;
   --todo-list-inset: 4px;
   color: var(--todo-ink);
   background: color-mix(in srgb, var(--cc-canvas-node-menu-surface) 68%, var(--cc-surface));
@@ -106,7 +106,7 @@
   min-height: 0;
   position: relative;
   flex: none;
-  padding: 16px var(--todo-gutter) 0;
+  padding: 8px var(--todo-gutter) 0;
 }
 .todo-scroll {
   flex: 1 1 0;
@@ -155,11 +155,13 @@
   font: inherit;
 }
 .todo-drawer-header {
-  display: flex;
+  display: grid;
   flex: 0 0 var(--todo-header-height);
-  align-items: center;
-  justify-content: flex-end;
-  padding-inline: calc(var(--todo-gutter) + 12px);
+  grid-template: 32px 24px / 44px;
+  row-gap: 2px;
+  place-content: center end;
+  justify-items: center;
+  padding-inline: calc(var(--todo-gutter) + 6px);
   box-shadow: inset 0 -1px color-mix(in srgb, var(--todo-ink) 6%, transparent);
 }
 .project-todo-drawer .todo-close {
@@ -175,6 +177,17 @@
 }
 .project-todo-drawer .todo-close:is(:hover, :active) {
   background: color-mix(in srgb, var(--todo-ink) 8%, var(--cc-canvas-node-menu-hover));
+}
+.project-todo-drawer .todo-completed-toggle {
+  justify-self: stretch;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: var(--todo-quiet);
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+}
+.todo-completed-toggle:is(:hover, :focus-visible) {
+  background: var(--cc-canvas-node-menu-hover);
 }
 .todo-row,
 .todo-new {
@@ -251,6 +264,9 @@
 }
 .todo-expanded .todo-title {
   white-space: pre-wrap;
+}
+.todo-row[data-status='done'] .todo-title {
+  color: var(--todo-quiet);
 }
 :is(.todo-title-slot, .todo-note-slot) > [inert] {
   opacity: 0;

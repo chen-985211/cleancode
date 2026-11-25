@@ -32,6 +32,40 @@ describe('project to-do drawer', () => {
     expect(opener).toHaveFocus()
   })
 
+  it('filters only completed rows and remembers visibility for each project session', async () => {
+    const items = (['todo', 'active', 'done'] as const).map((status) => ({
+      ...blankTodo(),
+      status,
+      text: status,
+      createdAt: 1,
+      completedAt: status === 'done' ? 2 : null
+    }))
+    const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    const view = render(<ProjectTodoDrawer projectId="a" api={api} />)
+    const opener = screen.getByRole('button', { name: '打开待办清单' })
+    fireEvent.click(opener)
+    fireEvent.click(await screen.findByRole('button', { name: 'done' }))
+    const hide = screen.getByRole('button', { name: '隐藏已完成' })
+    expect(hide).toHaveTextContent(/^隐藏$/)
+    fireEvent.click(hide)
+    expect(screen.queryByRole('button', { name: 'done' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'todo' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'active' })).toBeVisible()
+    expect(opener).toHaveTextContent('01/03')
+    expect(api.saveTodo).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^active，当前/ }))
+    expect(screen.queryByRole('button', { name: 'active' })).toBeNull()
+    expect(opener).toHaveTextContent('02/03')
+    view.rerender(<ProjectTodoDrawer projectId="b" api={api} />)
+    expect(await screen.findByRole('button', { name: 'done' })).toBeVisible()
+    view.rerender(<ProjectTodoDrawer projectId="a" api={api} />)
+    const show = screen.getByRole('button', { name: '显示已完成' })
+    expect(show).toHaveTextContent(/^显示$/)
+    fireEvent.click(show)
+    expect(screen.getByRole('button', { name: 'done' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /^active，当前已完成/ })).toBeVisible()
+  })
+
   it('keeps deletion out of the typing surface and offers it from the item context menu', async () => {
     const item = { ...blankTodo(), text: '111111', createdAt: 1, completedAt: null }
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
