@@ -63,6 +63,7 @@
   display: flex;
   flex-direction: column;
   --todo-header-height: 64px;
+  --todo-list-inset: 4px;
   color: var(--todo-ink);
   background: color-mix(in srgb, var(--cc-canvas-node-menu-surface) 68%, var(--cc-surface));
   border-left: 1px solid var(--cc-statusbar-border);
@@ -102,6 +103,9 @@
   opacity: 0.65;
 }
 .todo-capture {
+  box-sizing: content-box;
+  min-height: 0;
+  interpolate-size: allow-keywords;
   position: relative;
   flex: none;
   padding: 16px var(--todo-gutter) 0;
@@ -119,7 +123,7 @@
 }
 .todo-groups {
   position: relative;
-  padding: 4px var(--todo-gutter) 12px;
+  padding: var(--todo-list-inset) var(--todo-gutter) 12px;
 }
 .todo-groups section {
   display: grid;

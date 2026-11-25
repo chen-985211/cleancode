@@ -440,6 +440,31 @@
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;
   --cc-motion-duration-todo-disclosure: 260ms;
+  --cc-motion-duration-todo-confirm: 360ms;
+  /* Critically damped step response, sampled every 5% and normalized at rest. */
+  --cc-easing-todo-confirm: linear(
+    0,
+    0.0557,
+    0.1756,
+    0.3137,
+    0.4469,
+    0.5645,
+    0.6633,
+    0.7434,
+    0.8069,
+    0.8562,
+    0.8941,
+    0.9228,
+    0.9444,
+    0.9605,
+    0.9724,
+    0.9812,
+    0.9876,
+    0.9923,
+    0.9957,
+    0.9982,
+    1
+  );
   --cc-easing-todo-disclosure: cubic-bezier(0.3, 0.15, 0.06, 1);
   --cc-motion-delay-brand-reveal: 280ms;
   --cc-motion-duration-brand-reveal: 700ms;

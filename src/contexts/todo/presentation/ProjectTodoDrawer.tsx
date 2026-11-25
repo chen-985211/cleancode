@@ -193,6 +193,8 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
   const [expandedIds, setExpandedIds] = useState(() => new Set<string>())
   const scroll = useRef<HTMLDivElement>(null),
     groups = useRef<HTMLDivElement>(null)
+  const capture = useRef<HTMLDivElement>(null)
+  const [confirmedId, setConfirmedId] = useState<string | null>(null)
   const capturePositions = useTodoReorderMotion(scroll)
   const focusAfterEdit = useRef<string | null>(null)
   const newButton = useRef<HTMLButtonElement>(null)
@@ -228,6 +230,30 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     pointerPolicy: 'passthrough'
   })
   useLayoutEffect(() => {
+    if (!confirmedId) return
+    const slot = capture.current
+    if (!slot?.animate) return
+    // The saved row now heads the scroll area. Reveal the space above it so
+    // the row starts where the editor was and its neighbors move with it.
+    const styles = getComputedStyle(slot)
+    const animation = slot.animate(
+      [
+        {
+          height: '0px',
+          marginBottom: 'calc(-1 * var(--todo-list-inset))',
+          opacity: 0,
+          overflow: 'clip'
+        },
+        { height: 'auto', marginBottom: '0px', opacity: 1, overflow: 'clip' }
+      ],
+      {
+        duration: parseFloat(styles.getPropertyValue('--cc-motion-duration-todo-confirm')),
+        easing: styles.getPropertyValue('--cc-easing-todo-confirm').trim()
+      }
+    )
+    return () => animation.cancel()
+  }, [confirmedId])
+  useLayoutEffect(() => {
     const selector = focusAfterEdit.current
     if (!selector) return
     focusAfterEdit.current = null
@@ -243,13 +269,16 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     })
   }
   function edit(item: TodoDraft | null) {
-    if (draft && session.find(draft.id)) setExpanded(draft.id, true)
+    if (draft && session.find(draft.id)) {
+      if (newLine) setConfirmedId(draft.id)
+      setExpanded(draft.id, true)
+    }
     setDraft(item)
   }
   function finish(itemId: string) {
     focusAfterEdit.current = `[data-todo-edit="${itemId}"]`
-    setExpanded(itemId, draft?.id === itemId && !!session.find(itemId))
-    if (draft?.id === itemId) setDraft(null)
+    if (draft?.id === itemId) edit(null)
+    else setExpanded(itemId, false)
   }
   function startNew() {
     if (scroll.current) scroll.current.scrollTop = 0
@@ -282,7 +311,7 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
   }
   return (
     <>
-      <div className="todo-capture">
+      <div className="todo-capture" ref={capture}>
         {newLine && editing ? (
           row(editing)
         ) : (
