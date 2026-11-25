@@ -7,7 +7,7 @@ export const enTodosMessages = {
   'todo.quick': 'Add a to-do',
   'todo.content': 'To-do text',
   'todo.note': 'Note',
-  'todo.pasteHint': 'Add a note or paste a link or screenshot',
+  'todo.pasteHint': 'Add a note, or paste a link or image',
   'todo.remove': 'Delete item',
   'todo.removeImage': 'Remove screenshot',
   'todo.removeLink': 'Remove link',

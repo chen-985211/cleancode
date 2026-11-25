@@ -5,7 +5,7 @@ export const zhCNTodosMessages = {
   'todo.quick': '记一条',
   'todo.content': '待办内容',
   'todo.note': '备注',
-  'todo.pasteHint': '写备注，或粘贴链接、截图',
+  'todo.pasteHint': '填写备注，或粘贴链接、图片',
   'todo.remove': '删除此条',
   'todo.removeImage': '移除截图',
   'todo.removeLink': '移除链接',

@@ -252,6 +252,7 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     if (draft?.id === itemId) setDraft(null)
   }
   function startNew() {
+    if (scroll.current) scroll.current.scrollTop = 0
     edit(blankTodo())
   }
   function row(item: TodoDraft) {
@@ -280,40 +281,39 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     )
   }
   return (
-    <div className="todo-scroll" ref={scroll}>
-      <div className="todo-groups" ref={groups}>
-        {todoStates.map((status) => {
-          const rows = items.filter(
-            (item) => item.status === status && !(newLine && item.id === draft?.id)
-          )
-          if (status === 'done') rows.sort((a, b) => b.completedAt! - a.completedAt!)
-          if (!rows.length && status !== 'todo') return null
-          return (
-            <section
-              key={status}
-              aria-label={t(`todo.${status}`)}
-              data-todo-history={status === 'done' ? '' : undefined}
-            >
-              {rows.map(row)}
-              {status === 'todo' &&
-                (editing && (newLine || !items.some((item) => item.id === editing.id)) ? (
-                  row(editing)
-                ) : (
-                  <button
-                    type="button"
-                    ref={newButton}
-                    className="todo-new"
-                    data-todo-position="new"
-                    onClick={startNew}
-                  >
-                    <Plus aria-hidden="true" size={15} />
-                    {t('todo.quick')}
-                  </button>
-                ))}
-            </section>
-          )
-        })}
+    <>
+      <div className="todo-capture">
+        <button type="button" className="todo-new" ref={newButton} onClick={startNew}>
+          <Plus aria-hidden="true" size={15} />
+          {t('todo.quick')}
+        </button>
       </div>
-    </div>
+      <div className="todo-scroll" ref={scroll}>
+        <div className="todo-groups" ref={groups}>
+          {todoStates.map((status) => {
+            const rows = items.filter(
+              (item) => item.status === status && !(newLine && item.id === draft?.id)
+            )
+            const draftRow =
+              status === 'todo' &&
+              editing &&
+              (newLine || !items.some((item) => item.id === editing.id))
+                ? editing
+                : null
+            if (status === 'done') rows.sort((a, b) => b.completedAt! - a.completedAt!)
+            if (!rows.length && !draftRow) return null
+            return (
+              <section
+                key={status}
+                aria-label={t(`todo.${status}`)}
+                data-todo-history={status === 'done' ? '' : undefined}
+              >
+                {(draftRow ? [draftRow, ...rows] : rows).map(row)}
+              </section>
+            )
+          })}
+        </div>
+      </div>
+    </>
   )
 }

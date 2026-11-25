@@ -21,10 +21,8 @@ export function TodoAttachments({
   return (
     <div className="todo-attachments">
       {item.images.map((id) => (
-        <div className="todo-image-row" key={id}>
-          <div className="todo-image-preview">
-            <Thumbnail session={session} id={id} expanded={expanded} />
-          </div>
+        <div className="todo-image-preview" key={id}>
+          <Thumbnail session={session} id={id} expanded={expanded} />
           {onChange && (
             <button
               className="todo-asset-remove"
@@ -52,11 +50,11 @@ export function TodoAttachments({
                 else event.preventDefault()
               }}
             >
+              <Paperclip aria-hidden="true" size={14} />
               <span className="todo-link-address">
                 <strong>{url.host}</strong>
                 {path && <span>{path}</span>}
               </span>
-              <Paperclip aria-hidden="true" size={14} />
             </a>
             {onChange && (
               <button

@@ -34,7 +34,7 @@ export function TodoRow({
   const [pasteError, setPasteError] = useState(false)
   useEffect(() => {
     if (!editing) return
-    title.current?.focus()
+    title.current?.focus({ preventScroll: true })
     const end = title.current?.value.length ?? 0
     title.current?.setSelectionRange(end, end)
   }, [item.id, editing])
@@ -113,6 +113,7 @@ export function TodoRow({
       <ContextMenu.Trigger asChild disabled={!saved}>
         <div
           className={expanded ? 'todo-row todo-expanded' : 'todo-row'}
+          data-editing={editing || undefined}
           data-todo-position={item.id}
           onClick={(e) => {
             if (editing || !isRowSurface(e.target)) return
@@ -171,10 +172,12 @@ export function TodoRow({
             <span className="todo-status">{dot}</span>
           )}
           <div className="todo-fields">
-            {editing ? (
+            <div className="todo-title-slot">
               <textarea
                 rows={1}
                 className="todo-edit-title"
+                inert={!editing}
+                aria-hidden={!editing}
                 ref={title}
                 aria-label={t('todo.content')}
                 aria-description={t('todo.pasteHint')}
@@ -184,8 +187,7 @@ export function TodoRow({
                 onPaste={(e) => paste(e, 'text')}
                 onChange={(e) => session.change({ ...item, text: e.target.value })}
               />
-            ) : (
-              <div className="todo-heading">
+              <div className="todo-heading" inert={editing} aria-hidden={editing}>
                 <TooltipLabel content={gestureHint}>
                   <button
                     type="button"
@@ -210,7 +212,7 @@ export function TodoRow({
                   </button>
                 </TooltipLabel>
               </div>
-            )}
+            </div>
             <div
               id={'todo-details-' + item.id}
               className="todo-detail"
@@ -218,25 +220,30 @@ export function TodoRow({
               aria-hidden={!expanded}
             >
               <div className="todo-detail-clip">
-                {editing ? (
-                  <textarea
-                    rows={1}
-                    aria-label={t('todo.note')}
-                    placeholder={t('todo.note')}
-                    value={item.note}
-                    onContextMenu={(e) => e.stopPropagation()}
-                    onPaste={(e) => paste(e, 'note')}
-                    onChange={(e) => session.change({ ...item, note: e.target.value })}
-                  />
-                ) : (
-                  item.note && <p className="todo-note">{item.note}</p>
-                )}
                 <TodoAttachments
                   item={item}
                   session={session}
                   expanded={expanded}
                   onChange={editing ? (next) => session.change(next) : undefined}
                 />
+                <div className="todo-note-slot" data-empty={!item.note.trim() || undefined}>
+                  <p className="todo-note" inert={editing} aria-hidden={editing}>
+                    {item.note.trim() ? item.note : t('todo.pasteHint')}
+                  </p>
+                  {expanded && (
+                    <textarea
+                      rows={1}
+                      inert={!editing}
+                      aria-hidden={!editing}
+                      aria-label={t('todo.note')}
+                      placeholder={t('todo.pasteHint')}
+                      value={item.note}
+                      onContextMenu={(e) => e.stopPropagation()}
+                      onPaste={(e) => paste(e, 'note')}
+                      onChange={(e) => session.change({ ...item, note: e.target.value })}
+                    />
+                  )}
+                </div>
                 {editing && pasteError && <span role="alert">{t('todo.pasteFailed')}</span>}
               </div>
             </div>

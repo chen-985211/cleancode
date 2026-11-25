@@ -101,6 +101,11 @@
 .todo-resize:is(:hover, :focus-visible, :active)::after {
   opacity: 0.65;
 }
+.todo-capture {
+  position: relative;
+  flex: none;
+  padding: 16px var(--todo-gutter) 0;
+}
 .todo-scroll {
   overflow: auto;
   min-height: 0;
@@ -113,7 +118,7 @@
 }
 .todo-groups {
   position: relative;
-  padding: 16px var(--todo-gutter) 12px;
+  padding: 4px var(--todo-gutter) 12px;
 }
 .todo-groups section {
   display: grid;
@@ -180,6 +185,9 @@
   background: var(--cc-canvas-node-menu-hover);
   box-shadow: var(--cc-shadow-sm), var(--cc-shadow-xs);
 }
+.todo-row[data-editing] {
+  background: color-mix(in srgb, var(--cc-canvas-node-menu-hover) 65%, var(--cc-surface));
+}
 .todo-fields {
   flex: 1;
   min-width: 0;
@@ -200,10 +208,34 @@
   font-size: 14px;
   line-height: 20px;
 }
+.todo-title-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  column-gap: 6px;
+  height: 30px;
+  overflow: clip;
+  interpolate-size: allow-keywords;
+}
+.todo-expanded .todo-title-slot {
+  height: auto;
+}
+.todo-title-slot > .todo-edit-title {
+  grid-area: 1 / 1;
+  align-self: start;
+  min-width: 0;
+}
 .todo-heading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  grid-area: 1 / 1 / 2 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: start;
+}
+.todo-expanded .todo-title {
+  white-space: pre-wrap;
+}
+:is(.todo-title-slot, .todo-note-slot) > [inert] {
+  opacity: 0;
+  pointer-events: none;
 }
 .project-todo-drawer .todo-edit-action {
   display: grid;
@@ -214,13 +246,18 @@
   padding: 0;
   border-radius: 6px;
   color: var(--todo-quiet);
+  opacity: 0;
+  pointer-events: none;
+}
+.todo-row:is(:hover, :has(:focus-visible)) .todo-edit-action {
+  opacity: 1;
+  pointer-events: auto;
 }
 .project-todo-drawer .todo-edit-action:is(:hover, :focus-visible) {
   color: var(--todo-ink);
   background: var(--todo-wash);
 }
 .todo-title {
-  flex: 1;
   min-width: 0;
   user-select: none;
   overflow: hidden;
@@ -267,7 +304,6 @@
 }
 .todo-fields textarea {
   field-sizing: content;
-  max-height: 10em;
   resize: none;
 }
 .todo-detail {
@@ -280,6 +316,16 @@
 .todo-detail-clip {
   min-height: 0;
   overflow: hidden;
+}
+.todo-note-slot {
+  display: grid;
+  align-items: start;
+  overflow: clip;
+  font-size: 14px;
+}
+.todo-note-slot > * {
+  grid-area: 1 / 1;
+  min-width: 0;
 }
 .todo-note,
 .todo-fields .todo-detail textarea {
@@ -302,6 +348,10 @@
 .todo-fields textarea::placeholder {
   color: var(--todo-quiet);
 }
+.todo-note-slot[data-empty] .todo-note,
+.todo-fields .todo-note-slot textarea::placeholder {
+  color: color-mix(in srgb, var(--todo-ink) 58%, var(--cc-canvas-node-menu-surface));
+}
 .project-todo-drawer .todo-new {
   align-items: center;
   width: 100%;
@@ -318,22 +368,12 @@
   gap: 5px;
   padding: 3px 0;
 }
-.todo-link-row,
-.todo-image-row {
+.todo-link-row {
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
   align-items: center;
   gap: 3px;
-}
-.todo-image-row {
-  align-items: flex-start;
-}
-.project-todo-drawer .todo-image-preview {
-  min-width: 0;
-  overflow: hidden;
-  border-radius: calc(7px * var(--cc-corner-radius-scale));
-  corner-shape: var(--cc-corner-shape);
-  background: var(--todo-wash);
 }
 .todo-link-row a {
   display: flex;
@@ -364,12 +404,15 @@
   font-weight: 550;
   color: var(--todo-ink);
 }
-.project-todo-drawer .todo-image-preview {
+.todo-image-preview {
   position: relative;
-  display: block;
-  width: fit-content;
+  justify-self: start;
+  min-width: 0;
   max-width: 100%;
-  padding: 0;
+  overflow: clip;
+  border-radius: calc(7px * var(--cc-corner-radius-scale));
+  corner-shape: var(--cc-corner-shape);
+  background: var(--todo-wash);
 }
 .todo-thumbnail {
   display: grid;
@@ -380,7 +423,7 @@
 .todo-thumbnail img {
   display: block;
   max-width: 100%;
-  max-height: 176px;
+  max-height: clamp(176px, 56cqi, 248px);
   object-fit: contain;
 }
 .project-todo-drawer .todo-asset-remove {
@@ -390,12 +433,26 @@
 .todo-asset-remove {
   opacity: 0;
 }
-.todo-expanded :is(.todo-link-row, .todo-image-row):is(:hover, :focus-within) .todo-asset-remove {
+.todo-expanded :is(.todo-link-row, .todo-image-preview):is(:hover, :focus-within) .todo-asset-remove {
   opacity: 1;
 }
 .project-todo-drawer .todo-asset-remove:hover {
   color: var(--todo-ink);
   background: var(--todo-wash);
+}
+.todo-image-preview .todo-asset-remove {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  color: var(--todo-ink);
+  background: var(--cc-surface-overlay);
+  box-shadow: var(--cc-shadow-xs);
+}
+.todo-image-preview .todo-asset-remove:hover {
+  background: var(--cc-chrome-raised);
 }
 .todo-item-menu {
   z-index: 52;
@@ -437,10 +494,21 @@
   outline: none;
 }
 @media (prefers-reduced-motion: no-preference) {
+  .todo-edit-action {
+    transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-enter);
+  }
   .todo-row {
     transition:
-      background-color var(--cc-motion-duration-feedback) var(--cc-easing-enter),
+      background-color var(--cc-motion-duration-surface) var(--cc-easing-enter),
       box-shadow var(--cc-motion-duration-surface) var(--cc-easing-enter);
+  }
+  .todo-title-slot {
+    transition: height var(--cc-motion-duration-surface) var(--cc-easing-standard);
+  }
+  .todo-note-slot > *,
+  .todo-heading,
+  .todo-edit-title {
+    transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   }
   .todo-count {
     animation: todo-count-in var(--cc-motion-duration-feedback) var(--cc-easing-enter);
@@ -456,17 +524,28 @@
     }
   }
   .todo-detail {
-    transition: grid-template-rows var(--cc-motion-duration-surface)
-      var(--cc-easing-terminal-feedback);
+    opacity: 0;
+    transition:
+      grid-template-rows var(--cc-motion-duration-surface) var(--cc-easing-standard),
+      opacity var(--cc-motion-duration-surface) var(--cc-easing-enter);
+  }
+  .todo-expanded .todo-detail {
+    opacity: 1;
   }
   @starting-style {
     .todo-expanded .todo-detail {
       grid-template-rows: 0fr;
+      opacity: 0;
     }
   }
 }
 @media (hover: none) {
   .todo-asset-remove {
     opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .todo-row {
+    transition: none;
   }
 }

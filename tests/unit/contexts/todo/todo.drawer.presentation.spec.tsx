@@ -51,6 +51,22 @@ describe('project to-do drawer', () => {
     expect(opener).toHaveTextContent('00/00')
   })
 
+  it('shows an empty note when a title-only item is expanded without editing it', async () => {
+    const item = { ...blankTodo(), text: '改进筛选栏', createdAt: 1, completedAt: null }
+    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    const heading = await screen.findByRole('button', { name: item.text })
+    fireEvent.click(heading)
+    const note = screen.getByRole('paragraph')
+    expect(note).toHaveTextContent('填写备注，或粘贴链接、图片')
+    expect(screen.queryByRole('textbox')).toBeNull()
+    fireEvent.click(note)
+    expect(heading).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('paragraph')).toBeNull()
+    expect(api.saveTodo).not.toHaveBeenCalled()
+  })
+
   it('reveals notes, links and images together only while their item is expanded', async () => {
     vi.stubGlobal(
       'IntersectionObserver',
@@ -91,6 +107,12 @@ describe('project to-do drawer', () => {
     expect(await refs.findByRole('img', { name: '粘贴的截图' })).toBeVisible()
     const heading = refs.getByRole('button', { name: item.text })
     const address = refs.getByRole('link', { name: /example.org/ })
+    const before = (first: Element, second: Element) =>
+      Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(before(refs.getByRole('img'), address)).toBe(true)
+    expect(before(address, refs.getByRole('paragraph'))).toBe(true)
+    expect(address.firstElementChild?.tagName).toBe('svg')
+    expect(refs.getByRole('paragraph')).toHaveTextContent('填写备注，或粘贴链接、图片')
     expect(fireEvent.click(address)).toBe(false)
     expect(heading).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(heading)
@@ -108,6 +130,9 @@ describe('project to-do drawer', () => {
     expect(refs.queryByRole('textbox')).toBeNull()
     fireEvent.click(refs.getByRole('button', { name: '编辑“改进筛选栏”' }))
     expect(refs.getByRole('textbox', { name: '待办内容' })).toHaveFocus()
+    const noteEditor = refs.getByRole('textbox', { name: '备注' })
+    expect(noteEditor).toHaveAttribute('placeholder', '填写备注，或粘贴链接、图片')
+    expect(before(refs.getByRole('link'), noteEditor)).toBe(true)
     expect(refs.getByRole('button', { name: '移除链接' })).toBeVisible()
     fireEvent.keyDown(refs.getByRole('textbox', { name: '待办内容' }), { key: 'Escape' })
     fireEvent.keyDown(refs.getByRole('button', { name: item.text }), { key: 'Escape' })
@@ -128,6 +153,13 @@ describe('project to-do drawer', () => {
     const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    const add = await screen.findByRole('button', { name: '记一条' })
+    const first = await screen.findByRole('button', { name: items[0].text })
+    expect(add.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(add)
+    expect(add).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '待办内容' }), { key: 'Escape' })
+    expect(add).toHaveFocus()
     for (const { text } of items) fireEvent.click(await screen.findByRole('button', { name: text }))
     for (const { text } of items)
       expect(screen.getByRole('button', { name: text })).toHaveAttribute('aria-expanded', 'true')
@@ -160,8 +192,10 @@ describe('project to-do drawer', () => {
       }
     })
     expect(title).toHaveValue('')
+    const pastedLink = screen.getByRole('link')
     fireEvent.keyDown(title, { key: 'Escape' })
-    expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.org/design')
+    expect(screen.getByRole('link')).toBe(pastedLink)
+    expect(pastedLink).toHaveAttribute('href', 'https://example.org/design')
     expect(opener).toHaveTextContent('00/01')
     fireEvent.keyDown(screen.getByRole('button', { name: 'example.org' }), { key: 'F2' })
     expect(screen.getByRole('textbox', { name: '待办内容' })).toHaveFocus()

@@ -194,11 +194,18 @@ describe('project to-do list', () => {
       })
       expect(await img.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBe(1)
       await page.mouse.move(8, 8)
+      const pencil = page.getByRole('button', { name: '编辑“调整筛选栏”' })
+      const pencilOpacity = () => pencil.evaluate((el) => getComputedStyle(el).opacity)
+      await expect.poll(pencilOpacity).toBe('0')
       expect(
         await page.locator('.todo-expanded').evaluate((el) => getComputedStyle(el).boxShadow)
       ).not.toBe('none')
       const address = page.getByRole('link', { name: /example.org/ })
       await address.hover()
+      await expect.poll(pencilOpacity).toBe('1')
+      const clipBox = (await address.locator('svg').boundingBox())!
+      const addressBox = (await address.locator('strong').boundingBox())!
+      expect(clipBox.x + clipBox.width).toBeLessThanOrEqual(addressBox.x)
       expect(await address.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('none')
       // Observe the actual click after React's delegated handler, before native navigation.
       await address.evaluate((link) => {
@@ -221,16 +228,57 @@ describe('project to-do list', () => {
       expect(await savedTitle.getAttribute('aria-expanded')).toBe('false')
       expect(await page.getByRole('textbox', { name: '待办内容' }).count()).toBe(0)
       await savedTitle.click()
-      const pencil = page.getByRole('button', { name: '编辑“调整筛选栏”' })
+      await page.mouse.move(8, 8)
+      await savedTitle.press('Tab')
+      expect(await pencil.evaluate((el) => el === document.activeElement)).toBe(true)
+      await expect.poll(pencilOpacity).toBe('1')
       const titleBox = (await savedTitle.boundingBox())!
       const pencilBox = (await pencil.boundingBox())!
       expect(pencilBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width)
       expect(
         Math.abs(pencilBox.y + pencilBox.height / 2 - titleBox.y - titleBox.height / 2)
       ).toBeLessThan(1)
+      const expandedRow = page.locator('.todo-expanded')
+      const settle = () =>
+        expandedRow.evaluate(async (row) => {
+          await Promise.allSettled(
+            row.getAnimations({ subtree: true }).map((animation) => animation.finished)
+          )
+        })
+      await settle()
+      const sizes = await expandedRow.evaluateHandle((row) => {
+        const elements = [
+          row,
+          ...row.querySelectorAll(
+            '.todo-title-slot, .todo-note-slot, .todo-link-row a, .todo-thumbnail'
+          )
+        ]
+        const initial = elements.map((el) => el.getBoundingClientRect())
+        const changed = new Set<string>()
+        const observer = new ResizeObserver(() => {
+          elements.forEach((el, i) => {
+            const bounds = el.getBoundingClientRect()
+            if (bounds.width !== initial[i].width || bounds.height !== initial[i].height)
+              changed.add(el.className)
+          })
+        })
+        elements.forEach((el) => observer.observe(el))
+        return { changed, observer }
+      })
       await pencil.click()
       const editor = page.getByRole('textbox', { name: '待办内容' })
       expect(await editor.evaluate((el) => el === document.activeElement)).toBe(true)
+      await settle()
+      await editor.press('Escape')
+      await settle()
+      expect(
+        await sizes.evaluate(({ changed, observer }) => {
+          observer.disconnect()
+          return [...changed]
+        })
+      ).toEqual([])
+      await sizes.dispose()
+      await savedTitle.press('F2')
       await editor.fill('调整筛选栏宽度')
       await editor.press('Escape')
       const renamed = page.getByRole('button', { name: '调整筛选栏宽度', exact: true })
