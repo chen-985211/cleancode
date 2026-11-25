@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react'
 import { TooltipLabel } from '../../../presentation/shared/components/Tooltip'
 import { WorkbenchIcon } from '../../../presentation/shared/components/WorkbenchIcons'
 import { ContextMenu } from 'radix-ui'
 import { useI18n } from '../../../presentation/i18n/useI18n'
-import { todoStates, type TodoDraft, type TodoState } from '../domain/ProjectTodoList'
+import {
+  hasTodoContent,
+  todoStates,
+  type TodoDraft,
+  type TodoState
+} from '../domain/ProjectTodoList'
+import type { TodoImage } from '../application/ProjectTodos'
 import { TodoAttachments } from './TodoAttachments'
 import type { TodoSession } from './TodoSession'
-import { classifyTodoPaste } from './todoPaste'
+import { classifyTodoPaste, numberedTodoLines } from './todoPaste'
 
 export function TodoRow({
   editing,
@@ -16,6 +22,10 @@ export function TodoRow({
   onStatus,
   item,
   session,
+  saved,
+  capture,
+  onChange,
+  onSplit,
   onFinish,
   onNext
 }: {
@@ -26,12 +36,28 @@ export function TodoRow({
   onStatus: (status: TodoState) => void
   item: TodoDraft
   session: TodoSession
+  saved: boolean
+  capture: boolean
+  onChange: (item: TodoDraft, images?: TodoImage[]) => void
+  onSplit: (lines: string[]) => void
   onFinish: (itemId: string) => void
   onNext: () => void
 }) {
   const { t } = useI18n()
   const title = useRef<HTMLTextAreaElement>(null)
-  const [pasteError, setPasteError] = useState(false)
+  const [pasteError, setPasteError] = useState<string | null>(null)
+  const [offer, setOffer] = useState<{ id: string; lines: string[] } | null>(null)
+  const liveEditor = useRef<TodoDraft | null>(null)
+  useLayoutEffect(() => {
+    liveEditor.current = editing ? item : null
+    return () => {
+      liveEditor.current = null
+    }
+  }, [item, editing])
+  function change(next: TodoDraft, images?: TodoImage[]) {
+    setOffer(null)
+    onChange(next, images)
+  }
   useEffect(() => {
     if (!editing) return
     title.current?.focus({ preventScroll: true })
@@ -76,21 +102,27 @@ export function TodoRow({
         control.setSelectionRange(start + text.length, start + text.length)
       )
     }
-    session.change(next)
+    change(next)
+    if (capture && field === 'text' && !hasTodoContent(item) && !files.length) {
+      const lines = numberedTodoLines(text)
+      const referenced = new Set(lines.flatMap((line) => classifyTodoPaste(line, '').links))
+      if (lines.length && links.every((link) => referenced.has(link)))
+        setOffer({ id: item.id, lines })
+    }
     const savedAtPaste = Boolean(session.find(item.id))
     if (files.length) {
-      setPasteError(false)
+      setPasteError(null)
       void Promise.all(files.map(readImage))
         .then((images) => {
           const live = session.find(item.id)
           if (removed.current || (savedAtPaste && !live)) return
-          const current = live ?? next
-          session.change(
+          const current = liveEditor.current?.id === item.id ? liveEditor.current : (live ?? next)
+          change(
             { ...current, images: [...current.images, ...images.map((image) => image.id)] },
             images
           )
         })
-        .catch(() => setPasteError(true))
+        .catch(() => setPasteError(item.id))
     }
   }
   function remove() {
@@ -99,7 +131,6 @@ export function TodoRow({
     onFinish(item.id)
   }
   const gestureHint = t(expanded ? 'todo.collapseGesture' : 'todo.itemGesture')
-  const saved = 'createdAt' in item
   const caption = item.text.trim() || item.note.trim().split('\n')[0]
   const name = caption || (item.links[0] && new URL(item.links[0]).host) || t('todo.image')
   const next = todoStates[(todoStates.indexOf(item.status) + 1) % todoStates.length]
@@ -150,7 +181,8 @@ export function TodoRow({
               (e.target === title.current || e.metaKey || e.ctrlKey)
             ) {
               e.preventDefault()
-              onNext()
+              if (capture) onNext()
+              else onFinish(item.id)
             }
           }}
         >
@@ -185,7 +217,7 @@ export function TodoRow({
                 value={item.text}
                 onContextMenu={(e) => e.stopPropagation()}
                 onPaste={(e) => paste(e, 'text')}
-                onChange={(e) => session.change({ ...item, text: e.target.value })}
+                onChange={(e) => change({ ...item, text: e.target.value })}
               />
               <div className="todo-heading" inert={editing} aria-hidden={editing}>
                 <TooltipLabel content={gestureHint}>
@@ -224,7 +256,7 @@ export function TodoRow({
                   item={item}
                   session={session}
                   expanded={expanded}
-                  onChange={editing ? (next) => session.change(next) : undefined}
+                  onChange={editing ? change : undefined}
                 />
                 <div className="todo-note-slot" data-empty={!item.note.trim() || undefined}>
                   <p className="todo-note" inert={editing} aria-hidden={editing}>
@@ -240,11 +272,18 @@ export function TodoRow({
                       value={item.note}
                       onContextMenu={(e) => e.stopPropagation()}
                       onPaste={(e) => paste(e, 'note')}
-                      onChange={(e) => session.change({ ...item, note: e.target.value })}
+                      onChange={(e) => change({ ...item, note: e.target.value })}
                     />
                   )}
                 </div>
-                {editing && pasteError && <span role="alert">{t('todo.pasteFailed')}</span>}
+                {editing && capture && offer?.id === item.id && (
+                  <button className="todo-split" type="button" onClick={() => onSplit(offer.lines)}>
+                    {t('todo.split', { count: offer.lines.length })}
+                  </button>
+                )}
+                {editing && pasteError === item.id && (
+                  <span role="alert">{t('todo.pasteFailed')}</span>
+                )}
               </div>
             </div>
           </div>
@@ -256,6 +295,11 @@ export function TodoRow({
           collisionPadding={8}
           onEscapeKeyDown={(e) => e.stopPropagation()}
         >
+          {item.status !== 'done' && (
+            <ContextMenu.Item onSelect={() => onStatus('done')}>
+              {t('todo.complete')}
+            </ContextMenu.Item>
+          )}
           <ContextMenu.Item onSelect={remove}>{t('todo.remove')}</ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>

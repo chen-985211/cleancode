@@ -48,15 +48,20 @@ export function registerProjectTodos(directory: string, ipcMain: IpcMainLike, lo
     channel: todoChannels.save,
     operation: 'saveTodo',
     handler: (value) => {
-      const { projectId, draft, images = [] } = record(value)
+      const command = record(value)
+      const { projectId, images = [] } = command
+      if ('draft' in command === 'drafts' in command) return invalid()
+      const drafts = 'draft' in command ? [command.draft] : command.drafts
+      if (!Array.isArray(drafts) || !drafts.length || !drafts.every(isTodoDraft)) return invalid()
+      if (new Set(drafts.map((draft) => draft.id)).size !== drafts.length) return invalid()
+      const referenced = new Set(drafts.flatMap((draft) => draft.images))
       if (
-        !isTodoDraft(draft) ||
         !Array.isArray(images) ||
         !images.every(isImage) ||
-        !images.every((image) => draft.images.includes(image.id))
+        !images.every((image) => referenced.has(image.id))
       )
         return invalid()
-      return todos.save(project(projectId), draft, images)
+      return todos.save(project(projectId), drafts, images)
     }
   })
   return repository

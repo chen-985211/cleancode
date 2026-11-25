@@ -1,5 +1,19 @@
-import { classifyTodoPaste } from '../../../../src/contexts/todo/presentation/todoPaste'
+import {
+  classifyTodoPaste,
+  numberedTodoLines
+} from '../../../../src/contexts/todo/presentation/todoPaste'
 describe('to-do clipboard', () => {
+  it.each([
+    ['1. first\r\n2. second', ['first', 'second']],
+    ['1、画布\n\n2）侧栏', ['画布', '侧栏']],
+    ['1.单条', []],
+    ['first\nsecond', []],
+    ['1. first\n3. third', []],
+    ['1.23\n2.45', []],
+    ['1. first\n说明\n2. second', []]
+  ] as const)('recognizes a complete consecutive numbered list in %s', (text, lines) => {
+    expect(numberedTodoLines(text)).toEqual(lines)
+  })
   it.each([
     ['保留这段话', '保留这段话', []],
     ['www.example.org', '', ['https://www.example.org/']],

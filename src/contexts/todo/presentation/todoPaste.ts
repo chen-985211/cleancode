@@ -1,5 +1,26 @@
 import { httpLink } from '../domain/ProjectTodoList'
 
+export function numberedTodoLines(text: string): string[] {
+  const lines = text
+    .trim()
+    .split(/\r\n?|\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length < 2) return []
+  const titles: string[] = []
+  let previous: number | undefined
+  for (const line of lines) {
+    const match = /^(\d+)(?:[.．](?!\d)|[、)）])\s*(\S.*)$/u.exec(line)
+    if (!match) return []
+    const index = Number(match[1])
+    if (!Number.isSafeInteger(index) || (previous !== undefined && index !== previous + 1))
+      return []
+    previous = index
+    titles.push(match[2])
+  }
+  return titles
+}
+
 function clipboardUrl(candidate: string) {
   const text = candidate.trim()
   if (!text || /\s/.test(text)) return null

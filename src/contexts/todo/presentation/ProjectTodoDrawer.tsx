@@ -14,11 +14,20 @@ import { useI18n } from '../../../presentation/i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../../presentation/shared/components/SurfaceMotion'
 import { useOutsidePointerDismiss } from '../../../presentation/shared/hooks/useOutsidePointerDismiss'
 import { TooltipLabel } from '../../../presentation/shared/components/Tooltip'
-import type { TodoApi } from '../application/ProjectTodos'
-import { todoStates, type TodoDraft, type TodoItem } from '../domain/ProjectTodoList'
+import type { TodoApi, TodoImage } from '../application/ProjectTodos'
+import {
+  hasTodoContent,
+  todosInStatus,
+  todoStates,
+  type TodoDraft,
+  type TodoItem
+} from '../domain/ProjectTodoList'
 import { blankTodo, TodoSession } from './TodoSession'
 import { TodoRow } from './TodoRow'
 import { useTodoReorderMotion } from './useTodoReorderMotion'
+import { useTodoCaptureMotion } from './useTodoCaptureMotion'
+import { useTodoReadingPosition } from './useTodoReadingPosition'
+import { classifyTodoPaste } from './todoPaste'
 import './project-todos.css'
 
 const widthKey = 'cleancode.todo.drawerWidth'
@@ -129,7 +138,12 @@ export function ProjectTodoDrawer({
           </span>
         ) : null}
         {!state.loading && !state.loadFailed && (
-          <TodoRows session={session} key={projectId} items={state.items} />
+          <TodoRows
+            session={session}
+            key={projectId}
+            items={state.items}
+            expandedIds={state.expanded}
+          />
         )}
         {(state.loadFailed || state.saveFailed) && (
           <div role="alert" className="todo-feedback">
@@ -187,41 +201,33 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) 
   )
 }
 
-function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] }) {
+function TodoRows({
+  session,
+  items,
+  expandedIds
+}: {
+  session: TodoSession
+  items: TodoItem[]
+  expandedIds: ReadonlySet<string>
+}) {
   const { t } = useI18n()
-  const [draft, setDraft] = useState<TodoDraft | null>(null)
-  const [expandedIds, setExpandedIds] = useState(() => new Set<string>())
+  const [editor, setEditor] = useState<{ item: TodoDraft; capture: boolean } | null>(null)
+  const draft = editor?.item
   const scroll = useRef<HTMLDivElement>(null),
     groups = useRef<HTMLDivElement>(null)
   const capture = useRef<HTMLDivElement>(null)
-  const [confirmedId, setConfirmedId] = useState<string | null>(null)
+  const prepareCapture = useTodoCaptureMotion(capture, scroll)
   const capturePositions = useTodoReorderMotion(scroll)
   const focusAfterEdit = useRef<string | null>(null)
   const newButton = useRef<HTMLButtonElement>(null)
-  const newLine = draft && !('createdAt' in draft)
-  const editing =
-    draft &&
-    (items.find((item) => item.id === draft.id) ?? {
-      ...draft,
-      text: '',
-      note: '',
-      links: [],
-      images: []
-    })
-  useLayoutEffect(() => {
-    const body = scroll.current!,
-      content = groups.current!
-    function measure() {
-      const fourth = content.querySelector<HTMLElement>('[data-todo-history] > :nth-child(4)')
-      body.style.maxHeight = fourth ? fourth.offsetTop + 'px' : ''
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(content)
-    return () => observer.disconnect()
-  }, [items, draft])
+  const newLine = editor?.capture
+  const listed = newLine ? items.filter((item) => item.id !== draft?.id) : items
+  const sections = todoStates
+    .map((status) => ({ status, rows: todosInStatus(listed, status) }))
+    .filter(({ rows }) => rows.length > 0)
+  useTodoReadingPosition(scroll, groups, session.reading)
   useOutsidePointerDismiss({
-    active: draft !== null,
+    active: Boolean(draft),
     isInside: (target) =>
       target instanceof Element &&
       (!target.closest('#project-todo-drawer') ||
@@ -230,81 +236,83 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
     pointerPolicy: 'passthrough'
   })
   useLayoutEffect(() => {
-    if (!confirmedId) return
-    const slot = capture.current
-    if (!slot?.animate) return
-    // The saved row now heads the scroll area. Reveal the space above it so
-    // the row starts where the editor was and its neighbors move with it.
-    const styles = getComputedStyle(slot)
-    const animation = slot.animate(
-      [
-        {
-          height: '0px',
-          marginBottom: 'calc(-1 * var(--todo-list-inset))',
-          opacity: 0,
-          overflow: 'clip'
-        },
-        { height: 'auto', marginBottom: '0px', opacity: 1, overflow: 'clip' }
-      ],
-      {
-        duration: parseFloat(styles.getPropertyValue('--cc-motion-duration-todo-confirm')),
-        easing: styles.getPropertyValue('--cc-easing-todo-confirm').trim()
-      }
-    )
-    return () => animation.cancel()
-  }, [confirmedId])
-  useLayoutEffect(() => {
     const selector = focusAfterEdit.current
     if (!selector) return
     focusAfterEdit.current = null
     const target = groups.current?.querySelector<HTMLButtonElement>(selector) ?? newButton.current
     target?.focus({ preventScroll: true })
   }, [draft, items, expandedIds])
-  function setExpanded(itemId: string, expanded: boolean) {
-    setExpandedIds((current) => {
-      const next = new Set(current)
-      if (expanded) next.add(itemId)
-      else next.delete(itemId)
-      return next
-    })
-  }
-  function edit(item: TodoDraft | null) {
-    if (draft && session.find(draft.id)) {
-      if (newLine) setConfirmedId(draft.id)
-      setExpanded(draft.id, true)
+  function edit(item: TodoDraft | null, continuing = false) {
+    if (draft) {
+      const saved = session.find(draft.id)
+      if (newLine) prepareCapture(saved ? [draft.id] : [], continuing)
+      session.setExpanded(draft.id, Boolean(saved) && !continuing)
     }
-    setDraft(item)
+    setEditor(item ? { item, capture: !('createdAt' in item) } : null)
+  }
+  function change(next: TodoDraft, images?: TodoImage[]) {
+    setEditor((current) => (current?.item.id === next.id ? { ...current, item: next } : current))
+    // A temporarily empty existing editor still owns its saved row. Only the menu removes it.
+    if (newLine || hasTodoContent(next)) session.change(next, images)
+  }
+  function split(lines: string[]) {
+    if (!newLine || !draft) return
+    const parts = lines.map((line) => {
+      const { text, links } = classifyTodoPaste(line, '')
+      return { ...blankTodo(), text, links }
+    })
+    // The captured draft already occupies the oldest insertion slot in this batch.
+    parts[parts.length - 1].id = draft.id
+    prepareCapture(
+      parts.map((part) => part.id),
+      false
+    )
+    focusAfterEdit.current = `[data-todo-edit="${parts[0].id}"]`
+    session.change(parts.reverse())
+    setEditor(null)
   }
   function finish(itemId: string) {
     focusAfterEdit.current = `[data-todo-edit="${itemId}"]`
     if (draft?.id === itemId) edit(null)
-    else setExpanded(itemId, false)
+    else session.setExpanded(itemId, false)
   }
   function startNew() {
     if (scroll.current) scroll.current.scrollTop = 0
-    edit(blankTodo())
+    edit(blankTodo(), Boolean(newLine))
   }
-  function row(item: TodoDraft) {
+  function row(source: TodoDraft, captureRow = false) {
+    const item = draft?.id === source.id ? draft : source
     return (
       <TodoRow
-        key={item.id}
         item={item}
         session={session}
+        saved={!captureRow || Boolean(session.find(item.id))}
+        capture={captureRow}
+        onChange={change}
+        onSplit={split}
         expanded={draft?.id === item.id || expandedIds.has(item.id)}
         editing={draft?.id === item.id}
         onExpand={() => {
           edit(null)
-          setExpanded(item.id, true)
+          session.setExpanded(item.id, true)
         }}
         onEdit={() => edit(item)}
         onFinish={finish}
         onNext={startNew}
         onStatus={(status) => {
-          capturePositions()
-          edit(null)
-          setExpanded(item.id, false)
+          if (captureRow) {
+            change({ ...item, status })
+            return
+          }
+          capturePositions(item.id)
+          if (editor?.item.id === item.id) {
+            setEditor({ ...editor, item: { ...editor.item, status } })
+          } else if (editor) {
+            edit(null)
+          }
           focusAfterEdit.current = `[data-todo-status="${item.id}"]`
-          session.change({ ...item, status })
+          const saved = session.find(item.id)
+          if (saved) session.change({ ...saved, status })
         }}
       />
     )
@@ -312,8 +320,8 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
   return (
     <>
       <div className="todo-capture" ref={capture}>
-        {newLine && editing ? (
-          row(editing)
+        {newLine && draft ? (
+          row(draft, true)
         ) : (
           <button type="button" className="todo-new" ref={newButton} onClick={startNew}>
             <Plus aria-hidden="true" size={15} />
@@ -323,31 +331,28 @@ function TodoRows({ session, items }: { session: TodoSession; items: TodoItem[] 
       </div>
       <div className="todo-scroll" ref={scroll}>
         <div className="todo-groups" ref={groups}>
-          {todoStates.map((status) => {
-            const rows = items.filter(
-              (item) => item.status === status && !(newLine && item.id === draft?.id)
-            )
-            const draftRow =
-              status === 'todo' &&
-              editing &&
-              !newLine &&
-              !items.some((item) => item.id === editing.id)
-                ? editing
-                : null
-            // The list retains insertion order when an existing item is edited.
-            if (status === 'todo') rows.reverse()
-            if (status === 'done') rows.sort((a, b) => b.completedAt! - a.completedAt!)
-            if (!rows.length && !draftRow) return null
-            return (
-              <section
-                key={status}
-                aria-label={t(`todo.${status}`)}
-                data-todo-history={status === 'done' ? '' : undefined}
+          {/* Named regions own their rows in the accessibility tree. The shared DOM
+              parent keeps each row, its focus and its loaded previews alive on regroup. */}
+          {sections.map(({ status, rows }) => (
+            <section
+              key={status}
+              aria-label={t(`todo.${status}`)}
+              aria-owns={rows.map((item) => 'todo-entry-' + item.id).join(' ')}
+            />
+          ))}
+          {sections.flatMap(({ rows }) =>
+            rows.map((item) => (
+              <div
+                className="todo-list-entry"
+                id={'todo-entry-' + item.id}
+                data-todo-entry={item.id}
+                data-todo-history={item.status === 'done' ? '' : undefined}
+                key={item.id}
               >
-                {(draftRow ? [draftRow, ...rows] : rows).map(row)}
-              </section>
-            )
-          })}
+                {row(item)}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

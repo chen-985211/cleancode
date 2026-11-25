@@ -21,14 +21,18 @@ export class ProjectTodos {
   image(projectId: string, id: string) {
     return this.repository.image(projectId, id)
   }
-  save(projectId: string, draft: TodoDraft, images: TodoImage[] = []) {
+  save(projectId: string, changes: TodoDraft | TodoDraft[], images: TodoImage[] = []) {
     return this.repository.change(projectId, images, (items) =>
-      updateTodoList(items, draft, Date.now())
+      updateTodoList(items, changes, Date.now())
     )
   }
 }
 export interface TodoApi {
   listTodos(projectId: string): Promise<TodoItem[]>
-  saveTodo(command: { projectId: string; draft: TodoDraft; images?: TodoImage[] }): Promise<void>
+  saveTodo(
+    command: { projectId: string; images?: TodoImage[] } & (
+      { draft: TodoDraft } | { drafts: TodoDraft[] }
+    )
+  ): Promise<void>
   readTodoImage(command: { projectId: string; id: string }): Promise<string>
 }

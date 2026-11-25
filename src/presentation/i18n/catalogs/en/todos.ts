@@ -1,6 +1,8 @@
 import type { zhCNTodosMessages } from '../zh-CN/todos'
 
 export const enTodosMessages = {
+  'todo.complete': 'Mark as done',
+  'todo.split': 'Split into {count} to-dos',
   'todo.open': 'Open to-do list',
   'todo.close': 'Close to-do list',
   'todo.list': 'To-do list',

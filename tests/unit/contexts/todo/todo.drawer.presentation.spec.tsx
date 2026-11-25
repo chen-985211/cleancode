@@ -98,8 +98,7 @@ describe('project to-do drawer', () => {
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     const opener = screen.getByRole('button', { name: '打开待办清单' })
     fireEvent.click(opener)
-    const group = await screen.findByRole('region', { name: '待办' })
-    const refs = within(group)
+    const refs = within(await screen.findByRole('complementary', { name: '待办清单' }))
     expect(refs.queryByRole('link')).toBeNull()
     expect(refs.queryByRole('img')).toBeNull()
     fireEvent.click(refs.getByRole('button', { name: item.text }))
@@ -178,15 +177,208 @@ describe('project to-do drawer', () => {
     expect(screen.queryByRole('button', { name: '记一条' })).toBeNull()
     fireEvent.keyDown(editor(), { key: 'Enter' })
     expect(editor()).toHaveFocus()
+    expect(screen.getByRole('button', { name: '先记的' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('button', { name: '记一条' })).toBeNull()
     fireEvent.change(editor(), { target: { value: '后记的' } })
     fireEvent.keyDown(editor(), { key: 'Escape' })
     await screen.findByRole('button', { name: '后记的' })
-    const titles = within(screen.getByRole('region', { name: '待办' }))
+    const titles = screen
       .getAllByRole('button', { name: /^(已有待办|先记的|后记的)$/ })
       .map((button) => button.textContent)
     expect(titles).toEqual(['后记的', '先记的', '已有待办'])
   })
+
+  it('keeps a saved item in place through an empty edit and finishes Enter on its own title', async () => {
+    const items = ['较旧', '较新'].map((text) => ({
+      ...blankTodo(),
+      text,
+      createdAt: 1,
+      completedAt: null
+    }))
+    const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    const opener = screen.getByRole('button', { name: '打开待办清单' })
+    fireEvent.click(opener)
+    fireEvent.click(await screen.findByRole('button', { name: '编辑“较旧”' }))
+    const title = screen.getByRole('textbox', { name: '待办内容' })
+    fireEvent.change(title, { target: { value: '' } })
+    expect(title).toHaveValue('')
+    expect(opener).toHaveTextContent('00/02')
+    expect(api.saveTodo).not.toHaveBeenCalled()
+    fireEvent.change(title, { target: { value: '新标题' } })
+    fireEvent.keyDown(title, { key: 'Enter' })
+    const renamed = screen.getByRole('button', { name: '新标题' })
+    expect(renamed).toHaveFocus()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: '较新' }).compareDocumentPosition(renamed) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    fireEvent.keyDown(renamed, { key: 'F2' })
+    const editing = screen.getByRole('textbox', { name: '待办内容' })
+    fireEvent.change(editing, { target: { value: '' } })
+    fireEvent.keyDown(editing, { key: 'Escape' })
+    expect(renamed).toHaveFocus()
+    expect(opener).toHaveTextContent('00/02')
+  })
+
+  it('restores each project’s reading position and manually expanded items', async () => {
+    const item = { ...blankTodo(), text: '阅读位置', createdAt: 1, completedAt: null }
+    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    const view = render(<ProjectTodoDrawer projectId="first" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    fireEvent.click(await screen.findByRole('button', { name: item.text }))
+    const scroller = () => view.container.querySelector<HTMLElement>('.todo-scroll')!
+    scroller().scrollTop = 84
+    fireEvent.scroll(scroller())
+    view.rerender(<ProjectTodoDrawer projectId="second" api={api} />)
+    expect(await screen.findByRole('button', { name: item.text })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+    expect(scroller().scrollTop).toBe(0)
+    view.rerender(<ProjectTodoDrawer projectId="first" api={api} />)
+    expect(await screen.findByRole('button', { name: item.text })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+    expect(scroller().scrollTop).toBe(84)
+  })
+
+  it('can complete a pending item directly from its context menu', async () => {
+    const item = { ...blankTodo(), text: '检查按钮', createdAt: 1, completedAt: null }
+    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    fireEvent.contextMenu(await screen.findByRole('button', { name: item.text }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '直接完成' }))
+    expect(screen.getByRole('region', { name: '已完成' })).toHaveAttribute(
+      'aria-owns',
+      'todo-entry-' + item.id
+    )
+    expect(screen.getByRole('button', { name: item.text })).toBeVisible()
+    expect(api.saveTodo).toHaveBeenCalledOnce()
+    expect(api.saveTodo).toHaveBeenCalledWith(
+      expect.objectContaining({ draft: expect.objectContaining({ id: item.id, status: 'done' }) })
+    )
+  })
+
+  it('puts a changed item first in its destination and preserves the order of its peers', async () => {
+    const items = ['甲', '乙', '丙', '丁'].map((text) => ({
+      ...blankTodo(),
+      text,
+      createdAt: 1,
+      completedAt: null
+    }))
+    const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    await screen.findByRole('button', { name: '甲' })
+    const advance = (name: string) =>
+      fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + name + '，当前') }))
+    const titles = () =>
+      screen.getAllByRole('button', { name: /^[甲乙丙丁]$/ }).map((button) => button.textContent)
+    const complete = async (name: string) => {
+      fireEvent.contextMenu(screen.getByRole('button', { name }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: '直接完成' }))
+    }
+    advance('乙')
+    advance('丁')
+    expect(titles()).toEqual(['丙', '甲', '丁', '乙'])
+    await complete('丙')
+    advance('乙')
+    expect(titles()).toEqual(['甲', '丁', '乙', '丙'])
+    await complete('丁')
+    expect(titles()).toEqual(['甲', '丁', '乙', '丙'])
+    advance('丙')
+    advance('乙')
+    expect(titles()).toEqual(['乙', '丙', '甲', '丁'])
+  })
+
+  it('keeps the details of a solitary item open while its circle cycles in place', async () => {
+    const item = {
+      ...blankTodo(),
+      text: '唯一一条',
+      note: '继续阅读',
+      images: [crypto.randomUUID()],
+      createdAt: 1,
+      completedAt: null
+    }
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(private callback: IntersectionObserverCallback) {}
+        observe() {
+          this.callback(
+            [{ isIntersecting: true } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver
+          )
+        }
+        disconnect() {}
+      }
+    )
+    onTestFinished(() => {
+      vi.unstubAllGlobals()
+    })
+    const api = {
+      listTodos: vi.fn(async () => [item]),
+      saveTodo: vi.fn(),
+      readTodoImage: vi.fn(async () => 'data:image/png;base64,Zm9v')
+    }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    fireEvent.click(await screen.findByRole('button', { name: item.text }))
+    const preview = await screen.findByRole('img', { name: '粘贴的截图' })
+    for (const state of ['进行中', '已完成', '待办']) {
+      fireEvent.click(screen.getByRole('button', { name: /^唯一一条，当前/ }))
+      expect(screen.getByRole('region', { name: state })).toHaveAttribute(
+        'aria-owns',
+        'todo-entry-' + item.id
+      )
+      expect(screen.getByRole('button', { name: item.text })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      )
+      expect(screen.getByRole('paragraph')).toHaveTextContent(item.note)
+      expect(preview).toBeInTheDocument()
+    }
+  })
+
+  it.each([true, false])(
+    'offers an optional split on a fresh numbered paste (split=%s)',
+    async (split) => {
+      const api = { listTodos: vi.fn(async () => []), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      const opener = screen.getByRole('button', { name: '打开待办清单' })
+      fireEvent.click(opener)
+      fireEvent.click(await screen.findByRole('button', { name: '记一条' }))
+      const title = screen.getByRole('textbox', { name: '待办内容' })
+      const text = '1. 调整搜索框\n2. https://example.org/filter\n3. 优化空状态'
+      fireEvent.paste(title, {
+        clipboardData: {
+          files: [],
+          getData: (format: string) => (format === 'text/plain' ? text : '')
+        }
+      })
+      const offer = screen.getByRole('button', { name: '拆成 3 条' })
+      if (split) {
+        fireEvent.click(offer)
+        expect(
+          screen
+            .getAllByRole('button', { name: /^(调整搜索框|example\.org|优化空状态)$/ })
+            .map((el) => el.textContent)
+        ).toEqual(['调整搜索框', 'example.org', '优化空状态'])
+        expect(opener).toHaveTextContent('00/03')
+        fireEvent.click(screen.getByRole('button', { name: 'example.org' }))
+        expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.org/filter')
+      } else {
+        fireEvent.keyDown(title, { key: 'Escape' })
+        expect(screen.getByRole('button', { name: '1. 调整搜索框' })).toBeVisible()
+        expect(screen.getByRole('paragraph')).toHaveTextContent('2. https://example.org/filter')
+        expect(opener).toHaveTextContent('00/01')
+      }
+    }
+  )
 
   it('gives an image-only item a title without reading the screenshot until expansion', async () => {
     const item = { ...blankTodo(), images: [crypto.randomUUID()], createdAt: 1, completedAt: null }

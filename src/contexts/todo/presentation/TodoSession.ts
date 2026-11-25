@@ -11,12 +11,23 @@ export function blankTodo(): TodoDraft {
 }
 type SessionState = {
   items: TodoItem[]
+  expanded: ReadonlySet<string>
   loading: boolean
   loadFailed: boolean
   saveFailed: boolean
 }
 export class TodoSession {
-  private state: SessionState = { items: [], loading: true, loadFailed: false, saveFailed: false }
+  readonly reading: {
+    scrollTop: number
+    anchor?: { id: string; inset: number }
+  } = { scrollTop: 0 }
+  private state: SessionState = {
+    items: [],
+    expanded: new Set(),
+    loading: true,
+    loadFailed: false,
+    saveFailed: false
+  }
   private readonly listeners = new Set<() => void>()
   private readonly latest = new Map<string, TodoDraft>()
   private readonly failed = new Set<string>()
@@ -54,41 +65,56 @@ export class TodoSession {
   find(id: string) {
     return this.state.items.find((item) => item.id === id)
   }
-  change(draft: TodoDraft, images: TodoImage[] = []) {
-    if (
-      this.state.loading ||
-      this.state.loadFailed ||
-      (!hasTodoContent(draft) && !this.find(draft.id) && !this.failed.has(draft.id))
-    )
-      return
-    for (const image of images) this.unsavedImages.set(image.id, image)
-    this.latest.set(draft.id, draft)
-    this.publish({ items: updateTodoList(this.state.items, draft, Date.now()) })
-    void this.write(draft)
+  setExpanded(id: string, expanded: boolean) {
+    if (this.state.expanded.has(id) === expanded) return
+    const next = new Set(this.state.expanded)
+    if (expanded) next.add(id)
+    else next.delete(id)
+    this.publish({ expanded: next })
   }
-  private async write(draft: TodoDraft) {
-    const images = draft.images.flatMap((id) => this.unsavedImages.get(id) ?? [])
+  change(changes: TodoDraft | TodoDraft[], images: TodoImage[] = []) {
+    if (this.state.loading || this.state.loadFailed) return
+    const drafts = (Array.isArray(changes) ? changes : [changes]).filter(
+      (draft) => hasTodoContent(draft) || this.find(draft.id) || this.failed.has(draft.id)
+    )
+    if (!drafts.length) return
+    for (const image of images) this.unsavedImages.set(image.id, image)
+    const items = updateTodoList(this.state.items, drafts, Date.now())
+    const ranks = new Map(items.map((item) => [item.id, item.statusOrder]))
+    for (const draft of drafts)
+      this.latest.set(draft.id, { ...draft, statusOrder: ranks.get(draft.id) })
+    this.publish({ items })
+    // A later edit can arrive before a split is acknowledged. Submit the complete
+    // outstanding set in order so either successful write leaves a consistent list.
+    void this.write([...this.latest.values()])
+  }
+  private async write(drafts: TodoDraft[]) {
+    drafts.sort((a, b) => (a.statusOrder ?? 0) - (b.statusOrder ?? 0))
+    const imageIds = new Set(drafts.flatMap((draft) => draft.images))
+    const images = [...imageIds].flatMap((id) => this.unsavedImages.get(id) ?? [])
+    const content = drafts.length === 1 ? { draft: drafts[0] } : { drafts }
     try {
-      await this.api.saveTodo({ projectId: this.projectId, draft, images })
+      await this.api.saveTodo({ projectId: this.projectId, ...content, images })
       for (const image of images) this.unsavedImages.delete(image.id)
-      if (this.latest.get(draft.id) !== draft) return
-      this.latest.delete(draft.id)
-      this.failed.delete(draft.id)
+      for (const draft of drafts) {
+        if (this.latest.get(draft.id) !== draft) continue
+        this.latest.delete(draft.id)
+        this.failed.delete(draft.id)
+      }
     } catch {
-      if (this.latest.get(draft.id) !== draft) return
-      this.failed.add(draft.id)
+      for (const draft of drafts) {
+        if (this.latest.get(draft.id) === draft) this.failed.add(draft.id)
+      }
     }
-    this.publish({ saveFailed: this.failed.size > 0 })
+    const saveFailed = this.failed.size > 0
+    if (this.state.saveFailed !== saveFailed) this.publish({ saveFailed })
   }
   retry() {
     if (this.state.loadFailed) {
       void this.load()
       return
     }
-    for (const id of this.failed) {
-      const d = this.latest.get(id)
-      if (d) void this.write(d)
-    }
+    if (this.failed.size) void this.write([...this.latest.values()])
   }
   image(id: string) {
     const data = this.unsavedImages.get(id)?.data

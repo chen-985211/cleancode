@@ -103,14 +103,13 @@
   opacity: 0.65;
 }
 .todo-capture {
-  box-sizing: content-box;
   min-height: 0;
-  interpolate-size: allow-keywords;
   position: relative;
   flex: none;
   padding: 16px var(--todo-gutter) 0;
 }
 .todo-scroll {
+  flex: 1 1 0;
   overflow: auto;
   min-height: 0;
   overscroll-behavior: contain;
@@ -123,14 +122,30 @@
 }
 .todo-groups {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--todo-list-inset);
   padding: var(--todo-list-inset) var(--todo-gutter) 12px;
 }
-.todo-groups section {
-  display: grid;
-  gap: 4px;
+.todo-groups > section {
+  position: absolute;
 }
-.todo-groups section + section {
-  margin-top: 12px;
+.todo-list-entry {
+  flex: none;
+  min-height: 0;
+  interpolate-size: allow-keywords;
+}
+.project-todo-drawer .todo-split {
+  margin-block: 2px 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--todo-wash);
+  color: var(--todo-quiet);
+  font-size: 12px;
+}
+.project-todo-drawer .todo-split:is(:hover, :focus-visible) {
+  color: var(--todo-ink);
+  background: var(--cc-canvas-node-menu-hover);
 }
 .project-todo-drawer button {
   border: 0;

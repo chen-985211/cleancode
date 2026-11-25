@@ -7,6 +7,8 @@ export interface TodoDraft {
   links: string[]
   images: string[]
   status: TodoState
+  /** Order of entry into this status. Autosave carries it across retries. */
+  statusOrder?: number
 }
 export interface TodoItem extends TodoDraft {
   createdAt: number
@@ -35,6 +37,7 @@ export function isTodoDraft(value: unknown): value is TodoDraft {
     typeof d.text === 'string' &&
     typeof d.note === 'string' &&
     todoStates.includes(d.status!) &&
+    (d.statusOrder === undefined || (Number.isSafeInteger(d.statusOrder) && d.statusOrder > 0)) &&
     Array.isArray(d.links) &&
     d.links.every((v) => typeof v === 'string' && httpLink(v)) &&
     Array.isArray(d.images) &&
@@ -49,18 +52,58 @@ export function isTodoItem(value: unknown): value is TodoItem {
     (item.status === 'done' ? Number.isFinite(item.completedAt) : item.completedAt === null)
   )
 }
-export function updateTodoList(items: TodoItem[], draft: TodoDraft, now: number): TodoItem[] {
-  const old = items.find((item) => item.id === draft.id)
-  if (!hasTodoContent(draft)) return items.filter((item) => item.id !== draft.id)
-  const item: TodoItem = {
-    id: draft.id,
-    text: draft.text,
-    note: draft.note,
-    status: draft.status,
-    links: [...new Set(draft.links.map((link) => httpLink(link)!))],
-    images: [...new Set(draft.images)],
-    createdAt: old?.createdAt ?? now,
-    completedAt: draft.status === 'done' ? (old?.completedAt ?? now) : null
+
+export function todosInStatus(items: TodoItem[], status: TodoState) {
+  const rows = items.filter((item) => item.status === status)
+  // Unranked items keep their existing display order until they next change status.
+  if (status === 'todo') rows.reverse()
+  return rows.sort(
+    (a, b) =>
+      (b.statusOrder ?? 0) - (a.statusOrder ?? 0) || (b.completedAt ?? 0) - (a.completedAt ?? 0)
+  )
+}
+
+function compactStatusOrders(byId: Map<string, TodoItem>) {
+  const ranks = [...new Set(Array.from(byId.values(), (item) => item.statusOrder ?? 0))]
+  const compact = new Map(ranks.sort((a, b) => a - b).map((rank, i) => [rank, i + 1]))
+  for (const item of byId.values()) {
+    if (item.statusOrder !== undefined)
+      byId.set(item.id, { ...item, statusOrder: compact.get(item.statusOrder) })
   }
-  return old ? items.map((t) => (t.id === item.id ? item : t)) : [...items, item]
+  return ranks.length
+}
+
+export function updateTodoList(
+  items: TodoItem[],
+  changes: TodoDraft | TodoDraft[],
+  now: number
+): TodoItem[] {
+  const byId = new Map(items.map((item) => [item.id, item]))
+  let lastOrder = items.reduce((last, item) => Math.max(last, item.statusOrder ?? 0), 0)
+  for (const draft of Array.isArray(changes) ? changes : [changes]) {
+    if (!hasTodoContent(draft)) {
+      byId.delete(draft.id)
+      continue
+    }
+    const old = byId.get(draft.id)
+    let statusOrder = old?.statusOrder
+    // A retried draft can have returned to its stored status after visiting another.
+    if (old?.status !== draft.status || (draft.statusOrder ?? 0) > (statusOrder ?? 0)) {
+      if (lastOrder === Number.MAX_SAFE_INTEGER) lastOrder = compactStatusOrders(byId)
+      lastOrder = Math.max(lastOrder + 1, draft.statusOrder ?? 0)
+      statusOrder = lastOrder
+    }
+    byId.set(draft.id, {
+      id: draft.id,
+      text: draft.text,
+      note: draft.note,
+      status: draft.status,
+      links: [...new Set(draft.links.map((link) => httpLink(link)!))],
+      images: [...new Set(draft.images)],
+      createdAt: old?.createdAt ?? now,
+      statusOrder,
+      completedAt: draft.status === 'done' ? (old?.completedAt ?? now) : null
+    })
+  }
+  return [...byId.values()]
 }

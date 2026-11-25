@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { registerProjectTodos } from '../../../src/platform/electron-main/projectTodosRuntime'
 import type { IpcInvokeResult } from '../../../src/platform/ipc/registerIpcHandler'
 import { todoChannels } from '../../../src/platform/ipc/todoChannels'
@@ -7,8 +10,10 @@ describe('project to-do IPC', () => {
       string,
       (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
     >()
+    const directory = await mkdtemp(join(tmpdir(), 'cc-todo-ipc-'))
+    onTestFinished(() => rm(directory, { recursive: true, force: true }))
     registerProjectTodos(
-      'unused',
+      directory,
       {
         handle: (key, fn) => {
           handlers.set(key, fn)
@@ -32,5 +37,24 @@ describe('project to-do IPC', () => {
     await expect(call(todoChannels.save, { projectId: 'project', draft })).resolves.toMatchObject(
       invalid
     )
+    const valid = { ...draft, links: [] }
+    for (const payload of [
+      { drafts: [] },
+      { drafts: [valid, draft] },
+      { drafts: [valid, valid] },
+      { draft: valid, drafts: [valid] },
+      { draft: { ...valid, statusOrder: -1 } },
+      { draft: { ...valid, statusOrder: 1.5 } }
+    ]) {
+      await expect(
+        call(todoChannels.save, { projectId: 'project', ...payload })
+      ).resolves.toMatchObject(invalid)
+    }
+    await expect(
+      call(todoChannels.save, {
+        projectId: 'project',
+        drafts: [valid, { ...valid, id: crypto.randomUUID() }]
+      })
+    ).resolves.toMatchObject({ ok: true })
   })
 })
