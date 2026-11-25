@@ -474,7 +474,7 @@
 }
 .todo-item-menu {
   z-index: 52;
-  min-width: 116px;
+  min-width: 144px;
   padding: 4px;
   border: 1px solid var(--cc-border);
   border-radius: calc(9px * var(--cc-corner-radius-scale));

@@ -31,6 +31,7 @@ import { classifyTodoPaste } from './todoPaste'
 import './project-todos.css'
 
 const widthKey = 'cleancode.todo.drawerWidth'
+const minDrawerWidth = 284
 const defaultDrawerWidth = 428
 export interface ProjectTodoDrawerHandle {
   readonly open: boolean
@@ -49,8 +50,8 @@ export function ProjectTodoDrawer({
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   useImperativeHandle(ref, () => ({ open, close: () => setOpen(false) }), [open])
-  const [width, setWidth] = useState(
-    () => Number(window.localStorage.getItem(widthKey)) || defaultDrawerWidth
+  const [width, setWidth] = useState(() =>
+    Math.max(minDrawerWidth, Number(window.localStorage.getItem(widthKey)) || defaultDrawerWidth)
   )
   const [sessions] = useState(() => new Map<string, TodoSession>())
   const session = useMemo(() => {
@@ -162,7 +163,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) 
   function resize(value: number) {
     const host = handle.current?.parentElement?.parentElement
     const max = Math.max(160, (host?.clientWidth ?? innerWidth) * 0.64)
-    const next = Math.round(Math.min(max, Math.max(Math.min(220, max), value)))
+    const next = Math.round(Math.min(max, Math.max(minDrawerWidth, value)))
     onWidth(next)
     window.localStorage.setItem(widthKey, String(next))
   }
