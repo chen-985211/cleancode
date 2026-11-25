@@ -346,7 +346,6 @@ function TodoRows({
                 className="todo-list-entry"
                 id={'todo-entry-' + item.id}
                 data-todo-entry={item.id}
-                data-todo-history={item.status === 'done' ? '' : undefined}
                 key={item.id}
               >
                 {row(item)}

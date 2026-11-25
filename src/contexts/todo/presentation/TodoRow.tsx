@@ -217,7 +217,6 @@ export function TodoRow({
                 aria-description={t('todo.pasteHint')}
                 placeholder={saved ? name : t('todo.quick')}
                 value={item.text}
-                onContextMenu={(e) => e.stopPropagation()}
                 onPaste={(e) => paste(e, 'text')}
                 onChange={(e) => change({ ...item, text: e.target.value })}
               />
@@ -272,7 +271,6 @@ export function TodoRow({
                       aria-label={t('todo.note')}
                       placeholder={t('todo.pasteHint')}
                       value={item.note}
-                      onContextMenu={(e) => e.stopPropagation()}
                       onPaste={(e) => paste(e, 'note')}
                       onChange={(e) => change({ ...item, note: e.target.value })}
                     />
@@ -297,11 +295,6 @@ export function TodoRow({
           collisionPadding={8}
           onEscapeKeyDown={(e) => e.stopPropagation()}
         >
-          {item.status !== 'done' && (
-            <ContextMenu.Item onSelect={() => onStatus('done')}>
-              {t('todo.complete')}
-            </ContextMenu.Item>
-          )}
           <ContextMenu.Item onSelect={remove}>{t('todo.remove')}</ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>

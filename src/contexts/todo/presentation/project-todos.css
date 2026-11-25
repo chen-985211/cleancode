@@ -283,10 +283,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-todo-history] .todo-caption {
-  text-decoration: line-through;
-  text-decoration-color: currentColor;
-}
 .todo-status,
 .todo-asset-remove {
   display: grid;

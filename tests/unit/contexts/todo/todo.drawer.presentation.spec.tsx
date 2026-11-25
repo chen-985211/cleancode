@@ -51,6 +51,28 @@ describe('project to-do drawer', () => {
     expect(opener).toHaveTextContent('00/00')
   })
 
+  it.each(['待办内容', '备注'])(
+    'deletes the edited item from the %s context menu',
+    async (field) => {
+      const items = ['保留', '移除'].map((text) => ({
+        ...blankTodo(),
+        text,
+        createdAt: 1,
+        completedAt: null
+      }))
+      const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      const opener = screen.getByRole('button', { name: '打开待办清单' })
+      fireEvent.click(opener)
+      fireEvent.click(await screen.findByRole('button', { name: '编辑“移除”' }))
+      fireEvent.contextMenu(screen.getByRole('textbox', { name: field }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: '删除此条' }))
+      expect(screen.queryByRole('button', { name: '移除' })).toBeNull()
+      expect(screen.getByRole('button', { name: '保留' })).toBeVisible()
+      expect(opener).toHaveTextContent('00/01')
+    }
+  )
+
   it('shows an empty note when a title-only item is expanded without editing it', async () => {
     const item = { ...blankTodo(), text: '改进筛选栏', createdAt: 1, completedAt: null }
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
@@ -302,23 +324,29 @@ describe('project to-do drawer', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.org/')
   })
 
-  it('can complete a pending item directly from its context menu', async () => {
-    const item = { ...blankTodo(), text: '检查按钮', createdAt: 1, completedAt: null }
-    const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
-    render(<ProjectTodoDrawer projectId="project" api={api} />)
-    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
-    fireEvent.contextMenu(await screen.findByRole('button', { name: item.text }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: '直接完成' }))
-    expect(screen.getByRole('region', { name: '已完成' })).toHaveAttribute(
-      'aria-owns',
-      'todo-entry-' + item.id
-    )
-    expect(screen.getByRole('button', { name: item.text })).toBeVisible()
-    expect(api.saveTodo).toHaveBeenCalledOnce()
-    expect(api.saveTodo).toHaveBeenCalledWith(
-      expect.objectContaining({ draft: expect.objectContaining({ id: item.id, status: 'done' }) })
-    )
-  })
+  it.each(['todo', 'active', 'done'] as const)(
+    'offers only deletion for a %s item',
+    async (status) => {
+      const item = {
+        ...blankTodo(),
+        status,
+        text: '检查按钮',
+        createdAt: 1,
+        completedAt: status === 'done' ? 2 : null
+      }
+      const api = {
+        listTodos: vi.fn(async () => [item]),
+        saveTodo: vi.fn(),
+        readTodoImage: vi.fn()
+      }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+      fireEvent.contextMenu(await screen.findByRole('button', { name: item.text }))
+      const actions = await screen.findAllByRole('menuitem')
+      expect(actions.map((action) => action.textContent)).toEqual(['删除此条'])
+      expect(api.saveTodo).not.toHaveBeenCalled()
+    }
+  )
 
   it('puts a changed item first in its destination and preserves the order of its peers', async () => {
     const items = ['甲', '乙', '丙', '丁'].map((text) => ({
@@ -335,17 +363,14 @@ describe('project to-do drawer', () => {
       fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + name + '，当前') }))
     const titles = () =>
       screen.getAllByRole('button', { name: /^[甲乙丙丁]$/ }).map((button) => button.textContent)
-    const complete = async (name: string) => {
-      fireEvent.contextMenu(screen.getByRole('button', { name }))
-      fireEvent.click(await screen.findByRole('menuitem', { name: '直接完成' }))
-    }
     advance('乙')
     advance('丁')
     expect(titles()).toEqual(['丙', '甲', '丁', '乙'])
-    await complete('丙')
+    advance('丙')
+    advance('丙')
     advance('乙')
     expect(titles()).toEqual(['甲', '丁', '乙', '丙'])
-    await complete('丁')
+    advance('丁')
     expect(titles()).toEqual(['甲', '丁', '乙', '丙'])
     advance('丙')
     advance('乙')
