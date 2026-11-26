@@ -19,6 +19,32 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it('loads the registered workspace by identity when a retry finds the original branch elsewhere', async () => {
+    const f = fixture()
+    const command = {
+      projectDirectory: '/project',
+      branchName: 'feature',
+      requestId: 'reload',
+      baseBranch: 'refs/heads/main',
+      selectWorkspace: false
+    }
+    await f.prepare.create(command)
+    const target = f.records.get('reload')!
+    const synchronized = Project.fromSnapshot(f.project()).syncGitBranchWorkspaces({
+      mainDirectory: '/project',
+      mainGitBranch: 'feature',
+      worktrees: [{ branchName: 'renamed', directory: target.workspaceDirectory }]
+    })
+    await f.projects.save(synchronized)
+
+    const loaded = await f.prepare.create(command)
+    expect(loaded.workspaces.find((item) => item.isCurrent)).toMatchObject({
+      workspaceId: target.workspaceId,
+      gitBranch: 'renamed'
+    })
+    expect(f.project().workspaces.find((item) => item.isCurrent)?.workspaceId).toBe('main')
+    expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+  })
   it.each(['new', 'retry', 'recovered', 'discovered'] as const)(
     'preserves the selected workspace during background %s creation',
     async (path) => {

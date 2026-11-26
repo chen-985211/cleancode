@@ -3,7 +3,6 @@ import { WorkspaceDefaultsAutosave } from './WorkspaceDefaultsAutosave'
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import type {
-  WorkspaceDefaults,
   WorkspaceInitializationDetails,
   WorkspaceInitializationSnapshot,
   WorkspaceInitializationResult
@@ -20,22 +19,13 @@ import {
 import { toAgentFlowNodeId } from '../projections/agentConsoleFlowNode'
 import { workspaceInitializationPositions } from './workspaceInitializationPlacement'
 import { WorkspaceDefaultsSettingsPane } from './WorkspaceDefaultsSettingsPane'
+import type { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useI18n } from '../../i18n/useI18n'
 
 interface WorkspaceInitializationInput {
   readonly notifications: AppNotificationController
   readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly createWorkspace: (
-    workbench: WorkbenchSnapshot,
-    branchName: string,
-    options?: {
-      readonly baseBranch?: string
-      readonly requestId: string
-      readonly defaults?: WorkspaceDefaults
-      readonly issueCommand?: StartIssueWorkspaceCommand
-      readonly beforeCreate?: () => Promise<void>
-    }
-  ) => Promise<WorkbenchSnapshot | undefined>
+  readonly createWorkspace: ReturnType<typeof useBranchWorkspaceActions>['createBranchWorkspace']
   readonly nodeStore: WorkbenchNodeStore
   readonly protectedNodeIds: ReadonlySet<string>
   readonly reactFlowInstanceRef: React.MutableRefObject<ReactFlowInstance<
@@ -281,7 +271,9 @@ export function useWorkspaceInitialization({
   }, [currentWorkbench, initialization, pending, errors, report, t])
   async function resume(workbench: WorkbenchSnapshot, operation: WorkspaceInitializationSnapshot) {
     const result = await createWorkspace(workbench, operation.branchName!, {
-      requestId: operation.id
+      requestId: operation.id,
+      selectWorkspace: false,
+      ...(operation.baseBranch ? { baseBranch: operation.baseBranch } : {})
     })
     if (!result) throw new Error(t('workspaceDefaults.failed'))
     if (result.initialization) {

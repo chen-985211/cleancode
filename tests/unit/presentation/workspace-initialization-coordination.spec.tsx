@@ -128,6 +128,38 @@ describe('workspace initialization coordination', () => {
     expect(screen.queryByRole('button', { name: '配置默认内容' })).not.toBeInTheDocument()
   })
 
+  it.each(['refs/remotes/origin/main', undefined])(
+    'resumes the saved request from settings with its original base %s',
+    async (baseBranch) => {
+      const f = fixture()
+      const operation = { ...f.details.initialization, baseBranch }
+      const create = vi.fn(async () => ({ ...f.workbench, initialization: null }))
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: {
+          getWorkspaceDefaults: async () => ({
+            defaults: { templates: [], agents: [] },
+            removedTemplateIds: []
+          }),
+          listBlockTemplates: async () => [],
+          discoverCreatableAgentProviders: async () => [],
+          getAgentProviderPreferences: async () => ({ disabledProviderIds: [] }),
+          listWorkspaceInitializations: async () => [{ ...f.details, initialization: operation }]
+        }
+      })
+      const { result } = renderController(f.workbench, create)
+      const close = vi.fn()
+      render(result.current.renderSettings([f.workbench], close))
+      fireEvent.click(await screen.findByRole('button', { name: '重试 feature' }))
+      await waitFor(() => expect(close).toHaveBeenCalledOnce())
+      expect(create).toHaveBeenCalledWith(f.workbench, 'feature', {
+        requestId: operation.id,
+        selectWorkspace: false,
+        ...(baseBranch ? { baseBranch } : {})
+      })
+    }
+  )
+
   it('does not apply unfinished contents on mount, workspace changes, or a newly empty graph', () => {
     const f = fixture()
     const apply = vi.fn()

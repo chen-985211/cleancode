@@ -35,6 +35,24 @@ const command = {
 describe('issue creation and explicit workspace selection', () => {
   afterEach(() => vi.restoreAllMocks())
 
+  it('resumes a creation without a saved base and preserves later navigation on reload', async () => {
+    const f = fixture()
+    const request = { projectDirectory: '/b', branchName: 'older-request', requestId: 'retry' }
+    const created = await f.invoke('cleancode:create-branch-workspace', request)
+    expect(await f.selection()).toEqual(['/b', created.graph.workspaceId])
+    await f.invoke('cleancode:switch-branch-workspace', {
+      projectDirectory: '/a',
+      workspaceId: 'feature'
+    })
+    const resumed = await f.invoke('cleancode:create-branch-workspace', {
+      ...request,
+      selectWorkspace: false
+    })
+    expect(resumed.graph.workspaceId).toBe(created.graph.workspaceId)
+    expect(await f.selection()).toEqual(['/a', 'feature'])
+    expect(f.git.createBranchWorktree).toHaveBeenCalledOnce()
+  })
+
   it('keeps creation separate from selection and restores the accepted project and workspace', async () => {
     const f = fixture()
     const created = await f.invoke('cleancode:start-issue-workspace', command)

@@ -309,7 +309,10 @@ export class PrepareWorkspaceInitializationUseCase {
     const operation = WorkspaceInitialization.restore(snapshot)
     operation.activate()
     await this.dependencies.repository.save(operation.toSnapshot())
-    return project
+    // Background creation returns the target for loading without persisting a new selection.
+    return command.selectWorkspace === false
+      ? Project.fromSnapshot(project).switchCurrentWorkspace(snapshot.workspaceId).toSnapshot()
+      : project
   }
 
   private async recoverWorkspace(

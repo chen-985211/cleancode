@@ -41,6 +41,68 @@ describe('real Git workspace base resolution', () => {
     await rm(root, { recursive: true, force: true })
   })
 
+  it.each([
+    '+refs/heads/release/*:refs/remotes/origin/*',
+    '+refs/heads/release/stable:refs/remotes/origin/stable',
+    '+refs/heads/release/st*:refs/remotes/origin/st*'
+  ])('refreshes the selected tracking ref using its configured source %s', async (spec) => {
+    await git(source, 'branch', 'stable')
+    await git(source, 'switch', '-c', 'release/stable')
+    await git(checkout, 'config', '--replace-all', 'remote.origin.fetch', spec)
+    await git(checkout, 'fetch', 'origin')
+    await git(
+      source,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'Release'
+    )
+    const expected = await git(source, 'rev-parse', 'HEAD')
+    const ref = 'refs/remotes/origin/stable'
+    expect(await git(checkout, 'rev-parse', ref)).toBe(original)
+    expect(await new GitCliWorkspaceBaseAdapter().resolve(checkout, ref)).toBe(expected)
+    expect(await git(checkout, 'rev-parse', ref)).toBe(expected)
+    expect(await git(checkout, 'rev-parse', 'main')).toBe(original)
+  })
+
+  it('rejects a stale tracking ref that the configured fetch excludes', async () => {
+    await git(checkout, 'config', '--add', 'remote.origin.fetch', '^refs/heads/main')
+    await expect(
+      new GitCliWorkspaceBaseAdapter().resolve(checkout, 'refs/remotes/origin/main')
+    ).rejects.toMatchObject({ code: 'GIT_WORKSPACE_BASE_UNAVAILABLE' })
+  })
+
+  it('uses the remote owning the fetch destination, even under a different name', async () => {
+    const ref = 'refs/remotes/releases/stable'
+    await git(checkout, 'config', '--add', 'remote.origin.fetch', `+refs/heads/main:${ref}`)
+    expect(await new GitCliWorkspaceBaseAdapter().resolve(checkout, ref)).toBe(original)
+    expect(await git(checkout, 'rev-parse', ref)).toBe(original)
+  })
+
+  it('rejects conflicting sources without changing the existing tracking ref', async () => {
+    await git(
+      checkout,
+      'config',
+      '--add',
+      'remote.origin.fetch',
+      '+refs/heads/other:refs/remotes/origin/main'
+    )
+    await expect(
+      new GitCliWorkspaceBaseAdapter().resolve(checkout, 'refs/remotes/origin/main')
+    ).rejects.toMatchObject({ code: 'GIT_WORKSPACE_BASE_UNAVAILABLE' })
+    expect(await git(checkout, 'rev-parse', 'origin/main')).toBe(original)
+  })
+
+  it('offers no bases in an ordinary project directory and propagates filesystem errors', async () => {
+    const adapter = new GitCliWorkspaceBaseAdapter()
+    await expect(adapter.list(root, null)).resolves.toEqual({ branches: [], defaultBranch: null })
+    await expect(adapter.list(join(root, 'missing'), null)).rejects.toThrow()
+  })
+
   it('offers only the remote default and active local workspace among unrelated branches', async () => {
     await git(checkout, 'branch', 'feature/login')
     await git(checkout, 'branch', '3')

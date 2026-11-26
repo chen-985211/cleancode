@@ -26,11 +26,11 @@ export async function readGitCommit(directory: string, ref: string): Promise<str
 export async function fetchTrackingBranch(
   directory: string,
   remote: string,
-  branch: string
+  source: string,
+  destination: string
 ): Promise<string> {
-  const ref = `refs/remotes/${remote}/${branch}`
-  await runGit(directory, [...fetchOptions, remote, `+refs/heads/${branch}:${ref}`])
-  const commit = await readGitCommit(directory, ref)
+  await runGit(directory, [...fetchOptions, remote, `+${source}:${destination}`])
+  const commit = await readGitCommit(directory, destination)
   if (!commit) throw new Error('Remote branch unavailable')
   return commit
 }

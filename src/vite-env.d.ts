@@ -180,6 +180,7 @@ declare global {
       }): Promise<WorkbenchSnapshot[]>
       createBranchWorkspace(command: {
         readonly baseBranch?: string
+        readonly selectWorkspace?: false
         readonly requestId?: string
         readonly defaults?: WorkspaceDefaults
         readonly projectDirectory: string

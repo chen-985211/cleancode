@@ -1,7 +1,6 @@
 import { createBlockGraphError } from '../../contexts/block-graph/application/errors/BlockGraphErrors'
 import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
 import { join } from 'node:path'
-import { Project } from '../../contexts/project/domain/aggregates/Project'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type {
   WorkspaceInitializationDetails,
@@ -173,16 +172,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     wrapLifecycle: (
       lifecycle: Pick<ProjectIpcHandlersInput, 'archiveBranchWorkspace' | 'forgetProject'>
     ) => ({
-      createBranchWorkspace: async (command: Parameters<typeof preparation.create>[0]) => {
-        const project = await preparation.create(command)
-        if (command.selectWorkspace !== false) return project
-        const target = project.workspaces.find(
-          (item) => item.gitBranch === command.branchName.trim()
-        )
-        if (!target)
-          throw createProjectError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
-        return Project.fromSnapshot(project).switchCurrentWorkspace(target.workspaceId).toSnapshot()
-      },
+      createBranchWorkspace: preparation.create.bind(preparation),
       archiveBranchWorkspace: async (
         command: Parameters<typeof lifecycle.archiveBranchWorkspace>[0]
       ) => {

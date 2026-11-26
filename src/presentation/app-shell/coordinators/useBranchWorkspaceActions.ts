@@ -271,6 +271,7 @@ export function useBranchWorkspaceActions({
       branchName: string,
       options?: {
         readonly baseBranch?: string
+        readonly selectWorkspace?: false
         readonly requestId: string
         readonly defaults?: WorkspaceDefaults
         readonly issueCommand?: StartIssueWorkspaceCommand
@@ -301,7 +302,7 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        if (options?.issueCommand || options?.baseBranch) {
+        if (options?.issueCommand || options?.baseBranch || options?.selectWorkspace === false) {
           const current = currentWorkbenchRef.current
           if (
             selectionEpoch.current === epoch &&

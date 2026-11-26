@@ -33,6 +33,22 @@ export async function runGit(directory: string, args: readonly string[]): Promis
   return stdout
 }
 
+export async function isGitRepository(directory: string): Promise<boolean> {
+  try {
+    const output = await runGit(directory, ['rev-parse', '--is-inside-work-tree'])
+    return output.trim() === 'true'
+  } catch (error) {
+    if (isConfirmedNonRepositoryError(error)) return false
+    throw error
+  }
+}
+
+function isConfirmedNonRepositoryError(error: unknown): boolean {
+  const stderr = (error as { readonly stderr?: unknown } | null)?.stderr
+
+  return typeof stderr === 'string' && stderr.includes('fatal: not a git repository')
+}
+
 function createGitProcessEnvironment(): NodeJS.ProcessEnv {
   const env = { ...process.env }
 

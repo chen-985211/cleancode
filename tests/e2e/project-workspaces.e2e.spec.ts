@@ -21,6 +21,7 @@ import {
 } from '../support/e2eWorkbench'
 import { waitForE2eBlockGraph } from '../support/e2eBlockGraph'
 import { pollUntilState } from '../support/e2ePolling'
+import { setElectronContentSize } from '../support/e2eWindow'
 
 describe('project workspaces e2e', () => {
   let workbench: E2eWorkbench
@@ -195,11 +196,10 @@ describe('project workspaces e2e', () => {
 
       // Leave just enough room for the projects without a vertical scrollbar.
       const extraHeight = initialGeometry.scrollHeight - initialGeometry.clientHeight + 12
-      await electronApp.evaluate(({ BrowserWindow }, extra) => {
-        const window = BrowserWindow.getAllWindows()[0]!
-        const [width, height] = window.getContentSize()
-        window.setContentSize(width, height + extra)
-      }, extraHeight)
+      const [width, height] = await electronApp.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]!.getContentSize()
+      )
+      await setElectronContentSize(electronApp, { width, height: height + extraHeight })
       await page.waitForFunction(() => {
         const list = document.querySelector('.project-list')!
         return list.clientHeight === list.scrollHeight

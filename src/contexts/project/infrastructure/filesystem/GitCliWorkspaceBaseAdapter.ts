@@ -2,10 +2,12 @@ import type { WorkspaceBaseBranches } from '../../application/dto/WorkspaceBaseB
 import type { WorkspaceBaseBranchPort } from '../../application/ports/WorkspaceBaseBranchPort'
 import { createProjectError } from '../../application/errors/ProjectErrors'
 import { fetchTrackingBranch, readGitCommit } from './GitBaseCommit'
-import { runGit } from './GitProcess'
+import { isGitRepository, runGit } from './GitProcess'
+import { resolveTrackingSource } from './GitFetchRefspec'
 
 export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
   async list(directory: string, currentBranch: string | null): Promise<WorkspaceBaseBranches> {
+    if (!(await isGitRepository(directory))) return { branches: [], defaultBranch: null }
     const output = await runGit(directory, [
       'for-each-ref',
       '--format=%(refname)%09%(symref)%09%(HEAD)%09%(upstream)',
@@ -48,13 +50,8 @@ export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
         const commit = await readGitCommit(directory, ref)
         if (commit) return commit
       } else if (ref.startsWith('refs/remotes/')) {
-        const name = ref.slice('refs/remotes/'.length)
-        const remotes = (await runGit(directory, ['remote'])).trim().split('\n')
-        const remote = remotes
-          .sort((a, b) => b.length - a.length)
-          .find((item) => item && name.startsWith(`${item}/`))
-        if (remote)
-          return await fetchTrackingBranch(directory, remote, name.slice(remote.length + 1))
+        const { remote, source } = await resolveTrackingSource(directory, ref)
+        return await fetchTrackingBranch(directory, remote, source, ref)
       }
     } catch {
       // A failed refresh must never use a stale tracking ref.

@@ -139,8 +139,13 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
           : undefined
       if (baseBranch && !/^refs\/(heads|remotes)\/.+/.test(baseBranch))
         throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace base branch.')
+      const selectWorkspace = isRecord(command) ? command.selectWorkspace : undefined
+      if (selectWorkspace !== undefined && selectWorkspace !== false)
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace selection option.')
+      const deferSelection = baseBranch !== undefined || selectWorkspace === false
       const project = await input.createBranchWorkspace({
-        ...(baseBranch ? { baseBranch, selectWorkspace: false } : {}),
+        ...(baseBranch ? { baseBranch } : {}),
+        ...(deferSelection ? { selectWorkspace: false } : {}),
         projectDirectory: readStringField(command, 'projectDirectory'),
         branchName: readStringField(command, 'branchName'),
         ...(isRecord(command) && command.requestId !== undefined
@@ -151,7 +156,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
           : {})
       })
 
-      return baseBranch ? input.loadWorkbench(project) : loadAndSelectWorkbench(input, project)
+      return deferSelection ? input.loadWorkbench(project) : loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,

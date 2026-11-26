@@ -103,7 +103,13 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
     branch: string,
     tracking: boolean
   ): Promise<string> {
-    if (tracking) return fetchTrackingBranch(directory, source, branch)
+    if (tracking)
+      return fetchTrackingBranch(
+        directory,
+        source,
+        `refs/heads/${branch}`,
+        `refs/remotes/${source}/${branch}`
+      )
     const output = await runGit(directory, [
       'ls-remote',
       '--exit-code',
