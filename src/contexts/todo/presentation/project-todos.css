@@ -46,6 +46,13 @@
 .todo-count-divider {
   opacity: 0.6;
 }
+.project-todo-dock {
+  position: absolute;
+  inset: 0 0 0 auto;
+  /* Reserve the settled bounds while the drawer slides over the shell utilities. */
+  z-index: 51;
+  pointer-events: none;
+}
 .project-todo-drawer {
   --todo-ink: var(--cc-canvas-node-menu-foreground);
   --todo-quiet: color-mix(in srgb, var(--todo-ink) 62%, var(--cc-canvas-node-menu-surface));
@@ -54,12 +61,9 @@
   container-type: inline-size;
   --todo-row-radius: calc(15px * var(--cc-corner-radius-scale));
   position: absolute;
-  inset: 0 0 0 auto;
-  /* The shell utilities (50), minimap and count sit behind this surface. */
-  z-index: 51;
+  inset: 0;
   box-sizing: border-box;
-  width: var(--todo-width);
-  max-width: calc((100% - var(--cc-canvas-sidebar-inset, 0px)) * 0.64);
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   --todo-header-height: 72px;

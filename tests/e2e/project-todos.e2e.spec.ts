@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { pollUntilState } from '../support/e2ePolling'
+import { waitForCreatedWorkbenchNodeResult } from '../support/workbenchNodeCreationE2e'
 import {
   closeElectronApp,
   createE2eWorkbench,
@@ -20,6 +21,101 @@ describe('project to-do list', () => {
       taskName: task.name
     })
   })
+
+  it(
+    'keeps focus and new terminals in the exposed canvas while resizing the drawer',
+    async () => {
+      const workbench = await createE2eWorkbench('cleancode-todo-obstruction')
+      resources = { workbench }
+      const app = await launchApp(workbench)
+      resources.electronApp = app
+      const page = await app.firstWindow()
+      resources.page = page
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目', exact: true }).click()
+      const openingEdge = await page
+        .getByRole('button', { name: '打开待办清单' })
+        .evaluate((opener: HTMLButtonElement) => {
+          opener.click()
+          return new Promise<number>((resolve) =>
+            requestAnimationFrame(() => {
+              const panel = document.getElementById('project-todo-drawer')!
+              resolve(
+                panel.closest('[data-workbench-canvas-obstruction]')!.getBoundingClientRect().left
+              )
+            })
+          )
+        })
+      const drawer = page.locator('#project-todo-drawer[data-surface-motion-state="open"]')
+      await drawer.waitFor()
+      expect(openingEdge).toBeCloseTo((await drawer.boundingBox())!.x, 0)
+      const close = drawer.getByRole('button', { name: '收起待办清单' })
+      await close.press('Shift+Tab')
+      expect
+        .soft(
+          await drawer.evaluate((el) => {
+            const active = document.activeElement
+            if (!active || el.contains(active)) return false
+            const a = active.getBoundingClientRect(),
+              b = el.getBoundingClientRect()
+            return a.width > 0 && a.left >= b.left && a.right <= b.right
+          })
+        )
+        .toBe(false)
+      const coveredChrome = await drawer.evaluate((el) => {
+        const bounds = el.getBoundingClientRect()
+        return [
+          ...document.querySelectorAll<HTMLButtonElement>(
+            '.canvas-minimap button, .app-shell__toolbar button, .app-shell__settings button'
+          )
+        ]
+          .filter((button) => {
+            const box = button.getBoundingClientRect()
+            if (
+              button.disabled ||
+              box.width === 0 ||
+              box.left < bounds.left ||
+              box.right > bounds.right
+            )
+              return false
+            button.focus({ preventScroll: true })
+            return document.activeElement === button
+          })
+          .map((button) => button.getAttribute('aria-label') || button.textContent)
+      })
+      expect.soft(coveredChrome).toEqual([])
+      const handle = drawer.getByRole('separator')
+      const grip = (await handle.boundingBox())!
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(1, grip.y + grip.height / 2)
+      await page.mouse.up()
+      const maxWidth = (await drawer.boundingBox())!.width
+      expect.soft(Number(await handle.getAttribute('aria-valuenow'))).toBeCloseTo(maxWidth, 0)
+      await handle.press('ArrowRight')
+      expect.soft((await drawer.boundingBox())!.width).toBeCloseTo(maxWidth - 16, 0)
+      const pane = page.locator('.react-flow__pane')
+      await pane.click({ button: 'right', position: { x: 40, y: 150 } })
+      await page.getByRole('menuitem', { name: /新建终端/ }).click()
+      const selector = '.react-flow__node-terminal'
+      await waitForCreatedWorkbenchNodeResult(page, selector)
+      const node = (await page.locator(selector).boundingBox())!
+      expect(node.x + node.width).toBeLessThanOrEqual((await drawer.boundingBox())!.x - 23)
+      await page.screenshot({ path: 'test-results/project-todo-exposed-canvas.png' })
+      const nodeControl = page.locator(selector).getByRole('button', { name: /折叠终端/ })
+      expect(
+        await nodeControl.evaluate((button) => {
+          button.focus({ preventScroll: true })
+          return button === document.activeElement
+        })
+      ).toBe(true)
+      await close.click()
+      const zoom = page.getByRole('button', { name: '放大画布' })
+      await zoom.focus()
+      expect(await zoom.evaluate((button) => button === document.activeElement)).toBe(true)
+    },
+    electronScenarioTimeoutMs
+  )
 
   it(
     'lets canvas gestures finish and keeps the viewport fixed throughout double-click dismissal',

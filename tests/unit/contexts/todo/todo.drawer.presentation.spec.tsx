@@ -346,8 +346,10 @@ describe('project to-do drawer', () => {
       expect(title).toHaveFocus()
       expect(title).toHaveValue('甲乙')
       fireEvent.change(title, { target: { value: '甲\n乙' } })
-      expect(api.saveTodo).toHaveBeenLastCalledWith(
-        expect.objectContaining({ draft: expect.objectContaining({ text: '甲\n乙', note: '' }) })
+      await vi.waitFor(() =>
+        expect(api.saveTodo).toHaveBeenLastCalledWith(
+          expect.objectContaining({ draft: expect.objectContaining({ text: '甲\n乙', note: '' }) })
+        )
       )
       fireEvent.keyDown(title, { key: 'Enter' })
       expect(screen.getByRole('button', { name: /^甲\s+乙$/ })).toBeVisible()
@@ -379,6 +381,99 @@ describe('project to-do drawer', () => {
     )
     expect(screen.getByRole('textbox', { name: '备注' })).toHaveValue('备注')
     expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.org/')
+  })
+
+  it.each(['一\n二', '一 https://example.org/\n二'])(
+    'replaces only the selection in an existing single-line title when pasting %s',
+    async (pasted) => {
+      const item = {
+        ...blankTodo(),
+        text: '甲选乙',
+        note: '原备注',
+        createdAt: 1,
+        completedAt: null
+      }
+      const api = {
+        listTodos: vi.fn(async () => [item]),
+        saveTodo: vi.fn(),
+        readTodoImage: vi.fn()
+      }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+      fireEvent.click(await screen.findByRole('button', { name: '编辑“甲选乙”' }))
+      const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
+      title.setSelectionRange(1, 2)
+      fireEvent.paste(title, {
+        clipboardData: {
+          files: [],
+          getData: (format: string) => (format === 'text/plain' ? pasted : '')
+        }
+      })
+      expect(title).toHaveValue('甲' + pasted + '乙')
+      expect(screen.getByRole('textbox', { name: '备注' })).toHaveValue('原备注')
+      expect(api.saveTodo).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          draft: expect.objectContaining({ text: '甲' + pasted + '乙', note: '原备注' })
+        })
+      )
+    }
+  )
+
+  it.each([{ isComposing: true }, { keyCode: 229 }])(
+    'leaves Escape to the IME during composition (%o)',
+    async (composition) => {
+      const api = { listTodos: vi.fn(async () => []), saveTodo: vi.fn(), readTodoImage: vi.fn() }
+      render(<ProjectTodoDrawer projectId="project" api={api} />)
+      const opener = screen.getByRole('button', { name: '打开待办清单' })
+      fireEvent.click(opener)
+      fireEvent.click(await screen.findByRole('button', { name: '记一条' }))
+      const editor = screen.getByRole('textbox', { name: '待办内容' })
+      expect(fireEvent.keyDown(editor, { key: 'Escape', ...composition })).toBe(true)
+      expect(opener).toHaveAttribute('aria-expanded', 'true')
+      expect(editor).toHaveFocus()
+      fireEvent.keyDown(editor, { key: 'Escape' })
+      expect(opener).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.queryByRole('textbox')).toBeNull()
+    }
+  )
+
+  it('displays the recovered thumbnail when reopening an attachment after a failed read', async () => {
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(private callback: (entries: { isIntersecting: boolean }[]) => void) {}
+        observe() {
+          this.callback([{ isIntersecting: true }])
+        }
+        disconnect() {}
+      }
+    )
+    onTestFinished(() => {
+      vi.unstubAllGlobals()
+    })
+    const item = {
+      ...blankTodo(),
+      text: '设计稿',
+      images: [crypto.randomUUID()],
+      createdAt: 1,
+      completedAt: null
+    }
+    const data = 'data:image/png;base64,Zm9v'
+    const api = {
+      listTodos: async () => [item],
+      saveTodo: vi.fn(),
+      readTodoImage: vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue(data)
+    }
+    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
+    const title = await screen.findByRole('button', { name: item.text })
+    fireEvent.click(title)
+    await screen.findByRole('status')
+    fireEvent.click(title)
+    fireEvent.click(title)
+    expect(await screen.findByRole('img', { name: '粘贴的截图' })).toHaveAttribute('src', data)
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(api.readTodoImage).toHaveBeenCalledTimes(2)
   })
 
   it.each(['todo', 'active', 'done'] as const)(

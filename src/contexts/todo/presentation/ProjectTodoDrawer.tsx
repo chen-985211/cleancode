@@ -6,8 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
-  type CSSProperties
+  useSyncExternalStore
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRight, Plus } from '@phosphor-icons/react'
@@ -42,18 +41,24 @@ export interface ProjectTodoDrawerHandle {
 export function ProjectTodoDrawer({
   projectId,
   api,
+  canvasWidth = window.innerWidth,
+  onCoverCanvas,
   ref
 }: {
   projectId: string
   api: TodoApi
+  canvasWidth?: number
+  onCoverCanvas?: (dock: HTMLElement) => () => void
   ref?: Ref<ProjectTodoDrawerHandle>
 }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   useImperativeHandle(ref, () => ({ open, close: () => setOpen(false) }), [open])
-  const [width, setWidth] = useState(() =>
+  const [preferredWidth, setWidth] = useState(() =>
     Math.max(minDrawerWidth, Number(window.localStorage.getItem(widthKey)) || defaultDrawerWidth)
   )
+  const maxWidth = Math.max(1, Math.floor(canvasWidth * 0.64))
+  const width = Math.min(Math.max(minDrawerWidth, preferredWidth), maxWidth)
   const [sessions] = useState(() => new Map<string, TodoSession>())
   const session = useMemo(() => {
     let found = sessions.get(projectId)
@@ -67,12 +72,24 @@ export function ProjectTodoDrawer({
   useEffect(() => {
     session.start()
   }, [session])
+  useEffect(() => {
+    const flush = () => sessions.forEach((project) => project.flushOnPageHide())
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [sessions])
+  const dock = useRef<HTMLDivElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
   const [header, setHeader] = useState<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     if (open) closeButton.current?.focus({ preventScroll: true })
   }, [open])
+  useLayoutEffect(() => {
+    if (open && dock.current) return onCoverCanvas?.(dock.current)
+  }, [open, onCoverCanvas])
   function closeFromDrawer() {
     setOpen(false)
     toggle.current?.focus({ preventScroll: true })
@@ -108,77 +125,94 @@ export function ProjectTodoDrawer({
           )}
         </button>
       </TooltipLabel>
-      <AnchoredSurfaceMotion
-        open={open}
-        springPreset="sliding-panel-right"
-        role="complementary"
-        id="project-todo-drawer"
-        className="project-todo-drawer anchored-surface-motion"
-        aria-label={t('todo.list')}
-        style={{ '--todo-width': width + 'px' } as CSSProperties}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' && !e.defaultPrevented) {
-            e.stopPropagation()
-            closeFromDrawer()
-          }
-        }}
+      <div
+        ref={dock}
+        className="project-todo-dock"
+        style={{ width }}
+        data-workbench-canvas-obstruction={open || undefined}
       >
-        <div className="todo-drawer-header" ref={setHeader}>
-          <button
-            type="button"
-            className="todo-close"
-            aria-label={t('todo.close')}
-            ref={closeButton}
-            onClick={closeFromDrawer}
-          >
-            <ArrowRight aria-hidden="true" size={16} weight="bold" />
-          </button>
-        </div>
-        <ResizeHandle width={width} onWidth={setWidth} />
-        {state.loading && !state.loadFailed ? (
-          <span role="status" className="todo-feedback">
-            {t('todo.loading')}
-          </span>
-        ) : null}
-        {!state.loading && !state.loadFailed && (
-          <TodoRows
-            session={session}
-            key={projectId}
-            header={header}
-            items={state.items}
-            showCompleted={state.showCompleted}
-            expandedIds={state.expanded}
-          />
-        )}
-        {(state.loadFailed || state.saveFailed) && (
-          <div role="alert" className="todo-feedback">
-            {t(state.loadFailed ? 'todo.loadFailed' : 'todo.saveFailed')}{' '}
-            <button onClick={() => session.retry()}>{t('todo.retry')}</button>
+        <AnchoredSurfaceMotion
+          open={open}
+          springPreset="sliding-panel-right"
+          role="complementary"
+          id="project-todo-drawer"
+          className="project-todo-drawer anchored-surface-motion"
+          aria-label={t('todo.list')}
+          onKeyDown={(e) => {
+            if (
+              e.key === 'Escape' &&
+              !e.defaultPrevented &&
+              !e.nativeEvent.isComposing &&
+              e.nativeEvent.keyCode !== 229
+            ) {
+              e.stopPropagation()
+              closeFromDrawer()
+            }
+          }}
+        >
+          <div className="todo-drawer-header" ref={setHeader}>
+            <button
+              type="button"
+              className="todo-close"
+              aria-label={t('todo.close')}
+              ref={closeButton}
+              onClick={closeFromDrawer}
+            >
+              <ArrowRight aria-hidden="true" size={16} weight="bold" />
+            </button>
           </div>
-        )}
-      </AnchoredSurfaceMotion>
+          <ResizeHandle width={width} maxWidth={maxWidth} onWidth={setWidth} />
+          {state.loading && !state.loadFailed ? (
+            <span role="status" className="todo-feedback">
+              {t('todo.loading')}
+            </span>
+          ) : null}
+          {!state.loading && !state.loadFailed && (
+            <TodoRows
+              session={session}
+              key={projectId}
+              header={header}
+              items={state.items}
+              showCompleted={state.showCompleted}
+              expandedIds={state.expanded}
+            />
+          )}
+          {(state.loadFailed || state.saveFailed) && (
+            <div role="alert" className="todo-feedback">
+              {t(state.loadFailed ? 'todo.loadFailed' : 'todo.saveFailed')}{' '}
+              <button onClick={() => session.retry()}>{t('todo.retry')}</button>
+            </div>
+          )}
+        </AnchoredSurfaceMotion>
+      </div>
     </>
   )
 }
-function ResizeHandle({ width, onWidth }: { width: number; onWidth: (n: number) => void }) {
+function ResizeHandle({
+  width,
+  maxWidth,
+  onWidth
+}: {
+  width: number
+  maxWidth: number
+  onWidth: (n: number) => void
+}) {
   const { t } = useI18n()
   const start = useRef<{ x: number; width: number } | null>(null)
-  const handle = useRef<HTMLDivElement>(null)
   function resize(value: number) {
-    const host = handle.current?.parentElement?.parentElement
-    const max = Math.max(160, (host?.clientWidth ?? innerWidth) * 0.64)
-    const next = Math.round(Math.min(max, Math.max(minDrawerWidth, value)))
+    const next = Math.round(Math.min(maxWidth, Math.max(minDrawerWidth, value)))
     onWidth(next)
     window.localStorage.setItem(widthKey, String(next))
   }
   return (
     <div
       role="separator"
-      ref={handle}
       className="todo-resize"
       tabIndex={0}
       aria-orientation="vertical"
       aria-label={t('todo.resize')}
+      aria-valuemin={Math.min(minDrawerWidth, maxWidth)}
+      aria-valuemax={maxWidth}
       aria-valuenow={width}
       onPointerDown={(e) => {
         if (e.button !== 0) return

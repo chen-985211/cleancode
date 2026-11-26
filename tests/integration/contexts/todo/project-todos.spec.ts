@@ -42,6 +42,22 @@ describe('project to-do persistence', () => {
     await expect(todos.save('first', draft)).rejects.toThrow()
     expect(await todos.list('first')).toMatchObject([{ text: 'original', images: [] }])
   })
+  it('persists the time of a later offline completion through a retry and restart', async () => {
+    const todos = load()
+    const done = {
+      ...draft,
+      images: [],
+      text: '复核',
+      status: 'done' as const,
+      statusOrder: 1,
+      completedAt: 10
+    }
+    await todos.save('first', done)
+    const completedAgain = { ...done, statusOrder: 4, completedAt: 22 }
+    await todos.save('first', completedAgain)
+    await load().save('first', completedAgain)
+    expect(await load().list('first')).toMatchObject([{ statusOrder: 4, completedAt: 22 }])
+  })
   it('restores the last arrival first in each status after ordinary edits and reopening', async () => {
     const todos = load()
     const [a, b, c] = ['甲', '乙', '丙'].map((text) => ({

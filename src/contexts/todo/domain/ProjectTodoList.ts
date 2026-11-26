@@ -9,6 +9,8 @@ export interface TodoDraft {
   status: TodoState
   /** Order of entry into this status. Autosave carries it across retries. */
   statusOrder?: number
+  /** Time of the completion carried by this status order, including a delayed save. */
+  completedAt?: number | null
 }
 export interface TodoItem extends TodoDraft {
   createdAt: number
@@ -38,6 +40,7 @@ export function isTodoDraft(value: unknown): value is TodoDraft {
     typeof d.note === 'string' &&
     todoStates.includes(d.status!) &&
     (d.statusOrder === undefined || (Number.isSafeInteger(d.statusOrder) && d.statusOrder > 0)) &&
+    (d.completedAt == null || Number.isFinite(d.completedAt)) &&
     Array.isArray(d.links) &&
     d.links.every((v) => typeof v === 'string' && httpLink(v)) &&
     Array.isArray(d.images) &&
@@ -87,8 +90,9 @@ export function updateTodoList(
     }
     const old = byId.get(draft.id)
     let statusOrder = old?.statusOrder
+    const newerEntry = (draft.statusOrder ?? 0) > (statusOrder ?? 0)
     // A retried draft can have returned to its stored status after visiting another.
-    if (old?.status !== draft.status || (draft.statusOrder ?? 0) > (statusOrder ?? 0)) {
+    if (old?.status !== draft.status || newerEntry) {
       if (lastOrder === Number.MAX_SAFE_INTEGER) lastOrder = compactStatusOrders(byId)
       lastOrder = Math.max(lastOrder + 1, draft.statusOrder ?? 0)
       statusOrder = lastOrder
@@ -102,7 +106,10 @@ export function updateTodoList(
       images: [...new Set(draft.images)],
       createdAt: old?.createdAt ?? now,
       statusOrder,
-      completedAt: draft.status === 'done' ? (old?.completedAt ?? now) : null
+      completedAt:
+        draft.status === 'done'
+          ? ((newerEntry ? draft.completedAt : old?.completedAt) ?? now)
+          : null
     })
   }
   return [...byId.values()]

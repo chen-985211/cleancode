@@ -44,7 +44,9 @@ describe('project to-do IPC', () => {
       { drafts: [valid, valid] },
       { draft: valid, drafts: [valid] },
       { draft: { ...valid, statusOrder: -1 } },
-      { draft: { ...valid, statusOrder: 1.5 } }
+      { draft: { ...valid, statusOrder: 1.5 } },
+      { draft: { ...valid, completedAt: 'yesterday' } },
+      { draft: { ...valid, completedAt: Infinity } }
     ]) {
       await expect(
         call(todoChannels.save, { projectId: 'project', ...payload })

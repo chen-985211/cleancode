@@ -86,23 +86,21 @@ export function TodoRow({
       anchors
     )
     const control = event.currentTarget
-    const splitPastedTitle =
-      field === 'text' && !control.value.includes('\n') && text.includes('\n')
-    if (!links.length && !files.length && !splitPastedTitle) return
+    const multilineTitle = field === 'text' && text.includes('\n')
+    if (!links.length && !files.length && !multilineTitle) return
     event.preventDefault()
     const start = control.selectionStart ?? control.value.length
     const end = control.selectionEnd ?? start
     const next = { ...item, links: [...new Set([...item.links, ...links])] }
     if (text) {
       const combined = control.value.slice(0, start) + text + control.value.slice(end)
-      if (splitPastedTitle) {
+      if (multilineTitle && capture && !hasTodoContent(item)) {
         const [first, ...lines] = combined.split('\n')
         next.text = first
         next.note = [lines.join('\n'), next.note].filter(Boolean).join('\n')
       } else next[field] = combined
-      requestAnimationFrame(() =>
-        control.setSelectionRange(start + text.length, start + text.length)
-      )
+      const caret = Math.min(start + text.length, next[field].length)
+      requestAnimationFrame(() => control.setSelectionRange(caret, caret))
     }
     change(next)
     if (capture && field === 'text' && !hasTodoContent(item) && !files.length) {

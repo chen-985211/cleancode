@@ -34,9 +34,87 @@ describe('to-do autosave', () => {
     expect(edited[0].completedAt).toBe(1)
     expect(updateTodoList(edited, { ...draft, status: 'todo' }, 3)[0].completedAt).toBe(null)
   })
+  it('records a new completion after a round trip to the same stored status and keeps retries idempotent', () => {
+    const draft = { ...blankTodo(), text: '复核', status: 'done' as const }
+    const first = updateTodoList([], draft, 10)
+    const reopened = updateTodoList(first, { ...draft, status: 'todo' }, 20)
+    const active = updateTodoList(reopened, { ...draft, status: 'active' }, 21)
+    const [completedAgain] = updateTodoList(active, draft, 22)
+    const retried = updateTodoList(first, completedAgain, 30)
+    expect(retried[0].completedAt).toBe(22)
+    expect(updateTodoList(retried, completedAgain, 40)[0].completedAt).toBe(22)
+    expect(
+      updateTodoList(first, { ...draft, statusOrder: completedAgain.statusOrder }, 30)[0]
+        .completedAt
+    ).toBe(30)
+  })
+
+  it('coalesces edits made during an image save and sends only the latest text after acknowledgement', async () => {
+    let acknowledge!: () => void
+    const saveTodo = vi
+      .fn<TodoApi['saveTodo']>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            acknowledge = resolve
+          })
+      )
+      .mockResolvedValue(undefined)
+    const session = new TodoSession(
+      { listTodos: async () => [], readTodoImage: vi.fn(), saveTodo },
+      'project'
+    )
+    session.start()
+    await vi.waitFor(() => expect(session.snapshot().loading).toBe(false))
+    const image = { id: crypto.randomUUID(), data: 'data:image/png;base64,AAAA' }
+    const draft = { ...blankTodo(), text: '原文', images: [image.id] }
+    session.change(draft, [image])
+    for (let i = 1; i <= 20; i++) session.change({ ...draft, text: String(i) })
+    expect(session.find(draft.id)?.text).toBe('20')
+    expect(saveTodo).toHaveBeenCalledTimes(1)
+    acknowledge()
+    await vi.waitFor(() => expect(saveTodo).toHaveBeenCalledTimes(2))
+    expect(saveTodo).toHaveBeenLastCalledWith({
+      projectId: 'project',
+      draft: { ...draft, text: '20', statusOrder: 1 },
+      images: []
+    })
+  })
+  it('hands off the latest pending draft once when the renderer leaves during a save', async () => {
+    let rejectOld!: (error: Error) => void
+    const saveTodo = vi
+      .fn<TodoApi['saveTodo']>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectOld = reject
+          })
+      )
+      .mockResolvedValue(undefined)
+    const session = new TodoSession(
+      { listTodos: async () => [], readTodoImage: vi.fn(), saveTodo },
+      'project'
+    )
+    session.start()
+    await vi.waitFor(() => expect(session.snapshot().loading).toBe(false))
+    const draft = { ...blankTodo(), text: '第一版' }
+    session.change(draft)
+    session.change({ ...draft, text: '最后一版' })
+    session.flushOnPageHide()
+    session.flushOnPageHide()
+    expect(saveTodo).toHaveBeenCalledTimes(2)
+    expect(saveTodo.mock.lastCall?.[0]).toMatchObject({
+      projectId: 'project',
+      draft: { text: '最后一版' }
+    })
+    rejectOld(new Error('first write failed'))
+    await Promise.resolve()
+    expect(session.snapshot().saveFailed).toBe(false)
+  })
   it('restores the same group order when several offline status changes are retried together', async () => {
     const [a, b, c] = ['甲', '乙', '丙'].map((text) => ({ ...blankTodo(), text }))
-    let stored = updateTodoList([], [a, b, c], 10)
+    const done = { ...blankTodo(), text: '丁', status: 'done' as const }
+    let stored = updateTodoList([], [a, b, c, done], 10)
     let offline = true
     const session = new TodoSession(
       {
@@ -55,6 +133,11 @@ describe('to-do autosave', () => {
     session.change({ ...b, status: 'active' })
     session.change({ ...b, status: 'todo' })
     session.change({ ...a, status: 'todo' })
+    session.change({ ...done, status: 'todo' })
+    session.change({ ...done, status: 'active' })
+    session.change(done)
+    const completedOffline = session.find(done.id)!.completedAt
+    expect(completedOffline).toBeGreaterThan(10)
     const titles = (items: typeof stored) => todosInStatus(items, 'todo').map((item) => item.text)
     expect(titles(session.snapshot().items)).toEqual(['甲', '乙', '丙'])
     await vi.waitFor(() => expect(session.snapshot().saveFailed).toBe(true))
@@ -62,6 +145,7 @@ describe('to-do autosave', () => {
     session.retry()
     await vi.waitFor(() => expect(session.snapshot().saveFailed).toBe(false))
     expect(titles(stored)).toEqual(['甲', '乙', '丙'])
+    expect(stored.find((item) => item.id === done.id)?.completedAt).toBe(completedOffline)
   })
   it('keeps an unacknowledged split together with a newer edit when the first write fails', async () => {
     let rejectSplit!: (error: Error) => void
@@ -84,6 +168,9 @@ describe('to-do autosave', () => {
     session.change(parts)
     const renamed = { ...parts[1], text: '第一条' }
     session.change(renamed)
+    expect(saveTodo).toHaveBeenCalledTimes(1)
+    rejectSplit(new Error('disk full'))
+    await vi.waitFor(() => expect(saveTodo).toHaveBeenCalledTimes(2))
     expect(saveTodo).toHaveBeenLastCalledWith({
       projectId: 'project',
       drafts: [
@@ -92,8 +179,6 @@ describe('to-do autosave', () => {
       ],
       images: []
     })
-    rejectSplit(new Error('disk full'))
-    await Promise.resolve()
     expect(session.snapshot().saveFailed).toBe(false)
   })
   it('retries the whole failed split together and preserves the original list order', async () => {

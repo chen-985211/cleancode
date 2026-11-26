@@ -297,6 +297,7 @@ export function WorkbenchCanvas({
   })
   const paneInteraction = useWorkbenchPaneInteraction({
     projectId: currentWorkbench?.project.id,
+    canvasWidth: canvasSize.width,
     objectContextMenu,
     paneContextMenu,
     editingTerminalGroupId,

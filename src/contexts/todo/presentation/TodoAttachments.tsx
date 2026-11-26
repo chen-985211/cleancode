@@ -1,5 +1,5 @@
 import { GlobeSimple, X } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useI18n } from '../../../presentation/i18n/useI18n'
 import { GitHubMarkIcon } from '../../../presentation/shared/components/GitHubMarkIcon'
 import type { TodoDraft } from '../domain/ProjectTodoList'
@@ -90,10 +90,10 @@ function Thumbnail({
 }) {
   const { t } = useI18n()
   const frame = useRef<HTMLSpanElement>(null)
-  const [src, setSrc] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [preview, setPreview] = useState<{ src: string } | 'failed' | null>(null)
+  const hasPreview = useEffectEvent(() => preview !== null && preview !== 'failed')
   useEffect(() => {
-    if (!expanded || src) return
+    if (!expanded || hasPreview()) return
     let current = true
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -101,10 +101,10 @@ function Thumbnail({
         observer.disconnect()
         void session.image(id).then(
           (data) => {
-            if (current) setSrc(data)
+            if (current) setPreview({ src: data })
           },
           () => {
-            if (current) setFailed(true)
+            if (current) setPreview('failed')
           }
         )
       },
@@ -115,13 +115,15 @@ function Thumbnail({
       current = false
       observer.disconnect()
     }
-  }, [id, session, expanded, src])
+  }, [id, session, expanded])
   return (
     <span className="todo-thumbnail" ref={frame}>
-      {failed ? (
+      {preview === 'failed' ? (
         <span role="status">{t('todo.imageUnavailable')}</span>
       ) : (
-        src && <img src={src} alt={t('todo.image')} onError={() => setFailed(true)} />
+        preview && (
+          <img src={preview.src} alt={t('todo.image')} onError={() => setPreview('failed')} />
+        )
       )}
     </span>
   )

@@ -32,7 +32,8 @@ export class TodoSession {
   }
   private readonly listeners = new Set<() => void>()
   private readonly latest = new Map<string, TodoDraft>()
-  private readonly failed = new Set<string>()
+  private inFlight: TodoDraft[] | null = null
+  private writeQueued = false
   private readonly unsavedImages = new Map<string, TodoImage>()
   constructor(
     private readonly api: TodoApi,
@@ -80,46 +81,60 @@ export class TodoSession {
   change(changes: TodoDraft | TodoDraft[], images: TodoImage[] = []) {
     if (this.state.loading || this.state.loadFailed) return
     const drafts = (Array.isArray(changes) ? changes : [changes]).filter(
-      (draft) => hasTodoContent(draft) || this.find(draft.id) || this.failed.has(draft.id)
+      (draft) => hasTodoContent(draft) || this.find(draft.id) || this.latest.has(draft.id)
     )
     if (!drafts.length) return
     for (const image of images) this.unsavedImages.set(image.id, image)
     const items = updateTodoList(this.state.items, drafts, Date.now())
-    const ranks = new Map(items.map((item) => [item.id, item.statusOrder]))
-    for (const draft of drafts)
-      this.latest.set(draft.id, { ...draft, statusOrder: ranks.get(draft.id) })
+    const byId = new Map(items.map((item) => [item.id, item]))
+    for (const draft of drafts) {
+      const item = byId.get(draft.id)
+      this.latest.set(draft.id, {
+        ...draft,
+        statusOrder: item?.statusOrder,
+        ...(item?.status === 'done' && { completedAt: item.completedAt })
+      })
+    }
     this.publish({ items })
-    // A later edit can arrive before a split is acknowledged. Submit the complete
-    // outstanding set in order so either successful write leaves a consistent list.
-    void this.write([...this.latest.values()])
+    if (this.inFlight) this.writeQueued = true
+    else void this.writePending()
   }
-  private async write(drafts: TodoDraft[]) {
+  private async writePending() {
+    const drafts = [...this.latest.values()]
     drafts.sort((a, b) => (a.statusOrder ?? 0) - (b.statusOrder ?? 0))
+    this.inFlight = drafts
+    this.writeQueued = false
     const imageIds = new Set(drafts.flatMap((draft) => draft.images))
     const images = [...imageIds].flatMap((id) => this.unsavedImages.get(id) ?? [])
     const content = drafts.length === 1 ? { draft: drafts[0] } : { drafts }
+    let saveFailed = false
     try {
       await this.api.saveTodo({ projectId: this.projectId, ...content, images })
+      if (this.inFlight !== drafts) return
       for (const image of images) this.unsavedImages.delete(image.id)
       for (const draft of drafts) {
-        if (this.latest.get(draft.id) !== draft) continue
-        this.latest.delete(draft.id)
-        this.failed.delete(draft.id)
+        if (this.latest.get(draft.id) === draft) this.latest.delete(draft.id)
       }
     } catch {
-      for (const draft of drafts) {
-        if (this.latest.get(draft.id) === draft) this.failed.add(draft.id)
-      }
+      if (this.inFlight !== drafts) return
+      saveFailed = true
     }
-    const saveFailed = this.failed.size > 0
-    if (this.state.saveFailed !== saveFailed) this.publish({ saveFailed })
+    this.inFlight = null
+    if (!this.latest.size) this.unsavedImages.clear()
+    if (this.writeQueued) void this.writePending()
+    else if (this.state.saveFailed !== saveFailed) this.publish({ saveFailed })
+  }
+  flushOnPageHide() {
+    // The renderer may leave before the acknowledgement. Hand the full pending
+    // batch to the main process's per-project queue while IPC is still available.
+    if (this.writeQueued) void this.writePending()
   }
   retry() {
     if (this.state.loadFailed) {
       void this.load()
       return
     }
-    if (this.failed.size) void this.write([...this.latest.values()])
+    if (this.state.saveFailed && !this.inFlight) void this.writePending()
   }
   image(id: string) {
     const data = this.unsavedImages.get(id)?.data

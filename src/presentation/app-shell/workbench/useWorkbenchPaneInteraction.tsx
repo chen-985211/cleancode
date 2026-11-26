@@ -12,9 +12,11 @@ import type { useCanvasObjectContextMenu } from './menus/useCanvasObjectContextM
 import type { useCanvasPaneContextMenu } from './menus/useCanvasPaneContextMenu'
 import { isWorkbenchDirectZoomActive } from './viewport/workbenchDirectZoom'
 import { isWorkbenchViewportMotionActive } from './viewport/workbenchViewportMotion'
+import { isolateCoveredWorkbenchControls } from './isolateCoveredWorkbenchControls'
 
 export function useWorkbenchPaneInteraction({
   projectId,
+  canvasWidth,
   editingTerminalGroupId,
   reactFlowInstanceRef,
   objectContextMenu,
@@ -27,6 +29,7 @@ export function useWorkbenchPaneInteraction({
   canvasBusy
 }: {
   projectId?: string
+  canvasWidth: number
   editingTerminalGroupId: string | null
   reactFlowInstanceRef: WorkbenchCanvasProps['reactFlowInstanceRef']
   objectContextMenu: ReturnType<typeof useCanvasObjectContextMenu>
@@ -106,7 +109,13 @@ export function useWorkbenchPaneInteraction({
     click,
     drawer:
       projectId && window.cleancode?.listTodos ? (
-        <ProjectTodoDrawer projectId={projectId} api={window.cleancode} ref={drawer} />
+        <ProjectTodoDrawer
+          projectId={projectId}
+          canvasWidth={canvasWidth}
+          api={window.cleancode}
+          ref={drawer}
+          onCoverCanvas={isolateCoveredWorkbenchControls}
+        />
       ) : null
   }
 }
