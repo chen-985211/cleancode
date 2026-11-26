@@ -10,6 +10,7 @@ import type { useCanvasConnectionInteraction } from './useCanvasConnectionIntera
 
 import type { useCanvasObjectContextMenu } from './menus/useCanvasObjectContextMenu'
 import type { useCanvasPaneContextMenu } from './menus/useCanvasPaneContextMenu'
+import { minimumWorkbenchCreationCanvasWidth } from './viewport/workbenchCanvasSafeViewport'
 import { isWorkbenchDirectZoomActive } from './viewport/workbenchDirectZoom'
 import { isWorkbenchViewportMotionActive } from './viewport/workbenchViewportMotion'
 import { isolateCoveredWorkbenchControls } from './isolateCoveredWorkbenchControls'
@@ -112,6 +113,7 @@ export function useWorkbenchPaneInteraction({
         <ProjectTodoDrawer
           projectId={projectId}
           canvasWidth={canvasWidth}
+          reservedCanvasWidth={minimumWorkbenchCreationCanvasWidth}
           api={window.cleancode}
           ref={drawer}
           onCoverCanvas={isolateCoveredWorkbenchControls}

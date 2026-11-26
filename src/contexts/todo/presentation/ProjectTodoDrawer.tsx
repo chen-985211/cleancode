@@ -43,12 +43,14 @@ export function ProjectTodoDrawer({
   projectId,
   api,
   canvasWidth = window.innerWidth,
+  reservedCanvasWidth = 0,
   onCoverCanvas,
   ref
 }: {
   projectId: string
   api: TodoApi
   canvasWidth?: number
+  reservedCanvasWidth?: number
   onCoverCanvas?: (dock: HTMLElement) => () => void
   ref?: Ref<ProjectTodoDrawerHandle>
 }) {
@@ -58,7 +60,10 @@ export function ProjectTodoDrawer({
   const [preferredWidth, setWidth] = useState(() =>
     Math.max(minDrawerWidth, Number(window.localStorage.getItem(widthKey)) || defaultDrawerWidth)
   )
-  const maxWidth = Math.max(1, Math.floor(canvasWidth * 0.64))
+  const maxWidth = Math.max(
+    1,
+    Math.floor(Math.min(canvasWidth * 0.64, canvasWidth - reservedCanvasWidth))
+  )
   const width = Math.min(Math.max(minDrawerWidth, preferredWidth), maxWidth)
   const [sessions] = useState(() => new Map<string, TodoSession>())
   const session = useMemo(() => {
