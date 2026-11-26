@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { blankTodo } from '../../../../src/contexts/todo/presentation/TodoSession'
 import { ProjectTodoDrawer } from '../../../../src/contexts/todo/presentation/ProjectTodoDrawer'
 
@@ -177,10 +177,25 @@ describe('project to-do drawer', () => {
     expect(refs.getByRole('button', { name: '移除链接' })).toBeVisible()
     expect(fireEvent.click(address)).toBe(true)
     fireEvent.click(image)
+    const dialog = screen.getByRole('dialog', { name: '截图预览' })
+    expect(within(dialog).queryByRole('button', { name: '上一张' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: '下一张' })).toBeNull()
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', image.getAttribute('src'))
+    fireEvent.click(within(dialog).getByRole('img'))
+    expect(dialog).toBeVisible()
+    fireEvent.keyDown(within(dialog).getByRole('button', { name: '关闭预览' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    const thumbnail = refs.getByRole('button', { name: '放大查看截图' })
+    await waitFor(() => expect(thumbnail).toHaveFocus())
+    expect(note).toBeVisible()
     expect(heading).toHaveAttribute('aria-expanded', 'true')
     fireEvent.keyDown(note, { key: 'Escape' })
     expect(refs.queryByRole('button', { name: '移除链接' })).toBeNull()
     fireEvent.click(address)
+    expect(refs.queryByRole('textbox')).toBeNull()
+    fireEvent.click(thumbnail)
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭预览' }))
+    await waitFor(() => expect(thumbnail).toHaveFocus())
     expect(refs.queryByRole('textbox')).toBeNull()
     expect(heading).toHaveAttribute('aria-expanded', 'true')
     fireEvent.keyDown(heading, { key: 'Escape' })
