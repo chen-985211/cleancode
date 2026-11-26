@@ -413,19 +413,19 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             <TrashIcon size={14} weight="bold" aria-hidden="true" />
           </button>
         </TooltipLabel>
+        <ProjectSidebarBranchWorkspaceForm
+          base={base}
+          branchName={branchName}
+          isSubmitting={isSubmitting}
+          formRef={formRef}
+          open={isBranchWorkspaceFormOpen}
+          projectId={workbench.project.id}
+          surfaceRef={branchWorkspaceFormSurfaceRef}
+          onBranchNameChange={setBranchName}
+          onExitComplete={completeBranchWorkspaceFormClose}
+          onSubmit={submitBranchWorkspace}
+        />
       </div>
-      <ProjectSidebarBranchWorkspaceForm
-        base={base}
-        branchName={branchName}
-        isSubmitting={isSubmitting}
-        formRef={formRef}
-        open={isBranchWorkspaceFormOpen}
-        projectId={workbench.project.id}
-        surfaceRef={branchWorkspaceFormSurfaceRef}
-        onBranchNameChange={setBranchName}
-        onExitComplete={completeBranchWorkspaceFormClose}
-        onSubmit={submitBranchWorkspace}
-      />
       <div
         className={
           isExpanded

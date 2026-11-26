@@ -1,10 +1,10 @@
-.project-card:has(> .branch-workspace-surface) {
+.project-card:has(.branch-workspace-surface) {
   z-index: 7;
 }
 
 .branch-workspace-surface {
   position: absolute;
-  top: 32px;
+  top: 100%;
   right: 28px;
   z-index: 58;
   width: min(218px, calc(100% - 36px));
@@ -15,9 +15,21 @@
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
   opacity: var(--branch-workspace-motion-opacity, 1);
-  transform: translate3d(0, var(--branch-workspace-motion-y, 0px), 0)
+  transform: translate3d(
+      0,
+      calc(var(--branch-workspace-motion-y, 0px) * var(--branch-workspace-direction, 1)),
+      0
+    )
     scale(var(--branch-workspace-motion-scale, 1));
   transform-origin: top right;
+}
+
+.branch-workspace-surface[data-side='top'] {
+  --branch-workspace-direction: -1;
+
+  top: auto;
+  bottom: 100%;
+  transform-origin: bottom right;
 }
 
 .branch-workspace-surface[data-branch-workspace-spring-state='opening'],

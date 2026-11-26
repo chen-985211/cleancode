@@ -190,6 +190,21 @@ describe('project workspaces e2e', () => {
       })
       expect(scrollTop).toBeGreaterThan(0)
       await page.getByRole('button', { name: '添加项目' }).waitFor()
+
+      await expectBranchFormToFit(page, projectList)
+
+      // Leave just enough room for the projects without a vertical scrollbar.
+      const extraHeight = initialGeometry.scrollHeight - initialGeometry.clientHeight + 12
+      await electronApp.evaluate(({ BrowserWindow }, extra) => {
+        const window = BrowserWindow.getAllWindows()[0]!
+        const [width, height] = window.getContentSize()
+        window.setContentSize(width, height + extra)
+      }, extraHeight)
+      await page.waitForFunction(() => {
+        const list = document.querySelector('.project-list')!
+        return list.clientHeight === list.scrollHeight
+      })
+      await expectBranchFormToFit(page, projectList)
     },
     electronScenarioTimeoutMs
   )
@@ -316,6 +331,39 @@ describe('project workspaces e2e', () => {
     }
   )
 })
+
+async function expectBranchFormToFit(page: Page, projectList: Locator): Promise<void> {
+  const lastProject = projectList.getByRole('group', { name: /^项目 / }).last()
+  const trigger = lastProject.getByRole('button', { name: '新建分支工作区' })
+  const readScrollGeometry = () =>
+    projectList.evaluate((list) => ({
+      width: list.clientWidth,
+      horizontalOverflow: list.scrollWidth - list.clientWidth,
+      height: list.scrollHeight,
+      top: list.scrollTop
+    }))
+  await projectList.evaluate((list) => {
+    list.scrollTop = list.scrollHeight
+  })
+  const beforeOpen = await readScrollGeometry()
+  await trigger.click()
+  const form = page.getByRole('dialog', { name: '新建分支工作区' })
+  await page
+    .locator('.branch-workspace-surface[data-branch-workspace-spring-state="open"]')
+    .waitFor()
+
+  expect(await readScrollGeometry()).toEqual({ ...beforeOpen, horizontalOverflow: 0 })
+  const submit = form.getByRole('button', { name: '创建 Worktree' })
+  expect(
+    await submit.evaluate((button) => {
+      const rect = button.getBoundingClientRect()
+      return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 1))
+    })
+  ).toBe(true)
+  await page.keyboard.press('Escape')
+  expect(await trigger.evaluate((button) => button === document.activeElement)).toBe(true)
+  await page.locator('.branch-workspace-surface').waitFor({ state: 'detached' })
+}
 
 async function setProjectPickerDirectory(
   electronApp: ElectronApplication,

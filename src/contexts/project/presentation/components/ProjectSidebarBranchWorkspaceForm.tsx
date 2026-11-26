@@ -1,5 +1,5 @@
 import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
-import type { FormEvent, RefObject } from 'react'
+import { useLayoutEffect, type FormEvent, type RefObject } from 'react'
 import { ChoiceSelect } from '../../../../presentation/shared/components/ChoiceSelect'
 import { useI18n } from '../../../../presentation/i18n/useI18n'
 import { useBranchWorkspaceFormSpring } from '../motion/useBranchWorkspaceFormSpring'
@@ -38,6 +38,29 @@ export function ProjectSidebarBranchWorkspaceForm({
 }: ProjectSidebarBranchWorkspaceFormProps) {
   const { t } = useI18n()
   const presence = useBranchWorkspaceFormSpring(open, surfaceRef, onExitComplete)
+  useLayoutEffect(() => {
+    const surface = surfaceRef.current
+    const header = surface?.offsetParent
+    const list = surface?.closest('.project-list')
+    if (!open || !surface || !header || !list) return
+
+    const placeForm = () => {
+      const anchor = header.getBoundingClientRect()
+      const viewport = list.getBoundingClientRect()
+      const below = viewport.top + list.clientHeight - anchor.bottom
+      const above = anchor.top - viewport.top
+      surface.dataset.side = below < surface.offsetHeight && above > below ? 'top' : 'bottom'
+    }
+    placeForm()
+    const observer = new ResizeObserver(placeForm)
+    observer.observe(list)
+    observer.observe(surface)
+    list.addEventListener('scroll', placeForm, { passive: true })
+    return () => {
+      observer.disconnect()
+      list.removeEventListener('scroll', placeForm)
+    }
+  }, [open, surfaceRef])
   if (!presence.isPresent) return null
 
   const refs = new Set(base.branches)

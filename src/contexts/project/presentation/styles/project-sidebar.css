@@ -216,6 +216,7 @@
 }
 
 .project-card__header {
+  position: relative;
   display: flex;
   min-width: 0;
   height: 34px;
@@ -377,8 +378,9 @@
   transform: translateY(calc(-6px * (1 - var(--project-disclosure-progress, 1))));
 }
 
-.workspace-list__selection {
+.workspace-list > .workspace-list__selection {
   z-index: 0;
+  width: calc(100% - var(--cc-selection-motion-x, 0px));
   border-radius: calc(7px * var(--cc-corner-radius-scale));
   corner-shape: var(--cc-corner-shape);
   background: var(--workspace-selection);

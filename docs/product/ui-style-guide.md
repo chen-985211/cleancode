@@ -280,7 +280,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 终端设置的弹性分段控件是显式的手势型例外，由根级表现层 `ElasticSegmentedControl`、`elasticSegmentMotion.ts` 与 `elasticSegmentGeometry.ts` 统一拥有，使用 Motion 的 motion value 与 spring，不复用普通选择底板的平移控制器。点击包含拉伸和收拢，拖动保留抓取偏移，松手使用近期指针速度预测落点并承接速度；边界提供渐进阻力与压缩。任何阶段均可由新输入接管，不排队或跳回旧端点。拖动只预览，释放后提交一次；取消、捕获丢失及外部值更新清除旧手势，迟到回调不能覆盖新状态。动画只改变材质，文字和轨道不随之伸缩。系统减弱动态效果继续由共享偏好 owner 提供，保留选择结果，取消弹性和惯性演出。两个设置消费者只提供选项和值，不各自定义物理规则。
 
-新建分支工作区表单复用统一 surface presence，以所属项目的 “+” 按钮为固定来源，在按钮下方通过临界阻尼 spring 协调短位移、缩放和透明度，关闭时从当前 presentation 沿原路径收回；按钮必须通过 `aria-controls` 和 `aria-expanded` 表达控制关系。关闭意图发生后表单立即停止交互，spring 收敛后再清理草稿和释放 DOM；快速反向复用同一 live surface。Escape 或外部关闭手势都把焦点返回触发按钮；用于关闭表单的第一次画布手势只负责关闭，不得同时触发画布选择、平移或放置。
+新建分支工作区表单复用统一 surface presence，以所属项目的 “+” 按钮为固定来源，优先在项目行下方展开，下方空间不足时向上展开，保持列表宽度和滚动位置。临界阻尼 spring 从靠近按钮的一侧协调短位移、缩放和透明度，关闭时从当前 presentation 沿原路径收回；按钮必须通过 `aria-controls` 和 `aria-expanded` 表达控制关系。关闭意图发生后表单立即停止交互，spring 收敛后再清理草稿和释放 DOM；快速反向复用同一 live surface。Escape 或外部关闭手势都把焦点返回触发按钮；用于关闭表单的第一次画布手势只负责关闭，不得同时触发画布选择、平移或放置。
 
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/shared/motion/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；utility button、分支表单、通知图标与 surface 进出复用 `src/presentation/shared/motion/springProgressMotion.ts` 的逐帧生命周期和重定向，设置分类的多层重定向由 `src/presentation/app-shell/app-features/settings/applicationSettingsPaneMotion.ts` 负责，具体空间投影仍由各 owner 决定。各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
 
