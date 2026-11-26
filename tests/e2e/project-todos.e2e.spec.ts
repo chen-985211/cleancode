@@ -585,7 +585,16 @@ describe('project to-do list', () => {
           expect(motion.middle).toBeLessThan(Math.max(motion.start, motion.end))
         }
       }
-      await savedTitle.click()
+      const point = await savedTitle.locator('.todo-caption').evaluate((caption) => {
+        const range = document.createRange()
+        range.setStart(caption.firstChild!, 2)
+        range.collapse(true)
+        const box = range.getBoundingClientRect()
+        return { x: box.x, y: box.y + box.height / 2, cursor: getComputedStyle(caption).cursor }
+      })
+      await page.mouse.click(point.x, point.y)
+      expect.soft(point.cursor).toBe('text')
+      expect(await editor.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(2)
       expect(await page.getByRole('link', { name: /example.org/ }).getAttribute('href')).toBe(
         'https://example.org/filter'
       )

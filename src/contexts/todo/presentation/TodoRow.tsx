@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react'
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type MouseEvent as ReactMouseEvent
+} from 'react'
 import { TooltipLabel } from '../../../presentation/shared/components/Tooltip'
 import { ContextMenu } from 'radix-ui'
 import { useI18n } from '../../../presentation/i18n/useI18n'
@@ -43,7 +49,7 @@ export function TodoRow({
   const { t } = useI18n()
   const title = useRef<HTMLTextAreaElement>(null)
   const note = useRef<HTMLTextAreaElement>(null)
-  const focusNote = useRef(false)
+  const editFocus = useRef<{ field: 'text' | 'note'; offset: number } | null>(null)
   const [pasteError, setPasteError] = useState<string | null>(null)
   const [offer, setOffer] = useState<{ id: string; lines: string[] } | null>(null)
   const liveEditor = useRef<TodoDraft | null>(null)
@@ -57,13 +63,15 @@ export function TodoRow({
     setOffer(null)
     onChange(next, images)
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editing) return
-    const field = focusNote.current ? note.current : title.current
-    focusNote.current = false
+    const initial = editFocus.current
+    editFocus.current = null
+    const field = initial?.field === 'note' ? note.current : title.current
     if (!field) return
     field.focus({ preventScroll: true })
-    field.setSelectionRange(field.value.length, field.value.length)
+    const offset = initial?.offset ?? field.value.length
+    field.setSelectionRange(offset, offset)
   }, [item.id, editing])
   const removed = useRef(false)
   function paste(
@@ -150,7 +158,12 @@ export function TodoRow({
           data-todo-position={item.id}
           onClick={(e) => {
             if (editing || !isRowSurface(e.target)) return
-            focusNote.current = Boolean(e.target.closest('.todo-note-slot'))
+            const noteSlot = e.target.closest('.todo-note-slot')
+            const field = noteSlot ? 'note' : 'text'
+            const preview = noteSlot
+              ? noteSlot.querySelector('.todo-note')
+              : e.target.closest('.todo-title')?.querySelector('.todo-caption')
+            editFocus.current = { field, offset: clickedTextOffset(e, preview, item[field]) }
             onEdit()
           }}
           onKeyDown={(e) => {
@@ -298,6 +311,20 @@ function isRowSurface(target: EventTarget): target is Element {
     target instanceof Element &&
     !target.closest('textarea, a[href], button:not(.todo-title), [role="menu"]')
   )
+}
+
+function clickedTextOffset(
+  event: ReactMouseEvent,
+  preview: Element | null | undefined,
+  value: string
+) {
+  if (!preview || event.detail === 0) return value.length
+  const caret = preview.ownerDocument.caretPositionFromPoint?.(event.clientX, event.clientY)
+  const text = preview.firstChild
+  if (!text || caret?.offsetNode !== text) return value.length
+  // A title preview can trim whitespace or show a link or note in place of an empty title.
+  const start = value.indexOf(text.textContent ?? '')
+  return start < 0 ? value.length : start + caret.offset
 }
 
 function readImage(file: File): Promise<{ id: string; data: string }> {

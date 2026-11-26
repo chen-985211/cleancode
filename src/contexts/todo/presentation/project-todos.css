@@ -229,6 +229,7 @@
 }
 .project-todo-drawer .todo-title,
 .todo-fields :is(input, textarea) {
+  cursor: text;
   appearance: none;
   display: block;
   box-sizing: border-box;
@@ -347,6 +348,7 @@
 }
 .todo-note {
   margin: 0;
+  cursor: text;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
