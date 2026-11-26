@@ -24,7 +24,10 @@ export function useWorkbenchNodeSelection({
 }: {
   readonly focusSelectedWorkbenchNode: (nodeId: string) => void
   readonly isTerminalGroupSelectionMode: boolean
-  readonly returnToGlobalCanvasView: (anchorNodeId: string | null) => void
+  readonly returnToGlobalCanvasView: (
+    anchorNodeId: string | null,
+    mode?: 'preserve-viewport'
+  ) => void
   readonly selectTerminalBlock: (blockId: string, additive: boolean) => void
   readonly selectTerminalGroup: (groupId: string) => void
   readonly selectedAgentId: string | null
@@ -128,27 +131,30 @@ export function useWorkbenchNodeSelection({
     [selectAgent, selectTerminal, selectTerminalGroup, setSelectedAgentId]
   )
 
-  const clearWorkbenchSelection = useCallback(() => {
-    const anchorNodeId = resolveWorkbenchSelectionAnchorNodeId({
+  const clearWorkbenchSelection = useCallback(
+    (mode?: 'preserve-viewport') => {
+      const anchorNodeId = resolveWorkbenchSelectionAnchorNodeId({
+        isTerminalGroupSelectionMode,
+        selectedAgentId,
+        selectedTerminalBlockIds,
+        selectedTerminalGroupId
+      })
+      setSelectedAgentId(null)
+      setSelectedTerminalBlockIds([])
+      setSelectedTerminalGroupId(null)
+      returnToGlobalCanvasView(anchorNodeId, mode)
+    },
+    [
       isTerminalGroupSelectionMode,
+      returnToGlobalCanvasView,
       selectedAgentId,
       selectedTerminalBlockIds,
-      selectedTerminalGroupId
-    })
-    setSelectedAgentId(null)
-    setSelectedTerminalBlockIds([])
-    setSelectedTerminalGroupId(null)
-    returnToGlobalCanvasView(anchorNodeId)
-  }, [
-    isTerminalGroupSelectionMode,
-    returnToGlobalCanvasView,
-    selectedAgentId,
-    selectedTerminalBlockIds,
-    selectedTerminalGroupId,
-    setSelectedAgentId,
-    setSelectedTerminalBlockIds,
-    setSelectedTerminalGroupId
-  ])
+      selectedTerminalGroupId,
+      setSelectedAgentId,
+      setSelectedTerminalBlockIds,
+      setSelectedTerminalGroupId
+    ]
+  )
 
   return {
     clearWorkbenchSelection,

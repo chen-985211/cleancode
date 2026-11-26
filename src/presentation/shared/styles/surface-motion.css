@@ -58,6 +58,17 @@
   will-change: opacity, transform;
 }
 
+@property --cc-panel-slide-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.anchored-surface-motion[data-surface-spring-preset='sliding-panel-right'] {
+  transform: translate3d(var(--cc-panel-slide-x), 0, 0);
+  will-change: transform;
+}
+
 .anchored-surface-motion[data-surface-spring-preset='anchored-top-right'] {
   transform: translate3d(
     var(--cc-surface-motion-translate-x, 0),

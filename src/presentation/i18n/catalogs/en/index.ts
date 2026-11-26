@@ -10,8 +10,11 @@ import { enAgentMessages } from './agent'
 import { enDiagnosticsMessages } from './diagnostics'
 import { enErrorsMessages } from './errors'
 
+import { enTodosMessages } from './todos'
+
 export const enMessages = {
   ...enCommonMessages,
+  ...enTodosMessages,
   ...enSettingsMessages,
   ...enProjectMessages,
   ...enCanvasMessages,

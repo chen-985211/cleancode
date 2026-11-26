@@ -123,7 +123,7 @@ export interface WorkbenchCanvasProps {
   readonly canCreateTerminalGroup?: boolean
   readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
-  readonly onPaneClick: () => void
+  readonly onPaneClick: (mode?: 'preserve-viewport') => void
   readonly onNodeDrag: (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart: (
     event: globalThis.MouseEvent | TouchEvent,

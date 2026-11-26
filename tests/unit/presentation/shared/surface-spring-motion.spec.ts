@@ -165,6 +165,33 @@ describe('surface spring motion', () => {
     expect(readNumber(root, property)).toBe(0)
   })
 
+  it('moves the sliding panel toward each new intent from its current position', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'sliding-panel-right',
+      scheduler
+    })
+    const change = (visible: boolean) =>
+      controller.intentChanged(root, { visible, reducedMotion: false, onSettled: vi.fn() })
+    const x = () => readNumber(root, '--cc-panel-slide-x')
+    change(true)
+    scheduler.advanceNextFrame(48)
+    const before = x()
+    change(false)
+    expect(x()).toBe(before)
+    scheduler.advanceNextFrame(4)
+    expect(x()).toBeGreaterThan(before)
+    scheduler.advanceNextFrame(70)
+    const returning = x()
+    change(true)
+    expect(x()).toBe(returning)
+    scheduler.advanceNextFrame(4)
+    expect(x()).toBeLessThan(returning)
+    scheduler.advanceUntilIdle()
+    expect(x()).toBe(0)
+  })
+
   it('reverses a drawer from its current spring presentation', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()

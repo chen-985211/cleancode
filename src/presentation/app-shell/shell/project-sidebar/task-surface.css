@@ -33,6 +33,9 @@
 .app-shell:has(.task-surface-host:not([hidden])) > .app-shell__settings {
   visibility: hidden;
 }
+.app-shell:has(.task-surface-host:not([hidden])) > .app-shell__workspace {
+  isolation: isolate;
+}
 .task-surface .project-issues__header {
   padding-top: calc(var(--cc-titlebar-height) + 4px);
 }

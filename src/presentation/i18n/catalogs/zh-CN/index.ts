@@ -9,8 +9,11 @@ import { zhCNAgentMessages } from './agent'
 import { zhCNDiagnosticsMessages } from './diagnostics'
 import { zhCNErrorsMessages } from './errors'
 
+import { zhCNTodosMessages } from './todos'
+
 export const zhCNMessages = {
   ...zhCNCommonMessages,
+  ...zhCNTodosMessages,
   ...zhCNSettingsMessages,
   ...zhCNProjectMessages,
   ...zhCNCanvasMessages,

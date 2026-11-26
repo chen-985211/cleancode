@@ -78,11 +78,23 @@ describe('project issues', () => {
     'explains disabled Issues and preserves the repository across the Electron boundary',
     async () => {
       await launch("the 'fixture/issues' repository has disabled issues")
+      await page.getByRole('button', { name: '打开待办清单' }).click()
+      const todo = page.locator('#project-todo-drawer[data-surface-motion-state="open"]')
+      await todo.waitFor()
+      const clip = (await todo.locator('.todo-close').boundingBox())!
       await page.getByRole('button', { name: '任务', exact: true }).click()
       const panel = page.getByRole('complementary', { name: '任务', exact: true })
       const alert = panel.getByRole('alert')
       await alert.waitFor()
       await page.locator('.task-surface[data-surface-motion-state="open"]').waitFor()
+      // The background workspace is inert, so hit testing alone cannot detect a painted overlay.
+      const painted = await page.screenshot({ clip, scale: 'css' })
+      const taskOnly = await page.screenshot({
+        clip,
+        scale: 'css',
+        style: '#project-todo-drawer { visibility: hidden !important; }'
+      })
+      expect(painted.equals(taskOnly)).toBe(true)
       expect(await alert.locator('p').textContent()).toBe(
         '可以在顶部选择其他 GitHub 仓库作为任务来源。'
       )
@@ -131,6 +143,10 @@ describe('project issues', () => {
         await alert.waitFor()
         expect(await panel.locator('.project-issues__list').boundingBox()).toEqual(before)
       }
+      await panel.getByRole('button', { name: '关闭任务面板' }).click()
+      await page.locator('.task-surface-host').waitFor({ state: 'hidden' })
+      await todo.getByRole('button', { name: '记一条' }).click()
+      await todo.getByRole('textbox', { name: '待办内容' }).waitFor()
     },
     electronScenarioTimeoutMs
   )

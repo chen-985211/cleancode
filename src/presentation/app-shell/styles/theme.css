@@ -55,6 +55,7 @@
   --cc-terminal-control-foreground: #50565f;
   --cc-canvas-node-menu-surface: #f2f4f5;
   --cc-canvas-node-menu-hover: #e9ebec;
+  --cc-todo-row-selected: #e8eaeb;
   --cc-canvas-node-menu-foreground: #16181a;
   --cc-canvas-node-menu-icon: #16181a;
   --cc-foreground: #1b1e27;
@@ -177,6 +178,7 @@
   --cc-terminal-control-foreground: #c1c6cb;
   --cc-canvas-node-menu-surface: #212426;
   --cc-canvas-node-menu-hover: #373a3c;
+  --cc-todo-row-selected: var(--cc-canvas-node-menu-hover);
   --cc-canvas-node-menu-foreground: #e9ebec;
   --cc-canvas-node-menu-icon: #e9ebec;
   --cc-foreground: #edf1f7;
@@ -437,6 +439,33 @@
   --cc-motion-duration-press: 100ms;
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;
+  --cc-motion-duration-todo-disclosure: 260ms;
+  --cc-motion-duration-todo-confirm: 360ms;
+  /* Critically damped step response, sampled every 5% and normalized at rest. */
+  --cc-easing-todo-confirm: linear(
+    0,
+    0.0557,
+    0.1756,
+    0.3137,
+    0.4469,
+    0.5645,
+    0.6633,
+    0.7434,
+    0.8069,
+    0.8562,
+    0.8941,
+    0.9228,
+    0.9444,
+    0.9605,
+    0.9724,
+    0.9812,
+    0.9876,
+    0.9923,
+    0.9957,
+    0.9982,
+    1
+  );
+  --cc-easing-todo-disclosure: cubic-bezier(0.3, 0.15, 0.06, 1);
   --cc-motion-delay-brand-reveal: 280ms;
   --cc-motion-duration-brand-reveal: 700ms;
   --cc-motion-delay-brand-sweep: 1480ms;

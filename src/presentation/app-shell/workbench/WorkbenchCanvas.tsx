@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useWorkbenchNodeDragSession } from './nodes/useWorkbenchNodeDragSession'
 import { useTerminalObjectMotionWorkload } from '../context-adapters/run/useTerminalObjectMotionWorkload'
 import { defaultReduceCanvasVisualNoise } from '../app-features/settings/canvasVisualNoisePreference'
@@ -24,6 +25,7 @@ import { CanvasArrangementSelectionOverlay } from '../../../contexts/canvas-arra
 import { projectCanvasArrangementSelectionOntoNodes } from '../projections/workbenchCanvasArrangementSelection'
 import { useWorkbenchCanvasArrangement } from '../context-adapters/canvas-arrangement/useWorkbenchCanvasArrangement'
 import { useCanvasObjectContextMenu } from './menus/useCanvasObjectContextMenu'
+import { useWorkbenchPaneInteraction } from './useWorkbenchPaneInteraction'
 import { WorkbenchCanvasBottomControls } from './WorkbenchCanvasBottomControls'
 import { toQuickExecutionTarget } from '../../../contexts/block-graph/presentation/view-models/quickExecutionProjection'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
@@ -35,6 +37,7 @@ import { cancelWorkbenchViewportMotion } from './viewport/workbenchViewportMotio
 import { cancelWorkbenchDirectZoom } from './viewport/workbenchDirectZoom'
 import { workbenchDragAutoPanSpeed } from './viewport/workbenchDragAutoPan'
 import { isApplyingWorkbenchViewport } from './viewport/workbenchViewportAdapter'
+import { useCanvasMoveHandlers } from './viewport/useCanvasMoveHandlers'
 import { useWorkbenchDirectZoom } from './viewport/useWorkbenchDirectZoom'
 import { useWorkbenchCanvasOrganization } from './viewport/useWorkbenchCanvasOrganization'
 import {
@@ -141,6 +144,7 @@ export function WorkbenchCanvas({
   const { t } = useI18n()
   const nodes = useWorkbenchNodes(nodeStore)
   useTerminalObjectMotionWorkload(nodes, terminalZoomRasterCoordinator)
+  const [navigationLayer, setNavigationLayer] = useState<HTMLDivElement | null>(null)
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const edges = useWorkbenchCanvasEdges({
@@ -291,6 +295,20 @@ export function WorkbenchCanvas({
     reactFlowInstanceRef,
     shortcutPlatform
   })
+  const paneInteraction = useWorkbenchPaneInteraction({
+    projectId: currentWorkbench?.project.id,
+    canvasWidth: canvasSize.width,
+    objectContextMenu,
+    paneContextMenu,
+    editingTerminalGroupId,
+    reactFlowInstanceRef,
+    connectionInteraction,
+    templateInteraction,
+    placing: !!placementTemplate,
+    nodes,
+    onPaneClick,
+    canvasBusy: isTerminalGroupSelectionMode || isCanvasArrangementPending
+  })
   useWorkbenchDirectZoom({
     canvasSurfaceRef,
     onViewportInteractionStart: () => {
@@ -360,6 +378,38 @@ export function WorkbenchCanvas({
     return () => resizeObserver.disconnect()
   }, [canvasLeftInset, canvasSizeRef])
 
+  const moveHandlers = useCanvasMoveHandlers(viewportStore.getViewport, {
+    onMove: (_event, viewport) =>
+      synchronizeCanvasViewportFromMove({
+        onRasterZoomChange: (zoom) => terminalZoomRasterCoordinator?.updateCanvasZoom(zoom),
+        viewport,
+        projectCanvasViewport: viewportStore.setViewport
+      }),
+    onMoveStart: (event) => {
+      viewportMoveCompletionRef.current =
+        !event && isApplyingWorkbenchViewport(reactFlowInstanceRef.current)
+          ? 'controller'
+          : activeDraggedNodeRef.current !== null
+            ? 'node-drag'
+            : null
+      terminalZoomRasterCoordinator?.beginInteraction()
+      if (event) {
+        canvasOrganization.cancelFocus()
+        cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
+        cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
+        onViewportInteractionStart?.()
+      }
+    },
+    onMoveEnd: (event, viewport) =>
+      persistCanvasViewportFromMoveEnd({
+        event,
+        isManagedViewportMove: viewportMoveCompletionRef.current !== null,
+        isRestoringViewport: isRestoringViewportRef.current,
+        onRasterInteractionEnd: (zoom) => terminalZoomRasterCoordinator?.endInteraction(zoom),
+        onViewportChange,
+        viewport
+      })
+  })
   useWorkbenchCanvasViewportRestoration({
     currentWorkbench,
     isRestoringViewportRef,
@@ -389,6 +439,7 @@ export function WorkbenchCanvas({
             connectionInteraction.onKeyDown(event)
           }}
           onPointerDownCapture={(event) => {
+            paneInteraction.capturePress(event)
             if (!workflowDragging.begin(event)) templateInteraction.beginSelection(event)
           }}
           onPointerMoveCapture={(event) => {
@@ -483,24 +534,9 @@ export function WorkbenchCanvas({
                   )
                 )
               }
-              onNodeContextMenu={(event, node) => {
-                if (node.type === 'terminalGroup' && node.id === editingTerminalGroupId) {
-                  objectContextMenu.close()
-                  paneContextMenu.open(event)
-                  return
-                }
-                paneContextMenu.close()
-                objectContextMenu.onNodeContextMenu(event, node)
-              }}
+              onNodeContextMenu={paneInteraction.onNodeContextMenu}
               onPaneContextMenu={paneContextMenu.open}
-              onPaneClick={() => {
-                connectionInteraction.clearSelection()
-                objectContextMenu.close()
-                paneContextMenu.close()
-                if (placementTemplate) return
-                templateInteraction.clearSelection()
-                onPaneClick()
-              }}
+              onPaneClick={paneInteraction.click}
               onNodeDragStart={(event, node) => {
                 cancelledDragIdRef.current = null
                 cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
@@ -564,72 +600,44 @@ export function WorkbenchCanvas({
                   }
                 }
               }}
-              onMove={(_event, viewport) =>
-                synchronizeCanvasViewportFromMove({
-                  onRasterZoomChange: (zoom) =>
-                    terminalZoomRasterCoordinator?.updateCanvasZoom(zoom),
-                  viewport,
-                  projectCanvasViewport: viewportStore.setViewport
-                })
-              }
-              onMoveStart={(event) => {
-                viewportMoveCompletionRef.current =
-                  !event && isApplyingWorkbenchViewport(reactFlowInstanceRef.current)
-                    ? 'controller'
-                    : activeDraggedNodeRef.current !== null
-                      ? 'node-drag'
-                      : null
-                terminalZoomRasterCoordinator?.beginInteraction()
-                if (event) {
-                  canvasOrganization.cancelFocus()
-                  cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
-                  cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
-                  onViewportInteractionStart?.()
-                }
-              }}
-              onMoveEnd={(event, viewport) =>
-                persistCanvasViewportFromMoveEnd({
-                  event,
-                  isManagedViewportMove: viewportMoveCompletionRef.current !== null,
-                  isRestoringViewport: isRestoringViewportRef.current,
-                  onRasterInteractionEnd: (zoom) =>
-                    terminalZoomRasterCoordinator?.endInteraction(zoom),
-                  onViewportChange,
-                  viewport
-                })
-              }
+              {...moveHandlers}
               defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
               multiSelectionKeyCode={null}
               selectionKeyCode={null}
               minZoom={minimumCanvasZoom}
               maxZoom={maximumCanvasZoom}
+              zoomOnDoubleClick={false}
               zoomOnScroll={false}
               proOptions={{ hideAttribution: true }}
             >
-              <Panel className="canvas-minimap-panel" position="bottom-right">
-                <CanvasMinimap
-                  isCollapsed={isMinimapCollapsed}
-                  nodes={minimapNodes}
-                  canvasSize={canvasSize}
-                  viewportStore={viewportStore}
-                  shortcutTooltips={shortcutTooltips}
-                  minimapNodeInteraction={minimapNodeInteraction}
-                  onToggleCollapsed={onToggleMinimap}
-                  onZoomOut={onZoomCanvasOut}
-                  onZoomIn={onZoomCanvasIn}
-                  onFitCanvas={onFitCanvas}
-                  onMinimapNodeClick={onMinimapNodeClick}
-                  onViewportCenterPreview={(center) =>
-                    moveCanvasViewportToMinimapCenter(center, false)
-                  }
-                  onViewportCenterCommit={(center) =>
-                    moveCanvasViewportToMinimapCenter(center, true)
-                  }
-                  getMiniMapNodeColor={getMiniMapNodeColor}
-                  getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
-                  getMiniMapNodeClassName={getMiniMapNodeClassName}
-                />
-              </Panel>
+              {navigationLayer &&
+                createPortal(
+                  <Panel className="canvas-minimap-panel" position="bottom-right">
+                    <CanvasMinimap
+                      isCollapsed={isMinimapCollapsed}
+                      nodes={minimapNodes}
+                      canvasSize={canvasSize}
+                      viewportStore={viewportStore}
+                      shortcutTooltips={shortcutTooltips}
+                      minimapNodeInteraction={minimapNodeInteraction}
+                      onToggleCollapsed={onToggleMinimap}
+                      onZoomOut={onZoomCanvasOut}
+                      onZoomIn={onZoomCanvasIn}
+                      onFitCanvas={onFitCanvas}
+                      onMinimapNodeClick={onMinimapNodeClick}
+                      onViewportCenterPreview={(center) =>
+                        moveCanvasViewportToMinimapCenter(center, false)
+                      }
+                      onViewportCenterCommit={(center) =>
+                        moveCanvasViewportToMinimapCenter(center, true)
+                      }
+                      getMiniMapNodeColor={getMiniMapNodeColor}
+                      getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
+                      getMiniMapNodeClassName={getMiniMapNodeClassName}
+                    />
+                  </Panel>,
+                  navigationLayer
+                )}
             </ReactFlow>
             {placementTemplate && templateInteraction.placementOrigin ? (
               <LiveBlockTemplatePlacementPreview
@@ -671,6 +679,8 @@ export function WorkbenchCanvas({
           {paneContextMenu.menu}
           {connectionInteraction.menu}
         </div>
+        <div ref={setNavigationLayer} className="workbench-navigation-layer" />
+        {paneInteraction.drawer}
         <CanvasStatusbar
           quickExecutionRef={setQuickExecutionContainer}
           motionRef={statusbarMotionRef}

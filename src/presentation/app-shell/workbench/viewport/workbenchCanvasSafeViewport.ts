@@ -1,9 +1,19 @@
+import { defaultAgentLayoutSize } from '../../../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import {
+  defaultTerminalBlockSize,
+  minimumCanvasZoom
+} from '../../../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type {
   WorkbenchNodeSize,
   WorkbenchScreenRect
 } from '../creation/workbenchNodeCreationPolicy'
 
 export const workbenchViewportSafeMargin = 24
+export const minimumWorkbenchCreationCanvasWidth =
+  Math.ceil(
+    Math.max(defaultTerminalBlockSize.width, defaultAgentLayoutSize.width) * minimumCanvasZoom
+  ) +
+  2 * workbenchViewportSafeMargin
 export const workbenchCanvasObstructionAttribute = 'data-workbench-canvas-obstruction'
 
 interface ClientRect {

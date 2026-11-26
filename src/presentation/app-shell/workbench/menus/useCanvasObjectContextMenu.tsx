@@ -47,6 +47,7 @@ export function useCanvasObjectContextMenu({
     target: BatchTerminalRemovalTargetSnapshot
   ) => Promise<void> | void
 }): {
+  readonly isOpen: boolean
   readonly close: () => void
   readonly edges: Edge[]
   readonly menu: ReactNode
@@ -109,6 +110,7 @@ export function useCanvasObjectContextMenu({
   )
 
   return {
+    isOpen: !!activeTarget,
     close,
     edges: useMemo(
       () => projectContextSelectionOntoEdges(edges, activeTarget),

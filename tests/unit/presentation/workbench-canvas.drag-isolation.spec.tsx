@@ -298,30 +298,39 @@ describe('workbench canvas drag isolation', () => {
     expect(reactFlowProps.latest?.selectionKeyCode).toBeNull()
   })
 
-  it('delegates empty canvas clicks to the workbench selection model', () => {
+  it('delegates a stationary click to selection and commits only a real mouse pan', () => {
     const { agentNode, terminalNode } = createNodes()
     const onPaneClick = vi.fn()
-
-    renderCanvas([agentNode, terminalNode], vi.fn(), onPaneClick)
-
-    act(() => {
-      reactFlowProps.latest?.onPaneClick?.()
-    })
-
-    expect(onPaneClick).toHaveBeenCalledOnce()
-  })
-
-  it('reports only user-originated viewport movement', () => {
-    const { agentNode, terminalNode } = createNodes()
+    const onViewportChange = vi.fn()
     const onViewportInteractionStart = vi.fn()
-
-    renderCanvas([agentNode, terminalNode], vi.fn(), vi.fn(), onViewportInteractionStart)
+    const coordinator = createRenderingCoordinator()
+    renderCanvas([agentNode, terminalNode], vi.fn(), onPaneClick, onViewportInteractionStart, {
+      onViewportChange,
+      terminalZoomRasterCoordinator: coordinator
+    })
+    const start = { x: 0, y: 0, zoom: 1 }
+    const end = { ...start, x: 20 }
+    const flow = reactFlowProps.latest!
+    act(() => {
+      flow.onMoveStart?.(new MouseEvent('mousedown'), start)
+      flow.onMoveEnd?.(new MouseEvent('mouseup'), start)
+      flow.onPaneClick?.()
+    })
+    expect(coordinator.beginInteraction).not.toHaveBeenCalled()
+    expect(coordinator.endInteraction).not.toHaveBeenCalled()
+    expect(onViewportChange).not.toHaveBeenCalled()
+    expect(onViewportInteractionStart).not.toHaveBeenCalled()
+    expect(onPaneClick).toHaveBeenCalledOnce()
 
     act(() => {
-      reactFlowProps.latest?.onMoveStart?.(null)
-      reactFlowProps.latest?.onMoveStart?.({} as MouseEvent)
+      flow.onMoveStart?.(new MouseEvent('mousedown'), start)
+      flow.onMove?.(new MouseEvent('mousemove'), end)
+      flow.onMoveEnd?.(new MouseEvent('mouseup'), end)
     })
-
+    expect(coordinator.beginInteraction).toHaveBeenCalledOnce()
+    expect(coordinator.endInteraction).toHaveBeenCalledExactlyOnceWith(end.zoom)
+    expect(onViewportChange).toHaveBeenCalledExactlyOnceWith(end)
+    act(() => flow.onMoveStart?.(null))
     expect(onViewportInteractionStart).toHaveBeenCalledOnce()
     expect(viewportMotionSpies.cancel).toHaveBeenCalledOnce()
     expect(directZoomSpies.cancel).toHaveBeenCalledOnce()
@@ -516,7 +525,10 @@ interface MockReactFlowProps {
     viewport: { readonly x: number; readonly y: number; readonly zoom: number }
   ) => void
   readonly onPaneClick?: () => void
-  readonly onMoveStart?: (event: MouseEvent | null | undefined) => void
+  readonly onMoveStart?: (
+    event: MouseEvent | null | undefined,
+    viewport?: ReactFlowModule.Viewport
+  ) => void
   readonly onMoveEnd?: (
     event: MouseEvent | null | undefined,
     viewport: ReactFlowModule.Viewport

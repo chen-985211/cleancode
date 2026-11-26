@@ -74,6 +74,7 @@ export function useCanvasPaneContextMenu({
   )
 
   return {
+    isOpen: position?.graphId === graphId && position.open,
     close,
     menu:
       position?.graphId === graphId ? (

@@ -114,9 +114,11 @@ interface WorkbenchSnapshot {
 
 import type { ApplicationUpdateSnapshot } from './platform/ipc/applicationUpdateChannels'
 
+import type { TodoApi } from './contexts/todo/application/ProjectTodos'
+
 declare global {
   interface Window {
-    cleancode?: {
+    cleancode?: TodoApi & {
       appName: 'cleancode'
       getApplicationUpdate(): Promise<ApplicationUpdateSnapshot>
       checkApplicationUpdate(): Promise<ApplicationUpdateSnapshot>

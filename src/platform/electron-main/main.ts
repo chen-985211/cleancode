@@ -2,6 +2,7 @@ import { createProjectError } from '../../contexts/project/application/errors/Pr
 import { FindProjectByDirectoryUseCase } from '../../contexts/project/application/use-cases/FindProjectByDirectoryUseCase'
 import { FindDefaultGraphSnapshotUseCase } from '../../contexts/block-graph/application/use-cases/FindDefaultGraphSnapshotUseCase'
 import { createAgentSessionRuntime } from './createAgentSessionRuntime'
+import { registerProjectTodos } from './projectTodosRuntime'
 import { registerProjectIssuesRuntime } from './projectIssuesRuntime'
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
@@ -129,7 +130,9 @@ if (acquiresSingleInstanceLock) {
   })
 }
 
-const appStateDirectoryPath = getAppStateDirectoryPath()
+const appStateDirectoryPath =
+  process.env.CLEANCODE_TEST_APP_STATE_DIRECTORY ??
+  join(app.getPath('userData'), 'project-state-v2')
 const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 const terminalProviderStateDirectoryPath = join(appStateDirectoryPath, 'terminal-runtime-provider')
 const terminalProviderEntryPath = join(mainModuleDirectory, 'terminal-runtime-provider.js')
@@ -435,6 +438,7 @@ registerBlockGraphIpcHandlers({
 })
 
 blockTemplates.register(ipcMain, consoleLogger)
+const todoRepository = registerProjectTodos(appStateDirectoryPath, ipcMain, consoleLogger)
 workspaceInitialization.register(ipcMain, consoleLogger)
 canvasArrangementRuntime.registerIpcHandlers(ipcMain, consoleLogger)
 const terminalViewLifecycle = registerTerminalIpcHandlers({
@@ -617,13 +621,6 @@ async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
   })
 }
 
-function getAppStateDirectoryPath(): string {
-  return (
-    process.env.CLEANCODE_TEST_APP_STATE_DIRECTORY ??
-    join(app.getPath('userData'), 'project-state-v2')
-  )
-}
-
 if (isPrimaryAppInstance) {
   void app.whenReady().then(async () => {
     try {
@@ -695,5 +692,8 @@ const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
 const applicationQuitLifecycle = bindApplicationQuitLifecycle({
   app,
   relaunchExecutable: process.platform === 'linux' ? process.env.APPIMAGE : undefined,
-  shutdown: () => applicationRuntimeShutdown.dispose()
+  shutdown: async () => {
+    await applicationRuntimeShutdown.dispose()
+    await todoRepository.drain()
+  }
 })

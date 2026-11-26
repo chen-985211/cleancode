@@ -33,6 +33,7 @@ export interface WorkbenchDirectZoomInput {
 }
 
 export interface WorkbenchDirectZoomController {
+  readonly isActive: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => boolean
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
   readonly retarget: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
@@ -319,7 +320,14 @@ export function createWorkbenchDirectZoomController(
     void applyPresentation(motion, motion.target)
   }
 
-  return { cancel, retarget, setReducedMotion, subscribe, subscribePresentation }
+  return {
+    isActive: (instance) => activeMotion?.instance === instance,
+    cancel,
+    retarget,
+    setReducedMotion,
+    subscribe,
+    subscribePresentation
+  }
 }
 
 function resolveDirectZoomAnchor(
@@ -349,6 +357,8 @@ function clampZoomStops(zoomStops: number): number {
 const browserDirectZoomController = createWorkbenchDirectZoomController(
   browserViewportMotionFrameScheduler
 )
+
+export const isWorkbenchDirectZoomActive = browserDirectZoomController.isActive
 
 export function retargetWorkbenchDirectZoom(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
