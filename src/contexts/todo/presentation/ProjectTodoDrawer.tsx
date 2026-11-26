@@ -174,7 +174,7 @@ export function ProjectTodoDrawer({
               header={header}
               items={state.items}
               showCompleted={state.showCompleted}
-              expandedIds={state.expanded}
+              expandedId={state.expandedId}
             />
           )}
           {(state.loadFailed || state.saveFailed) && (
@@ -245,13 +245,13 @@ function TodoRows({
   header,
   items,
   showCompleted,
-  expandedIds
+  expandedId
 }: {
   session: TodoSession
   header: HTMLDivElement | null
   items: TodoItem[]
   showCompleted: boolean
-  expandedIds: ReadonlySet<string>
+  expandedId: string | null
 }) {
   const { t } = useI18n()
   const [editor, setEditor] = useState<{ item: TodoDraft; capture: boolean } | null>(null)
@@ -285,13 +285,11 @@ function TodoRows({
     focusAfterEdit.current = null
     const target = groups.current?.querySelector<HTMLButtonElement>(selector) ?? newButton.current
     target?.focus({ preventScroll: true })
-  }, [draft, items, expandedIds])
+  }, [draft, items, expandedId])
   function edit(item: TodoDraft | null, continuing = false) {
-    if (draft) {
-      const saved = session.find(draft.id)
-      if (newLine) prepareCapture(saved ? [draft.id] : [], continuing)
-      session.setExpanded(draft.id, Boolean(saved) && !continuing)
-    }
+    const saved = draft && session.find(draft.id)
+    if (newLine) prepareCapture(saved ? [saved.id] : [], continuing)
+    session.setExpanded(item?.id ?? saved?.id ?? null)
     setEditor(item ? { item, capture: !('createdAt' in item) } : null)
   }
   function change(next: TodoDraft, images?: TodoImage[]) {
@@ -313,12 +311,13 @@ function TodoRows({
     )
     focusAfterEdit.current = `[data-todo-edit="${parts[0].id}"]`
     session.change(parts.reverse())
+    session.setExpanded(null)
     setEditor(null)
   }
   function finish(itemId: string) {
     focusAfterEdit.current = `[data-todo-edit="${itemId}"]`
     if (draft?.id === itemId) edit(null)
-    else session.setExpanded(itemId, false)
+    else if (expandedId === itemId) session.setExpanded(null)
   }
   function startNew() {
     if (scroll.current) scroll.current.scrollTop = 0
@@ -334,12 +333,8 @@ function TodoRows({
         capture={captureRow}
         onChange={change}
         onSplit={split}
-        expanded={draft?.id === item.id || expandedIds.has(item.id)}
+        expanded={expandedId === item.id}
         editing={draft?.id === item.id}
-        onExpand={() => {
-          edit(null)
-          session.setExpanded(item.id, true)
-        }}
         onEdit={() => edit(item)}
         onFinish={finish}
         onNext={startNew}
@@ -351,10 +346,9 @@ function TodoRows({
             edit(null)
           } else {
             capturePositions(item.id)
-            if (editor?.item.id === item.id && !willHide) {
-              setEditor({ ...editor, item: { ...editor.item, status } })
-            } else if (editor) {
-              edit(null)
+            if (editor?.item.id === item.id) {
+              if (willHide) edit(null)
+              else setEditor({ ...editor, item: { ...editor.item, status } })
             }
             const saved = session.find(item.id)
             if (saved) session.change({ ...saved, status })

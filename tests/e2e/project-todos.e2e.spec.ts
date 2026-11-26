@@ -314,10 +314,16 @@ describe('project to-do list', () => {
       const read = page.getByRole('button', { name: '待复查 1', exact: true })
       await read.click()
       await settle()
-      const offset = () => drawer.locator('.todo-scroll').evaluate((el) => el.scrollTop)
-      const before = await offset()
-      expect(before).toBeGreaterThan(0)
-      const readingY = await read.evaluate((el) => el.getBoundingClientRect().top)
+      expect(await drawer.locator('.todo-expanded').count()).toBe(1)
+      expect(await title.inputValue()).toBe('待复查 1')
+      expect(
+        await page
+          .getByRole('button', { name: '待复查 13', exact: true })
+          .getAttribute('aria-expanded')
+      ).toBe('false')
+      expect(await drawer.locator('.todo-scroll').evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+      const readingY = await title.evaluate((el) => el.getBoundingClientRect().top)
+      await drawer.screenshot({ path: 'test-results/todo-inline-edit/switching-rows.png' })
       const pane = await page.locator('.react-flow__pane').boundingBox()
       await page.mouse.click(pane!.x + 20, pane!.y + 64)
       await drawer.waitFor({ state: 'detached' })
@@ -371,6 +377,18 @@ describe('project to-do list', () => {
       }))
       expect.soft(size.unused).toBeLessThanOrEqual(1)
       expect(size.overflow).toBeGreaterThan(0)
+      const firstRow = list.locator('.todo-row').first()
+      const rowSize = () =>
+        firstRow.evaluate((el) => {
+          const { width, height } = el.getBoundingClientRect()
+          return { width, height }
+        })
+      const shownSize = await rowSize()
+      await drawer.getByRole('button', { name: '隐藏已完成' }).click()
+      expect(await list.evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0)
+      expect(await rowSize()).toEqual(shownSize)
+      await drawer.getByRole('button', { name: '显示已完成' }).click()
+      expect(await rowSize()).toEqual(shownSize)
       for (const state of ['进行中', '已完成']) {
         const result = await boundary.evaluate(async (button) => {
           const start = button.getBoundingClientRect().top
@@ -433,8 +451,11 @@ describe('project to-do list', () => {
         '1111',
         '3434'
       ])
-      await list.evaluate((el) => {
-        el.scrollTop = el.scrollHeight
+      await list.hover()
+      await page.mouse.wheel(0, await list.evaluate((el) => el.scrollHeight))
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.todo-scroll')!
+        return el.scrollHeight - el.clientHeight - el.scrollTop < 1
       })
       const last = await list.evaluate((el) => {
         const row = el.querySelectorAll('.todo-row')
@@ -525,6 +546,7 @@ describe('project to-do list', () => {
       expect(
         await page.locator('.todo-detail').evaluate((el) => el.getBoundingClientRect().height)
       ).toBe(0)
+      const editor = page.getByRole('textbox', { name: '待办内容' })
       for (const preference of ['reduce', 'no-preference'] as const) {
         await page.emulateMedia({ reducedMotion: preference })
         await page.waitForFunction(
@@ -532,12 +554,15 @@ describe('project to-do list', () => {
           preference
         )
         for (const opening of [true, false]) {
-          const motion = await savedTitle.evaluate(async (button) => {
+          if (!opening) await editor.press('Escape')
+          const motion = await savedTitle.evaluate(async (button, open) => {
             const detail = document.getElementById(button.getAttribute('aria-controls')!)!
             const height = () => detail.getBoundingClientRect().height
             const start = height()
             if (!(button instanceof HTMLButtonElement)) throw new Error('Expected a to-do button')
-            button.click()
+            if (open) button.click()
+            else
+              button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
             await new Promise(requestAnimationFrame)
             const reveal = detail
               .getAnimations()
@@ -553,7 +578,7 @@ describe('project to-do list', () => {
             const middle = height()
             reveal.finish()
             return { start, middle, end: height(), duration }
-          })
+          }, opening)
           expect(motion.duration).toBe(260)
           expect(motion.end > motion.start).toBe(opening)
           expect(motion.middle).toBeGreaterThan(Math.min(motion.start, motion.end))
@@ -570,21 +595,13 @@ describe('project to-do list', () => {
       })
       expect(await img.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBe(1)
       await page.mouse.move(8, 8)
-      const pencil = page.getByRole('button', { name: '编辑“调整筛选栏”' })
-      const waitForPencilOpacity = (opacity: string) =>
-        pollUntilState({
-          description: 'the edit pencil to reach opacity ' + opacity,
-          observe: () => pencil.evaluate((el) => getComputedStyle(el).opacity),
-          accept: (current) => current === opacity,
-          timeoutMs: 5000
-        })
-      await waitForPencilOpacity('0')
+      expect(await editor.evaluate((el) => el === document.activeElement)).toBe(true)
       expect(
         await page.locator('.todo-expanded').evaluate((el) => getComputedStyle(el).boxShadow)
       ).not.toBe('none')
       const address = page.getByRole('link', { name: /example.org/ })
       await address.hover()
-      await waitForPencilOpacity('1')
+      expect(await page.getByRole('button', { name: /^编辑/ }).count()).toBe(0)
       const hostLabel = address.getByText('example.org', { exact: true })
       const iconBox = (await address.locator('.todo-link-icon').boundingBox())!
       const addressBox = (await hostLabel.boundingBox())!
@@ -606,32 +623,21 @@ describe('project to-do list', () => {
         })
       await hostLabel.click()
       expect(await waitForOpenedUrls(1)).toEqual(['https://example.org/filter'])
-      expect(await savedTitle.getAttribute('aria-expanded')).toBe('true')
+      expect(await editor.inputValue()).toBe('调整筛选栏')
       await address.press('Enter')
       expect(await waitForOpenedUrls(2)).toEqual([
         'https://example.org/filter',
         'https://example.org/filter'
       ])
       await opened.dispose()
-      const linkRow = page.locator('.todo-link-row')
-      const rowBox = (await linkRow.boundingBox())!
-      await linkRow.click({ position: { x: rowBox.width - 2, y: rowBox.height / 2 } })
-      await savedTitle.and(page.locator('[aria-expanded="false"]')).waitFor()
-      expect(await page.getByRole('textbox', { name: '待办内容' }).count()).toBe(0)
-      await savedTitle.dblclick()
-      expect(await savedTitle.getAttribute('aria-expanded')).toBe('false')
-      expect(await page.getByRole('textbox', { name: '待办内容' }).count()).toBe(0)
-      await savedTitle.click()
-      await page.mouse.move(8, 8)
+      await page.getByRole('textbox', { name: '备注' }).click()
+      await editor.dblclick()
+      expect(await editor.evaluate((el) => el === document.activeElement)).toBe(true)
+      await editor.press('Escape')
+      expect(await savedTitle.getAttribute('aria-expanded')).toBe('true')
+      expect(await savedTitle.evaluate((el) => el === document.activeElement)).toBe(true)
       await savedTitle.press('Tab')
-      expect(await pencil.evaluate((el) => el === document.activeElement)).toBe(true)
-      await waitForPencilOpacity('1')
-      const titleBox = (await savedTitle.boundingBox())!
-      const pencilBox = (await pencil.boundingBox())!
-      expect(pencilBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width)
-      expect(
-        Math.abs(pencilBox.y + pencilBox.height / 2 - titleBox.y - titleBox.height / 2)
-      ).toBeLessThan(1)
+      expect(await address.evaluate((el) => el === document.activeElement)).toBe(true)
       const expandedRow = page.locator('.todo-expanded')
       const settle = () =>
         expandedRow.evaluate(async (row) => {
@@ -659,8 +665,7 @@ describe('project to-do list', () => {
         elements.forEach((el) => observer.observe(el))
         return { changed, observer }
       })
-      await pencil.click()
-      const editor = page.getByRole('textbox', { name: '待办内容' })
+      await savedTitle.click()
       expect(await editor.evaluate((el) => el === document.activeElement)).toBe(true)
       await settle()
       await editor.press('Escape')

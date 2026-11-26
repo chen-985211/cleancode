@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react'
 import { TooltipLabel } from '../../../presentation/shared/components/Tooltip'
-import { WorkbenchIcon } from '../../../presentation/shared/components/WorkbenchIcons'
 import { ContextMenu } from 'radix-ui'
 import { useI18n } from '../../../presentation/i18n/useI18n'
 import {
@@ -17,7 +16,6 @@ import { classifyTodoPaste, numberedTodoLines } from './todoPaste'
 export function TodoRow({
   editing,
   expanded,
-  onExpand,
   onEdit,
   onStatus,
   item,
@@ -31,7 +29,6 @@ export function TodoRow({
 }: {
   editing: boolean
   expanded: boolean
-  onExpand: () => void
   onEdit: () => void
   onStatus: (status: TodoState) => void
   item: TodoDraft
@@ -45,6 +42,8 @@ export function TodoRow({
 }) {
   const { t } = useI18n()
   const title = useRef<HTMLTextAreaElement>(null)
+  const note = useRef<HTMLTextAreaElement>(null)
+  const focusNote = useRef(false)
   const [pasteError, setPasteError] = useState<string | null>(null)
   const [offer, setOffer] = useState<{ id: string; lines: string[] } | null>(null)
   const liveEditor = useRef<TodoDraft | null>(null)
@@ -60,9 +59,11 @@ export function TodoRow({
   }
   useEffect(() => {
     if (!editing) return
-    title.current?.focus({ preventScroll: true })
-    const end = title.current?.value.length ?? 0
-    title.current?.setSelectionRange(end, end)
+    const field = focusNote.current ? note.current : title.current
+    focusNote.current = false
+    if (!field) return
+    field.focus({ preventScroll: true })
+    field.setSelectionRange(field.value.length, field.value.length)
   }, [item.id, editing])
   const removed = useRef(false)
   function paste(
@@ -130,7 +131,7 @@ export function TodoRow({
     session.change({ ...item, text: '', note: '', links: [], images: [] })
     onFinish(item.id)
   }
-  const gestureHint = t(expanded ? 'todo.collapseGesture' : 'todo.itemGesture')
+  const gestureHint = t(expanded ? 'todo.editGesture' : 'todo.itemGesture')
   const caption = item.text.trim() || item.note.trim().split('\n')[0]
   const name = caption || (item.links[0] && new URL(item.links[0]).host) || t('todo.image')
   const next = todoStates[(todoStates.indexOf(item.status) + 1) % todoStates.length]
@@ -149,8 +150,8 @@ export function TodoRow({
           data-todo-position={item.id}
           onClick={(e) => {
             if (editing || !isRowSurface(e.target)) return
-            if (expanded) onFinish(item.id)
-            else onExpand()
+            focusNote.current = Boolean(e.target.closest('.todo-note-slot'))
+            onEdit()
           }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
@@ -233,16 +234,6 @@ export function TodoRow({
                     <span className="todo-caption">{name}</span>
                   </button>
                 </TooltipLabel>
-                <TooltipLabel content={t('todo.edit', { name })}>
-                  <button
-                    type="button"
-                    className="todo-edit-action"
-                    aria-label={t('todo.edit', { name })}
-                    onClick={onEdit}
-                  >
-                    <WorkbenchIcon role="edit" size={14} aria-hidden="true" />
-                  </button>
-                </TooltipLabel>
               </div>
             </div>
             <div
@@ -264,6 +255,7 @@ export function TodoRow({
                   </p>
                   {expanded && (
                     <textarea
+                      ref={note}
                       rows={1}
                       inert={!editing}
                       aria-hidden={!editing}
@@ -301,9 +293,10 @@ export function TodoRow({
   )
 }
 
-function isRowSurface(target: EventTarget) {
+function isRowSurface(target: EventTarget): target is Element {
   return (
-    target instanceof Element && !target.closest('textarea, button:not(.todo-title), [role="menu"]')
+    target instanceof Element &&
+    !target.closest('textarea, a[href], button:not(.todo-title), [role="menu"]')
   )
 }
 

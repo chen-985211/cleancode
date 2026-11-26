@@ -11,7 +11,7 @@ export function blankTodo(): TodoDraft {
 }
 type SessionState = {
   items: TodoItem[]
-  expanded: ReadonlySet<string>
+  expandedId: string | null
   showCompleted: boolean
   loading: boolean
   loadFailed: boolean
@@ -24,7 +24,7 @@ export class TodoSession {
   } = { scrollTop: 0 }
   private state: SessionState = {
     items: [],
-    expanded: new Set(),
+    expandedId: null,
     showCompleted: true,
     loading: true,
     loadFailed: false,
@@ -71,12 +71,8 @@ export class TodoSession {
   setShowCompleted(showCompleted: boolean) {
     this.publish({ showCompleted })
   }
-  setExpanded(id: string, expanded: boolean) {
-    if (this.state.expanded.has(id) === expanded) return
-    const next = new Set(this.state.expanded)
-    if (expanded) next.add(id)
-    else next.delete(id)
-    this.publish({ expanded: next })
+  setExpanded(id: string | null) {
+    if (this.state.expandedId !== id) this.publish({ expandedId: id })
   }
   change(changes: TodoDraft | TodoDraft[], images: TodoImage[] = []) {
     if (this.state.loading || this.state.loadFailed) return

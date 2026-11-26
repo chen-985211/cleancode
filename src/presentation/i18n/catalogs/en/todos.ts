@@ -29,7 +29,6 @@ export const enTodosMessages = {
   'todo.active': 'In progress',
   'todo.done': 'Completed',
   'todo.changeState': '{name}, {from}. Change to {to}',
-  'todo.edit': 'Edit “{name}”',
-  'todo.collapseGesture': 'Click to collapse',
-  'todo.itemGesture': 'Click to expand'
+  'todo.editGesture': 'Click to edit',
+  'todo.itemGesture': 'Click to expand and edit'
 } as const satisfies Record<keyof typeof zhCNTodosMessages, string>

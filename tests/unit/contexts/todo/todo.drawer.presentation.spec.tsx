@@ -72,7 +72,7 @@ describe('project to-do drawer', () => {
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     const opener = screen.getByRole('button', { name: '打开待办清单' })
     fireEvent.click(opener)
-    fireEvent.click(await screen.findByRole('button', { name: '编辑“111111”' }))
+    fireEvent.click(await screen.findByRole('button', { name: '111111' }))
     expect(screen.queryByRole('button', { name: '删除此条' })).toBeNull()
     const title = screen.getByRole('textbox', { name: '待办内容' })
     expect(title).toHaveFocus()
@@ -98,7 +98,7 @@ describe('project to-do drawer', () => {
       render(<ProjectTodoDrawer projectId="project" api={api} />)
       const opener = screen.getByRole('button', { name: '打开待办清单' })
       fireEvent.click(opener)
-      fireEvent.click(await screen.findByRole('button', { name: '编辑“移除”' }))
+      fireEvent.click(await screen.findByRole('button', { name: '移除' }))
       fireEvent.contextMenu(screen.getByRole('textbox', { name: field }))
       fireEvent.click(await screen.findByRole('menuitem', { name: '删除此条' }))
       expect(screen.queryByRole('button', { name: '移除' })).toBeNull()
@@ -107,19 +107,24 @@ describe('project to-do drawer', () => {
     }
   )
 
-  it('shows an empty note when a title-only item is expanded without editing it', async () => {
+  it('opens the inline editor on one click and keeps repeated clicks inside the item', async () => {
     const item = { ...blankTodo(), text: '改进筛选栏', createdAt: 1, completedAt: null }
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
     const heading = await screen.findByRole('button', { name: item.text })
+    expect(screen.queryByRole('button', { name: /^编辑/ })).toBeNull()
     fireEvent.click(heading)
-    const note = screen.getByRole('paragraph')
-    expect(note).toHaveTextContent('填写备注，或粘贴链接、图片')
-    expect(screen.queryByRole('textbox')).toBeNull()
+    const title = screen.getByRole('textbox', { name: '待办内容' })
+    expect(title).toHaveFocus()
+    const note = screen.getByRole('textbox', { name: '备注' })
+    expect(note).toHaveAttribute('placeholder', '填写备注，或粘贴链接、图片')
     fireEvent.click(note)
-    expect(heading).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('paragraph')).toBeNull()
+    fireEvent.doubleClick(title)
+    expect(heading).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.keyDown(title, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('paragraph'))
+    expect(screen.getByRole('textbox', { name: '备注' })).toHaveFocus()
     expect(api.saveTodo).not.toHaveBeenCalled()
   })
 
@@ -157,40 +162,28 @@ describe('project to-do drawer', () => {
     const refs = within(await screen.findByRole('complementary', { name: '待办清单' }))
     expect(refs.queryByRole('link')).toBeNull()
     expect(refs.queryByRole('img')).toBeNull()
-    fireEvent.click(refs.getByRole('button', { name: item.text }))
-    expect(refs.getByRole('link', { name: /example.org/ })).toHaveAttribute('href', link)
-    expect(await refs.findByRole('img', { name: '粘贴的截图' })).toBeVisible()
     const heading = refs.getByRole('button', { name: item.text })
+    fireEvent.click(heading)
+    const image = await refs.findByRole('img', { name: '粘贴的截图' })
     const address = refs.getByRole('link', { name: /example.org/ })
+    const note = refs.getByRole('textbox', { name: '备注' })
     const before = (first: Element, second: Element) =>
       Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(before(refs.getByRole('img'), address)).toBe(true)
-    expect(before(address, refs.getByRole('paragraph'))).toBe(true)
-    expect(refs.getByRole('paragraph')).toHaveTextContent('填写备注，或粘贴链接、图片')
-    expect(fireEvent.click(address)).toBe(true)
-    expect(heading).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(refs.getByRole('paragraph'))
-    expect(heading).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(heading)
-    expect(heading).toHaveAttribute('aria-expanded', 'true')
-    expect(refs.queryByRole('textbox')).toBeNull()
-    expect(refs.queryByRole('button', { name: '移除链接' })).toBeNull()
-    fireEvent.click(heading)
-    expect(heading).toHaveAttribute('aria-expanded', 'false')
-    for (const detail of [1, 2, 3]) {
-      fireEvent.click(heading, { detail })
-      expect(heading).toHaveAttribute('aria-expanded', String(detail % 2 === 1))
-    }
-    fireEvent.doubleClick(heading)
-    expect(refs.queryByRole('textbox')).toBeNull()
-    fireEvent.click(refs.getByRole('button', { name: '编辑“改进筛选栏”' }))
+    expect(image).toBeVisible()
+    expect(address).toHaveAttribute('href', link)
+    expect(before(image, address)).toBe(true)
+    expect(before(address, note)).toBe(true)
     expect(refs.getByRole('textbox', { name: '待办内容' })).toHaveFocus()
-    const noteEditor = refs.getByRole('textbox', { name: '备注' })
-    expect(noteEditor).toHaveAttribute('placeholder', '填写备注，或粘贴链接、图片')
-    expect(before(refs.getByRole('link'), noteEditor)).toBe(true)
     expect(refs.getByRole('button', { name: '移除链接' })).toBeVisible()
-    fireEvent.keyDown(refs.getByRole('textbox', { name: '待办内容' }), { key: 'Escape' })
-    fireEvent.keyDown(refs.getByRole('button', { name: item.text }), { key: 'Escape' })
+    expect(fireEvent.click(address)).toBe(true)
+    fireEvent.click(image)
+    expect(heading).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.keyDown(note, { key: 'Escape' })
+    expect(refs.queryByRole('button', { name: '移除链接' })).toBeNull()
+    fireEvent.click(address)
+    expect(refs.queryByRole('textbox')).toBeNull()
+    expect(heading).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.keyDown(heading, { key: 'Escape' })
     expect(refs.queryByRole('link')).toBeNull()
     expect(refs.queryByRole('img')).toBeNull()
     expect(opener).toHaveTextContent('00/01')
@@ -222,27 +215,46 @@ describe('project to-do drawer', () => {
     }
   })
 
-  it('keeps previously opened items visible when another item is opened', async () => {
-    const items = ['第一条', '第二条'].map((text) => ({
+  it('switches a single expanded editor across status groups and quick capture', async () => {
+    const items = (['todo', 'active'] as const).map((status) => ({
       ...blankTodo(),
-      text,
-      note: text + '备注',
+      status,
+      text: status,
       createdAt: 1,
       completedAt: null
     }))
     const api = { listTodos: vi.fn(async () => items), saveTodo: vi.fn(), readTodoImage: vi.fn() }
-    render(<ProjectTodoDrawer projectId="project" api={api} />)
+    const { container } = render(<ProjectTodoDrawer projectId="project" api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
-    const add = await screen.findByRole('button', { name: '记一条' })
-    const first = await screen.findByRole('button', { name: items[0].text })
+    const first = await screen.findByRole('button', { name: 'todo' })
+    const second = screen.getByRole('button', { name: 'active' })
+    const add = screen.getByRole('button', { name: '记一条' })
     expect(add.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(first)
+    fireEvent.change(screen.getByRole('textbox', { name: '备注' }), {
+      target: { value: '保留草稿' }
+    })
+    fireEvent.click(second)
+    expect(first).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: /^todo，当前/ }))
+    expect(first).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('textbox', { name: '待办内容' })).toHaveValue('active')
     fireEvent.click(add)
+    expect(second).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('button', { name: '记一条' })).toBeNull()
+    expect(container.querySelectorAll('.todo-expanded')).toHaveLength(1)
+    fireEvent.change(screen.getByRole('textbox', { name: '待办内容' }), {
+      target: { value: '新增' }
+    })
+    fireEvent.click(first)
+    expect(screen.getByRole('textbox', { name: '备注' })).toHaveValue('保留草稿')
+    expect(screen.getByRole('button', { name: '新增' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: '记一条' })).toBeVisible()
+    expect(container.querySelectorAll('.todo-expanded')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '记一条' }))
     fireEvent.keyDown(screen.getByRole('textbox', { name: '待办内容' }), { key: 'Escape' })
     expect(screen.getByRole('button', { name: '记一条' })).toHaveFocus()
-    for (const { text } of items) fireEvent.click(await screen.findByRole('button', { name: text }))
-    for (const { text } of items)
-      expect(screen.getByRole('button', { name: text })).toHaveAttribute('aria-expanded', 'true')
+    expect(container.querySelectorAll('.todo-expanded')).toHaveLength(0)
   })
 
   it('keeps newly captured items first after autosave, Enter and leaving the editor', async () => {
@@ -278,7 +290,7 @@ describe('project to-do drawer', () => {
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     const opener = screen.getByRole('button', { name: '打开待办清单' })
     fireEvent.click(opener)
-    fireEvent.click(await screen.findByRole('button', { name: '编辑“较旧”' }))
+    fireEvent.click(await screen.findByRole('button', { name: '较旧' }))
     const title = screen.getByRole('textbox', { name: '待办内容' })
     fireEvent.change(title, { target: { value: '' } })
     expect(title).toHaveValue('')
@@ -301,7 +313,7 @@ describe('project to-do drawer', () => {
     expect(opener).toHaveTextContent('00/02')
   })
 
-  it('restores each project’s reading position and manually expanded items', async () => {
+  it('restores each project’s reading position and last expanded item', async () => {
     const item = { ...blankTodo(), text: '阅读位置', createdAt: 1, completedAt: null }
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
     const view = render(<ProjectTodoDrawer projectId="first" api={api} />)
@@ -337,7 +349,7 @@ describe('project to-do drawer', () => {
       const opener = screen.getByRole('button', { name: '打开待办清单' })
       fireEvent.click(opener)
       fireEvent.click(
-        await screen.findByRole('button', { name: mode === 'new' ? '记一条' : '编辑“甲乙”' })
+        await screen.findByRole('button', { name: mode === 'new' ? '记一条' : '甲乙' })
       )
       const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
       if (mode === 'new') fireEvent.change(title, { target: { value: item.text } })
@@ -364,7 +376,7 @@ describe('project to-do drawer', () => {
     const api = { listTodos: vi.fn(async () => [item]), saveTodo: vi.fn(), readTodoImage: vi.fn() }
     render(<ProjectTodoDrawer projectId="project" api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
-    fireEvent.click(await screen.findByRole('button', { name: /^编辑“甲\s+乙”$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^甲\s+乙$/ }))
     const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
     title.setSelectionRange(2, 2)
     const reference = '参考 https://example.org/\r\n补充'
@@ -400,7 +412,7 @@ describe('project to-do drawer', () => {
       }
       render(<ProjectTodoDrawer projectId="project" api={api} />)
       fireEvent.click(screen.getByRole('button', { name: '打开待办清单' }))
-      fireEvent.click(await screen.findByRole('button', { name: '编辑“甲选乙”' }))
+      fireEvent.click(await screen.findByRole('button', { name: '甲选乙' }))
       const title = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '待办内容' })
       title.setSelectionRange(1, 2)
       fireEvent.paste(title, {
@@ -469,7 +481,8 @@ describe('project to-do drawer', () => {
     const title = await screen.findByRole('button', { name: item.text })
     fireEvent.click(title)
     await screen.findByRole('status')
-    fireEvent.click(title)
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '待办内容' }), { key: 'Escape' })
+    fireEvent.keyDown(title, { key: 'Escape' })
     fireEvent.click(title)
     expect(await screen.findByRole('img', { name: '粘贴的截图' })).toHaveAttribute('src', data)
     expect(screen.queryByRole('status')).toBeNull()
@@ -569,11 +582,8 @@ describe('project to-do drawer', () => {
         'aria-owns',
         'todo-entry-' + item.id
       )
-      expect(screen.getByRole('button', { name: item.text })).toHaveAttribute(
-        'aria-expanded',
-        'true'
-      )
-      expect(screen.getByRole('paragraph')).toHaveTextContent(item.note)
+      expect(screen.getByRole('textbox', { name: '待办内容' })).toHaveValue(item.text)
+      expect(screen.getByRole('textbox', { name: '备注' })).toHaveValue(item.note)
       expect(preview).toBeInTheDocument()
     }
   })
