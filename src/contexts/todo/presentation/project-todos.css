@@ -453,6 +453,87 @@
   max-height: clamp(176px, 56cqi, 248px);
   object-fit: contain;
 }
+.project-todo-drawer .todo-thumbnail-trigger {
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+  /* Keep even a one-pixel image clear of the corner remove button. */
+  min-width: 60px;
+  min-height: 32px;
+  padding: 0;
+  cursor: zoom-in;
+}
+.todo-image-backdrop,
+.todo-image-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+.todo-image-backdrop {
+  background: var(--cc-backdrop);
+}
+.todo-image-dialog {
+  display: grid;
+  place-items: center;
+  --todo-image-side: 24px;
+  padding: 52px var(--todo-image-side);
+  color: var(--cc-foreground);
+  outline: none;
+}
+.todo-image-dialog[data-multiple] {
+  --todo-image-side: 60px;
+}
+.todo-image-dialog > img {
+  display: block;
+  max-width: calc(100vw - 2 * var(--todo-image-side));
+  max-height: calc(100dvh - 104px);
+  box-shadow: var(--cc-shadow-floating);
+}
+.todo-image-dialog button {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--cc-border);
+  border-radius: 50%;
+  background: var(--cc-surface-overlay);
+  color: var(--cc-foreground);
+  cursor: pointer;
+}
+.todo-image-dialog-close {
+  top: 12px;
+  right: 12px;
+}
+.todo-image-previous,
+.todo-image-next {
+  top: 50%;
+  translate: 0 -50%;
+}
+.todo-image-previous {
+  left: 12px;
+}
+.todo-image-next {
+  right: 12px;
+}
+.todo-image-position {
+  position: absolute;
+  bottom: 12px;
+  justify-self: center;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--cc-surface-overlay);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.todo-image-dialog button:hover {
+  background: var(--cc-chrome-raised);
+}
+.todo-image-dialog button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
+}
 .project-todo-drawer .todo-asset-remove {
   color: var(--todo-quiet);
   border-radius: 50%;

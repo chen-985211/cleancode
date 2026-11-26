@@ -91,6 +91,9 @@ it(
     expect(await savedTitle.getAttribute('aria-expanded')).toBe('true')
     expect(await savedTitle.evaluate((el) => el === document.activeElement)).toBe(true)
     await savedTitle.press('Tab')
+    const thumbnail = page.getByRole('button', { name: '放大查看截图' })
+    expect(await thumbnail.evaluate((el) => el === document.activeElement)).toBe(true)
+    await thumbnail.press('Tab')
     expect(await address.evaluate((el) => el === document.activeElement)).toBe(true)
     const expandedRow = page.locator('.todo-expanded')
     const settle = () =>
