@@ -12,6 +12,7 @@ import type {
   AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
+import type { WorkspaceBaseBranches } from './contexts/project/application/dto/WorkspaceBaseBranches'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type {
   AgentPeerCanvasRequest,
@@ -149,6 +150,9 @@ declare global {
         readonly projectDirectory: string
         readonly initializationId: string
       }): Promise<void>
+      listWorkspaceBaseBranches(command: {
+        readonly projectDirectory: string
+      }): Promise<WorkspaceBaseBranches>
       listWorkspaceInitializations(command: {
         readonly projectDirectory: string
         readonly workspaceId?: string
@@ -175,6 +179,7 @@ declare global {
         readonly beforeProjectDirectory: string | null
       }): Promise<WorkbenchSnapshot[]>
       createBranchWorkspace(command: {
+        readonly baseBranch?: string
         readonly requestId?: string
         readonly defaults?: WorkspaceDefaults
         readonly projectDirectory: string

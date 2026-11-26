@@ -24,8 +24,11 @@ import {
 } from '../../domain/value-objects/WorkspaceDefaults'
 import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 
+import type { WorkspaceBaseBranchPort } from '../ports/WorkspaceBaseBranchPort'
+
 export interface CreateInitializedWorkspaceCommand {
   readonly selectWorkspace?: boolean
+  readonly baseBranch?: string
   readonly baseRef?: string
   readonly issue?: ProjectIssueReference
   readonly projectDirectory: string
@@ -44,6 +47,7 @@ export interface BeginEmptyCanvasInitializationCommand {
 export interface WorkspaceInitializationPreparationDependencies {
   readonly projects: ProjectRepository
   readonly registry: ProjectRegistryRepository
+  readonly baseBranches: WorkspaceBaseBranchPort
   readonly git: GitWorkspacePort
   readonly directories: BranchWorkspaceDirectoryPort
   readonly repository: WorkspaceInitializationRepository
@@ -58,6 +62,14 @@ export interface WorkspaceInitializationPreparationDependencies {
 export class PrepareWorkspaceInitializationUseCase {
   private readonly requests = new ProjectWorkspaceTransactionCoordinator()
   constructor(private readonly dependencies: WorkspaceInitializationPreparationDependencies) {}
+
+  async listBaseBranches(projectDirectory: string) {
+    const project = await this.requireProject(projectDirectory)
+    return this.dependencies.baseBranches.list(
+      project.directory,
+      project.workspaces.find((item) => item.isCurrent)?.gitBranch ?? null
+    )
+  }
 
   async getDefaults(projectDirectory: string): Promise<WorkspaceDefaultsResolution> {
     return this.reconcileDefaults(projectDirectory)
@@ -182,8 +194,12 @@ export class PrepareWorkspaceInitializationUseCase {
         projectDirectory: project.directory,
         branchName: command.branchName.trim()
       })
+      const baseRef = command.baseBranch
+        ? await this.dependencies.baseBranches.resolve(project.directory, command.baseBranch)
+        : command.baseRef
       const operation = WorkspaceInitialization.create({
-        ...(command.baseRef ? { baseRef: command.baseRef } : {}),
+        ...(baseRef ? { baseRef } : {}),
+        ...(command.baseBranch ? { baseBranch: command.baseBranch } : {}),
         ...(command.issue ? { issue: command.issue } : {}),
         id: command.requestId,
         projectId: project.id,
@@ -203,6 +219,7 @@ export class PrepareWorkspaceInitializationUseCase {
     if (
       snapshot.branchName !== command.branchName.trim() ||
       snapshot.mode !== 'new-workspace' ||
+      (command.baseBranch !== undefined && snapshot.baseBranch !== command.baseBranch) ||
       (command.baseRef !== undefined && snapshot.baseRef !== command.baseRef) ||
       (command.issue && !sameProjectIssue(snapshot.issue, command.issue))
     ) {

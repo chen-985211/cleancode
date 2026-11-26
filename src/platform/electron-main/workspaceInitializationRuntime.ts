@@ -1,6 +1,7 @@
 import { createBlockGraphError } from '../../contexts/block-graph/application/errors/BlockGraphErrors'
 import { createProjectError } from '../../contexts/project/application/errors/ProjectErrors'
 import { join } from 'node:path'
+import { Project } from '../../contexts/project/domain/aggregates/Project'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type {
   WorkspaceInitializationDetails,
@@ -13,6 +14,7 @@ import {
 } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { InitializeWorkspaceContentUseCase } from '../../contexts/project/application/use-cases/InitializeWorkspaceContentUseCase'
 import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
+import { GitCliWorkspaceBaseAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceBaseAdapter'
 import { FileSystemWorkspaceInitializationRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemWorkspaceInitializationRepository'
 import type { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import type { InstantiateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
@@ -31,7 +33,7 @@ import type { ProjectIpcHandlersInput } from './projectIpcHandlers'
 
 interface WorkspaceInitializationRuntimeInput extends Omit<
   WorkspaceInitializationPreparationDependencies,
-  'repository' | 'content'
+  'repository' | 'content' | 'baseBranches'
 > {
   readonly appStateDirectory: string
   readonly templates: BlockTemplateRepository
@@ -143,7 +145,12 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
       ).id
     }
   }
-  const preparation = new PrepareWorkspaceInitializationUseCase({ ...input, repository, content })
+  const preparation = new PrepareWorkspaceInitializationUseCase({
+    ...input,
+    repository,
+    content,
+    baseBranches: new GitCliWorkspaceBaseAdapter()
+  })
   const initialize = new InitializeWorkspaceContentUseCase(
     repository,
     content,
@@ -166,7 +173,16 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
     wrapLifecycle: (
       lifecycle: Pick<ProjectIpcHandlersInput, 'archiveBranchWorkspace' | 'forgetProject'>
     ) => ({
-      createBranchWorkspace: preparation.create.bind(preparation),
+      createBranchWorkspace: async (command: Parameters<typeof preparation.create>[0]) => {
+        const project = await preparation.create(command)
+        if (command.selectWorkspace !== false) return project
+        const target = project.workspaces.find(
+          (item) => item.gitBranch === command.branchName.trim()
+        )
+        if (!target)
+          throw createProjectError('BRANCH_WORKSPACE_NOT_FOUND', 'Workspace was not found.')
+        return Project.fromSnapshot(project).switchCurrentWorkspace(target.workspaceId).toSnapshot()
+      },
       archiveBranchWorkspace: async (
         command: Parameters<typeof lifecycle.archiveBranchWorkspace>[0]
       ) => {
@@ -190,6 +206,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
       registerWorkspaceInitializationIpcHandlers({
         ipcMain,
         logger,
+        listBaseBranches: preparation.listBaseBranches.bind(preparation),
         getDefaults: preparation.getDefaults.bind(preparation),
         cancel: preparation.cancelOne.bind(preparation),
         saveDefaults: preparation.saveDefaults.bind(preparation),

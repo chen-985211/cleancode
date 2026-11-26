@@ -45,6 +45,7 @@ export const zhCNErrorsMessages = {
     '项目画布数据版本过新，请升级 cleancode 后再打开。',
   'error.BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES': '工作区有未提交更改，无法归档。',
   'error.BRANCH_WORKSPACE_NOT_FOUND': '分支工作区不存在，请刷新后重试。',
+  'error.GIT_WORKSPACE_BASE_UNAVAILABLE': '无法使用该基准分支。请重试或选择其他分支。',
   'error.GIT_BRANCH_ALREADY_EXISTS': 'Git 分支已存在，无法创建同名工作区。',
   'error.GIT_BRANCH_NAME_INVALID': 'Git 分支名称无效，请修改名称后重试。',
   'error.GIT_BRANCH_CHECKED_OUT_IN_WORKTREE':

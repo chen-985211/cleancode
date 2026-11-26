@@ -270,6 +270,7 @@ export function useBranchWorkspaceActions({
       workbench: WorkbenchSnapshot,
       branchName: string,
       options?: {
+        readonly baseBranch?: string
         readonly requestId: string
         readonly defaults?: WorkspaceDefaults
         readonly issueCommand?: StartIssueWorkspaceCommand
@@ -300,9 +301,7 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        if (options?.issueCommand) {
-          // Creation publishes metadata, but must not commit a navigation choice.
-          rememberCreatedWorkspace(createdWorkbench)
+        if (options?.issueCommand || options?.baseBranch) {
           const current = currentWorkbenchRef.current
           if (
             selectionEpoch.current === epoch &&
@@ -311,6 +310,9 @@ export function useBranchWorkspaceActions({
           ) {
             await selectWorkspaceWithResult(createdWorkbench, createdWorkbench.graph.workspaceId)
           }
+          // Publish the row once navigation settles so new canvas actions have the correct scope.
+          // A superseding user selection still receives the new workspace in its sidebar.
+          rememberCreatedWorkspace(createdWorkbench)
         } else {
           clearCurrentBlockSelection()
           replaceWorkbench(createdWorkbench)

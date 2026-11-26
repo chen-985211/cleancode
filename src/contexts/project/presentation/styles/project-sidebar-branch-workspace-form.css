@@ -44,7 +44,7 @@
   font-size: 11px;
 }
 
-.branch-workspace-form button {
+.branch-workspace-form button:not([aria-haspopup]) {
   display: inline-flex;
   height: 30px;
   align-items: center;
@@ -60,13 +60,40 @@
   font-weight: 650;
 }
 
-.branch-workspace-form button:hover {
+.branch-workspace-form button:not(:disabled):hover {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
 }
 
 .branch-workspace-form input:focus-visible,
-.branch-workspace-form button:focus-visible {
+.branch-workspace-form button[type='submit']:focus-visible {
   border-color: var(--cc-sidebar-focus-ring);
   outline: none;
+}
+
+.branch-workspace-base {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding-inline-start: 8px;
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.branch-workspace-base .choice-select-trigger {
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px 7px;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
+.branch-workspace-form .choice-select-trigger span,
+.branch-workspace-base-menu button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -82,6 +82,27 @@ describe('prepare workspace initialization', () => {
     }
   )
 
+  it('freezes the chosen base on the first attempt and reuses it when creation is retried', async () => {
+    const f = fixture()
+    const command = {
+      requestId: 'retry-base',
+      projectDirectory: '/project',
+      branchName: 'fix/login',
+      baseBranch: 'refs/remotes/origin/main'
+    }
+    f.git.createBranchWorktree.mockRejectedValueOnce(new Error('Folder unavailable'))
+    await expect(f.prepare.create(command)).rejects.toThrow()
+    f.baseBranches.resolve.mockResolvedValue('b'.repeat(40))
+    await f.prepare.create(command)
+    expect(f.baseBranches.resolve).toHaveBeenCalledExactlyOnceWith('/project', command.baseBranch)
+    expect(f.git.createBranchWorktree).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseRef: 'a'.repeat(40) })
+    )
+    await expect(
+      f.prepare.create({ ...command, baseBranch: 'refs/heads/main' })
+    ).rejects.toMatchObject({ code: 'WORKSPACE_INITIALIZATION_CONFLICT' })
+  })
+
   it('preserves the issue and exact base across metadata failure and recovery', async () => {
     const f = fixture()
     const issue = {
@@ -367,6 +388,7 @@ function fixture() {
     createAgent: vi.fn(),
     run: vi.fn()
   }
+  const baseBranches = { list: vi.fn(), resolve: vi.fn(async () => 'a'.repeat(40)) }
   const prepare = new PrepareWorkspaceInitializationUseCase({
     projects,
     registry: {
@@ -375,10 +397,20 @@ function fixture() {
     },
     git,
     directories,
+    baseBranches,
     repository,
     content,
     transactions,
     createWorkspace: (command, onCreated) => base.execute(command, onCreated)
   })
-  return { prepare, content, git, projects, records, project: () => project, addGitWorktree }
+  return {
+    prepare,
+    baseBranches,
+    content,
+    git,
+    projects,
+    records,
+    project: () => project,
+    addGitWorktree
+  }
 }

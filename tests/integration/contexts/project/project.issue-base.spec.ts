@@ -5,13 +5,15 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { GitCliIssueBaseAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliIssueBaseAdapter'
 
+import { GitCliWorkspaceBaseAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliWorkspaceBaseAdapter'
+
 const exec = promisify(execFile)
 const git = async (cwd: string, ...args: string[]) =>
   (
     await exec('git', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
   ).stdout.trim()
 
-describe('real Git issue base resolution', () => {
+describe('real Git workspace base resolution', () => {
   let root: string
   let source: string
   let checkout: string
@@ -37,6 +39,60 @@ describe('real Git issue base resolution', () => {
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })
+  })
+
+  it('offers only the remote default and active local workspace among unrelated branches', async () => {
+    await git(checkout, 'branch', 'feature/login')
+    await git(checkout, 'branch', '3')
+    await git(source, 'branch', 'experiment')
+    await git(checkout, 'fetch', 'origin')
+    await git(
+      source,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'New upstream commit'
+    )
+    const latest = await git(source, 'rev-parse', 'HEAD')
+    const adapter = new GitCliWorkspaceBaseAdapter()
+    const choices = await adapter.list(checkout, 'feature/login')
+    expect(choices.defaultBranch).toBe('refs/remotes/origin/main')
+    expect(choices.branches).toEqual(['refs/remotes/origin/main', 'refs/heads/feature/login'])
+    expect((await adapter.list(checkout, null)).branches).toEqual([
+      'refs/remotes/origin/main',
+      'refs/heads/main'
+    ])
+    expect(await git(checkout, 'rev-parse', 'origin/main')).toBe(original)
+    const commit = await adapter.resolve(checkout, choices.defaultBranch!)
+    await git(checkout, 'worktree', 'add', '-b', 'test/login-api', join(root, 'task'), commit)
+    expect(await git(join(root, 'task'), 'rev-parse', 'HEAD')).toBe(latest)
+    expect(await git(checkout, 'rev-parse', 'HEAD')).toBe(original)
+    await git(checkout, 'remote', 'set-url', 'origin', join(root, 'missing'))
+    await expect(adapter.resolve(checkout, 'refs/remotes/origin/main')).rejects.toMatchObject({
+      code: 'GIT_WORKSPACE_BASE_UNAVAILABLE'
+    })
+    expect(await adapter.resolve(checkout, 'refs/heads/main')).toBe(original)
+    await git(checkout, 'remote', 'remove', 'origin')
+    expect(await adapter.list(checkout, 'feature/login')).toEqual({
+      branches: ['refs/heads/feature/login'],
+      defaultBranch: 'refs/heads/feature/login'
+    })
+  })
+
+  it('shows the available remote alone, then no choices when there are no branch refs', async () => {
+    const adapter = new GitCliWorkspaceBaseAdapter()
+    await git(checkout, 'switch', '--detach')
+    await git(checkout, 'branch', '-d', 'main')
+    expect(await adapter.list(checkout, null)).toEqual({
+      branches: ['refs/remotes/origin/main'],
+      defaultBranch: 'refs/remotes/origin/main'
+    })
+    await git(checkout, 'remote', 'remove', 'origin')
+    expect(await adapter.list(checkout, null)).toEqual({ branches: [], defaultBranch: null })
   })
 
   it('creates from a local branch with an unreachable remote and preserves the source checkout', async () => {

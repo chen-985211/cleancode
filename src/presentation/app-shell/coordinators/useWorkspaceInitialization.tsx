@@ -29,6 +29,7 @@ interface WorkspaceInitializationInput {
     workbench: WorkbenchSnapshot,
     branchName: string,
     options?: {
+      readonly baseBranch?: string
       readonly requestId: string
       readonly defaults?: WorkspaceDefaults
       readonly issueCommand?: StartIssueWorkspaceCommand
@@ -229,16 +230,24 @@ export function useWorkspaceInitialization({
   async function createBranchWorkspace(
     workbench: WorkbenchSnapshot,
     branchName: string,
+    baseBranch?: string,
     issueCommand?: StartIssueWorkspaceCommand
   ): Promise<boolean> {
-    if (!window.cleancode?.applyWorkspaceInitialization)
+    if (!window.cleancode?.applyWorkspaceInitialization && !baseBranch)
       return Boolean(await createWorkspace(workbench, branchName))
-    const key = `${workbench.project.id}:${branchName}`
+    const key = JSON.stringify([
+      workbench.project.id,
+      branchName,
+      baseBranch,
+      issueCommand?.repository,
+      issueCommand?.number
+    ])
     const requestId = requests.current.get(key) ?? crypto.randomUUID()
     requests.current.set(key, requestId)
     const creationCameraEpoch = cameraEpoch.current
     const result = await createWorkspace(workbench, branchName, {
       requestId,
+      ...(baseBranch ? { baseBranch } : {}),
       issueCommand,
       ...(issueCommand
         ? { beforeCreate: () => autosaveStore.flush(workbench.project.directory) }
@@ -295,7 +304,7 @@ export function useWorkspaceInitialization({
     cancelFocus,
     createBranchWorkspace,
     createIssueWorkspace: (workbench: WorkbenchSnapshot, command: StartIssueWorkspaceCommand) =>
-      createBranchWorkspace(workbench, command.branchName, command),
+      createBranchWorkspace(workbench, command.branchName, undefined, command),
     renderSettings: (workbenches: readonly WorkbenchSnapshot[], onClose: () => void) => (
       <WorkspaceDefaultsSettingsPane
         autosaveStore={autosaveStore}

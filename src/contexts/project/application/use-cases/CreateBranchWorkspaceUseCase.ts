@@ -60,7 +60,7 @@ export class CreateBranchWorkspaceUseCase {
       throw createProjectError('NOT_GIT_REPOSITORY', 'Project is not a Git repository.')
     }
 
-    if (!inspection.currentBranch) {
+    if (!inspection.currentBranch && !command.baseRef) {
       throw createProjectError(
         'GIT_REPOSITORY_HAS_NO_CURRENT_BRANCH',
         'Git repository has no current branch.'

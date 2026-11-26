@@ -1,3 +1,4 @@
+import type { WorkspaceBaseBranches } from '../../contexts/project/application/dto/WorkspaceBaseBranches'
 import { createIpcError } from '../ipc/IpcError'
 import type {
   WorkspaceInitializationDetails,
@@ -16,6 +17,7 @@ export interface WorkspaceInitializationIpcInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
   readonly cancel: (projectDirectory: string, initializationId: string) => Promise<void>
+  readonly listBaseBranches: (directory: string) => Promise<WorkspaceBaseBranches>
   readonly getDefaults: (directory: string) => Promise<WorkspaceDefaultsResolution>
   readonly saveDefaults: (
     directory: string,
@@ -36,6 +38,14 @@ export interface WorkspaceInitializationIpcInput {
 export function registerWorkspaceInitializationIpcHandlers(
   input: WorkspaceInitializationIpcInput
 ): void {
+  registerIpcHandler<unknown, WorkspaceBaseBranches>({
+    channel: 'cleancode:list-workspace-base-branches',
+    handler: (command) => input.listBaseBranches(readString(command, 'projectDirectory')),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listWorkspaceBaseBranches',
+    scope: 'project.git'
+  })
   registerIpcHandler<unknown, void>({
     channel: 'cleancode:cancel-workspace-initialization',
     handler: (command) =>

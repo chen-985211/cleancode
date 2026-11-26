@@ -43,12 +43,16 @@ describe('app shell branch workspace errors', () => {
     fireEvent.change(within(projectCard).getByLabelText('分支名称'), {
       target: { value: 'main' }
     })
-    fireEvent.click(within(projectCard).getByRole('button', { name: '创建 Worktree' }))
+    const submit = within(projectCard).getByRole('button', { name: '创建 Worktree' })
+    await waitFor(() => expect(submit).toBeEnabled())
+    fireEvent.click(submit)
 
     await waitFor(() =>
       expect(createBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        branchName: 'main'
+        branchName: 'main',
+        baseBranch: 'refs/heads/main',
+        requestId: expect.any(String)
       })
     )
     const notificationViewport = await screen.findByLabelText('通知')

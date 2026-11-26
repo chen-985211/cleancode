@@ -10,8 +10,14 @@ describe('workspace creation submission', () => {
           finish = resolve
         })
     )
+    vi.stubGlobal('cleancode', {
+      listWorkspaceBaseBranches: vi.fn(async () => ({
+        branches: ['refs/heads/main'],
+        defaultBranch: 'refs/heads/main'
+      }))
+    })
     function Form() {
-      const form = useProjectSidebarBranchWorkspaceForm(submit)
+      const form = useProjectSidebarBranchWorkspaceForm('/project', submit)
       return (
         <>
           <button onClick={form.open}>Open</button>
@@ -22,7 +28,9 @@ describe('workspace creation submission', () => {
                 value={form.branchName}
                 onChange={(event) => form.setBranchName(event.target.value)}
               />
-              <button type="submit">Create</button>
+              <button type="submit" disabled={!form.base.value}>
+                Create
+              </button>
             </form>
           ) : null}
         </>
@@ -31,6 +39,7 @@ describe('workspace creation submission', () => {
     render(<Form />)
     fireEvent.click(screen.getByText('Open'))
     fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'feature/defaults' } })
+    await waitFor(() => expect(screen.getByText('Create')).toBeEnabled())
     fireEvent.click(screen.getByText('Create'))
     fireEvent.click(screen.getByText('Create'))
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1))

@@ -411,7 +411,7 @@ describe('workspace default contents e2e', () => {
     await page.getByRole('button', { name: '新建分支工作区', exact: true }).click()
     const form = page.getByRole('dialog', { name: '新建分支工作区', exact: true })
     await form.getByLabel('分支名称').fill(branch)
-    expect(await form.getByRole('button').count()).toBe(1)
+    await form.getByRole('button', { name: '基准分支', exact: true }).waitFor()
     if (branch === 'feature/defaults') {
       await page
         .locator('.branch-workspace-surface[data-branch-workspace-spring-state="open"]')

@@ -27,6 +27,11 @@ describe('project sidebar branch workspace form', () => {
       configurable: true,
       value: createRuntimeApi({
         listWorkbenches: vi.fn(async () => [workbench]),
+        switchBranchWorkspace: vi.fn(async () => featureWorkbench),
+        listWorkspaceBaseBranches: vi.fn(async () => ({
+          branches: ['refs/remotes/origin/main', 'refs/heads/feature/login'],
+          defaultBranch: 'refs/remotes/origin/main'
+        })),
         createBranchWorkspace
       })
     })
@@ -53,6 +58,24 @@ describe('project sidebar branch workspace form', () => {
     expect(branchNameInput).toHaveAttribute('placeholder', '新分支名称')
     expect(within(projectCard).queryByText('同时创建独立 Git worktree')).not.toBeInTheDocument()
     expect(submitButton.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
+    expect(branchNameInput).toHaveValue('')
+    const form = within(projectCard).getByRole('dialog', { name: '新建分支工作区' })
+    expect(within(form).queryByText('新建分支工作区')).not.toBeInTheDocument()
+    expect(within(form).queryByText('分支名称')).not.toBeInTheDocument()
+    expect(within(form).queryByText('基准分支')).not.toBeInTheDocument()
+    expect(within(form).getByText('基于')).toBeInTheDocument()
+    const base = await within(projectCard).findByRole('button', { name: '基准分支' })
+    await waitFor(() => expect(base).toHaveTextContent('origin/main'))
+    fireEvent.click(base)
+    const menu = screen.getByRole('menu', { name: '基准分支' })
+    expect(within(menu).getByRole('menuitemradio', { name: 'origin/main' })).toBeChecked()
+    expect(
+      within(menu)
+        .getAllByRole('menuitemradio')
+        .map((row) => row.textContent)
+    ).toEqual(['origin/main', 'feature/login'])
+    firePointerSequence(within(menu).getByRole('menuitemradio', { name: 'feature/login' }))
+    expect(base).toHaveTextContent('feature/login')
     fireEvent.pointerDown(branchNameInput)
     expect(branchNameInput).toBeInTheDocument()
     fireEvent.change(branchNameInput, {
@@ -63,7 +86,9 @@ describe('project sidebar branch workspace form', () => {
     await waitFor(() =>
       expect(createBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        branchName: 'feature/sidebar'
+        branchName: 'feature/sidebar',
+        baseBranch: 'refs/heads/feature/login',
+        requestId: expect.any(String)
       })
     )
     await screen.findByRole('button', { name: 'feature/sidebar 独立工作区' })

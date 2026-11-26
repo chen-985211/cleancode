@@ -133,7 +133,14 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
   registerIpcHandler<unknown, WorkbenchSnapshot>({
     channel: 'cleancode:create-branch-workspace',
     handler: async (command) => {
+      const baseBranch =
+        isRecord(command) && command.baseBranch !== undefined
+          ? readStringField(command, 'baseBranch')
+          : undefined
+      if (baseBranch && !/^refs\/(heads|remotes)\/.+/.test(baseBranch))
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace base branch.')
       const project = await input.createBranchWorkspace({
+        ...(baseBranch ? { baseBranch, selectWorkspace: false } : {}),
         projectDirectory: readStringField(command, 'projectDirectory'),
         branchName: readStringField(command, 'branchName'),
         ...(isRecord(command) && command.requestId !== undefined
@@ -144,7 +151,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
           : {})
       })
 
-      return loadAndSelectWorkbench(input, project)
+      return baseBranch ? input.loadWorkbench(project) : loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,

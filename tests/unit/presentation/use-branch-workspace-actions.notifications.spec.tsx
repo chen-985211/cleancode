@@ -23,6 +23,41 @@ describe('branch workspace action notifications', () => {
     })
   })
 
+  it('publishes the new sidebar workspace and canvas together when navigation is still current', async () => {
+    const workbench = createWorkbench()
+    const created = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaceId: 'new-workspace',
+      gitBranch: 'test/login'
+    })
+    const selection = createDeferred<WorkbenchSnapshot>()
+    const switchBranchWorkspace = vi.fn(() => selection.promise)
+    const rememberCreatedWorkspace = vi.fn()
+    const replaceWorkbench = vi.fn()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        createBranchWorkspace: vi.fn(async () => created),
+        switchBranchWorkspace
+      })
+    })
+    const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
+      rememberCreatedWorkspace,
+      replaceWorkbench
+    })
+    const pending = result.current.createBranchWorkspace(workbench, 'test/login', {
+      requestId: 'create',
+      baseBranch: 'refs/heads/main'
+    })
+    await vi.waitFor(() => expect(switchBranchWorkspace).toHaveBeenCalledOnce())
+    expect(rememberCreatedWorkspace).not.toHaveBeenCalled()
+    expect(replaceWorkbench).not.toHaveBeenCalled()
+    selection.resolve(created)
+    await act(async () => {
+      await pending
+    })
+    expect(replaceWorkbench).toHaveBeenCalledWith(created)
+  })
+
   it('opens the created issue workspace when started from another project in the task panel', async () => {
     const current = createWorkbench()
     const target = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
@@ -464,6 +499,7 @@ function renderBranchWorkspaceActions(
   workbench: ReturnType<typeof createWorkbench>,
   notifications: ReturnType<typeof createNotifications>,
   overrides: {
+    readonly rememberCreatedWorkspace?: (workbench: WorkbenchSnapshot) => void
     readonly replaceWorkbench?: (workbench: WorkbenchSnapshot) => void
   } = {}
 ) {
@@ -471,7 +507,7 @@ function renderBranchWorkspaceActions(
     () => {
       const actions = useBranchWorkspaceActions({
         currentWorkbench: workbench,
-        rememberCreatedWorkspace: vi.fn(),
+        rememberCreatedWorkspace: overrides.rememberCreatedWorkspace ?? vi.fn(),
         forgetWorkspaceTerminalStates: vi.fn(),
         notifications,
         replaceWorkbench: overrides.replaceWorkbench ?? vi.fn(),

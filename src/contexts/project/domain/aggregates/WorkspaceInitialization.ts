@@ -30,6 +30,7 @@ export interface WorkspaceInitializationItem {
 }
 
 export interface WorkspaceInitializationInput {
+  readonly baseBranch?: string
   readonly baseRef?: string
   readonly issue?: ProjectIssueReference
   readonly id: string
@@ -59,6 +60,7 @@ export class WorkspaceInitialization {
   static create(input: WorkspaceInitializationInput): WorkspaceInitialization {
     const defaults = normalizeWorkspaceDefaults(input.defaults)
     const scope = {
+      ...(input.baseBranch ? { baseBranch: input.baseBranch } : {}),
       ...(input.baseRef ? { baseRef: input.baseRef } : {}),
       ...(input.issue ? { issue: normalizeProjectIssue(input.issue) } : {}),
       id: input.id,
@@ -112,6 +114,7 @@ export class WorkspaceInitialization {
     )
       invalid()
     if (snapshot.issue) normalizeProjectIssue(snapshot.issue)
+    if (snapshot.baseBranch !== undefined && !validText(snapshot.baseBranch)) invalid()
     if (snapshot.baseRef !== undefined && !validText(snapshot.baseRef)) invalid()
     for (const item of snapshot.items) {
       if (
