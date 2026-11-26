@@ -23,10 +23,36 @@ function isImage(value: unknown): value is TodoImage {
     /^data:image\/(?:png|jpeg|webp|gif|avif|bmp);base64,[a-z\d+/]+=*$/i.test(image.data)
   )
 }
-export function registerProjectTodos(directory: string, ipcMain: IpcMainLike, logger: Logger) {
+interface TodoIpcMain extends IpcMainLike {
+  on(
+    channel: string,
+    listener: (event: { returnValue: unknown }, command?: unknown) => void
+  ): unknown
+}
+
+export function registerProjectTodos(directory: string, ipcMain: TodoIpcMain, logger: Logger) {
   const repository = new FileTodoRepository(directory)
   const todos = new ProjectTodos(repository)
   const base = { ipcMain, logger, scope: 'todo' }
+  registerIpcHandler({
+    ...base,
+    channel: todoChannels.drain,
+    operation: 'finishTodoWritesBeforeUnload',
+    ipcMain: {
+      handle(channel, handle) {
+        ipcMain.on(channel, (event, command) => {
+          void handle(event, command).then((result) => {
+            event.returnValue = result
+          })
+        })
+      }
+    },
+    handler: async (command) => {
+      if (command !== undefined) return invalid()
+      await repository.drain()
+      return true
+    }
+  })
   registerIpcHandler({
     ...base,
     channel: todoChannels.list,

@@ -1,4 +1,5 @@
-import { GlobeSimple, X } from '@phosphor-icons/react'
+import { GlobeSimpleIcon } from '@phosphor-icons/react/dist/csr/GlobeSimple'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useI18n } from '../../../presentation/i18n/useI18n'
 import { GitHubMarkIcon } from '../../../presentation/shared/components/GitHubMarkIcon'
@@ -31,7 +32,7 @@ export function TodoAttachments({
               aria-label={t('todo.removeImage')}
               onClick={() => onChange({ ...item, images: item.images.filter((v) => v !== id) })}
             >
-              <X aria-hidden="true" size={12} />
+              <XIcon aria-hidden="true" size={12} />
             </button>
           )}
         </div>
@@ -58,7 +59,7 @@ export function TodoAttachments({
                 aria-label={t('todo.removeLink')}
                 onClick={() => onChange({ ...item, links: item.links.filter((v) => v !== link) })}
               >
-                <X aria-hidden="true" size={12} />
+                <XIcon aria-hidden="true" size={12} />
               </button>
             )}
           </div>
@@ -74,7 +75,7 @@ function SiteIcon({ hostname }: { hostname: string }) {
   const initial = site.match(/^[a-z]/i)?.[0].toUpperCase()
   return (
     <span className="todo-link-icon" aria-hidden="true">
-      {isGitHub ? <GitHubMarkIcon size={14} /> : (initial ?? <GlobeSimple size={13} />)}
+      {isGitHub ? <GitHubMarkIcon size={14} /> : (initial ?? <GlobeSimpleIcon size={13} />)}
     </span>
   )
 }

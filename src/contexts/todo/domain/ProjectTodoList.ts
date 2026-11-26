@@ -82,17 +82,23 @@ export function updateTodoList(
   now: number
 ): TodoItem[] {
   const byId = new Map(items.map((item) => [item.id, item]))
-  let lastOrder = items.reduce((last, item) => Math.max(last, item.statusOrder ?? 0), 0)
+  let lastOrder: number | undefined
   for (const draft of Array.isArray(changes) ? changes : [changes]) {
+    const old = byId.get(draft.id)
     if (!hasTodoContent(draft)) {
       byId.delete(draft.id)
+      if (old?.statusOrder === lastOrder) lastOrder = undefined
       continue
     }
-    const old = byId.get(draft.id)
     let statusOrder = old?.statusOrder
     const newerEntry = (draft.statusOrder ?? 0) > (statusOrder ?? 0)
     // A retried draft can have returned to its stored status after visiting another.
     if (old?.status !== draft.status || newerEntry) {
+      // A batch must allocate the same rank as applying its changes one at a time.
+      lastOrder ??= [...byId.values()].reduce(
+        (max, item) => Math.max(max, item.statusOrder ?? 0),
+        0
+      )
       if (lastOrder === Number.MAX_SAFE_INTEGER) lastOrder = compactStatusOrders(byId)
       lastOrder = Math.max(lastOrder + 1, draft.statusOrder ?? 0)
       statusOrder = lastOrder

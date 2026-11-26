@@ -35,6 +35,7 @@ export class TodoSession {
   private inFlight: TodoDraft[] | null = null
   private writeQueued = false
   private readonly unsavedImages = new Map<string, TodoImage>()
+  private readonly pendingPastes = new Map<Promise<TodoImage[]>, string>()
   constructor(
     private readonly api: TodoApi,
     private readonly projectId: string
@@ -68,6 +69,15 @@ export class TodoSession {
   find(id: string) {
     return this.state.items.find((item) => item.id === id)
   }
+  async pasteImages(id: string, read: Promise<TodoImage[]>, apply: (images: TodoImage[]) => void) {
+    this.pendingPastes.set(read, id)
+    try {
+      const images = await read
+      if (this.pendingPastes.has(read)) apply(images)
+    } finally {
+      this.pendingPastes.delete(read)
+    }
+  }
   setShowCompleted(showCompleted: boolean) {
     this.publish({ showCompleted })
   }
@@ -85,6 +95,10 @@ export class TodoSession {
     const byId = new Map(items.map((item) => [item.id, item]))
     for (const draft of drafts) {
       const item = byId.get(draft.id)
+      if (!item) {
+        for (const [read, id] of this.pendingPastes)
+          if (id === draft.id) this.pendingPastes.delete(read)
+      }
       this.latest.set(draft.id, {
         ...draft,
         statusOrder: item?.statusOrder,
@@ -123,7 +137,7 @@ export class TodoSession {
   flushOnPageHide() {
     // The renderer may leave before the acknowledgement. Hand the full pending
     // batch to the main process's per-project queue while IPC is still available.
-    if (this.writeQueued) void this.writePending()
+    if (this.writeQueued || (this.state.saveFailed && !this.inFlight)) void this.writePending()
   }
   retry() {
     if (this.state.loadFailed) {

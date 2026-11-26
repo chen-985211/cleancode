@@ -3,6 +3,38 @@ import type { TodoApi } from '../../../../src/contexts/todo/application/ProjectT
 import { todosInStatus, updateTodoList } from '../../../../src/contexts/todo/domain/ProjectTodoList'
 
 describe('to-do autosave', () => {
+  it('preserves group order across a batched deletion, creation and another status cycle', async () => {
+    const highest = { ...blankTodo(), text: 'old', statusOrder: 10 }
+    const a = { ...blankTodo(), text: 'A' }
+    const b = { ...blankTodo(), text: 'B' }
+    let stored = updateTodoList([], highest, 1)
+    let release!: () => void
+    const firstWrite = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const saveTodo = vi.fn<TodoApi['saveTodo']>(async (command) => {
+      await firstWrite
+      stored = updateTodoList(stored, 'drafts' in command ? command.drafts : command.draft, 2)
+    })
+    const session = new TodoSession(
+      { listTodos: async () => stored, readTodoImage: vi.fn(), saveTodo },
+      'project'
+    )
+    session.start()
+    await vi.waitFor(() => expect(session.snapshot().loading).toBe(false))
+    session.change({ ...highest, note: 'saving' })
+    session.change({ ...highest, text: '' })
+    session.change([a, b])
+    // Hand off the coalesced delete and inserts while the preceding save is still in flight.
+    session.flushOnPageHide()
+    for (const status of ['active', 'done', 'todo'] as const) session.change({ ...a, status })
+    release()
+    await vi.waitFor(() => expect(saveTodo).toHaveBeenCalledTimes(3))
+    const order = (items: typeof stored) =>
+      todosInStatus(items, 'todo').map(({ text, statusOrder }) => ({ text, statusOrder }))
+    expect(order(stored)).toEqual(order(session.snapshot().items))
+    expect(order(stored).map(({ text }) => text)).toEqual(['A', 'B'])
+  })
   it('retains text and image bytes after a failed write and retries the same project and item', async () => {
     const api: TodoApi = {
       listTodos: vi.fn(async () => []),

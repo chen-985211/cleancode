@@ -9,7 +9,8 @@ import {
   useSyncExternalStore
 } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Plus } from '@phosphor-icons/react'
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight'
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { useI18n } from '../../../presentation/i18n/useI18n'
 import { AnchoredSurfaceMotion } from '../../../presentation/shared/components/SurfaceMotion'
 import { useOutsidePointerDismiss } from '../../../presentation/shared/hooks/useOutsidePointerDismiss'
@@ -74,12 +75,14 @@ export function ProjectTodoDrawer({
   }, [session])
   useEffect(() => {
     const flush = () => sessions.forEach((project) => project.flushOnPageHide())
-    window.addEventListener('pagehide', flush)
+    const unsubscribe = api.onTodoPageHide?.(flush)
+    if (!unsubscribe) window.addEventListener('pagehide', flush)
     return () => {
-      window.removeEventListener('pagehide', flush)
+      if (unsubscribe) unsubscribe()
+      else window.removeEventListener('pagehide', flush)
       flush()
     }
-  }, [sessions])
+  }, [api, sessions])
   const dock = useRef<HTMLDivElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -158,7 +161,7 @@ export function ProjectTodoDrawer({
               ref={closeButton}
               onClick={closeFromDrawer}
             >
-              <ArrowRight aria-hidden="true" size={16} weight="bold" />
+              <ArrowRightIcon aria-hidden="true" size={16} weight="bold" />
             </button>
           </div>
           <ResizeHandle width={width} maxWidth={maxWidth} onWidth={setWidth} />
@@ -383,7 +386,7 @@ function TodoRows({
           row(draft, true)
         ) : (
           <button type="button" className="todo-new" ref={newButton} onClick={startNew}>
-            <Plus aria-hidden="true" size={15} />
+            <PlusIcon aria-hidden="true" size={15} />
             {t('todo.quick')}
           </button>
         )}

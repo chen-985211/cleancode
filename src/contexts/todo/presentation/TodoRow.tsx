@@ -73,7 +73,6 @@ export function TodoRow({
     const offset = initial?.offset ?? field.value.length
     field.setSelectionRange(offset, offset)
   }, [item.id, editing])
-  const removed = useRef(false)
   function paste(
     event: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
     field: 'text' | 'note'
@@ -118,13 +117,11 @@ export function TodoRow({
       if (lines.length && links.every((link) => referenced.has(link)))
         setOffer({ id: item.id, lines })
     }
-    const savedAtPaste = Boolean(session.find(item.id))
     if (files.length) {
       setPasteError(null)
-      void Promise.all(files.map(readImage))
-        .then((images) => {
+      void session
+        .pasteImages(item.id, Promise.all(files.map(readImage)), (images) => {
           const live = session.find(item.id)
-          if (removed.current || (savedAtPaste && !live)) return
           const current = liveEditor.current?.id === item.id ? liveEditor.current : (live ?? next)
           change(
             { ...current, images: [...current.images, ...images.map((image) => image.id)] },
@@ -135,7 +132,6 @@ export function TodoRow({
     }
   }
   function remove() {
-    removed.current = true
     session.change({ ...item, text: '', note: '', links: [], images: [] })
     onFinish(item.id)
   }

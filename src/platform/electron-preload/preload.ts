@@ -20,9 +20,31 @@ import {
 } from '../ipc/applicationUpdateChannels'
 
 import { todoChannels } from '../ipc/todoChannels'
+
+const todoFlushers = new Set<() => void>()
+let pendingTodoWrites = 0
+globalThis.window?.addEventListener('pagehide', () => {
+  for (const flush of todoFlushers) flush()
+  // Chromium does not await promises on pagehide. Wait only if this window has unacknowledged saves.
+  if (pendingTodoWrites) unwrapIpcResult(ipcRenderer.sendSync(todoChannels.drain))
+})
+
 const cleancodeApi = {
+  onTodoPageHide: (flush: () => void) => {
+    todoFlushers.add(flush)
+    return () => {
+      todoFlushers.delete(flush)
+    }
+  },
   listTodos: (projectId: string) => invokeCleancode(todoChannels.list, projectId),
-  saveTodo: (command: unknown) => invokeCleancode(todoChannels.save, command),
+  saveTodo: async (command: unknown) => {
+    pendingTodoWrites++
+    try {
+      await invokeCleancode<void>(todoChannels.save, command)
+    } finally {
+      pendingTodoWrites--
+    }
+  },
   readTodoImage: (command: unknown) => invokeCleancode(todoChannels.image, command),
   appName: 'cleancode',
   getApplicationUpdate: () =>
@@ -279,15 +301,17 @@ function subscribeRendererEvent<TEvent>(
 }
 
 async function invokeCleancode<TResult>(channel: string, command?: unknown): Promise<TResult> {
-  const result = (await ipcRenderer.invoke(channel, command)) as IpcInvokeResult<TResult>
+  return unwrapIpcResult<TResult>(await ipcRenderer.invoke(channel, command))
+}
 
+function unwrapIpcResult<TResult>(result: unknown): TResult {
   if (isIpcFailureResult(result)) {
     // contextBridge copies Error instances without custom fields such as code and details.
     // Reject with the serialized value so the renderer can still identify the failure.
     throw result.error
   }
 
-  if (isIpcSuccessResult(result)) {
+  if (isIpcSuccessResult<TResult>(result)) {
     return result.value
   }
 

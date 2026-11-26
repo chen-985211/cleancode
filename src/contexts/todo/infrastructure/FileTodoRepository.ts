@@ -9,7 +9,7 @@ export class FileTodoRepository implements TodoRepository {
   private readonly pending = new Map<string, Promise<unknown>>()
   constructor(private readonly root: string) {}
   async drain() {
-    await Promise.allSettled(this.pending.values())
+    while (this.pending.size) await Promise.allSettled(this.pending.values())
   }
   list(projectId: string) {
     return this.serial(projectId, async (dir) => {

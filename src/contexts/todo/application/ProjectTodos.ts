@@ -28,6 +28,7 @@ export class ProjectTodos {
   }
 }
 export interface TodoApi {
+  onTodoPageHide?(flush: () => void): () => void
   listTodos(projectId: string): Promise<TodoItem[]>
   saveTodo(
     command: { projectId: string; images?: TodoImage[] } & (

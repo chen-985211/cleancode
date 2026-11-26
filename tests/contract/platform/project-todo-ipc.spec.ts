@@ -2,19 +2,31 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerProjectTodos } from '../../../src/platform/electron-main/projectTodosRuntime'
-import type { IpcInvokeResult } from '../../../src/platform/ipc/registerIpcHandler'
 import { todoChannels } from '../../../src/platform/ipc/todoChannels'
 describe('project to-do IPC', () => {
-  it('rejects unsafe attachment identifiers and non-web links before writing', async () => {
-    const handlers = new Map<
-      string,
-      (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
-    >()
+  it('validates attachment, save and shutdown requests', async () => {
+    const handlers = new Map<string, (event: unknown, command?: unknown) => Promise<unknown>>()
     const directory = await mkdtemp(join(tmpdir(), 'cc-todo-ipc-'))
     onTestFinished(() => rm(directory, { recursive: true, force: true }))
     registerProjectTodos(
       directory,
       {
+        on: (key, listener) => {
+          handlers.set(
+            key,
+            (_event, command) =>
+              new Promise((resolve) =>
+                listener(
+                  {
+                    set returnValue(reply: unknown) {
+                      resolve(reply)
+                    }
+                  },
+                  command
+                )
+              )
+          )
+        },
         handle: (key, fn) => {
           handlers.set(key, fn)
         }
@@ -23,6 +35,7 @@ describe('project to-do IPC', () => {
     )
     const call = (key: string, value: unknown) => handlers.get(key)!(null, value)
     const invalid = { ok: false, error: { code: 'INVALID_IPC_COMMAND' } }
+    await expect(call(todoChannels.drain, 'unexpected')).resolves.toMatchObject(invalid)
     await expect(
       call(todoChannels.image, { projectId: 'project', id: '../x' })
     ).resolves.toMatchObject(invalid)
@@ -58,5 +71,6 @@ describe('project to-do IPC', () => {
         drafts: [valid, { ...valid, id: crypto.randomUUID() }]
       })
     ).resolves.toMatchObject({ ok: true })
+    await expect(call(todoChannels.drain, undefined)).resolves.toEqual({ ok: true, value: true })
   })
 })

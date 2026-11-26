@@ -19,6 +19,22 @@ describe('project to-do persistence', () => {
     await rm(directory, { recursive: true, force: true })
   })
   const load = () => new ProjectTodos(new FileTodoRepository(directory))
+  it('finishes writes accepted after shutdown starts waiting for a project', async () => {
+    const repository = new FileTodoRepository(directory)
+    const todos = new ProjectTodos(repository)
+    const item = { ...draft, text: 'first', images: [] }
+    const firstWrite = todos.save('project', item)
+    const draining = repository.drain()
+    let lastWriteFinished = false
+    const lastWrite = todos.save('project', { ...item, text: 'last' }).then(() => {
+      lastWriteFinished = true
+    })
+    await draining
+    const finishedAtShutdown = lastWriteFinished
+    await Promise.all([firstWrite, lastWrite])
+    expect(finishedAtShutdown).toBe(true)
+    expect(await load().list('project')).toMatchObject([{ text: 'last' }])
+  })
   it('serializes overlapping edits, restores images, and isolates projects', async () => {
     const todos = load()
     await todos.save('first', draft, [{ id: image, data: png }])
