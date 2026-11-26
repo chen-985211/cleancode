@@ -38,12 +38,25 @@ it(
         )
       }
       await thumbnail.scrollIntoViewIfNeeded()
-      const scrollTop = await scroll.evaluate((el) => el.scrollTop)
-      expect(scrollTop).toBeGreaterThan(0)
       const thumbnailBounds = (await thumbnail.boundingBox())!
+      // Both pointer and keyboard activation dispatch a click after any scroll into view.
+      const opening = await scroll.evaluateHandle((el) => {
+        const position = { scrollTop: 0 }
+        el.addEventListener(
+          'click',
+          () => {
+            position.scrollTop = el.scrollTop
+          },
+          { capture: true, once: true }
+        )
+        return position
+      })
       if (colorScheme === 'light') await thumbnail.click()
       else await thumbnail.press('Enter')
       await dialog.waitFor()
+      const { scrollTop } = await opening.jsonValue()
+      await opening.dispose()
+      expect(scrollTop).toBeGreaterThan(0)
       const image = dialog.getByRole('img')
       const aspect = await image.evaluate(async (el: HTMLImageElement) => {
         await el.decode()
