@@ -236,7 +236,8 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
   onSelectWorkspace
 }: ProjectCardProps<TWorkbench>) {
   const { t } = useI18n()
-  const isCurrentProject = currentWorkbench?.project.id === workbench.project.id
+  const currentProjectId = currentWorkbench?.project.id
+  const isCurrentProject = currentProjectId === workbench.project.id
   const currentWorkspaceId = isCurrentProject
     ? (workbench.project.workspaces.find((workspace) => workspace.isCurrent)?.workspaceId ?? null)
     : null
@@ -250,7 +251,10 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     refreshWorkspaceSelection,
     workspaceArchive.rows.length
   ])
-  const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
+  const [branchSelector, setBranchSelector] = useState<{
+    openedFromProjectId: string | undefined
+  } | null>(null)
+  const isBranchSelectorOpen = branchSelector !== null
   const [isExpanded, setIsExpanded] = useState(true)
   const disclosureMotionRef = useProjectDisclosureMotion(isExpanded)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
@@ -280,10 +284,14 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     workbench.project.directory,
     (newBranchName, baseBranch) => onCreateBranchWorkspace(workbench, newBranchName, baseBranch)
   )
+  if (branchSelector && branchSelector.openedFromProjectId !== currentProjectId) {
+    setBranchSelector(null)
+    setBranchSearchQuery('')
+  }
   if (intent && intent.id !== handledIntentId) {
     setHandledIntentId(intent.id)
     setIsExpanded(true)
-    setIsBranchSelectorOpen(false)
+    setBranchSelector(null)
     setBranchSearchQuery('')
     setOpenWorkspaceMenuId(null)
     setIsRemoveProjectDialogOpen(false)
@@ -292,7 +300,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     }
   }
   const closeBranchSelector = useCallback((): void => {
-    setIsBranchSelectorOpen(false)
+    setBranchSelector(null)
     setBranchSearchQuery('')
   }, [])
   const closeBranchSelectorAndRestoreFocus = useCallback((): void => {
@@ -307,7 +315,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
       return
     }
 
-    setIsBranchSelectorOpen(true)
+    setBranchSelector({ openedFromProjectId: currentProjectId })
   }
   const toggleProjectExpanded = (): void => {
     if (isExpanded) {

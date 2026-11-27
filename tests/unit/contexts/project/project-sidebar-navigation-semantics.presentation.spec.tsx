@@ -94,6 +94,43 @@ describe('project sidebar navigation semantics', () => {
     }
   })
 
+  it('opens the hovered project’s branch selector independently and clears its menu when switching', () => {
+    const alpha = createWorkbenchSnapshot('/tmp/alpha', 'alpha', { gitBranch: 'main' })
+    const beta = createWorkbenchSnapshot('/tmp/beta', 'beta', { gitBranch: 'develop' })
+    const props = {
+      workbenches: [alpha, beta],
+      isDesktopRuntime: true,
+      onAddProject: vi.fn(),
+      onArchiveBranchWorkspace: vi.fn(),
+      onCheckoutMainBranch: vi.fn(),
+      onCreateBranchWorkspace: vi.fn(),
+      onRemoveProject: vi.fn(),
+      onReorderProject: vi.fn(),
+      onSelectWorkspace: vi.fn()
+    }
+    const { rerender } = render(<ProjectSidebar {...props} currentWorkbench={alpha} />)
+    const trigger = (branch: string) =>
+      screen.getByRole('button', { name: `选择默认工作区分支 ${branch}` })
+    fireEvent.click(trigger('develop'))
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'develop' })
+    ).toBeEnabled()
+    expect(props.onSelectWorkspace).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByPlaceholderText('搜索分支'), { target: { value: 'old query' } })
+
+    rerender(<ProjectSidebar {...props} currentWorkbench={beta} />)
+    expect(trigger('main')).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger('develop')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '切换到默认工作区 main' }))
+    expect(props.onSelectWorkspace).toHaveBeenCalledWith(alpha, 'main')
+
+    rerender(<ProjectSidebar {...props} currentWorkbench={alpha} />)
+    expect(trigger('main')).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger('develop'))
+    expect(screen.getByPlaceholderText('搜索分支')).toHaveValue('')
+  })
+
   it('places a compact add-project action at the far edge of the projects heading', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const onAddProject = vi.fn()

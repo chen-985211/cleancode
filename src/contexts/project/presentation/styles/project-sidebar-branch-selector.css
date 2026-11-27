@@ -26,11 +26,19 @@
 }
 
 .default-branch-selector__toggle {
+  opacity: 0;
   width: 30px;
   flex: 0 0 auto;
   justify-content: center;
   border-radius: calc(6px * var(--cc-corner-radius-scale));
   corner-shape: var(--cc-corner-shape);
+}
+
+.workspace-list:has(.workspace-row--active) .default-branch-selector__toggle,
+.default-branch-selector:hover .default-branch-selector__toggle,
+.default-branch-selector:has(:focus-visible) .default-branch-selector__toggle,
+.default-branch-selector__toggle[aria-expanded='true'] {
+  opacity: 1;
 }
 
 .default-branch-selector__toggle:hover,

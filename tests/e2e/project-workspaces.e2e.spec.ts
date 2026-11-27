@@ -164,7 +164,7 @@ describe('project workspaces e2e', () => {
         const projectName = `sidebar-project-${index}`
         const projectDirectory = join(workbench.projectDirectory, projectName)
         await mkdir(projectDirectory)
-        if (index === 1) {
+        if (index <= 2) {
           execFileSync('git', ['init', '-b', 'main'], { cwd: projectDirectory })
           execFileSync(
             'git',
@@ -199,7 +199,24 @@ describe('project workspaces e2e', () => {
       expect(initialGeometry.scrollHeight).toBeGreaterThan(initialGeometry.clientHeight)
       expect(initialGeometry.scrollTop).toBe(0)
 
-      const branchRow = projectList.locator('.default-branch-selector').first()
+      const branchRows = projectList.locator('.default-branch-selector')
+      const branchRow = branchRows.first()
+      const otherRow = branchRows.nth(1)
+      const arrowOpacity = (row: Locator) =>
+        row
+          .locator('.default-branch-selector__toggle')
+          .evaluate((button) => getComputedStyle(button).opacity)
+      await branchRow.getByRole('button', { name: '切换到默认工作区 main' }).click()
+      await branchRow.locator('[aria-current="page"]').waitFor()
+      await otherRow.hover()
+      expect(await arrowOpacity(branchRow)).toBe('1')
+      expect(await arrowOpacity(otherRow)).toBe('1')
+      await projectsLabel.hover()
+      expect(await arrowOpacity(branchRow)).toBe('1')
+      expect(await arrowOpacity(otherRow)).toBe('0')
+      await projectList.evaluate((list) => {
+        list.scrollTop = 0
+      })
       const readBranchLayout = () =>
         branchRow.evaluate((row) => {
           const bounds = row.getBoundingClientRect()
