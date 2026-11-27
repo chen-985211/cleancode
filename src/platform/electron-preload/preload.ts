@@ -4,7 +4,8 @@ import { release } from 'node:os'
 import {
   desktopWindowChannels,
   supportsSnapLayouts,
-  type DesktopWindowControlsApi
+  type DesktopWindowControlsApi,
+  type DesktopWindowState
 } from '../ipc/desktopWindowControls'
 
 import {
@@ -39,15 +40,15 @@ const desktopWindowControls: DesktopWindowControlsApi | undefined =
   process.platform === 'win32' || process.platform === 'linux'
     ? {
         perform: (action) => invokeCleancode<void>(desktopWindowChannels.perform, action),
-        isMaximized: () => invokeCleancode<boolean>(desktopWindowChannels.isMaximized),
-        onMaximizedChange: (listener) =>
-          subscribeRendererEvent(desktopWindowChannels.maximizedChanged, listener),
+        readState: () => invokeCleancode<DesktopWindowState>(desktopWindowChannels.readState),
+        onStateChange: (listener) =>
+          subscribeRendererEvent(desktopWindowChannels.stateChanged, listener),
         snap: supportsSnapLayouts(process.platform, release())
           ? {
               setBounds: (bounds) =>
                 invokeCleancode<void>(desktopWindowChannels.setSnapBounds, bounds),
-              onHoverChange: (listener) =>
-                subscribeRendererEvent(desktopWindowChannels.snapHoverChanged, listener)
+              onPointerChange: (listener) =>
+                subscribeRendererEvent(desktopWindowChannels.snapPointerChanged, listener)
             }
           : undefined
       }

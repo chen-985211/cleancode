@@ -1,10 +1,11 @@
 .desktop-window-controls {
   position: fixed;
   z-index: 1700;
-  top: 6px;
-  left: 11px;
+  top: 7px;
+  left: 12px;
   display: flex;
   align-items: center;
+  gap: 1px;
   user-select: none;
   -webkit-app-region: no-drag;
 }
@@ -16,7 +17,7 @@ body:has(.app-shell--window-full-screen) .desktop-window-controls {
 .desktop-window-controls button {
   position: relative;
   display: grid;
-  width: 23px;
+  width: 22px;
   height: 24px;
   place-items: center;
   border: 0;
@@ -32,7 +33,7 @@ body:has(.app-shell--window-full-screen) .desktop-window-controls {
   width: 14px;
   height: 14px;
   box-sizing: border-box;
-  border: 1px solid var(--cc-caption-outline);
+  border: 0.5px solid var(--caption-rim);
   border-radius: 50%;
   background: var(--caption-color);
   content: '';
@@ -40,26 +41,38 @@ body:has(.app-shell--window-full-screen) .desktop-window-controls {
 
 .desktop-caption-close {
   --caption-color: var(--cc-caption-close);
+  --caption-rim: var(--cc-caption-close-rim);
 }
 .desktop-caption-minimize {
   --caption-color: var(--cc-caption-minimize);
+  --caption-rim: var(--cc-caption-minimize-rim);
 }
 .desktop-caption-maximize {
   --caption-color: var(--cc-caption-maximize);
+  --caption-rim: var(--cc-caption-maximize-rim);
 }
 
-.desktop-window-controls button:active::before {
-  filter: brightness(0.85);
+.desktop-window-controls[data-inactive]:not(:hover, [data-snap-pointer]) button::before {
+  background: var(--cc-caption-inactive);
+  border-color: var(--cc-caption-inactive-rim);
+}
+
+.desktop-window-controls button:active::before,
+.desktop-window-controls[data-snap-pointer='pressed'] .desktop-caption-maximize::before {
+  filter: brightness(0.83);
 }
 
 .desktop-window-controls svg {
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  pointer-events: none;
   opacity: 0;
 }
 
-.desktop-window-controls:is(:hover, :focus-within, [data-snap-hover]) svg {
+.desktop-window-controls:is(:hover, [data-snap-pointer]) svg,
+.desktop-window-controls:not([data-inactive]):focus-within svg {
   opacity: 1;
 }
 

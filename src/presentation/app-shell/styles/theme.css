@@ -1,11 +1,15 @@
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
-  --cc-caption-close: #ff5f57;
-  --cc-caption-minimize: #febc2e;
-  --cc-caption-maximize: #28c840;
-  --cc-caption-outline: rgb(0 0 0 / 16%);
-  --cc-caption-glyph: #352e2c;
+  --cc-caption-close: #ff5c5f;
+  --cc-caption-close-rim: #f7002a;
+  --cc-caption-minimize: #fac801;
+  --cc-caption-minimize-rim: #f4b700;
+  --cc-caption-maximize: #37c75a;
+  --cc-caption-maximize-rim: #00b510;
+  --cc-caption-inactive: #dcdcdc;
+  --cc-caption-inactive-rim: #d1d1d1;
+  --cc-caption-glyph: rgb(0 0 0 / 50%);
   --cc-background: #f2f4f5;
   --cc-canvas: #e8eaeb;
   --cc-chrome: #f3f5f8;
@@ -129,6 +133,8 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --cc-caption-inactive: color-mix(in srgb, var(--cc-chrome) 84%, var(--cc-foreground));
+  --cc-caption-inactive-rim: color-mix(in srgb, var(--cc-chrome) 79%, var(--cc-foreground));
   --cc-background: #101318;
   --cc-canvas: #17191b;
   --cc-chrome: #171b22;

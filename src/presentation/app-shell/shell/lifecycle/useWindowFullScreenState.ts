@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 
 export function useWindowFullScreenState(): boolean {
-  return useNativeWindowFlag(
+  return useNativeWindowState(
+    false,
     window.cleancode?.getWindowFullScreenState,
     window.cleancode?.onWindowFullScreenStateChange
   )
 }
 
-export function useNativeWindowFlag(
-  read: (() => Promise<boolean>) | undefined,
-  subscribe: ((listener: (value: boolean) => void) => () => void) | undefined
-): boolean {
-  const [value, setValue] = useState(false)
+export function useNativeWindowState<T>(
+  initialValue: T,
+  read: (() => Promise<T>) | undefined,
+  subscribe: ((listener: (value: T) => void) => () => void) | undefined
+): T {
+  const [value, setValue] = useState(initialValue)
 
   useEffect(() => {
     if (!read || !subscribe) return

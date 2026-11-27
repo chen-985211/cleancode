@@ -1,26 +1,29 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { XIcon } from '@phosphor-icons/react/dist/csr/X'
-import { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus'
-import { ArrowsInSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsInSimple'
-import { ArrowsOutSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsOutSimple'
 import { useI18n } from '../../../i18n/useI18n'
-import { useNativeWindowFlag } from '../lifecycle/useWindowFullScreenState'
+import { useNativeWindowState } from '../lifecycle/useWindowFullScreenState'
 import type {
   DesktopWindowControlsApi,
-  SnapButtonBounds
+  SnapButtonBounds,
+  SnapPointerState
 } from '../../../../platform/ipc/desktopWindowControls'
+
+const initialState = { focused: false, maximized: false }
 
 export function DesktopWindowControls({ api }: { readonly api: DesktopWindowControlsApi }) {
   const { t } = useI18n()
-  const maximized = useNativeWindowFlag(api.isMaximized, api.onMaximizedChange)
+  const { focused, maximized } = useNativeWindowState(
+    initialState,
+    api.readState,
+    api.onStateChange
+  )
   const maximizeButton = useRef<HTMLButtonElement>(null)
-  const [nativeHover, setNativeHover] = useState(false)
+  const [nativePointer, setNativePointer] = useState<SnapPointerState>('idle')
   const snap = api.snap
   useLayoutEffect(() => {
     const button = maximizeButton.current
     if (!snap || !button) return
-    const unsubscribe = snap.onHoverChange(setNativeHover)
+    const unsubscribe = snap.onPointerChange(setNativePointer)
     const publish = (): void => {
       const { x, y, width, height } = button.getBoundingClientRect()
       const scale = window.devicePixelRatio
@@ -47,14 +50,14 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
     }
   }, [snap])
 
-  const MaximizeIcon = maximized ? ArrowsInSimpleIcon : ArrowsOutSimpleIcon
   // Window controls must remain above the settings surface and outside its inert app root.
   return createPortal(
     <div
       className="desktop-window-controls"
       role="group"
       aria-label={t('app.windowControls')}
-      data-snap-hover={nativeHover || undefined}
+      data-inactive={!focused || undefined}
+      data-snap-pointer={nativePointer === 'idle' ? undefined : nativePointer}
     >
       <button
         type="button"
@@ -62,7 +65,15 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
         aria-label={t('app.closeWindow')}
         onClick={() => void api.perform('close')}
       >
-        <XIcon aria-hidden="true" weight="bold" />
+        <svg viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d="m3.9 3.9 6.2 6.2m0-6.2-6.2 6.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
       </button>
       <button
         type="button"
@@ -70,7 +81,9 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
         aria-label={t('app.minimizeWindow')}
         onClick={() => void api.perform('minimize')}
       >
-        <MinusIcon aria-hidden="true" weight="bold" />
+        <svg viewBox="0 0 14 14" aria-hidden="true">
+          <rect x="3" y="6" width="8" height="2" rx="1" />
+        </svg>
       </button>
       <button
         type="button"
@@ -79,7 +92,15 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
         aria-label={t(maximized ? 'app.restoreWindow' : 'app.maximizeWindow')}
         onClick={() => void api.perform('toggle-maximize')}
       >
-        <MaximizeIcon aria-hidden="true" weight="bold" />
+        <svg viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d={
+              maximized
+                ? 'M3 6.25 6.25 3v3.25ZM11 7.75 7.75 11V7.75Z'
+                : 'M4 9.1V5.6Q4 4 5.6 4h3.5ZM10 4.9v3.5Q10 10 8.4 10H4.9Z'
+            }
+          />
+        </svg>
       </button>
     </div>,
     document.body

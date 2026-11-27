@@ -9,7 +9,7 @@ import {
 import { consoleLogger } from '../logging/ConsoleLogSink'
 
 interface NativeSnapLayout {
-  readonly hoverMessage: number
+  readonly pointerMessage: number
   setBounds(handle: Buffer, x: number, y: number, width: number, height: number): void
 }
 
@@ -19,9 +19,10 @@ export function bindWindowsSnapLayout(window: BrowserWindow): void {
   if (!supportsSnapLayouts(process.platform, release())) return
   try {
     native ??= createRequire(import.meta.url)('./windows-snap-layout.node') as NativeSnapLayout
-    window.hookWindowMessage(native.hoverMessage, (hovered) => {
+    window.hookWindowMessage(native.pointerMessage, (state) => {
       if (!window.webContents.isDestroyed()) {
-        window.webContents.send(desktopWindowChannels.snapHoverChanged, hovered[0] === 1)
+        const pointer = state[0] === 2 ? 'pressed' : state[0] === 1 ? 'hover' : 'idle'
+        window.webContents.send(desktopWindowChannels.snapPointerChanged, pointer)
       }
     })
     const clear = () => setWindowsSnapButtonBounds(window, null)

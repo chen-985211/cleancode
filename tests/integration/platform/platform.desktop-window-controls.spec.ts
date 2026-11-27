@@ -15,6 +15,7 @@ function createWindow() {
     minimize: vi.fn(),
     maximize: vi.fn(),
     unmaximize: vi.fn(),
+    isFocused: vi.fn(() => true),
     isMaximized: vi.fn(() => false),
     isFullScreen: () => false,
     isDestroyed: () => false,
@@ -51,9 +52,9 @@ describe('desktop window controls', () => {
     ): Promise<IpcInvokeResult<unknown>> => handlers.get(channel)!(event, command)
     await invoke(desktopWindowChannels.perform, 'toggle-maximize')
     target.isMaximized.mockReturnValue(true)
-    await expect(invoke(desktopWindowChannels.isMaximized)).resolves.toEqual({
+    await expect(invoke(desktopWindowChannels.readState)).resolves.toEqual({
       ok: true,
-      value: true
+      value: { maximized: true, focused: true }
     })
     await invoke(desktopWindowChannels.perform, 'toggle-maximize')
     await invoke(desktopWindowChannels.perform, 'minimize')
@@ -71,13 +72,18 @@ describe('desktop window controls', () => {
   it('publishes external maximize and restore until the native window closes', () => {
     const target = createWindow()
     bindDesktopWindowState(target)
+    target.isMaximized.mockReturnValue(true)
     target.emit('maximize')
+    target.isFocused.mockReturnValue(false)
+    target.emit('blur')
+    target.isMaximized.mockReturnValue(false)
     target.emit('unmaximize')
     target.emit('closed')
     target.emit('maximize')
     expect(target.webContents.send.mock.calls).toEqual([
-      [desktopWindowChannels.maximizedChanged, true],
-      [desktopWindowChannels.maximizedChanged, false]
+      [desktopWindowChannels.stateChanged, { maximized: true, focused: true }],
+      [desktopWindowChannels.stateChanged, { maximized: true, focused: false }],
+      [desktopWindowChannels.stateChanged, { maximized: false, focused: false }]
     ])
   })
 })

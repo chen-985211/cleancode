@@ -1,17 +1,20 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { DesktopWindowControls } from '../../../src/presentation/app-shell/shell/desktop-window-controls/DesktopWindowControls'
-import type { DesktopWindowControlsApi } from '../../../src/platform/ipc/desktopWindowControls'
+import type {
+  DesktopWindowControlsApi,
+  DesktopWindowState
+} from '../../../src/platform/ipc/desktopWindowControls'
 import { createDeferred } from '../../fixtures/deferred'
 
 describe('desktop window caption buttons', () => {
   it('dispatches accessible actions and follows the latest native window state', async () => {
-    const initial = createDeferred<boolean>()
+    const initial = createDeferred<DesktopWindowState>()
     const unsubscribe = vi.fn()
-    let publish: (maximized: boolean) => void = () => undefined
+    let publish: (state: DesktopWindowState) => void = () => undefined
     const api: DesktopWindowControlsApi = {
       perform: vi.fn().mockResolvedValue(undefined),
-      isMaximized: () => initial.promise,
-      onMaximizedChange: (listener) => {
+      readState: () => initial.promise,
+      onStateChange: (listener) => {
         publish = listener
         return unsubscribe
       }
@@ -20,9 +23,13 @@ describe('desktop window caption buttons', () => {
     fireEvent.click(screen.getByRole('button', { name: '关闭窗口' }))
     fireEvent.click(screen.getByRole('button', { name: '最小化窗口' }))
     fireEvent.click(screen.getByRole('button', { name: '最大化窗口' }))
-    act(() => publish(true))
+    act(() => publish({ maximized: true, focused: false }))
+    const group = screen.getByRole('group', { name: '窗口控制' })
+    expect(group).toHaveAttribute('data-inactive')
+    act(() => publish({ maximized: true, focused: true }))
+    expect(group).not.toHaveAttribute('data-inactive')
     await act(async () => {
-      initial.resolve(false)
+      initial.resolve({ maximized: false, focused: false })
       await initial.promise
     })
     fireEvent.click(screen.getByRole('button', { name: '还原窗口' }))

@@ -1,12 +1,13 @@
 export const desktopWindowChannels = {
   perform: 'cleancode:perform-desktop-window-action',
-  isMaximized: 'cleancode:is-window-maximized',
-  maximizedChanged: 'cleancode:window-maximized-changed',
+  readState: 'cleancode:get-desktop-window-state',
+  stateChanged: 'cleancode:desktop-window-state-changed',
   setSnapBounds: 'cleancode:set-snap-button-bounds',
-  snapHoverChanged: 'cleancode:snap-button-hover-changed'
+  snapPointerChanged: 'cleancode:snap-button-pointer-changed'
 } as const
 
 export type DesktopWindowAction = 'close' | 'minimize' | 'toggle-maximize'
+export type SnapPointerState = 'idle' | 'hover' | 'pressed'
 
 /** Physical pixels relative to the renderer's client area. */
 export interface SnapButtonBounds {
@@ -16,13 +17,18 @@ export interface SnapButtonBounds {
   readonly height: number
 }
 
+export interface DesktopWindowState {
+  readonly maximized: boolean
+  readonly focused: boolean
+}
+
 export interface DesktopWindowControlsApi {
   perform(action: DesktopWindowAction): Promise<void>
-  isMaximized(): Promise<boolean>
-  onMaximizedChange(listener: (maximized: boolean) => void): () => void
+  readState(): Promise<DesktopWindowState>
+  onStateChange(listener: (state: DesktopWindowState) => void): () => void
   readonly snap?: {
     setBounds(bounds: SnapButtonBounds | null): Promise<void>
-    onHoverChange(listener: (hovered: boolean) => void): () => void
+    onPointerChange(listener: (state: SnapPointerState) => void): () => void
   }
 }
 

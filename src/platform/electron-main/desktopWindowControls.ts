@@ -1,6 +1,7 @@
 import {
   desktopWindowChannels,
   type DesktopWindowAction,
+  type DesktopWindowState,
   type SnapButtonBounds
 } from '../ipc/desktopWindowControls'
 import { registerIpcHandler, type IpcMainLike } from '../ipc/registerIpcHandler'
@@ -18,29 +19,32 @@ type ControlsTarget = Pick<
   | 'minimize'
   | 'maximize'
   | 'unmaximize'
+  | 'isFocused'
   | 'isMaximized'
   | 'isFullScreen'
   | 'isDestroyed'
   | 'getNativeWindowHandle'
 >
-type StateTarget = Parameters<typeof bindWindowFullScreenState>[0]
+type WindowFlags = Pick<BrowserWindow, 'isFocused' | 'isMaximized'>
+type StateTarget = Parameters<typeof bindWindowFullScreenState>[0] & WindowFlags
+
+function readState(window: WindowFlags | null): DesktopWindowState {
+  return { focused: window?.isFocused() ?? false, maximized: window?.isMaximized() ?? false }
+}
 
 export function bindDesktopWindowState(target: StateTarget): void {
   bindWindowFullScreenState(target)
-  const publish = (maximized: boolean): void => {
+  const events = ['focus', 'blur', 'maximize', 'unmaximize']
+  const publish = (): void => {
     if (!target.isDestroyed() && !target.webContents.isDestroyed()) {
-      target.webContents.send(desktopWindowChannels.maximizedChanged, maximized)
+      target.webContents.send(desktopWindowChannels.stateChanged, readState(target))
     }
   }
-  const onMaximize = () => publish(true)
-  const onUnmaximize = () => publish(false)
   const dispose = (): void => {
-    target.removeListener('maximize', onMaximize)
-    target.removeListener('unmaximize', onUnmaximize)
+    for (const event of events) target.removeListener(event, publish)
     target.removeListener('closed', dispose)
   }
-  target.on('maximize', onMaximize)
-  target.on('unmaximize', onUnmaximize)
+  for (const event of events) target.on(event, publish)
   target.on('closed', dispose)
 }
 
@@ -51,11 +55,11 @@ export function registerDesktopWindowIpc(input: {
 }): void {
   registerWindowFullScreenStateIpc(input)
   const boundary = { ipcMain: input.ipcMain, logger: input.logger, scope: 'platform.window' }
-  registerIpcHandler<undefined, boolean>({
+  registerIpcHandler<undefined, DesktopWindowState>({
     ...boundary,
-    channel: desktopWindowChannels.isMaximized,
-    operation: 'isWindowMaximized',
-    handler: (_command, event) => input.resolveWindow(event)?.isMaximized() ?? false
+    channel: desktopWindowChannels.readState,
+    operation: 'getDesktopWindowState',
+    handler: (_command, event) => readState(input.resolveWindow(event))
   })
   registerIpcHandler<DesktopWindowAction, void>({
     ...boundary,

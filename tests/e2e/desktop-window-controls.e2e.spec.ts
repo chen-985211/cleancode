@@ -106,19 +106,22 @@ describe.skipIf(process.platform === 'darwin')('custom desktop window controls',
         return JSON.parse(stdout) as { hit: number; children: number[] }
       }
       await page.evaluate(() => {
-        window.cleancode?.desktopWindowControls?.snap?.onHoverChange((hovered) => {
-          document.body.dataset.snapHoverEvents =
-            (document.body.dataset.snapHoverEvents ?? '') + Number(hovered)
+        window.cleancode?.desktopWindowControls?.snap?.onPointerChange((state) => {
+          document.body.dataset.snapPointerEvents =
+            (document.body.dataset.snapPointerEvents ?? '') + state + ' '
         })
       })
       const result = await probe(green, 'Hover')
       expect(result.hit).toBe(9) // HTMAXBUTTON
       expect(result.children.every((hit) => hit === -1)).toBe(true) // HTTRANSPARENT to the parent
-      await page.waitForFunction(() => document.body.dataset.snapHoverEvents?.includes('1'))
+      await page.waitForFunction(() => document.body.dataset.snapPointerEvents?.includes('hover '))
       await probe(green, 'Leave')
-      await page.waitForFunction(() => document.body.dataset.snapHoverEvents?.includes('10'))
+      await page.waitForFunction(() => document.body.dataset.snapPointerEvents?.includes('idle '))
       expect((await probe(controls.getByRole('button', { name: '最小化窗口' }))).hit).not.toBe(9)
       await probe(green, 'Cancel')
+      await page.waitForFunction(() =>
+        document.body.dataset.snapPointerEvents?.includes('pressed ')
+      )
       expect(
         await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isMaximized())
       ).toBe(false)

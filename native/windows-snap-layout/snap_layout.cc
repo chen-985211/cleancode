@@ -6,9 +6,9 @@
 #include <new>
 
 namespace {
-// All subclasses run on the Electron UI thread. Only a posted hover transition
+// All subclasses run on the Electron UI thread. Only a posted pointer transition
 // crosses into JavaScript; hit testing itself must return synchronously to Win32.
-const UINT hover_message = RegisterWindowMessageW(L"CleanCode.SnapButtonHover");
+const UINT pointer_message = RegisterWindowMessageW(L"CleanCode.SnapButtonPointer");
 constexpr UINT_PTR subclass_id = 1;
 
 struct Button {
@@ -31,14 +31,15 @@ bool Contains(HWND window, const Button& button, LPARAM screen_position) {
   return ScreenToClient(window, &point) && PtInRect(&button.bounds, point);
 }
 
-void SetHover(HWND window, Button& button, bool hovered) {
-  if (hovered == button.hovered) return;
+void SetPointer(HWND window, Button& button, bool hovered, bool pressed) {
+  if (hovered == button.hovered && pressed == button.pressed) return;
   button.hovered = hovered;
-  if (hovered) {
+  button.pressed = pressed;
+  if (hovered && !pressed) {
     TRACKMOUSEEVENT track{sizeof(track), TME_NONCLIENT | TME_LEAVE, window, 0};
     TrackMouseEvent(&track);
   }
-  PostMessageW(window, hover_message, hovered, 0);
+  PostMessageW(window, pointer_message, hovered ? (pressed ? 2 : 1) : 0, 0);
 }
 
 BOOL CALLBACK AttachChild(HWND child, LPARAM root) {
@@ -77,25 +78,31 @@ LRESULT CALLBACK WindowProc(HWND window, UINT msg, WPARAM w, LPARAM l, UINT_PTR,
       if (Contains(window, button, l)) return HTMAXBUTTON;
       break;
     case WM_NCMOUSEMOVE:
-      SetHover(window, button, w == HTMAXBUTTON);
+      SetPointer(window, button, w == HTMAXBUTTON, button.pressed);
       if (w == HTMAXBUTTON) return DefWindowProcW(window, msg, w, l);
       break;
     case WM_NCMOUSELEAVE:
-      SetHover(window, button, false);
+      if (!button.pressed) SetPointer(window, button, false, false);
       break;
     case WM_NCLBUTTONDOWN:
     case WM_NCLBUTTONDBLCLK:
       if (w == HTMAXBUTTON) {
-        button.pressed = true;
+        SetPointer(window, button, true, true);
         SetCapture(window);
         return 0;
+      }
+      break;
+    case WM_MOUSEMOVE:
+      if (button.pressed) {
+        POINT point{GET_X_LPARAM(l), GET_Y_LPARAM(l)};
+        SetPointer(window, button, PtInRect(&button.bounds, point), true);
       }
       break;
     case WM_LBUTTONUP:
       if (button.pressed) {
         POINT point{GET_X_LPARAM(l), GET_Y_LPARAM(l)};
         bool activate = PtInRect(&button.bounds, point);
-        button.pressed = false;
+        SetPointer(window, button, activate, false);
         ReleaseCapture();
         if (activate) {
           PostMessageW(window, WM_SYSCOMMAND, IsZoomed(window) ? SC_RESTORE : SC_MAXIMIZE, 0);
@@ -105,7 +112,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT msg, WPARAM w, LPARAM l, UINT_PTR,
       break;
     case WM_CAPTURECHANGED:
     case WM_CANCELMODE:
-      button.pressed = false;
+      if (button.pressed) SetPointer(window, button, false, false);
       break;
     case WM_PARENTNOTIFY:
       AttachNewChild(w, l, window);
@@ -155,8 +162,9 @@ napi_value SetBounds(napi_env env, napi_callback_info info) {
   if (button) {
     button->bounds = rect;
     if (IsRectEmpty(&rect)) {
-      SetHover(window, *button, false);
-      if (button->pressed && GetCapture() == window) ReleaseCapture();
+      bool release = button->pressed && GetCapture() == window;
+      SetPointer(window, *button, false, false);
+      if (release) ReleaseCapture();
     } else {
       EnumChildWindows(window, AttachChild, reinterpret_cast<LPARAM>(window));
     }
@@ -168,8 +176,8 @@ napi_value Initialize(napi_env env, napi_value exports) {
   napi_value setter, message;
   napi_create_function(env, "setBounds", NAPI_AUTO_LENGTH, SetBounds, nullptr, &setter);
   napi_set_named_property(env, exports, "setBounds", setter);
-  napi_create_uint32(env, hover_message, &message);
-  napi_set_named_property(env, exports, "hoverMessage", message);
+  napi_create_uint32(env, pointer_message, &message);
+  napi_set_named_property(env, exports, "pointerMessage", message);
   return exports;
 }
 }  // namespace
