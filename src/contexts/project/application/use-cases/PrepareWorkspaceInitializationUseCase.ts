@@ -61,6 +61,7 @@ export interface WorkspaceInitializationPreparationDependencies {
 
 export class PrepareWorkspaceInitializationUseCase {
   private readonly requests = new ProjectWorkspaceTransactionCoordinator()
+  private readonly pendingReservations = new Set<{ readonly directory: string }>()
   constructor(private readonly dependencies: WorkspaceInitializationPreparationDependencies) {}
 
   async listBaseBranches(projectDirectory: string) {
@@ -170,6 +171,12 @@ export class PrepareWorkspaceInitializationUseCase {
   }
 
   async cancel(projectDirectory: string, workspaceId?: string): Promise<void> {
+    if (workspaceId === undefined) {
+      // Reopening the directory can restore the same project ID after removal.
+      for (const reservation of this.pendingReservations) {
+        if (reservation.directory === projectDirectory) this.pendingReservations.delete(reservation)
+      }
+    }
     const project = await this.dependencies.projects.findByDirectory(projectDirectory)
     if (!project) return
     for (const snapshot of await this.dependencies.repository.list(project.id, workspaceId)) {
@@ -185,35 +192,7 @@ export class PrepareWorkspaceInitializationUseCase {
   ): Promise<ProjectSnapshot> {
     let project = await this.requireProject(command.projectDirectory)
     let snapshot = await this.dependencies.repository.find(command.requestId)
-    if (!snapshot) {
-      const inspection = await this.dependencies.git.inspectRepository(project.directory)
-      if (inspection.localBranches.includes(command.branchName.trim())) {
-        throw createProjectError('GIT_BRANCH_ALREADY_EXISTS', 'Git branch already exists.')
-      }
-      const workspaceDirectory = this.dependencies.directories.resolveBranchWorkspaceDirectory({
-        projectDirectory: project.directory,
-        branchName: command.branchName.trim()
-      })
-      const baseRef = command.baseBranch
-        ? await this.dependencies.baseBranches.resolve(project.directory, command.baseBranch)
-        : command.baseRef
-      const operation = WorkspaceInitialization.create({
-        ...(baseRef ? { baseRef } : {}),
-        ...(command.baseBranch ? { baseBranch: command.baseBranch } : {}),
-        ...(command.issue ? { issue: command.issue } : {}),
-        id: command.requestId,
-        projectId: project.id,
-        projectDirectory: project.directory,
-        workspaceId: globalThis.crypto.randomUUID(),
-        workspaceDirectory,
-        branchName: command.branchName.trim(),
-        mode: 'new-workspace',
-        defaults: command.defaults ?? (await this.dependencies.repository.getDefaults(project.id))
-      })
-      await this.dependencies.repository.save(operation.toSnapshot())
-      await this.prepareItems(operation)
-      snapshot = operation.toSnapshot()
-    }
+    if (!snapshot) snapshot = await this.reserveWorkspace(project, command)
     await this.getDefaults(project.directory)
     this.assertRequest(snapshot, project, snapshot.workspaceId)
     if (
@@ -313,6 +292,49 @@ export class PrepareWorkspaceInitializationUseCase {
     return command.selectWorkspace === false
       ? Project.fromSnapshot(project).switchCurrentWorkspace(snapshot.workspaceId).toSnapshot()
       : project
+  }
+
+  private async reserveWorkspace(
+    project: ProjectSnapshot,
+    command: CreateInitializedWorkspaceCommand & { readonly requestId: string }
+  ): Promise<WorkspaceInitializationSnapshot> {
+    const reservation = { directory: project.directory }
+    this.pendingReservations.add(reservation)
+    try {
+      const inspection = await this.dependencies.git.inspectRepository(project.directory)
+      if (inspection.localBranches.includes(command.branchName.trim())) {
+        throw createProjectError('GIT_BRANCH_ALREADY_EXISTS', 'Git branch already exists.')
+      }
+      const workspaceDirectory = this.dependencies.directories.resolveBranchWorkspaceDirectory({
+        projectDirectory: project.directory,
+        branchName: command.branchName.trim()
+      })
+      const baseRef = command.baseBranch
+        ? await this.dependencies.baseBranches.resolve(project.directory, command.baseBranch)
+        : command.baseRef
+      return await this.dependencies.transactions.run(project.directory, async () => {
+        const current = await this.requireProject(project.directory)
+        if (current.id !== project.id || !this.pendingReservations.has(reservation)) stale()
+        const operation = WorkspaceInitialization.create({
+          ...(baseRef ? { baseRef } : {}),
+          ...(command.baseBranch ? { baseBranch: command.baseBranch } : {}),
+          ...(command.issue ? { issue: command.issue } : {}),
+          id: command.requestId,
+          projectId: project.id,
+          projectDirectory: project.directory,
+          workspaceId: globalThis.crypto.randomUUID(),
+          workspaceDirectory,
+          branchName: command.branchName.trim(),
+          mode: 'new-workspace',
+          defaults: command.defaults ?? (await this.dependencies.repository.getDefaults(project.id))
+        })
+        await this.dependencies.repository.save(operation.toSnapshot())
+        await this.prepareItems(operation)
+        return operation.toSnapshot()
+      })
+    } finally {
+      this.pendingReservations.delete(reservation)
+    }
   }
 
   private async recoverWorkspace(

@@ -8,6 +8,7 @@ export const fetchOptions = [
   '-c',
   'gc.auto=0',
   'fetch',
+  '--refmap=',
   '--no-tags',
   '--no-write-fetch-head',
   '--no-recurse-submodules',

@@ -3,7 +3,7 @@ import type { WorkspaceBaseBranchPort } from '../../application/ports/WorkspaceB
 import { createProjectError } from '../../application/errors/ProjectErrors'
 import { fetchTrackingBranch, readGitCommit } from './GitBaseCommit'
 import { isGitRepository, runGit } from './GitProcess'
-import { resolveTrackingSource } from './GitFetchRefspec'
+import { readFetchRefspecs, resolveTrackingSource } from './GitFetchRefspec'
 
 export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
   async list(directory: string, currentBranch: string | null): Promise<WorkspaceBaseBranches> {
@@ -28,17 +28,23 @@ export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
       locals[0]
 
     const remotes = refs.filter((ref) => ref.name.startsWith('refs/remotes/'))
-    const remoteBranches = remotes.filter((ref) => !ref.target).map((ref) => ref.name)
+    const remoteBranches = new Set(remotes.filter((ref) => !ref.target).map((ref) => ref.name))
     const remoteDefaults = remotes.filter((ref) => ref.target && ref.name.endsWith('/HEAD'))
     const candidates = [
       remoteDefaults.find((ref) => ref.name === 'refs/remotes/origin/HEAD')?.target,
       ...remoteDefaults.map((ref) => ref.target),
       'refs/remotes/origin/main',
       'refs/remotes/origin/master',
-      local?.upstream
+      local?.upstream,
+      ...remoteBranches
     ]
-    const remote =
-      candidates.find((ref) => ref && remoteBranches.includes(ref)) ?? remoteBranches[0]
+    let remote: string | undefined
+    if (remoteBranches.size) {
+      const refspecs = await readFetchRefspecs(directory)
+      remote = candidates.find(
+        (ref) => ref && remoteBranches.has(ref) && resolveTrackingSource(refspecs, ref)
+      )
+    }
     const branches = [remote, local?.name].filter((ref) => ref !== undefined)
     return { branches, defaultBranch: branches[0] ?? null }
   }
@@ -50,8 +56,9 @@ export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
         const commit = await readGitCommit(directory, ref)
         if (commit) return commit
       } else if (ref.startsWith('refs/remotes/')) {
-        const { remote, source } = await resolveTrackingSource(directory, ref)
-        return await fetchTrackingBranch(directory, remote, source, ref)
+        const tracking = resolveTrackingSource(await readFetchRefspecs(directory), ref)
+        if (tracking)
+          return await fetchTrackingBranch(directory, tracking.remote, tracking.source, ref)
       }
     } catch {
       // A failed refresh must never use a stale tracking ref.

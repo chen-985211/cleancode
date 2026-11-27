@@ -13,6 +13,7 @@ import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts
 import { PrepareWorkspaceInitializationUseCase } from '../../../../src/contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { CreateBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { SwitchBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
+import { CheckoutMainWorkspaceBranchUseCase } from '../../../../src/contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
 import { SelectCurrentProjectUseCase } from '../../../../src/contexts/project/application/use-cases/SelectCurrentProjectUseCase'
 import { SynchronizeProjectGitStateUseCase } from '../../../../src/contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
 import { GitHubCliIssueAdapter } from '../../../../src/contexts/project/infrastructure/github/GitHubCliIssueAdapter'
@@ -34,6 +35,18 @@ const command = {
 
 describe('issue creation and explicit workspace selection', () => {
   afterEach(() => vi.restoreAllMocks())
+
+  it('rejects an explicitly empty base before creating a worktree', async () => {
+    const f = fixture()
+    await expect(
+      f.invokeRaw('cleancode:create-branch-workspace', {
+        projectDirectory: '/b',
+        branchName: 'topic',
+        baseBranch: ''
+      })
+    ).resolves.toMatchObject({ ok: false, error: { code: 'INVALID_IPC_COMMAND' } })
+    expect(f.git.createBranchWorktree).not.toHaveBeenCalled()
+  })
 
   it('resumes a creation without a saved base and preserves later navigation on reload', async () => {
     const f = fixture()
@@ -66,32 +79,41 @@ describe('issue creation and explicit workspace selection', () => {
     expect(await f.selection()).toEqual(['/b', created.graph.workspaceId])
   })
 
-  it('persists the latest navigation when an earlier workbench load is slow', async () => {
-    const f = fixture()
-    const created = await f.invoke('cleancode:start-issue-workspace', command)
-    const gate = createDeferred<void>()
-    const entered = createDeferred<void>()
-    const load = f.loadWorkbench.getMockImplementation()!
-    f.loadWorkbench.mockImplementationOnce(async (project) => {
-      entered.resolve()
-      await gate.promise
-      return load(project)
-    })
-    const older = f.invoke('cleancode:switch-branch-workspace', {
-      projectDirectory: '/b',
-      workspaceId: created.graph.workspaceId
-    })
-    await entered.promise
-    const newer = f.invoke('cleancode:switch-branch-workspace', {
-      projectDirectory: '/a',
-      workspaceId: 'main'
-    })
-    // Drain runnable commands while the earlier load is held at an explicit gate.
-    await setImmediate()
-    gate.resolve()
-    await Promise.all([older, newer])
-    expect(await f.selection()).toEqual(['/a', 'main'])
-  })
+  it.each(['workspace', 'checkout'] as const)(
+    'persists the latest %s navigation when an earlier workbench load is slow',
+    async (navigation) => {
+      const f = fixture()
+      const created = await f.invoke('cleancode:start-issue-workspace', command)
+      const gate = createDeferred<void>()
+      const entered = createDeferred<void>()
+      const load = f.loadWorkbench.getMockImplementation()!
+      f.loadWorkbench.mockImplementationOnce(async (project) => {
+        entered.resolve()
+        await gate.promise
+        return load(project)
+      })
+      const older = f.invoke('cleancode:switch-branch-workspace', {
+        projectDirectory: '/b',
+        workspaceId: created.graph.workspaceId
+      })
+      await entered.promise
+      const newer =
+        navigation === 'checkout'
+          ? f.invoke('cleancode:checkout-main-workspace-branch', {
+              projectDirectory: '/a',
+              branchName: 'main'
+            })
+          : f.invoke('cleancode:switch-branch-workspace', {
+              projectDirectory: '/a',
+              workspaceId: 'main'
+            })
+      // Drain runnable commands while the earlier load is held at an explicit gate.
+      await setImmediate()
+      gate.resolve()
+      await Promise.all([older, newer])
+      expect(await f.selection()).toEqual(['/a', 'main'])
+    }
+  )
 
   it.each(['same-project', 'other-project'] as const)(
     'preserves a newer %s selection through completion, retry, Git sync and reload',
@@ -247,6 +269,7 @@ function fixture() {
     createWorkspace: (value, receipt) => create.execute(value, receipt)
   })
   const switchWorkspace = new SwitchBranchWorkspaceUseCase(projects, transactions)
+  const checkout = new CheckoutMainWorkspaceBranchUseCase(projects, git, transactions)
   const registryTransactions = new ProjectRegistryTransactionCoordinator()
   const select = new SelectCurrentProjectUseCase(registry, registryTransactions)
   const selectCurrentProject = async (directory: string | null) => {
@@ -307,21 +330,23 @@ function fixture() {
     inferProjectName: vi.fn(),
     createOrOpenProject: vi.fn(),
     archiveBranchWorkspace: vi.fn(),
-    checkoutMainWorkspaceBranch: vi.fn(),
+    checkoutMainWorkspaceBranch: (value) => checkout.execute(value),
     forgetProject: vi.fn(),
     rememberProject: vi.fn(),
     reorderProjects: vi.fn(),
     getWorkspaceExternalOpenCapabilities: vi.fn(),
     openWorkspaceExternally: vi.fn()
   })
+  const invokeRaw = (channel: string, value: unknown) => handlers.get(channel)!({}, value)
   return {
     git,
     sync,
     project,
     addGitWorktree,
     loadWorkbench,
+    invokeRaw,
     invoke: async (channel: string, value: unknown) => {
-      const response = await handlers.get(channel)!({}, value)
+      const response = await invokeRaw(channel, value)
       expect(response.ok).toBe(true)
       if (!response.ok) throw new Error(response.error.message)
       return response.value as WorkbenchSnapshot

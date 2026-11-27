@@ -403,7 +403,7 @@ export function useBranchWorkspaceActions({
   const checkoutMainBranch = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'checkout-main')
-      const occurrenceId = beginActionAttempt(key)
+      const occurrenceId = beginSelectionAttempt(key)
 
       try {
         const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
@@ -411,12 +411,14 @@ export function useBranchWorkspaceActions({
           branchName
         })
 
-        if (!isCurrentActionAttempt(key, occurrenceId)) return
+        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
         if (checkedOutWorkbench) {
           replaceWorkbench(checkedOutWorkbench)
         }
-        completeActionAttempt(key, occurrenceId)
+        if (settleSelectionAttempt(key, occurrenceId)) dismissPublishedActionError(key)
       } catch (error) {
+        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
+        currentSelectionAttemptRef.current = null
         publishActionError({
           error,
           fallbackKey: 'workspaceAction.checkoutFailed',
@@ -427,11 +429,12 @@ export function useBranchWorkspaceActions({
       }
     },
     [
-      beginActionAttempt,
-      completeActionAttempt,
-      isCurrentActionAttempt,
+      beginSelectionAttempt,
+      dismissPublishedActionError,
+      isCurrentSelectionAttempt,
       publishActionError,
-      replaceWorkbench
+      replaceWorkbench,
+      settleSelectionAttempt
     ]
   )
 

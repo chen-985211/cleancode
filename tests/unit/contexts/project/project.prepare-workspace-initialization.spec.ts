@@ -3,6 +3,9 @@ import { PrepareWorkspaceInitializationUseCase } from '../../../../src/contexts/
 import { CreateBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
 import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
+import { ProjectRegistry } from '../../../../src/contexts/project/domain/aggregates/ProjectRegistry'
+import { ForgetProjectUseCase } from '../../../../src/contexts/project/application/use-cases/ForgetProjectUseCase'
+import { createDeferred } from '../../../fixtures/deferred'
 import type {
   WorkspaceDefaults,
   WorkspaceInitializationSnapshot
@@ -19,6 +22,45 @@ const defaults: WorkspaceDefaults = {
 }
 
 describe('prepare workspace initialization', () => {
+  it.each(['forgotten', 'reopened', 'replaced'] as const)(
+    'abandons a creation when the project was %s during the remote fetch',
+    async (change) => {
+      const f = fixture()
+      const fetching = createDeferred<void>()
+      const commit = createDeferred<string>()
+      f.baseBranches.resolve.mockImplementationOnce(() => {
+        fetching.resolve()
+        return commit.promise
+      })
+      const pending = f.prepare.create({
+        projectDirectory: '/project',
+        branchName: 'topic',
+        baseBranch: 'refs/remotes/origin/main',
+        requestId: 'late-fetch'
+      })
+      await fetching.promise
+      if (change === 'replaced') {
+        await f.projects.save(
+          Project.create({ id: 'another-project', name: 'Replacement', directory: '/project' })
+        )
+      } else {
+        await new ForgetProjectUseCase(f.registry, undefined, f.transactions).execute({
+          directory: '/project'
+        })
+        await f.prepare.cancel('/project')
+        if (change === 'reopened')
+          await f.registry.save(ProjectRegistry.empty().rememberProject('/project'))
+      }
+      commit.resolve('a'.repeat(40))
+      await expect(pending).rejects.toMatchObject({
+        code:
+          change === 'forgotten' ? 'PROJECT_NOT_REMEMBERED' : 'WORKSPACE_INITIALIZATION_SCOPE_STALE'
+      })
+      expect(f.records.size).toBe(0)
+      expect(f.content.prepareTemplate).not.toHaveBeenCalled()
+      expect(f.git.createBranchWorktree).not.toHaveBeenCalled()
+    }
+  )
   it('loads the registered workspace by identity when a retry finds the original branch elsewhere', async () => {
     const f = fixture()
     const command = {
@@ -415,12 +457,16 @@ function fixture() {
     run: vi.fn()
   }
   const baseBranches = { list: vi.fn(), resolve: vi.fn(async () => 'a'.repeat(40)) }
+  let remembered = ProjectRegistry.empty().rememberProject('/project')
+  const registry = {
+    get: async () => remembered.toSnapshot(),
+    save: async (value: ProjectRegistry) => {
+      remembered = value
+    }
+  }
   const prepare = new PrepareWorkspaceInitializationUseCase({
     projects,
-    registry: {
-      get: async () => ({ projectDirectories: ['/project'], currentProjectDirectory: '/project' }),
-      save: async () => {}
-    },
+    registry,
     git,
     directories,
     baseBranches,
@@ -431,6 +477,8 @@ function fixture() {
   })
   return {
     prepare,
+    registry,
+    transactions,
     baseBranches,
     content,
     git,

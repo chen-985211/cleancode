@@ -76,6 +76,69 @@ describe('real Git workspace base resolution', () => {
     ).rejects.toMatchObject({ code: 'GIT_WORKSPACE_BASE_UNAVAILABLE' })
   })
 
+  it('refreshes only the selected tracking ref when the remote has additional fetch destinations', async () => {
+    await git(checkout, 'branch', 'mirror-main')
+    await git(
+      checkout,
+      'config',
+      '--add',
+      'remote.origin.fetch',
+      '+refs/heads/main:refs/heads/mirror-main'
+    )
+    await git(
+      source,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'Upstream change'
+    )
+    const upstream = await git(source, 'rev-parse', 'main')
+    expect(
+      await new GitCliWorkspaceBaseAdapter().resolve(checkout, 'refs/remotes/origin/main')
+    ).toBe(upstream)
+    expect(await git(checkout, 'rev-parse', 'refs/remotes/origin/main')).toBe(upstream)
+    expect(await git(checkout, 'rev-parse', 'refs/heads/mirror-main')).toBe(original)
+  })
+
+  it.each(['excluded', 'ambiguous', 'unmapped'] as const)(
+    'skips the cached default when its source is %s, even with no local branch',
+    async (kind) => {
+      await git(source, 'branch', 'release')
+      await git(checkout, 'fetch', 'origin')
+      await git(checkout, 'switch', '--detach')
+      await git(checkout, 'branch', '-D', 'main')
+      if (kind === 'unmapped')
+        await git(
+          checkout,
+          'config',
+          '--replace-all',
+          'remote.origin.fetch',
+          '+refs/heads/release:refs/remotes/origin/release'
+        )
+      else
+        await git(
+          checkout,
+          'config',
+          '--add',
+          'remote.origin.fetch',
+          kind === 'excluded' ? '^refs/heads/main' : '+refs/heads/other:refs/remotes/origin/main'
+        )
+      await git(checkout, 'remote', 'set-url', 'origin', join(root, 'offline'))
+      const adapter = new GitCliWorkspaceBaseAdapter()
+      const release = 'refs/remotes/origin/release'
+      expect(await adapter.list(checkout, null)).toEqual({
+        branches: [release],
+        defaultBranch: release
+      })
+      await git(checkout, 'config', '--unset-all', 'remote.origin.fetch')
+      expect(await adapter.list(checkout, null)).toEqual({ branches: [], defaultBranch: null })
+    }
+  )
+
   it('uses the remote owning the fetch destination, even under a different name', async () => {
     const ref = 'refs/remotes/releases/stable'
     await git(checkout, 'config', '--add', 'remote.origin.fetch', `+refs/heads/main:${ref}`)
