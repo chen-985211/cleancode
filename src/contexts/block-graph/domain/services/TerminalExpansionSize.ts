@@ -10,7 +10,7 @@ export const defaultWorkflowTerminalSize = { width: 420, height: 280 }
 
 export function terminalExpansionSize(
   block: TerminalBlockSnapshot,
-  connections: readonly TerminalConnectionSnapshot[],
+  connections: readonly Pick<TerminalConnectionSnapshot, 'sourceBlockId' | 'targetBlockId'>[],
   mode: 'normalize' | 'expand' = 'normalize'
 ) {
   const usesDefaultSize =

@@ -1,3 +1,4 @@
+import { createBlockTemplate } from '../../../../src/contexts/block-graph/domain/services/BlockTemplateProjection'
 import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { BlockTemplateLibrary } from '../../../../src/contexts/block-graph/domain/aggregates/BlockTemplateLibrary'
 import type { BlockTemplateLibrarySnapshot } from '../../../../src/contexts/block-graph/domain/aggregates/BlockTemplateTypes'
@@ -35,6 +36,54 @@ describe('block template use cases', () => {
       { code: 'BLOCK_TEMPLATE_PROJECT_SCOPE_INVALID' }
     )
   })
+  it.each([
+    { width: 720, height: 460, gap: 64 },
+    { width: 720, height: 460, isCollapsed: false, gap: 601 },
+    { width: 720, height: 460, isCollapsed: true, gap: 601 },
+    { width: 560, height: 340, gap: 64 },
+    { width: 420, height: 280, gap: 601 },
+    { width: 640, height: 380, gap: 381 }
+  ])(
+    'prepares matching group geometry for placement and creation at $width × $height',
+    async ({ width, height, gap, isCollapsed }) => {
+      const source = createGraph('project-1')
+      source.createTerminalGroup({ name: 'Pair', memberBlockIds: ['install', 'build'] }, 'preserve')
+      const saved = createBlockTemplate({
+        graph: source.toSnapshot(),
+        id: 'pair',
+        name: 'Pair',
+        description: '',
+        scope: { type: 'global' },
+        createdAt: '2026-08-06',
+        selectedBlockIds: ['install', 'build']
+      })
+      const template = {
+        ...saved,
+        nodes: saved.nodes.map((node, i) => ({
+          ...node,
+          ...(isCollapsed === undefined ? {} : { isCollapsed }),
+          position: { x: i * 1021, y: i * 53 },
+          size: { width, height }
+        }))
+      }
+      const templates = new InMemoryTemplateRepository()
+      await templates.transact((library) => library.add(template))
+      const prepared = new PrepareBlockTemplateUseCase(templates, new InMemoryTemplateRepository())
+      const command = { operationId: 'item', templateId: 'pair', projectId: 'project-1' }
+      const frozen = await prepared.execute(command)
+      expect(await prepared.find('item')).toEqual(frozen)
+      const [first, next] = frozen.nodes
+      expect(next.position.x - first.position.x - first.size.width).toBe(gap)
+      expect(next.position.y - first.position.y).toBe(gap === 64 ? 0 : 53)
+      const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'new' })
+      graph.instantiateBlockTemplate(frozen, { x: 0, y: 0 })
+      expect(graph.toSnapshot().blocks.map(({ position, size }) => ({ position, size }))).toEqual(
+        frozen.nodes.map(({ position, size }) => ({ position, size }))
+      )
+      expect((await templates.get()).templates[0]).toEqual(template)
+    }
+  )
+
   it('commits a workspace initialization template once across retries and object deletion', async () => {
     const source = createGraph('project-1')
     const templates = new InMemoryTemplateRepository()

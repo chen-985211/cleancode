@@ -2,6 +2,7 @@ import { createBlockGraphError } from '../errors/BlockGraphErrors'
 import type { BlockTemplateRepository } from '../ports/BlockTemplateRepository'
 import type { BlockTemplateSnapshot } from '../dto/BlockTemplateSnapshot'
 import { BlockTemplateLibrary } from '../../domain/aggregates/BlockTemplateLibrary'
+import { resolveWorkspaceTemplateLayout } from '../../domain/services/WorkspaceTemplateLayout'
 
 export class PrepareBlockTemplateUseCase {
   constructor(
@@ -34,9 +35,10 @@ export class PrepareBlockTemplateUseCase {
       library.add(snapshot)
       return snapshot
     })
-    return transaction.result
+    return resolveWorkspaceTemplateLayout(transaction.result)
   }
   async find(operationId: string): Promise<BlockTemplateSnapshot | null> {
-    return BlockTemplateLibrary.restore(await this.prepared.get()).find(operationId) ?? null
+    const template = BlockTemplateLibrary.restore(await this.prepared.get()).find(operationId)
+    return template ? resolveWorkspaceTemplateLayout(template) : null
   }
 }

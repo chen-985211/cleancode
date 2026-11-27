@@ -84,7 +84,7 @@ export function commitCompletedCanvasViewportMotion({
   onViewportChange,
   projectCanvasViewport
 }: CommitCompletedCanvasViewportMotionInput): void {
-  if (completion.intent.type === 'instant') {
+  if (completion.intent.type === 'instant' && !completion.intent.persist) {
     return
   }
 
