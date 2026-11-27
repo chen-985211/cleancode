@@ -1,6 +1,11 @@
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
+  --cc-caption-close: #ff5f57;
+  --cc-caption-minimize: #febc2e;
+  --cc-caption-maximize: #28c840;
+  --cc-caption-outline: rgb(0 0 0 / 16%);
+  --cc-caption-glyph: #352e2c;
   --cc-background: #f2f4f5;
   --cc-canvas: #e8eaeb;
   --cc-chrome: #f3f5f8;

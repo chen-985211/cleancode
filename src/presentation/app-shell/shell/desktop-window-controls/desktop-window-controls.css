@@ -1,0 +1,73 @@
+.desktop-window-controls {
+  position: fixed;
+  z-index: 1700;
+  top: 6px;
+  left: 11px;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+body:has(.app-shell--window-full-screen) .desktop-window-controls {
+  display: none;
+}
+
+.desktop-window-controls button {
+  position: relative;
+  display: grid;
+  width: 23px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  color: var(--cc-caption-glyph);
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.desktop-window-controls button::before {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--cc-caption-outline);
+  border-radius: 50%;
+  background: var(--caption-color);
+  content: '';
+}
+
+.desktop-caption-close {
+  --caption-color: var(--cc-caption-close);
+}
+.desktop-caption-minimize {
+  --caption-color: var(--cc-caption-minimize);
+}
+.desktop-caption-maximize {
+  --caption-color: var(--cc-caption-maximize);
+}
+
+.desktop-window-controls button:active::before {
+  filter: brightness(0.85);
+}
+
+.desktop-window-controls svg {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+}
+
+.desktop-window-controls:is(:hover, :focus-within, [data-snap-hover]) svg {
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .desktop-window-controls svg {
+    opacity: 1;
+  }
+  .desktop-window-controls button::before {
+    border-color: ButtonText;
+  }
+}

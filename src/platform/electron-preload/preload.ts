@@ -1,5 +1,11 @@
 import { isRegisteredApplicationErrorCode } from '../ipc/applicationErrorCatalog'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { release } from 'node:os'
+import {
+  desktopWindowChannels,
+  supportsSnapLayouts,
+  type DesktopWindowControlsApi
+} from '../ipc/desktopWindowControls'
 
 import {
   isSerializedAppError,
@@ -29,7 +35,26 @@ globalThis.window?.addEventListener('pagehide', () => {
   if (pendingTodoWrites) unwrapIpcResult(ipcRenderer.sendSync(todoChannels.drain))
 })
 
+const desktopWindowControls: DesktopWindowControlsApi | undefined =
+  process.platform === 'win32' || process.platform === 'linux'
+    ? {
+        perform: (action) => invokeCleancode<void>(desktopWindowChannels.perform, action),
+        isMaximized: () => invokeCleancode<boolean>(desktopWindowChannels.isMaximized),
+        onMaximizedChange: (listener) =>
+          subscribeRendererEvent(desktopWindowChannels.maximizedChanged, listener),
+        snap: supportsSnapLayouts(process.platform, release())
+          ? {
+              setBounds: (bounds) =>
+                invokeCleancode<void>(desktopWindowChannels.setSnapBounds, bounds),
+              onHoverChange: (listener) =>
+                subscribeRendererEvent(desktopWindowChannels.snapHoverChanged, listener)
+            }
+          : undefined
+      }
+    : undefined
+
 const cleancodeApi = {
+  desktopWindowControls,
   onTodoPageHide: (flush: () => void) => {
     todoFlushers.add(flush)
     return () => {

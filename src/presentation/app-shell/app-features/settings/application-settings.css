@@ -61,6 +61,8 @@
   -webkit-app-region: drag;
 }
 
+body:has(.desktop-window-controls):not(:has(.app-shell--window-full-screen))
+  .application-settings-header,
 .application-settings-surface--mac .application-settings-header {
   min-height: max(84px, calc(var(--cc-window-controls-height) + 54px));
   padding: max(34px, calc(var(--cc-window-controls-height) + 6px)) 24px 12px;

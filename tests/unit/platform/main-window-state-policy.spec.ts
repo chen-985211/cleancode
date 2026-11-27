@@ -33,7 +33,7 @@ describe('main window state policy', () => {
       'undersized bounds',
       {
         version: 1,
-        normalBounds: { x: 10, y: 20, width: 959, height: 640 },
+        normalBounds: { x: 10, y: 20, width: 329, height: 640 },
         displayMode: 'normal'
       }
     ],
@@ -47,6 +47,17 @@ describe('main window state policy', () => {
     ]
   ])('rejects %s', (_name, value) => {
     expect(decodeMainWindowState(value)).toBeNull()
+  })
+
+  it('restores a narrow Windows snap zone while respecting each platform minimum', () => {
+    const snapped = {
+      version: 1,
+      displayMode: 'normal',
+      normalBounds: { x: 0, y: 0, width: 330, height: 360 }
+    }
+    expect(decodeMainWindowState(snapped, 'win32')).toEqual(snapped)
+    expect(decodeMainWindowState(snapped, 'linux')).toBeNull()
+    expect(decodeMainWindowState(snapped, 'darwin')).toBeNull()
   })
 
   it('centers the current default size in the primary work area without saved state', () => {

@@ -104,7 +104,7 @@ import { configureApplicationUpdates } from './applicationUpdateRuntime'
 import { bindApplicationQuitLifecycle } from './applicationQuitLifecycle'
 import { configureApplicationDiagnostics } from './applicationDiagnosticsRuntime'
 import { configureApplicationRepository } from './applicationRepositoryRuntime'
-import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
+import { registerDesktopWindowIpc } from './desktopWindowControls'
 import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
 import { createMainAgentActivityRuntime } from './mainAgentActivityRuntime'
@@ -383,7 +383,7 @@ const electronWindowPolicy = resolveElectronWindowPolicy({
   backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
 })
 const quitConfirmation = configureQuitConfirmation({ app, ipcMain, logger: consoleLogger })
-registerWindowFullScreenStateIpc({
+registerDesktopWindowIpc({
   ipcMain,
   logger: consoleLogger,
   resolveWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender)

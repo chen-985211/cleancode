@@ -146,6 +146,9 @@ importers:
       lint-staged:
         specifier: 17.0.8
         version: 17.0.8
+      node-gyp:
+        specifier: 12.4.0
+        version: 12.4.0
       playwright:
         specifier: 1.61.1
         version: 1.61.1

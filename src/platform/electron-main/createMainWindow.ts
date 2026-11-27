@@ -13,13 +13,14 @@ import {
 } from './applicationQuitConfirmation'
 import { bindMainWindowStatePersistence } from './mainWindowStateLifecycle'
 import {
-  mainWindowMinimumSize,
+  getMainWindowMinimumSize,
   mainWindowStateSchemaVersion,
   resolveMainWindowFullScreenOptions,
   resolveMainWindowStartupState
 } from './mainWindowStatePolicy'
 import { resolveWindowFrameOptions, shouldRemoveDefaultWindowMenu } from './windowFrameOptions'
-import { bindWindowFullScreenState } from './windowFullScreenState'
+import { bindDesktopWindowState } from './desktopWindowControls'
+import { bindWindowsSnapLayout } from './windowsSnapLayout'
 
 const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 
@@ -47,10 +48,11 @@ export function createMainWindow(input: {
         ? { mode: 'normal' }
         : { mode: 'offscreen-inactive', position: input.policy.position }
   })
+  const minimumSize = getMainWindowMinimumSize()
   const mainWindow = new BrowserWindow({
     ...startupState.normalBounds,
-    minWidth: mainWindowMinimumSize.width,
-    minHeight: mainWindowMinimumSize.height,
+    minWidth: minimumSize.width,
+    minHeight: minimumSize.height,
     ...resolveMainWindowFullScreenOptions(startupState.displayMode),
     title: 'cleancode',
     backgroundColor: '#f7f8fa',
@@ -80,7 +82,8 @@ export function createMainWindow(input: {
     target: mainWindow
   })
   if (shouldRemoveDefaultWindowMenu(process.platform)) mainWindow.removeMenu()
-  bindWindowFullScreenState(mainWindow)
+  bindDesktopWindowState(mainWindow)
+  bindWindowsSnapLayout(mainWindow)
   bindApplicationQuitConfirmationToWindow({
     coordinator: input.applicationQuitConfirmation,
     platform: process.platform,
