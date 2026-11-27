@@ -54,10 +54,3 @@
   position: relative;
   z-index: 1;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .directional-menu-trigger,
-  .menu-option-highlight-motion {
-    transition: none;
-  }
-}

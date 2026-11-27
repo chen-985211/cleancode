@@ -243,7 +243,7 @@ describe('terminal workflow build coordination', () => {
     )
   })
 
-  it('projects the final graph without staged movement for reduced motion', () => {
+  it('stages the build even when the system requests reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({
       addEventListener: vi.fn(),
       matches: true,
@@ -271,11 +271,13 @@ describe('terminal workflow build coordination', () => {
 
     act(() => result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api'])))
 
-    expect(findNode(nodeStore, 'terminal-api').position).toEqual(graph.blocks[0]!.position)
-    expect(result.current.terminalWorkflowBuildPresentation).toBeNull()
+    act(() => result.current.cancelLayoutFocus())
+    runAnimationFrame(0)
+    expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(graph.blocks[0]!.position)
+    expect(result.current.terminalWorkflowBuildPresentation).not.toBeNull()
   })
 
-  it('settles an active build when reduced motion changes at runtime', () => {
+  it('keeps an active build running when the system preference changes', () => {
     const media = createMutableMediaQueryList(false)
     vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
     const graph = createGraph(['terminal-api'])
@@ -302,8 +304,9 @@ describe('terminal workflow build coordination', () => {
 
     act(() => media.setMatches(true))
 
-    expect(findNode(nodeStore, 'terminal-api').position).toEqual(graph.blocks[0]!.position)
-    expect(result.current.terminalWorkflowBuildPresentation).toBeNull()
+    runAnimationFrame(16)
+    expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(graph.blocks[0]!.position)
+    expect(result.current.terminalWorkflowBuildPresentation).not.toBeNull()
   })
 
   function runAnimationFrame(timestamp: number): void {

@@ -27,11 +27,13 @@ import {
 import { useAgentProviderState } from '../../../../../contexts/agent/presentation/view-models/useAgentProviderState'
 import { useAgentProviderNotifications } from '../../../../../contexts/agent/presentation/view-models/useAgentProviderNotifications'
 import { useAgentSessionAttachment } from '../../../coordinators/useAgentSessionAttachment'
+import { useWorkbenchNodeExitView } from '../useWorkbenchNodeExitView'
 import { useAgentTerminalView } from '../../../coordinators/useAgentTerminalView'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useOptionalNotifications } from '../../../app-features/notifications/useNotifications'
 
 export function AgentConsole({
+  isExiting = false,
   agent,
   approvalController,
   currentWorkbench = null,
@@ -100,12 +102,13 @@ export function AgentConsole({
     notifications,
     scopeKey: currentWorkspaceKey
   })
+  const displayedSession = useWorkbenchNodeExitView(session, isExiting)
   useAgentTerminalView({
     colorPairs: providerCatalog.descriptor?.terminalColorPairs,
     dimensionsRef,
     enabled: true,
     onDimensionsChange: recordTerminalDimensions,
-    session,
+    session: displayedSession,
     terminalElementRef,
     workspaceKey: currentWorkspaceKey
   })
@@ -316,7 +319,7 @@ export function AgentConsole({
             providerName={providerName}
             terminalElementRef={terminalElementRef}
             onFallbackInput={writeAgentInput}
-            session={session}
+            session={displayedSession}
             useFallback={isTestRuntime()}
             workspaceDisplayName={currentWorkspace?.displayName}
           />

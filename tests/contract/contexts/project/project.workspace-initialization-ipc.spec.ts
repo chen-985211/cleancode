@@ -4,6 +4,15 @@ import type { WorkspaceDefaults } from '../../../../src/contexts/project/applica
 import type { Logger } from '../../../../src/platform/logging/Logger'
 
 describe('workspace initialization IPC', () => {
+  it('queries branches for the supplied project directory through IPC', async () => {
+    const { invoke, listBaseBranches } = setup()
+    await invoke('cleancode:list-workspace-base-branches', { projectDirectory: '/project' })
+    expect(listBaseBranches).toHaveBeenCalledExactlyOnceWith('/project')
+    expect(await invoke('cleancode:list-workspace-base-branches', {})).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND' }
+    })
+  })
   it('passes explicit defaults and a complete workspace identity through the boundary', async () => {
     const { invoke, saveDefaults, apply } = setup()
     const defaults = {
@@ -87,17 +96,20 @@ function setup() {
     removedTemplateIds: []
   }))
   const apply = vi.fn()
+  const listBaseBranches = vi.fn()
   registerWorkspaceInitializationIpcHandlers({
     ipcMain,
     logger,
     saveDefaults,
     apply,
     cancel: vi.fn(),
+    listBaseBranches,
     getDefaults: vi.fn(),
     list: vi.fn(),
     begin: vi.fn()
   })
   return {
+    listBaseBranches,
     saveDefaults,
     apply,
     invoke: (channel: string, command: unknown) => handlers.get(channel)!({}, command)

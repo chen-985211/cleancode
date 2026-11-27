@@ -1,12 +1,40 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
+import type { WorkspaceBaseBranches } from '../../application/dto/WorkspaceBaseBranches'
 import { useOutsidePointerDismiss } from '../../../../presentation/shared/hooks/useOutsidePointerDismiss'
 
 export function useProjectSidebarBranchWorkspaceForm(
-  onSubmit: (branchName: string) => void | Promise<boolean>
+  projectDirectory: string,
+  onSubmit: (branchName: string, baseBranch: string) => void | Promise<boolean>
 ) {
   const [isOpen, setIsOpen] = useState(false)
   const [branchName, setBranchName] = useState('')
+  const [choices, setChoices] = useState<WorkspaceBaseBranches | null>(null)
+  const [baseBranch, setBaseBranch] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    if (!isOpen) return
+    let active = true
+    setChoices(null)
+    setBaseBranch('')
+    setLoadFailed(false)
+    async function load() {
+      try {
+        const result = await window.cleancode!.listWorkspaceBaseBranches({ projectDirectory })
+        if (active) {
+          setChoices(result)
+          setBaseBranch(result.defaultBranch ?? '')
+        }
+      } catch {
+        if (active) setLoadFailed(true)
+      }
+    }
+    void load()
+    return () => {
+      active = false
+    }
+  }, [isOpen, projectDirectory, attempt])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -17,14 +45,14 @@ export function useProjectSidebarBranchWorkspaceForm(
 
     const normalizedBranchName = branchName.trim()
 
-    if (!normalizedBranchName || submittingRef.current) {
+    if (!normalizedBranchName || !baseBranch || submittingRef.current) {
       return
     }
 
     submittingRef.current = true
     setIsSubmitting(true)
     void Promise.resolve()
-      .then<void | boolean>(async () => onSubmit(normalizedBranchName))
+      .then<void | boolean>(async () => onSubmit(normalizedBranchName, baseBranch))
       .then((result) => {
         if (result !== false) setIsOpen(false)
       })
@@ -38,6 +66,7 @@ export function useProjectSidebarBranchWorkspaceForm(
     setIsOpen(false)
   }
   const open = useCallback((): void => {
+    if (submittingRef.current) return
     setBranchName('')
     setIsOpen(true)
   }, [])
@@ -56,9 +85,16 @@ export function useProjectSidebarBranchWorkspaceForm(
 
   useOutsidePointerDismiss({
     active: isOpen && !isSubmitting,
-    isInside: (target) =>
-      surfaceRef.current?.contains(target) === true ||
-      triggerRef.current?.contains(target) === true,
+    isInside: (target) => {
+      const menuId = formRef.current
+        ?.querySelector('[aria-haspopup="menu"]')
+        ?.getAttribute('aria-controls')
+      return Boolean(
+        surfaceRef.current?.contains(target) ||
+        triggerRef.current?.contains(target) ||
+        (menuId && document.getElementById(menuId)?.contains(target))
+      )
+    },
     onDismiss: dismissFromOutside,
     pointerPolicy: 'consume'
   })
@@ -86,6 +122,14 @@ export function useProjectSidebarBranchWorkspaceForm(
 
   return {
     branchName,
+    base: {
+      branches: choices?.branches ?? [],
+      value: baseBranch,
+      loading: !choices && !loadFailed,
+      failed: loadFailed,
+      select: setBaseBranch,
+      retry: () => setAttempt((value) => value + 1)
+    },
     close,
     completeClose,
     formRef,

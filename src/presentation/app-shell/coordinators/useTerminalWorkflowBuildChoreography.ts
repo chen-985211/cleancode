@@ -8,10 +8,7 @@ import {
 } from '../projections/terminalWorkflowBuildChoreography'
 import type { WorkbenchFlowNode } from '../types/workbenchFlowNode'
 import type { WorkbenchNodeStore } from '../workbench/nodes/workbenchNodeStore'
-import {
-  prefersReducedMotion,
-  subscribeReducedMotionPreference
-} from '../../shared/motion/motionPreference'
+import { prefersReducedMotion } from '../../shared/motion/motionPreference'
 import type { TerminalWorkflowBuildMode } from '../app-features/settings/terminalWorkflowBuildPreference'
 
 export interface TerminalWorkflowBuildPresentation {
@@ -185,12 +182,6 @@ export function useTerminalWorkflowBuildChoreography({
   useEffect(() => {
     cancelActiveBuild(false)
   }, [cancelActiveBuild, currentProjectId, currentWorkspaceId])
-
-  useEffect(() => {
-    return subscribeReducedMotionPreference((reducedMotion) => {
-      if (reducedMotion) cancelActiveBuild(true)
-    })
-  }, [cancelActiveBuild])
 
   useEffect(
     () => () => {

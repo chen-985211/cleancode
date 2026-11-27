@@ -128,6 +128,38 @@ describe('workspace initialization coordination', () => {
     expect(screen.queryByRole('button', { name: '配置默认内容' })).not.toBeInTheDocument()
   })
 
+  it.each(['refs/remotes/origin/main', undefined])(
+    'resumes the saved request from settings with its original base %s',
+    async (baseBranch) => {
+      const f = fixture()
+      const operation = { ...f.details.initialization, baseBranch }
+      const create = vi.fn(async () => ({ ...f.workbench, initialization: null }))
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: {
+          getWorkspaceDefaults: async () => ({
+            defaults: { templates: [], agents: [] },
+            removedTemplateIds: []
+          }),
+          listBlockTemplates: async () => [],
+          discoverCreatableAgentProviders: async () => [],
+          getAgentProviderPreferences: async () => ({ disabledProviderIds: [] }),
+          listWorkspaceInitializations: async () => [{ ...f.details, initialization: operation }]
+        }
+      })
+      const { result } = renderController(f.workbench, create)
+      const close = vi.fn()
+      render(result.current.renderSettings([f.workbench], close))
+      fireEvent.click(await screen.findByRole('button', { name: '重试 feature' }))
+      await waitFor(() => expect(close).toHaveBeenCalledOnce())
+      expect(create).toHaveBeenCalledWith(f.workbench, 'feature', {
+        requestId: operation.id,
+        selectWorkspace: false,
+        ...(baseBranch ? { baseBranch } : {})
+      })
+    }
+  )
+
   it('does not apply unfinished contents on mount, workspace changes, or a newly empty graph', () => {
     const f = fixture()
     const apply = vi.fn()
@@ -165,6 +197,91 @@ describe('workspace initialization coordination', () => {
     })
     expect(create.mock.calls[0][2].requestId).toBe(create.mock.calls[1][2].requestId)
     expect(apply).toHaveBeenCalledOnce()
+  })
+
+  it('completes the creation form while default content is still being applied', async () => {
+    const f = fixture()
+    let finish!: (value: WorkspaceInitializationResult) => void
+    const apply = vi.fn(
+      () =>
+        new Promise<WorkspaceInitializationResult>((resolve) => {
+          finish = resolve
+        })
+    )
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        applyWorkspaceInitialization: apply,
+        listWorkspaceInitializations: async () => [f.details]
+      }
+    })
+    const { result } = renderController(
+      f.workbench,
+      vi.fn(async () => f.workbench)
+    )
+    const closed = vi.fn()
+    await act(async () => {
+      void result.current.createBranchWorkspace(f.workbench, 'feature').then(closed)
+    })
+    try {
+      expect(apply).toHaveBeenCalledOnce()
+      expect(closed).toHaveBeenCalledWith(true)
+      expect(result.current.workbench?.initialization?.stage).not.toBe('complete')
+    } finally {
+      await act(async () => finish(f.completed))
+    }
+    await waitFor(() => expect(result.current.workbench?.initialization?.stage).toBe('complete'))
+  })
+
+  it('keeps the user’s viewport after leaving and returning while defaults are pending', async () => {
+    const f = fixture()
+    let finish!: (value: WorkspaceInitializationResult) => void
+    const apply = vi.fn(
+      () =>
+        new Promise<WorkspaceInitializationResult>((resolve) => {
+          finish = resolve
+        })
+    )
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        applyWorkspaceInitialization: apply,
+        listWorkspaceInitializations: async () => [f.details]
+      }
+    })
+    const setViewport = vi.fn(async () => true)
+    const instance = { getViewport: () => ({ x: 90, y: 50, zoom: 0.8 }), setViewport }
+    const { result } = renderController(
+      f.workbench,
+      vi.fn(async () => f.workbench),
+      undefined,
+      instance as unknown as NonNullable<
+        Parameters<typeof useWorkspaceInitialization>[0]['reactFlowInstanceRef']['current']
+      >
+    )
+    await act(async () => {
+      await result.current.createBranchWorkspace(f.workbench, 'feature')
+    })
+    act(() => result.current.setWorkbench(createWorkbenchSnapshot('/other', 'Other')))
+    act(() => result.current.setWorkbench(f.workbench))
+    await act(async () =>
+      finish({
+        ...f.completed,
+        agents: [
+          {
+            agentId: 'agent',
+            name: 'Agent',
+            providerId: 'provider',
+            projectId: f.workbench.project.id,
+            workspaceId: f.workbench.graph.workspaceId,
+            cleancodeMcpEnabled: false,
+            layout: { position: { x: 320, y: 0 }, size: { width: 720, height: 460 } }
+          }
+        ]
+      })
+    )
+    await waitFor(() => expect(result.current.workbench?.initialization?.stage).toBe('complete'))
+    expect(setViewport).not.toHaveBeenCalled()
   })
 
   it('does not replace a newly selected workspace with a late initialization response', async () => {
@@ -234,7 +351,10 @@ function fixture() {
 function renderController(
   initial: WorkbenchSnapshot,
   createWorkspace: Parameters<typeof useWorkspaceInitialization>[0]['createWorkspace'],
-  notifications = { notify: vi.fn(() => ''), update: vi.fn(() => false), dismiss: vi.fn() }
+  notifications = { notify: vi.fn(() => ''), update: vi.fn(() => false), dismiss: vi.fn() },
+  flowInstance: Parameters<
+    typeof useWorkspaceInitialization
+  >[0]['reactFlowInstanceRef']['current'] = null
 ) {
   const nodeStore = createWorkbenchNodeStore()
   return renderHook(() => {
@@ -246,7 +366,7 @@ function renderController(
       createWorkspace,
       nodeStore,
       protectedNodeIds: new Set(),
-      reactFlowInstanceRef: { current: null },
+      reactFlowInstanceRef: { current: flowInstance },
       setCurrentWorkbench: setWorkbench,
       setWorkbenches
     })

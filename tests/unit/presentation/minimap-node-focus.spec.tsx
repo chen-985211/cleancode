@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useRef } from 'react'
@@ -12,7 +13,7 @@ import { useMinimapNodeFocus } from '../../../src/presentation/app-shell/workben
 
 describe('minimap node focus', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -80,7 +81,7 @@ describe('minimap node focus', () => {
     expect(viewport.zoom).toBeCloseTo(0.4352, 4)
   })
 
-  it('locates a minimap target without spatial motion when reduced motion is preferred', () => {
+  it('locates a minimap target without spatial motion with explicit immediate motion', () => {
     const setViewport = vi.fn(async () => true)
     const terminal = createTerminalBlock()
     const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
@@ -376,22 +377,6 @@ function createReactFlowInstance(
 type SetViewportSpy = ReturnType<
   typeof vi.fn<(viewport: Viewport, options: { readonly duration: number }) => Promise<boolean>>
 >
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
-}
 
 function createTerminalNode(terminal: TerminalBlockSnapshot): WorkbenchFlowNode {
   return {

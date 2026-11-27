@@ -159,6 +159,12 @@ function resolveCommittedFocusBounds(
     const expectedLayout = expectedLayoutsByNodeId.get(node.id)
     return expectedLayout ? [expectedLayout] : resolveCurrentNodeLayout(node)
   })
+  return boundsOfWorkbenchLayouts(layouts)
+}
+
+export function boundsOfWorkbenchLayouts(
+  layouts: readonly Pick<WorkbenchExpectedNodeLayout, 'position' | 'size'>[]
+) {
   if (layouts.length === 0) return null
 
   const left = Math.min(...layouts.map((layout) => layout.position.x))

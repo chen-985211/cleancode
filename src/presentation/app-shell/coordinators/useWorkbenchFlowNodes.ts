@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type Dispatch,
   type SetStateAction
 } from 'react'
@@ -104,6 +105,23 @@ export function useWorkbenchFlowNodes({
   onResizeAgent,
   onSelectAgent
 }: UseWorkbenchFlowNodesInput): void {
+  // Agent disposal can publish its final runtime event before the graph loses the node.
+  const [pendingAgentRemovals, setPendingAgentRemovals] = useState<
+    Pick<WorkspaceAgentSnapshot, 'agentId' | 'projectId' | 'workspaceId'>[]
+  >([])
+  const removeAgent = useCallback(
+    async (agent: WorkspaceAgentSnapshot) => {
+      const { agentId, projectId, workspaceId } = agent
+      const request = { agentId, projectId, workspaceId }
+      setPendingAgentRemovals((pending) => [...pending, request])
+      try {
+        await onRemoveAgent(agent)
+      } finally {
+        setPendingAgentRemovals((pending) => pending.filter((entry) => entry !== request))
+      }
+    },
+    [onRemoveAgent]
+  )
   const graphIdUsedForNodesRef = useRef<string | null>(null)
   const agentToolApprovalsRef = useRef(agentToolApprovals)
   const activeObjectEntrancesRef = useRef(new Map<string, WorkbenchObjectMotion>())
@@ -212,10 +230,16 @@ export function useWorkbenchFlowNodes({
             approvalController: currentAgentToolApprovals,
             currentWorkbench,
             currentWorkspace: currentWorkspace ?? null,
+            isRemovalPending: pendingAgentRemovals.some(
+              (entry) =>
+                entry.agentId === agent.agentId &&
+                entry.projectId === agent.projectId &&
+                entry.workspaceId === agent.workspaceId
+            ),
             isSelected: selectedAgentId === agent.agentId,
             onGraphUpdated: onAgentGraphUpdated,
             onMcpCapabilityChange,
-            onRemove: onRemoveAgent,
+            onRemove: removeAgent,
             onRename: onRenameAgent,
             onResize: onResizeAgent,
             onSelect: onSelectAgent
@@ -361,7 +385,8 @@ export function useWorkbenchFlowNodes({
     terminalStateStore,
     workflowNodeStates,
     terminalWorkflowBuildPresentation,
-    onRemoveAgent,
+    pendingAgentRemovals,
+    removeAgent,
     onMcpCapabilityChange,
     onRenameAgent,
     onResizeAgent,

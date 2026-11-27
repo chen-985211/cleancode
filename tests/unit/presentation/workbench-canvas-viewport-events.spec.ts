@@ -62,6 +62,16 @@ describe('workbench canvas viewport events', () => {
     expect(projection.onRasterInteractionEnd).toHaveBeenCalledWith(viewport.zoom)
   })
 
+  it('commits the initial framing of newly placed workspace contents for reopening', () => {
+    const projection = createViewportProjection()
+    const viewport = { x: 65, y: 160, zoom: 0.6 }
+    commitCompletedCanvasViewportMotion({
+      completion: { intent: { type: 'instant', persist: true }, viewport },
+      ...projection
+    })
+    expect(projection.onViewportChange).toHaveBeenCalledExactlyOnceWith(viewport)
+  })
+
   it('leaves instant restoration and preview commits with their explicit callers', () => {
     const projection = createViewportProjection()
 

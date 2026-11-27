@@ -169,8 +169,3 @@
   outline: 2px solid var(--cc-ring);
   outline-offset: 2px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .application-update-control {
-    transition: none;
-  }
-}

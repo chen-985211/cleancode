@@ -80,11 +80,3 @@
     transform: translate(var(--cc-tooltip-enter-x, 0), var(--cc-tooltip-enter-y, 0)) scale(0.7);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .cc-tooltip-content,
-  .cc-tooltip-content[data-state='closed'] {
-    animation: none;
-    transition: none;
-  }
-}

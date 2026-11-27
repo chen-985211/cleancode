@@ -153,9 +153,3 @@
     transform: rotate(360deg);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-create-split__spinner {
-    animation: none;
-  }
-}

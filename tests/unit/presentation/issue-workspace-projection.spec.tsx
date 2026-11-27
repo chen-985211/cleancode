@@ -3,11 +3,86 @@ import { useState } from 'react'
 import { useProjectWorkspaceLifecycle } from '../../../src/presentation/app-shell/coordinators/useProjectWorkspaceLifecycle'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbench/nodes/workbenchNodeStore'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types/workbenchSnapshot'
+import { createDeferred } from '../../fixtures/deferred'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
-describe('background issue workspace creation', () => {
+describe('background workspace updates', () => {
   afterEach(() => {
     delete window.cleancode
+  })
+
+  it.each(['unchanged', 'updated'] as const)(
+    'publishes a completed checkout to the %s sidebar after navigating away',
+    async (sidebarState) => {
+      const origin = createWorkbenchSnapshot('/project', 'project', { gitBranch: 'main' })
+      const other = createWorkbenchSnapshot('/other', 'other', { gitBranch: 'dev' })
+      const checkedOut = createWorkbenchSnapshot('/project', 'project', { gitBranch: 'release' })
+      const checkout = createDeferred<WorkbenchSnapshot>()
+      window.cleancode = {
+        checkoutMainWorkspaceBranch: () => checkout.promise,
+        switchBranchWorkspace: async () => other
+      } as unknown as NonNullable<Window['cleancode']>
+      const { result } = renderLifecycle(origin, other)
+      let pending!: Promise<void>
+      act(() => {
+        pending = result.current.branchWorkspaceActions.checkoutMainBranch(origin, 'release')
+      })
+      const extra = {
+        ...origin.gitBranches[0],
+        name: 'topic',
+        isCurrent: false,
+        isMainWorkspaceBranch: false
+      }
+      if (sidebarState === 'updated') {
+        act(() =>
+          result.current.replaceWorkbench({
+            ...origin,
+            gitBranches: [...origin.gitBranches, extra]
+          })
+        )
+      }
+      await act(() =>
+        result.current.branchWorkspaceActions.selectWorkspace(other, other.graph.workspaceId)
+      )
+      await act(async () => {
+        checkout.resolve(checkedOut)
+        await pending
+      })
+      const sidebar = result.current.workbenches.find(
+        (item) => item.project.id === origin.project.id
+      )!
+      expect(sidebar.project.workspaces[0].gitBranch).toBe('release')
+      expect(sidebar.gitBranches).toEqual(
+        sidebarState === 'updated' ? [extra, ...checkedOut.gitBranches] : checkedOut.gitBranches
+      )
+      expect(sidebar.graph).toBe(origin.graph)
+      expect(result.current.current).toBe(other)
+    }
+  )
+
+  it('keeps the newer branch when an older checkout result arrives last', async () => {
+    const origin = createWorkbenchSnapshot('/project', 'project', { gitBranch: 'main' })
+    const other = createWorkbenchSnapshot('/other', 'other')
+    const older = createDeferred<WorkbenchSnapshot>()
+    const newer = createWorkbenchSnapshot('/project', 'project', { gitBranch: 'hotfix' })
+    window.cleancode = {
+      checkoutMainWorkspaceBranch: vi
+        .fn()
+        .mockReturnValueOnce(older.promise)
+        .mockResolvedValueOnce(newer)
+    } as unknown as NonNullable<Window['cleancode']>
+    const { result } = renderLifecycle(origin, other)
+    let pending!: Promise<void>
+    act(() => {
+      pending = result.current.branchWorkspaceActions.checkoutMainBranch(origin, 'release')
+    })
+    await act(() => result.current.branchWorkspaceActions.checkoutMainBranch(origin, 'hotfix'))
+    await act(async () => {
+      older.resolve(createWorkbenchSnapshot('/project', 'project', { gitBranch: 'release' }))
+      await pending
+    })
+    expect(result.current.current).toBe(newer)
+    expect(result.current.workbenches[0]).toBe(newer)
   })
 
   it.each(['current-workspace', 'same-project', 'other-project'] as const)(
@@ -85,32 +160,7 @@ describe('background issue workspace creation', () => {
         switchBranchWorkspace: async () => target,
         synchronizeProjectGitState: async () => null
       } as unknown as NonNullable<Window['cleancode']>
-      const nodeStore = createWorkbenchNodeStore()
-      const { result } = renderHook(() => {
-        const [current, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(origin)
-        const [workbenches, setWorkbenches] = useState([origin, other])
-        const replaceWorkbench = (value: WorkbenchSnapshot) => {
-          setCurrentWorkbench(value)
-          setWorkbenches((items) =>
-            items.map((item) => (item.project.id === value.project.id ? value : item))
-          )
-        }
-        const controller = useProjectWorkspaceLifecycle({
-          currentWorkbench: current,
-          setCurrentWorkbench,
-          setWorkbenches,
-          replaceWorkbench,
-          notifications: { notify: vi.fn(() => ''), update: vi.fn(() => false), dismiss: vi.fn() },
-          nodeStore,
-          protectedNodeIds: new Set(),
-          reactFlowInstanceRef: { current: null },
-          setHoveredTerminalBlockId: vi.fn(),
-          setSelectedTerminalBlockId: vi.fn(),
-          terminateWorkspaceTerminalSessions: vi.fn(),
-          forgetWorkspaceTerminalStates: vi.fn()
-        })
-        return { ...controller, current, workbenches, replaceWorkbench }
-      })
+      const { result } = renderLifecycle(origin, other)
       let pending!: Promise<WorkbenchSnapshot | undefined>
       act(() => {
         pending = result.current.branchWorkspaceActions.createBranchWorkspace(origin, 'issue/42', {
@@ -165,3 +215,32 @@ describe('background issue workspace creation', () => {
     }
   )
 })
+
+function renderLifecycle(origin: WorkbenchSnapshot, other: WorkbenchSnapshot) {
+  const nodeStore = createWorkbenchNodeStore()
+  return renderHook(() => {
+    const [current, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(origin)
+    const [workbenches, setWorkbenches] = useState([origin, other])
+    const replaceWorkbench = (value: WorkbenchSnapshot) => {
+      setCurrentWorkbench(value)
+      setWorkbenches((items) =>
+        items.map((item) => (item.project.id === value.project.id ? value : item))
+      )
+    }
+    const controller = useProjectWorkspaceLifecycle({
+      currentWorkbench: current,
+      setCurrentWorkbench,
+      setWorkbenches,
+      replaceWorkbench,
+      notifications: { notify: vi.fn(() => ''), update: vi.fn(() => false), dismiss: vi.fn() },
+      nodeStore,
+      protectedNodeIds: new Set(),
+      reactFlowInstanceRef: { current: null },
+      setHoveredTerminalBlockId: vi.fn(),
+      setSelectedTerminalBlockId: vi.fn(),
+      terminateWorkspaceTerminalSessions: vi.fn(),
+      forgetWorkspaceTerminalStates: vi.fn()
+    })
+    return { ...controller, current, workbenches, replaceWorkbench }
+  })
+}

@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import { act, renderHook } from '@testing-library/react'
 
@@ -7,7 +8,7 @@ import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/type
 
 describe('application shortcut navigation hook', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -93,7 +94,7 @@ describe('application shortcut navigation hook', () => {
     expect(viewport.zoom).toBe(1)
   })
 
-  it('centers without spatial motion when the user prefers reduced motion', () => {
+  it('centers without spatial motion when motion is explicitly immediate', () => {
     const target = createNode('target', 600, 100)
     const setViewport = vi.fn(async () => true)
     const hook = renderNavigationHook({
@@ -243,22 +244,6 @@ function renderNavigationHook({
 type SetViewportSpy = ReturnType<
   typeof vi.fn<(viewport: Viewport, options: { readonly duration: number }) => Promise<boolean>>
 >
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
-}
 
 function createNode(
   id: string,

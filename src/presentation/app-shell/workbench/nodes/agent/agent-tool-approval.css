@@ -480,16 +480,3 @@
     stroke-dashoffset: -30;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-tool-approval-card,
-  .agent-tool-approval-card__spinner,
-  .agent-approval-intent-edge__path {
-    animation: none;
-  }
-
-  .agent-tool-approval-card__button,
-  .agent-tool-approval-card__locate {
-    transition: none;
-  }
-}

@@ -48,7 +48,7 @@ import {
 export { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
 
 export type WorkbenchViewportMotionIntent =
-  | { readonly type: 'instant' }
+  | { readonly type: 'instant'; readonly persist?: true }
   | { readonly type: 'quick' }
   | { readonly type: 'spatial' }
   | {

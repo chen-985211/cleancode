@@ -40,6 +40,7 @@ export interface RuntimeApiOverrides {
   readonly removeProject?: ReturnType<typeof vi.fn>
   readonly reorderProject?: ReturnType<typeof vi.fn>
   readonly archiveBranchWorkspace?: ReturnType<typeof vi.fn>
+  readonly listWorkspaceBaseBranches?: ReturnType<typeof vi.fn>
   readonly createBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
@@ -97,6 +98,9 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     removeProject: overrides.removeProject ?? vi.fn(),
     reorderProject: overrides.reorderProject ?? vi.fn(),
     archiveBranchWorkspace: overrides.archiveBranchWorkspace ?? vi.fn(),
+    listWorkspaceBaseBranches:
+      overrides.listWorkspaceBaseBranches ??
+      vi.fn(async () => ({ branches: ['refs/heads/main'], defaultBranch: 'refs/heads/main' })),
     createBranchWorkspace: overrides.createBranchWorkspace ?? vi.fn(),
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),

@@ -157,18 +157,14 @@ describe('project sidebar workspace archive feedback', () => {
 
       expect(screen.queryByRole('button', { name: 'feature 独立工作区' })).toBeNull()
       expect(screen.getByRole('button', { name: 'other 独立工作区' })).toBe(neighbor)
-      if (reduced) {
-        expect(row).not.toBeInTheDocument()
-      } else {
-        expect(row).toBeInTheDocument()
-        expect(row).toHaveAttribute('inert')
-        expect(row).toHaveAttribute('data-workspace-archive-state', 'exiting')
-        act(() => vi.advanceTimersByTime(400))
-        expect(Number.parseFloat(row.style.height)).toBeGreaterThan(0)
-        expect(Number.parseFloat(row.style.height)).toBeLessThan(32)
-        act(() => vi.advanceTimersByTime(2000))
-        expect(row).not.toBeInTheDocument()
-      }
+      expect(row).toBeInTheDocument()
+      expect(row).toHaveAttribute('inert')
+      expect(row).toHaveAttribute('data-workspace-archive-state', 'exiting')
+      act(() => vi.advanceTimersByTime(400))
+      expect(Number.parseFloat(row.style.height)).toBeGreaterThan(0)
+      expect(Number.parseFloat(row.style.height)).toBeLessThan(32)
+      act(() => vi.advanceTimersByTime(2000))
+      expect(row).not.toBeInTheDocument()
       await act(async () => operation.resolve())
     }
   )
@@ -243,7 +239,7 @@ describe('project sidebar workspace archive feedback', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('keeps the selection material attached after immediate reduced-motion removal', () => {
+  it('keeps the selection material attached through animated removal with the system preference enabled', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue(mediaQuery(true))
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(224)
     vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (
@@ -280,6 +276,7 @@ describe('project sidebar workspace archive feedback', () => {
 
     rerender(<ProjectSidebar {...props} currentWorkbench={archived} workbenches={[archived]} />)
 
+    act(() => vi.advanceTimersByTime(2000))
     expect(indicator.style.getPropertyValue('--cc-selection-motion-y')).toBe('34px')
   })
 

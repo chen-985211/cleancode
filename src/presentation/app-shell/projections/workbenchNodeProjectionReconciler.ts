@@ -212,6 +212,7 @@ const terminalGroupDataKeys = [
 ] as const satisfies readonly (keyof TerminalGroupFlowNode['data'])[]
 
 const agentDataKeys = [
+  'isRemovalPending',
   'isContextSelected',
   'approvalController',
   'currentWorkbench',

@@ -197,9 +197,9 @@ it.each([
       await terminal.getByRole('button', { name: '保存终端信息', exact: true }).click()
       await terminal.locator('.terminal-metadata-surface').waitFor({ state: 'detached' })
       expect(await motion.evaluate((recorder) => recorder.stop())).toEqual({
-        entered: !reducedMotion,
-        exited: !reducedMotion,
-        fieldsMoved: !reducedMotion,
+        entered: true,
+        exited: true,
+        fieldsMoved: true,
         terminalSizeStable: true
       })
       expect(await page.locator('.react-flow__viewport').getAttribute('style')).toBe(viewportBefore)

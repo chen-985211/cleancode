@@ -81,6 +81,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:save-workspace-defaults', command),
   cancelWorkspaceInitialization: (command: unknown) =>
     invokeCleancode('cleancode:cancel-workspace-initialization', command),
+  listWorkspaceBaseBranches: (command: unknown) =>
+    invokeCleancode('cleancode:list-workspace-base-branches', command),
   listWorkspaceInitializations: (command: unknown) =>
     invokeCleancode('cleancode:list-workspace-initializations', command),
   beginWorkspaceInitialization: (command: unknown) =>

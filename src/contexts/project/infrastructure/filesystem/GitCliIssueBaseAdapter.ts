@@ -2,24 +2,11 @@ import { createProjectError } from '../../application/errors/ProjectErrors'
 import type { IssueWorkspaceBasePort } from '../../application/ports/IssueWorkspaceBasePort'
 import { normalizeIssueRepository } from '../../domain/value-objects/ProjectIssue'
 
+import { fetchOptions, fetchTrackingBranch, readGitCommit } from './GitBaseCommit'
 import { runGit } from './GitProcess'
 
 const freshnessMs = 30_000
 const cacheLimit = 64
-const fetchOptions = [
-  '-c',
-  'maintenance.auto=false',
-  '-c',
-  'maintenance.commit-graph.auto=0',
-  '-c',
-  'gc.auto=0',
-  'fetch',
-  '--no-tags',
-  '--no-write-fetch-head',
-  '--no-recurse-submodules',
-  '--'
-]
-
 export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
   private readonly recent = new Map<string, { commit: string; expiresAt: number }>()
   private readonly pending = new Map<string, Promise<string>>()
@@ -30,7 +17,7 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
       if (!branch || branch !== branch.trim() || branch.startsWith('-'))
         throw new Error('Invalid base')
       if (/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(branch)) {
-        const commit = await this.readCommit(directory, branch)
+        const commit = await readGitCommit(directory, branch)
         if (!commit) throw new Error('Commit unavailable')
         return commit
       }
@@ -38,7 +25,7 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
       const localRef = branch.startsWith('refs/heads/') ? branch : `refs/heads/${branch}`
       await runGit(directory, ['check-ref-format', explicitRemote ? branch : localRef])
       if (!explicitRemote) {
-        const local = await this.readCommit(directory, localRef)
+        const local = await readGitCommit(directory, localRef)
         if (local) return local
         if (branch.startsWith('refs/heads/')) throw new Error('Local branch unavailable')
       }
@@ -82,15 +69,6 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
     }
   }
 
-  private async readCommit(directory: string, ref: string): Promise<string | undefined> {
-    try {
-      const commit = (await runGit(directory, ['rev-parse', '--verify', `${ref}^{commit}`])).trim()
-      return /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(commit) ? commit : undefined
-    } catch {
-      return undefined
-    }
-  }
-
   private async refresh(
     directory: string,
     repo: string,
@@ -102,11 +80,7 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
     await runGit(directory, ['check-ref-format', `refs/heads/${branch}`])
     const key = JSON.stringify([directory, repo.toLowerCase(), source, branch, url])
     const cached = this.recent.get(key)
-    if (
-      cached &&
-      cached.expiresAt > Date.now() &&
-      (await this.readCommit(directory, cached.commit))
-    )
+    if (cached && cached.expiresAt > Date.now() && (await readGitCommit(directory, cached.commit)))
       return cached.commit
     this.recent.delete(key)
     const existing = this.pending.get(key)
@@ -129,13 +103,13 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
     branch: string,
     tracking: boolean
   ): Promise<string> {
-    if (tracking) {
-      const ref = `refs/remotes/${source}/${branch}`
-      await runGit(directory, [...fetchOptions, source, `+refs/heads/${branch}:${ref}`])
-      const commit = await this.readCommit(directory, ref)
-      if (!commit) throw new Error('Remote branch unavailable')
-      return commit
-    }
+    if (tracking)
+      return fetchTrackingBranch(
+        directory,
+        source,
+        `refs/heads/${branch}`,
+        `refs/remotes/${source}/${branch}`
+      )
     const output = await runGit(directory, [
       'ls-remote',
       '--exit-code',
@@ -151,9 +125,9 @@ export class GitCliIssueBaseAdapter implements IssueWorkspaceBasePort {
       ?.split('\t')[0]
     if (!commit || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(commit))
       throw new Error('Remote branch unavailable')
-    if (!(await this.readCommit(directory, commit)))
+    if (!(await readGitCommit(directory, commit)))
       await runGit(directory, [...fetchOptions, source, commit])
-    if (!(await this.readCommit(directory, commit))) throw new Error('Fetched commit unavailable')
+    if (!(await readGitCommit(directory, commit))) throw new Error('Fetched commit unavailable')
     return commit
   }
 }

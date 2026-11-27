@@ -53,7 +53,9 @@ const groupCollapseSpringDynamics = { dampingRatio: 1, response: 0.3 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
 const disclosureRevealDynamics = { dampingRatio: 1, response: 0.12 }
 const presenceCreateSpringDynamics = { dampingRatio: 1, response: 0.34 }
-const presenceDeleteSpringDynamics = { dampingRatio: 1, response: 0.26 }
+const presenceDeleteSpringDynamics = { dampingRatio: 1, response: 0.31 }
+// Ramp into the spring so both node types reach half size around 200 ms after appearing.
+const creationWarmupSeconds = 0.26
 const positionSettlementThresholds = { speed: 1, value: 0.1 }
 const opacitySettlementThresholds = { speed: 0.02, value: 0.002 }
 const scaleSettlementThresholds = { speed: 0.02, value: 0.002 }
@@ -108,6 +110,7 @@ export function createWorkbenchObjectSpringController({
   let isDropFalling = false
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
+  let creationElapsedSeconds = 0
 
   const cancelFrame = (): void => {
     if (animationFrameId !== null) scheduler.cancelFrame(animationFrameId)
@@ -222,6 +225,13 @@ export function createWorkbenchObjectSpringController({
           : disclosureOpacityDynamics,
       contentActiveElapsedSeconds
     )
+    let scaleElapsedSeconds = activeElapsedSeconds
+    if (motion?.kind === 'create' && motion.scale) {
+      const previous = creationElapsedSeconds
+      creationElapsedSeconds += activeElapsedSeconds
+      scaleElapsedSeconds =
+        creationSpringTime(creationElapsedSeconds) - creationSpringTime(previous)
+    }
     scaleAxis = advanceSpringAxis(
       scaleAxis,
       scaleTarget,
@@ -230,7 +240,7 @@ export function createWorkbenchObjectSpringController({
         : motion?.kind === 'delete'
           ? presenceDeleteSpringDynamics
           : presenceCreateSpringDynamics,
-      activeElapsedSeconds
+      scaleElapsedSeconds
     )
     if (motion?.shellRect) {
       shellXAxis = advanceSpringAxis(
@@ -450,6 +460,7 @@ export function createWorkbenchObjectSpringController({
       }
 
       if (motion?.id !== nextMotion.id) {
+        creationElapsedSeconds = 0
         if (motion) retargetMotion(nextMotion)
         else initializeMotion(nextMotion)
         motion = nextMotion
@@ -486,6 +497,12 @@ export function createWorkbenchObjectSpringController({
       scheduleFrame()
     }
   }
+}
+
+function creationSpringTime(seconds: number): number {
+  return seconds < creationWarmupSeconds
+    ? (seconds * seconds) / (2 * creationWarmupSeconds)
+    : seconds - creationWarmupSeconds / 2
 }
 
 function isDisclosureMotion(motion: WorkbenchObjectMotion | null): boolean {

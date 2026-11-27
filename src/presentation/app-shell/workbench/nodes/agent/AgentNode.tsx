@@ -21,7 +21,7 @@ export const AgentNode = memo(function AgentNode({
     data.objectMotion,
     data.onObjectMotionComplete
   )
-  const isPresenceExit = data.objectMotion?.kind === 'delete'
+  const isRemoving = data.isRemovalPending || data.objectMotion?.kind === 'delete'
   const hasActiveApproval = approvalController.approvals.some(
     (approval) => approval.request.agentId === data.agent.agentId
   )
@@ -46,8 +46,8 @@ export const AgentNode = memo(function AgentNode({
       data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
       data-context-selected={data.isContextSelected || undefined}
       data-selection-state={selected ? 'selected' : 'unselected'}
-      aria-hidden={isPresenceExit || undefined}
-      inert={isPresenceExit || undefined}
+      aria-hidden={isRemoving || undefined}
+      inert={isRemoving || undefined}
       style={objectMotion.style}
       onAnimationEnd={objectMotion.onAnimationEnd}
     >
@@ -70,6 +70,7 @@ export const AgentNode = memo(function AgentNode({
         }}
       />
       <AgentConsole
+        isExiting={isRemoving}
         agent={data.agent}
         approvalController={approvalController}
         currentWorkbench={data.currentWorkbench}

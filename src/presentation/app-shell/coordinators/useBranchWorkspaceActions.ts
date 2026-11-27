@@ -24,6 +24,7 @@ interface UseBranchWorkspaceActionsInput {
   readonly notifications: AppNotificationController
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly rememberCreatedWorkspace: (workbench: WorkbenchSnapshot) => void
+  readonly rememberCheckout: (origin: WorkbenchSnapshot, checkout: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly terminateWorkspaceTerminalSessions: (
@@ -60,6 +61,7 @@ export function useBranchWorkspaceActions({
   notifications,
   replaceWorkbench,
   rememberCreatedWorkspace,
+  rememberCheckout,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
   terminateWorkspaceTerminalSessions,
@@ -71,6 +73,7 @@ export function useBranchWorkspaceActions({
   const translateRef = useRef(t)
   const currentActionOccurrenceIdsRef = useRef(new Map<string, string>())
   const selectionEpoch = useRef(0)
+  const appliedCheckoutEpochs = useRef(new Map<string, number>())
   const currentWorkbenchRef = useRef(currentWorkbench)
   useLayoutEffect(() => {
     currentWorkbenchRef.current = currentWorkbench
@@ -270,6 +273,8 @@ export function useBranchWorkspaceActions({
       workbench: WorkbenchSnapshot,
       branchName: string,
       options?: {
+        readonly baseBranch?: string
+        readonly selectWorkspace?: false
         readonly requestId: string
         readonly defaults?: WorkspaceDefaults
         readonly issueCommand?: StartIssueWorkspaceCommand
@@ -300,9 +305,7 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        if (options?.issueCommand) {
-          // Creation publishes metadata, but must not commit a navigation choice.
-          rememberCreatedWorkspace(createdWorkbench)
+        if (options?.issueCommand || options?.baseBranch || options?.selectWorkspace === false) {
           const current = currentWorkbenchRef.current
           if (
             selectionEpoch.current === epoch &&
@@ -311,6 +314,9 @@ export function useBranchWorkspaceActions({
           ) {
             await selectWorkspaceWithResult(createdWorkbench, createdWorkbench.graph.workspaceId)
           }
+          // Publish the row once navigation settles so new canvas actions have the correct scope.
+          // A superseding user selection still receives the new workspace in its sidebar.
+          rememberCreatedWorkspace(createdWorkbench)
         } else {
           clearCurrentBlockSelection()
           replaceWorkbench(createdWorkbench)
@@ -400,7 +406,8 @@ export function useBranchWorkspaceActions({
   const checkoutMainBranch = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'checkout-main')
-      const occurrenceId = beginActionAttempt(key)
+      const occurrenceId = beginSelectionAttempt(key)
+      const epoch = selectionEpoch.current
 
       try {
         const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
@@ -408,12 +415,20 @@ export function useBranchWorkspaceActions({
           branchName
         })
 
-        if (!isCurrentActionAttempt(key, occurrenceId)) return
         if (checkedOutWorkbench) {
+          const projectId = checkedOutWorkbench.project.id
+          if ((appliedCheckoutEpochs.current.get(projectId) ?? 0) > epoch) return
+          appliedCheckoutEpochs.current.set(projectId, epoch)
+          if (!isCurrentSelectionAttempt(key, occurrenceId)) {
+            rememberCheckout(workbench, checkedOutWorkbench)
+            return
+          }
           replaceWorkbench(checkedOutWorkbench)
         }
-        completeActionAttempt(key, occurrenceId)
+        if (settleSelectionAttempt(key, occurrenceId)) dismissPublishedActionError(key)
       } catch (error) {
+        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
+        currentSelectionAttemptRef.current = null
         publishActionError({
           error,
           fallbackKey: 'workspaceAction.checkoutFailed',
@@ -424,11 +439,13 @@ export function useBranchWorkspaceActions({
       }
     },
     [
-      beginActionAttempt,
-      completeActionAttempt,
-      isCurrentActionAttempt,
+      beginSelectionAttempt,
+      dismissPublishedActionError,
+      isCurrentSelectionAttempt,
       publishActionError,
-      replaceWorkbench
+      rememberCheckout,
+      replaceWorkbench,
+      settleSelectionAttempt
     ]
   )
 

@@ -1,10 +1,10 @@
-.project-card:has(> .branch-workspace-surface) {
+.project-card:has(.branch-workspace-surface) {
   z-index: 7;
 }
 
 .branch-workspace-surface {
   position: absolute;
-  top: 32px;
+  top: 100%;
   right: 28px;
   z-index: 58;
   width: min(218px, calc(100% - 36px));
@@ -15,9 +15,21 @@
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
   opacity: var(--branch-workspace-motion-opacity, 1);
-  transform: translate3d(0, var(--branch-workspace-motion-y, 0px), 0)
+  transform: translate3d(
+      0,
+      calc(var(--branch-workspace-motion-y, 0px) * var(--branch-workspace-direction, 1)),
+      0
+    )
     scale(var(--branch-workspace-motion-scale, 1));
   transform-origin: top right;
+}
+
+.branch-workspace-surface[data-side='top'] {
+  --branch-workspace-direction: -1;
+
+  top: auto;
+  bottom: 100%;
+  transform-origin: bottom right;
 }
 
 .branch-workspace-surface[data-branch-workspace-spring-state='opening'],
@@ -44,7 +56,7 @@
   font-size: 11px;
 }
 
-.branch-workspace-form button {
+.branch-workspace-form button:not([aria-haspopup]) {
   display: inline-flex;
   height: 30px;
   align-items: center;
@@ -60,13 +72,40 @@
   font-weight: 650;
 }
 
-.branch-workspace-form button:hover {
+.branch-workspace-form button:not(:disabled):hover {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
 }
 
 .branch-workspace-form input:focus-visible,
-.branch-workspace-form button:focus-visible {
+.branch-workspace-form button[type='submit']:focus-visible {
   border-color: var(--cc-sidebar-focus-ring);
   outline: none;
+}
+
+.branch-workspace-base {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding-inline-start: 8px;
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.branch-workspace-base .choice-select-trigger {
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px 7px;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
+.branch-workspace-form .choice-select-trigger span,
+.branch-workspace-base-menu button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

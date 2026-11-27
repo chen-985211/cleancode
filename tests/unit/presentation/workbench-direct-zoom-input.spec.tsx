@@ -109,7 +109,7 @@ describe('workbench direct zoom input', () => {
     }
   )
 
-  it('settles both canvas motion owners when reduced motion changes at runtime', () => {
+  it('keeps canvas zoom running when the system preference changes at runtime', () => {
     const media = createMutableMediaQueryList(false)
     vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
     const instance = createViewportInstance()
@@ -126,8 +126,8 @@ describe('workbench direct zoom input', () => {
 
     act(() => media.setMatches(true))
 
-    expect(settleDirectZoom).toHaveBeenCalledWith(true, instance)
-    expect(settleViewport).toHaveBeenCalledWith(true, instance)
+    expect(settleDirectZoom).not.toHaveBeenCalled()
+    expect(settleViewport).not.toHaveBeenCalled()
   })
 })
 

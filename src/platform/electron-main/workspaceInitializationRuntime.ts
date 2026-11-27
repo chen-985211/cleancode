@@ -13,6 +13,7 @@ import {
 } from '../../contexts/project/application/use-cases/PrepareWorkspaceInitializationUseCase'
 import { InitializeWorkspaceContentUseCase } from '../../contexts/project/application/use-cases/InitializeWorkspaceContentUseCase'
 import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
+import { GitCliWorkspaceBaseAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceBaseAdapter'
 import { FileSystemWorkspaceInitializationRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemWorkspaceInitializationRepository'
 import type { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import type { InstantiateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
@@ -31,7 +32,7 @@ import type { ProjectIpcHandlersInput } from './projectIpcHandlers'
 
 interface WorkspaceInitializationRuntimeInput extends Omit<
   WorkspaceInitializationPreparationDependencies,
-  'repository' | 'content'
+  'repository' | 'content' | 'baseBranches'
 > {
   readonly appStateDirectory: string
   readonly templates: BlockTemplateRepository
@@ -143,7 +144,12 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
       ).id
     }
   }
-  const preparation = new PrepareWorkspaceInitializationUseCase({ ...input, repository, content })
+  const preparation = new PrepareWorkspaceInitializationUseCase({
+    ...input,
+    repository,
+    content,
+    baseBranches: new GitCliWorkspaceBaseAdapter()
+  })
   const initialize = new InitializeWorkspaceContentUseCase(
     repository,
     content,
@@ -190,6 +196,7 @@ export function createWorkspaceInitializationRuntime(input: WorkspaceInitializat
       registerWorkspaceInitializationIpcHandlers({
         ipcMain,
         logger,
+        listBaseBranches: preparation.listBaseBranches.bind(preparation),
         getDefaults: preparation.getDefaults.bind(preparation),
         cancel: preparation.cancelOne.bind(preparation),
         saveDefaults: preparation.saveDefaults.bind(preparation),

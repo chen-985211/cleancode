@@ -23,6 +23,41 @@ describe('branch workspace action notifications', () => {
     })
   })
 
+  it('publishes the new sidebar workspace and canvas together when navigation is still current', async () => {
+    const workbench = createWorkbench()
+    const created = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaceId: 'new-workspace',
+      gitBranch: 'test/login'
+    })
+    const selection = createDeferred<WorkbenchSnapshot>()
+    const switchBranchWorkspace = vi.fn(() => selection.promise)
+    const rememberCreatedWorkspace = vi.fn()
+    const replaceWorkbench = vi.fn()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        createBranchWorkspace: vi.fn(async () => created),
+        switchBranchWorkspace
+      })
+    })
+    const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
+      rememberCreatedWorkspace,
+      replaceWorkbench
+    })
+    const pending = result.current.createBranchWorkspace(workbench, 'test/login', {
+      requestId: 'create',
+      baseBranch: 'refs/heads/main'
+    })
+    await vi.waitFor(() => expect(switchBranchWorkspace).toHaveBeenCalledOnce())
+    expect(rememberCreatedWorkspace).not.toHaveBeenCalled()
+    expect(replaceWorkbench).not.toHaveBeenCalled()
+    selection.resolve(created)
+    await act(async () => {
+      await pending
+    })
+    expect(replaceWorkbench).toHaveBeenCalledWith(created)
+  })
+
   it('opens the created issue workspace when started from another project in the task panel', async () => {
     const current = createWorkbench()
     const target = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
@@ -57,36 +92,139 @@ describe('branch workspace action notifications', () => {
     expect(replaceWorkbench).toHaveBeenCalledWith(target)
   })
 
-  it('does not navigate back when an issue finishes after a newer workspace selection', async () => {
+  it.each(['issue', 'resumed branch', 'legacy recovery'] as const)(
+    'keeps the newer workspace selection when a %s request finishes late',
+    async (source) => {
+      const workbench = createWorkbench()
+      const creation = createDeferred<WorkbenchSnapshot>()
+      const selected = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
+      const created = createWorkbenchSnapshot('/tmp/alpha-project', 'issue-result')
+      const replaceWorkbench = vi.fn()
+      const switchBranchWorkspace = vi.fn(async () => selected)
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: {
+          ...createRuntimeApi({
+            switchBranchWorkspace,
+            createBranchWorkspace: vi.fn(() => creation.promise)
+          }),
+          startIssueWorkspace: () => creation.promise
+        }
+      })
+      const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
+        replaceWorkbench
+      })
+      const pending = result.current.createBranchWorkspace(workbench, 'issue/42', {
+        requestId: 'request',
+        ...(source === 'issue'
+          ? {
+              issueCommand: {
+                projectDirectory: workbench.project.directory,
+                repository: 'owner/repo',
+                number: 42,
+                branchName: 'issue/42',
+                baseBranch: 'main'
+              }
+            }
+          : source === 'resumed branch'
+            ? { baseBranch: 'refs/remotes/origin/main' }
+            : { selectWorkspace: false })
+      })
+      await act(() => result.current.selectWorkspace(selected, selected.graph.workspaceId))
+      creation.resolve(created)
+      await expect(pending).resolves.toBe(created)
+      expect(switchBranchWorkspace).toHaveBeenCalledExactlyOnceWith({
+        projectDirectory: selected.project.directory,
+        workspaceId: selected.graph.workspaceId
+      })
+      expect(replaceWorkbench.mock.calls).toEqual([[selected]])
+    }
+  )
+
+  it.each(['before', 'after'] as const)(
+    'keeps the chosen branch when creation finishes %s checkout',
+    async (when) => {
+      const workbench = createWorkbench()
+      const creation = createDeferred<WorkbenchSnapshot>()
+      const checkout = createDeferred<WorkbenchSnapshot>()
+      const created = createWorkbenchSnapshot(workbench.project.directory, 'Created', {
+        workspaceId: 'new-workspace'
+      })
+      const checkedOut = createWorkbenchSnapshot(
+        workbench.project.directory,
+        workbench.project.name,
+        {
+          workspaceId: workbench.graph.workspaceId,
+          gitBranch: 'release'
+        }
+      )
+      const switchBranchWorkspace = vi.fn(async () => created)
+      const replaceWorkbench = vi.fn()
+      const rememberCreatedWorkspace = vi.fn()
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({
+          createBranchWorkspace: vi.fn(() => creation.promise),
+          checkoutMainWorkspaceBranch: vi.fn(() => checkout.promise),
+          switchBranchWorkspace
+        })
+      })
+      const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
+        replaceWorkbench,
+        rememberCreatedWorkspace
+      })
+      const pending = result.current.createBranchWorkspace(workbench, 'topic', {
+        requestId: 'request',
+        baseBranch: 'refs/remotes/origin/main'
+      })
+      const switching = result.current.checkoutMainBranch(workbench, 'release')
+      if (when === 'after') {
+        checkout.resolve(checkedOut)
+        await switching
+      }
+      creation.resolve(created)
+      await pending
+      checkout.resolve(checkedOut)
+      await switching
+      expect(switchBranchWorkspace).not.toHaveBeenCalled()
+      expect(replaceWorkbench.mock.calls).toEqual([[checkedOut]])
+      expect(rememberCreatedWorkspace).toHaveBeenCalledExactlyOnceWith(created)
+    }
+  )
+
+  it('ignores a late workspace load when checkout supersedes the automatic selection', async () => {
     const workbench = createWorkbench()
-    const creation = createDeferred<WorkbenchSnapshot>()
-    const selected = createWorkbenchSnapshot('/tmp/other-project', 'other-project')
-    const created = createWorkbenchSnapshot('/tmp/alpha-project', 'issue-result')
+    const created = createWorkbenchSnapshot(workbench.project.directory, 'Created', {
+      workspaceId: 'new-workspace'
+    })
+    const checkedOut = createWorkbenchSnapshot(
+      workbench.project.directory,
+      workbench.project.name,
+      { workspaceId: workbench.graph.workspaceId, gitBranch: 'release' }
+    )
+    const load = createDeferred<WorkbenchSnapshot>()
+    const switchBranchWorkspace = vi.fn(() => load.promise)
     const replaceWorkbench = vi.fn()
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: {
-        ...createRuntimeApi({ switchBranchWorkspace: vi.fn(async () => selected) }),
-        startIssueWorkspace: () => creation.promise
-      }
+      value: createRuntimeApi({
+        createBranchWorkspace: vi.fn(async () => created),
+        checkoutMainWorkspaceBranch: vi.fn(async () => checkedOut),
+        switchBranchWorkspace
+      })
     })
     const { result } = renderBranchWorkspaceActions(workbench, createNotifications(), {
       replaceWorkbench
     })
-    const pending = result.current.createBranchWorkspace(workbench, 'issue/42', {
+    const pending = result.current.createBranchWorkspace(workbench, 'topic', {
       requestId: 'request',
-      issueCommand: {
-        projectDirectory: workbench.project.directory,
-        repository: 'owner/repo',
-        number: 42,
-        branchName: 'issue/42',
-        baseBranch: 'main'
-      }
+      baseBranch: 'refs/remotes/origin/main'
     })
-    await act(() => result.current.selectWorkspace(selected, selected.graph.workspaceId))
-    creation.resolve(created)
-    await expect(pending).resolves.toBe(created)
-    expect(replaceWorkbench.mock.calls).toEqual([[selected]])
+    await vi.waitFor(() => expect(switchBranchWorkspace).toHaveBeenCalledOnce())
+    await result.current.checkoutMainBranch(workbench, 'release')
+    load.resolve(created)
+    await pending
+    expect(replaceWorkbench.mock.calls).toEqual([[checkedOut]])
   })
 
   it('reports a failed preparation without creating or selecting a workspace', async () => {
@@ -375,6 +513,7 @@ describe('branch workspace action notifications', () => {
       ({ currentWorkbench }) => {
         const actions = useBranchWorkspaceActions({
           currentWorkbench,
+          rememberCheckout: vi.fn(),
           rememberCreatedWorkspace: vi.fn(),
           forgetWorkspaceTerminalStates: vi.fn(),
           notifications,
@@ -464,6 +603,7 @@ function renderBranchWorkspaceActions(
   workbench: ReturnType<typeof createWorkbench>,
   notifications: ReturnType<typeof createNotifications>,
   overrides: {
+    readonly rememberCreatedWorkspace?: (workbench: WorkbenchSnapshot) => void
     readonly replaceWorkbench?: (workbench: WorkbenchSnapshot) => void
   } = {}
 ) {
@@ -471,7 +611,8 @@ function renderBranchWorkspaceActions(
     () => {
       const actions = useBranchWorkspaceActions({
         currentWorkbench: workbench,
-        rememberCreatedWorkspace: vi.fn(),
+        rememberCheckout: vi.fn(),
+        rememberCreatedWorkspace: overrides.rememberCreatedWorkspace ?? vi.fn(),
         forgetWorkspaceTerminalStates: vi.fn(),
         notifications,
         replaceWorkbench: overrides.replaceWorkbench ?? vi.fn(),

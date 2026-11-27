@@ -83,7 +83,6 @@ describe('workbench object motion styles', () => {
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-collapse')
-    expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
   it('morphs one group material between committed geometries while members move', () => {
@@ -140,7 +139,6 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-terminal-group-join')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-terminal-group-reflow')
-    expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
     expect(objectMotionStyles).not.toContain('.workbench-object-motion--group-accept')
     expect(groupRule).not.toContain('--terminal-group-drop-scale')
@@ -219,7 +217,6 @@ describe('workbench object motion styles', () => {
       '.terminal-group-node--drop-join > .terminal-group-node__material'
     )
     expect(objectMotionStyles).toContain('.react-flow__node.dragging')
-    expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
     nodeRules.forEach((rule) => {
       expect(rule).not.toMatch(/transition:[^;]*\btransform\b/s)
     })

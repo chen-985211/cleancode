@@ -94,6 +94,10 @@ describe('workspace default contents e2e', () => {
     await page.waitForLoadState('domcontentloaded')
     await expectDesktopRuntime(page)
     await page.getByRole('button', { name: '添加项目', exact: true }).click()
+    await page
+      .getByRole('group', { name: `项目 ${basename(workbench.projectDirectory)}`, exact: true })
+      .getByRole('button', { name: '新建分支工作区', exact: true })
+      .waitFor()
   }, electronScenarioTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -304,6 +308,91 @@ describe('workspace default contents e2e', () => {
   )
 
   it(
+    'frames the new workspace before its terminal and Agent enter',
+    { timeout: electronScenarioTimeoutMs },
+    async () => {
+      await page.evaluate(async (projectDirectory) => {
+        await window.cleancode!.saveWorkspaceDefaults({
+          projectDirectory,
+          defaults: {
+            templates: [{ templateId: 'notes', runAfterPlacement: false }],
+            agents: [{ providerId: 'codex', count: 1 }]
+          }
+        })
+      }, resources.workbench!.projectDirectory)
+      const observed = await page.evaluateHandle(() => {
+        const frames = {
+          emptyCanvasWithFormClosing: false,
+          firstTransform: '',
+          settledTransform: '',
+          entered: new Set<string>(),
+          allEnteredInView: true
+        }
+        function sample() {
+          if (
+            document.querySelector('.workspace-row--active .workspace-row__name')?.textContent ===
+            'framed'
+          ) {
+            const canvas = document.querySelector('.react-flow')!.getBoundingClientRect()
+            const nodes = document.querySelectorAll<HTMLElement>('.react-flow__node')
+            const form = document.querySelector('.branch-workspace-surface')
+            if (
+              !nodes.length &&
+              (!form || form.getAttribute('data-branch-workspace-spring-state') === 'closing')
+            ) {
+              frames.emptyCanvasWithFormClosing = true
+            }
+            const transform =
+              document.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform
+            const entering = document.querySelectorAll<HTMLElement>(
+              '.workbench-object-motion--create'
+            )
+            for (const shell of entering) {
+              const node = shell.closest<HTMLElement>('.react-flow__node')
+              if (
+                !node ||
+                getComputedStyle(node).visibility === 'hidden' ||
+                frames.entered.has(node.dataset.id!)
+              )
+                continue
+              const rect = shell.getBoundingClientRect()
+              const x = (rect.left + rect.right) / 2
+              const y = (rect.top + rect.bottom) / 2
+              frames.firstTransform ||= transform
+              frames.entered.add(node.dataset.id!)
+              frames.allEnteredInView &&=
+                x >= canvas.left && x <= canvas.right && y >= canvas.top && y <= canvas.bottom
+            }
+            if (nodes.length === 2 && !entering.length && frames.entered.size === 2) {
+              frames.settledTransform = transform
+              return
+            }
+          }
+          requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+        return frames
+      })
+      await createWorktree('framed')
+      await page.waitForFunction((frames) => !!frames.settledTransform, observed)
+      const frames = await observed.evaluate(({ entered, ...rest }) => ({
+        count: entered.size,
+        ...rest
+      }))
+      expect(frames.emptyCanvasWithFormClosing).toBe(true)
+      expect(frames.allEnteredInView).toBe(true)
+      expect(frames.firstTransform).toBe(frames.settledTransform)
+      await page.reload()
+      await page.waitForFunction(
+        (transform) =>
+          document.querySelector<HTMLElement>('.react-flow__viewport')?.style.transform ===
+          transform,
+        frames.settledTransform
+      )
+    }
+  )
+
+  it(
     'cleans a deleted default template during creation and uses the global notification surface',
     { timeout: electronScenarioTimeoutMs },
     async () => {
@@ -411,7 +500,7 @@ describe('workspace default contents e2e', () => {
     await page.getByRole('button', { name: '新建分支工作区', exact: true }).click()
     const form = page.getByRole('dialog', { name: '新建分支工作区', exact: true })
     await form.getByLabel('分支名称').fill(branch)
-    expect(await form.getByRole('button').count()).toBe(1)
+    await form.getByRole('button', { name: '基准分支', exact: true }).waitFor()
     if (branch === 'feature/defaults') {
       await page
         .locator('.branch-workspace-surface[data-branch-workspace-spring-state="open"]')

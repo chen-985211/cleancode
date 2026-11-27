@@ -1,55 +1,30 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 
-import {
-  createMotionPreferenceStore,
-  type MotionPreferenceStore
-} from '../../../../src/presentation/shared/motion/motionPreference'
-import { usePrefersReducedMotion } from '../../../../src/presentation/shared/hooks/usePrefersReducedMotion'
+import { useSurfaceMotionPresence } from '../../../../src/presentation/shared/hooks/useSurfaceMotionPresence'
 
-describe('motion preference', () => {
-  it('shares one media listener and releases it after the final subscriber leaves', () => {
-    const media = createMutableMediaQueryList(false)
-    const matchMedia = vi.fn(() => media.value)
-    const store = createMotionPreferenceStore(matchMedia)
-    const first = vi.fn()
-    const second = vi.fn()
+describe('application-owned surface motion', () => {
+  it.each([false, true])(
+    'plays the full exit with system reduced motion initially %s',
+    (initial) => {
+      const media = createMutableMediaQueryList(initial)
+      vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
+      const onExitComplete = vi.fn()
+      const { result, rerender } = renderHook(
+        (open: boolean) => useSurfaceMotionPresence(open, { onExitComplete }),
+        { initialProps: true }
+      )
 
-    const unsubscribeFirst = store.subscribe(first)
-    const unsubscribeSecond = store.subscribe(second)
-
-    expect(matchMedia).toHaveBeenCalledOnce()
-    expect(media.addEventListener).toHaveBeenCalledOnce()
-
-    media.setMatches(true)
-    expect(first).toHaveBeenCalledOnce()
-    expect(second).toHaveBeenCalledOnce()
-    expect(store.getSnapshot()).toBe(true)
-
-    unsubscribeFirst()
-    expect(media.removeEventListener).not.toHaveBeenCalled()
-    unsubscribeSecond()
-    expect(media.removeEventListener).toHaveBeenCalledOnce()
-  })
-
-  it('projects runtime preference changes through the React hook', () => {
-    const media = createMutableMediaQueryList(false)
-    const store = createMotionPreferenceStore(() => media.value)
-    const view = render(<PreferenceHarness store={store} />)
-
-    expect(screen.getByTestId('preference')).toHaveTextContent('full')
-
-    act(() => media.setMatches(true))
-    expect(screen.getByTestId('preference')).toHaveTextContent('reduced')
-
-    view.unmount()
-    expect(media.removeEventListener).toHaveBeenCalledOnce()
-  })
+      rerender(false)
+      expect(result.current.phase).toBe('closing')
+      act(() => media.setMatches(!initial))
+      expect(result.current.phase).toBe('closing')
+      expect(onExitComplete).not.toHaveBeenCalled()
+      act(() => result.current.completeMotion())
+      expect(result.current.phase).toBe('closed')
+      expect(onExitComplete).toHaveBeenCalledOnce()
+    }
+  )
 })
-
-function PreferenceHarness({ store }: { readonly store: MotionPreferenceStore }) {
-  const reducedMotion = usePrefersReducedMotion(store)
-  return <output data-testid="preference">{reducedMotion ? 'reduced' : 'full'}</output>
-}
 
 function createMutableMediaQueryList(initialMatches: boolean) {
   let matches = initialMatches

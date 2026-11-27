@@ -54,6 +54,33 @@ describe('workbench flow node presence lifecycle', () => {
 
     await waitFor(() => expect(controls.getNodes().some((node) => node.id === id)).toBe(false))
   })
+
+  it('restores the live Agent view when removal fails', async () => {
+    let rejectRemoval!: (reason: Error) => void
+    const pendingRemoval = new Promise<void>((_, reject) => {
+      rejectRemoval = reject
+    })
+    const onReady = vi.fn<(controls: HarnessControls) => void>()
+    render(<Harness onReady={onReady} onRemoveAgent={() => pendingRemoval} />)
+    const getAgent = () =>
+      onReady.mock.calls
+        .at(-1)?.[0]
+        .getNodes()
+        .find((node) => node.type === 'agentConsole')
+    await waitFor(() => expect(getAgent()).toBeDefined())
+    const node = getAgent()!
+    let result!: Promise<void>
+    act(() => {
+      result = node.data.onRemove(node.data.agent)
+    })
+    await waitFor(() => expect(getAgent()?.data.isRemovalPending).toBe(true))
+    await act(async () => {
+      rejectRemoval(new Error('Removal failed'))
+      await expect(result).rejects.toThrow('Removal failed')
+    })
+    await waitFor(() => expect(getAgent()?.data.isRemovalPending).toBe(false))
+    expect(getAgent()?.data.objectMotion).toBeUndefined()
+  })
 })
 
 interface HarnessControls {
@@ -62,7 +89,13 @@ interface HarnessControls {
   readonly removeTerminal: () => void
 }
 
-function Harness({ onReady }: { readonly onReady: (controls: HarnessControls) => void }) {
+function Harness({
+  onReady,
+  onRemoveAgent = noopAsync
+}: {
+  readonly onReady: (controls: HarnessControls) => void
+  readonly onRemoveAgent?: () => Promise<void>
+}) {
   const [graph, setGraph] = useState(initialGraph)
   const [workbench, setWorkbench] = useState(initialWorkbench)
   const [nodeStore] = useState(() => createWorkbenchNodeStore())
@@ -78,7 +111,7 @@ function Harness({ onReady }: { readonly onReady: (controls: HarnessControls) =>
     isTerminalGroupSelectionMode: false,
     onAgentGraphUpdated: noop,
     onMcpCapabilityChange: noopOptionalAsync,
-    onRemoveAgent: noopAsync,
+    onRemoveAgent,
     onRenameAgent: noopAsync,
     onResizeAgent: noopAsync,
     onSelectAgent: noop,

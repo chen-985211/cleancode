@@ -112,7 +112,7 @@ export async function selectExactXtermText(
   await page.mouse.up()
 }
 
-async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
+export async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
   await page.locator('.react-flow__viewport').evaluate(
     (viewport) =>
       new Promise<void>((resolve, reject) => {
@@ -140,7 +140,7 @@ async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
         })
         deadlineTimeout = window.setTimeout(() => {
           cleanup()
-          reject(new Error('Canvas viewport did not settle before xterm text selection.'))
+          reject(new Error('Canvas viewport did not settle.'))
         }, 3_000)
         scheduleQuietWindow()
       })

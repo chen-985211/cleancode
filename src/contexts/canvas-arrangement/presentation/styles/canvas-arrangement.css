@@ -99,14 +99,3 @@
 .canvas-arrangement-toolbar button:disabled {
   opacity: 0.48;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  :is(
-    .react-flow__node-terminal,
-    .react-flow__node-terminalGroup,
-    .react-flow__node-agentConsole
-  )::after,
-  .canvas-arrangement-toolbar button {
-    transition: none;
-  }
-}

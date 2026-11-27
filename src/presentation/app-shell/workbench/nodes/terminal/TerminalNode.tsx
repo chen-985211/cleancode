@@ -31,6 +31,7 @@ import type { TerminalDimensions } from '../../../../../contexts/run/presentatio
 import type { TerminalFlowNode } from '../../../types/terminalFlowNode'
 import type { WorkbenchNodeLayoutInput } from '../../../types/workbenchNodeLayout'
 import { useI18n } from '../../../../i18n/useI18n'
+import { useWorkbenchNodeExitView } from '../useWorkbenchNodeExitView'
 import { useWorkbenchObjectMotionPresentation } from '../useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from '../../../../shared/components/WorkbenchIcons'
 import { useTerminalState } from '../../../../../contexts/run/presentation/view-models/terminalStateStore'
@@ -56,7 +57,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     Boolean(data.isObjectMotionFrozen) ||
     (data.objectMotion?.kind === 'group-reflow' && Boolean(data.objectMotion.shellRect))
   const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
-  const session = useTerminalState(data.terminalStateStore, block.id, data.session, !isParked)
+  const isPresenceExit = data.objectMotion?.kind === 'delete'
+  const liveSession = useTerminalState(data.terminalStateStore, block.id, data.session, !isParked)
+  const session = useWorkbenchNodeExitView(liveSession, isPresenceExit)
   // Claiming the first run preserves the measurement view. A genuine replacement
   // still resets the viewport's search, paste and focus state as a new session.
   const [viewIdentity, setViewIdentity] = useState({ sessionId: session.sessionId, generation: 0 })
@@ -70,7 +73,6 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
   const isPresenceMotion =
     data.objectMotion?.kind === 'create' || data.objectMotion?.kind === 'delete'
-  const isPresenceExit = data.objectMotion?.kind === 'delete'
   const isPresencePending = data.objectPresence?.phase === 'pending'
   const isInteractionSuppressed =
     isDisclosureExit ||

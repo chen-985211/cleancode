@@ -593,12 +593,3 @@
     margin-left: auto;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .application-settings-back,
-  .shortcut-settings-reset-all,
-  .shortcut-recorder,
-  .shortcut-row-action {
-    transition: none;
-  }
-}

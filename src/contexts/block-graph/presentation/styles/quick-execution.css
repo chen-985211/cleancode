@@ -440,35 +440,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .quick-execution__slots,
-  .quick-execution__slot,
-  .quick-execution__glyph,
-  .quick-execution__black-hole {
-    transition: none;
-  }
-
-  .quick-execution__slot--filled:not(.quick-execution__slot--dragging):hover
-    .quick-execution__glyph,
-  .quick-execution__content:focus-visible .quick-execution__glyph {
-    transform: none;
-  }
-
-  .quick-execution__drag-proxy--near-black-hole .quick-execution__drag-proxy-card {
-    animation: none;
-    border-color: var(--cc-muted-strong);
-    box-shadow: 0 0 0 2px var(--cc-border);
-  }
-
-  .quick-execution__black-hole--target {
-    transform: translateY(0) scale(1);
-  }
-
-  .quick-execution__black-hole-motion {
-    display: none;
-  }
-}
-
 .quick-execution__binding {
   display: inline-flex;
   align-items: center;
@@ -509,11 +480,4 @@
   width: 18px;
   opacity: 0.35;
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .quick-execution:is([data-quick-execution-dragging], [data-quick-execution-settling])
-    .quick-execution__binding {
-    transition: none;
-  }
 }

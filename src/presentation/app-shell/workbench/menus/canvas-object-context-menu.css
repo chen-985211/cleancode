@@ -159,12 +159,6 @@
   stroke-dasharray: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .canvas-menu-motion-surface {
-    transform: none;
-  }
-}
-
 @media (prefers-contrast: more) {
   .canvas-node-menu {
     outline: 1px solid var(--cc-canvas-node-menu-foreground);

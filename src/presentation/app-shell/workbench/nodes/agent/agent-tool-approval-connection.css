@@ -50,9 +50,3 @@
 .terminal-workflow-edge--approval-failed .react-flow__arrowhead polyline {
   stroke: var(--cc-danger);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .terminal-workflow-edge--approval-proxy.animated path {
-    animation: none;
-  }
-}

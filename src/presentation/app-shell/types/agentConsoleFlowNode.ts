@@ -12,6 +12,7 @@ import type { WorkbenchSnapshot } from './workbenchSnapshot'
 interface AgentConsoleNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {
   readonly identity: CanvasObjectIdentity
   readonly agent: WorkspaceAgentSnapshot
+  readonly isRemovalPending?: boolean
   readonly isContextSelected?: boolean
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null

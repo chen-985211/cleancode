@@ -332,12 +332,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .terminal-metadata-form__saving-indicator {
-    animation: none;
-  }
-}
-
 @keyframes terminal-metadata-saving-spin {
   to {
     transform: rotate(360deg);

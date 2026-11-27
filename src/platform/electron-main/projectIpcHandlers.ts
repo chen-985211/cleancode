@@ -133,7 +133,19 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
   registerIpcHandler<unknown, WorkbenchSnapshot>({
     channel: 'cleancode:create-branch-workspace',
     handler: async (command) => {
+      const baseBranch =
+        isRecord(command) && command.baseBranch !== undefined
+          ? readStringField(command, 'baseBranch')
+          : undefined
+      if (baseBranch !== undefined && !/^refs\/(heads|remotes)\/.+/.test(baseBranch))
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace base branch.')
+      const selectWorkspace = isRecord(command) ? command.selectWorkspace : undefined
+      if (selectWorkspace !== undefined && selectWorkspace !== false)
+        throw createIpcError('INVALID_IPC_COMMAND', 'Invalid workspace selection option.')
+      const deferSelection = baseBranch !== undefined || selectWorkspace === false
       const project = await input.createBranchWorkspace({
+        ...(baseBranch ? { baseBranch } : {}),
+        ...(deferSelection ? { selectWorkspace: false } : {}),
         projectDirectory: readStringField(command, 'projectDirectory'),
         branchName: readStringField(command, 'branchName'),
         ...(isRecord(command) && command.requestId !== undefined
@@ -144,7 +156,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
           : {})
       })
 
-      return loadAndSelectWorkbench(input, project)
+      return deferSelection ? input.loadWorkbench(project) : loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
@@ -192,14 +204,15 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
 
   registerIpcHandler<unknown, WorkbenchSnapshot>({
     channel: 'cleancode:checkout-main-workspace-branch',
-    handler: async (command) => {
-      const project = await input.checkoutMainWorkspaceBranch({
-        projectDirectory: readStringField(command, 'projectDirectory'),
-        branchName: readStringField(command, 'branchName')
-      })
+    handler: (command) =>
+      workspaceSelections.run(async () => {
+        const project = await input.checkoutMainWorkspaceBranch({
+          projectDirectory: readStringField(command, 'projectDirectory'),
+          branchName: readStringField(command, 'branchName')
+        })
 
-      return loadAndSelectWorkbench(input, project)
-    },
+        return loadAndSelectWorkbench(input, project)
+      }),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'checkoutMainWorkspaceBranch',

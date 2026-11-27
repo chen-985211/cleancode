@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { realpath } from 'node:fs/promises'
-import { runGit } from './GitProcess'
+import { isGitRepository, runGit } from './GitProcess'
 
 import type {
   CheckoutBranchCommand,
@@ -80,22 +80,6 @@ export class GitCliWorkspaceAdapter implements GitWorkspacePort {
   async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
     await runGit(command.repositoryDirectory, ['worktree', 'prune'])
   }
-}
-
-async function isGitRepository(directory: string): Promise<boolean> {
-  try {
-    const output = await runGit(directory, ['rev-parse', '--is-inside-work-tree'])
-    return output.trim() === 'true'
-  } catch (error) {
-    if (isConfirmedNonRepositoryError(error)) return false
-    throw error
-  }
-}
-
-function isConfirmedNonRepositoryError(error: unknown): boolean {
-  const stderr = (error as { readonly stderr?: unknown } | null)?.stderr
-
-  return typeof stderr === 'string' && stderr.includes('fatal: not a git repository')
 }
 
 async function getCurrentBranch(directory: string): Promise<string | null> {

@@ -63,6 +63,19 @@ it(
     await title.press('Escape')
     await settle()
     await page.emulateMedia({ reducedMotion: 'reduce' })
+    const countMotion = () =>
+      page
+        .locator('.todo-count')
+        .last()
+        .evaluate((element) => {
+          const style = getComputedStyle(element)
+          return { name: style.animationName, duration: Number.parseFloat(style.animationDuration) }
+        })
+    const withSystemReduction = await countMotion()
+    expect(withSystemReduction.name).toBe('todo-count-in')
+    expect(withSystemReduction.duration).toBeGreaterThan(0.01)
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    expect(await countMotion()).toEqual(withSystemReduction)
     const source = page.getByRole('button', { name: '待复查 14，当前待办，改为进行中' })
     const feedback = await source.evaluate(async (button) => {
       if (!(button instanceof HTMLButtonElement)) throw new Error('Expected the status button')

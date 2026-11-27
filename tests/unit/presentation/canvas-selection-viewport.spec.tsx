@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
@@ -9,11 +10,9 @@ import {
   retargetWorkbenchDirectZoom
 } from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
 
-let reducedMotion = true
-
 describe('canvas selection viewport', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -341,7 +340,7 @@ describe('canvas selection viewport', () => {
   it.each(['terminal', 'agentConsole'] as const)(
     'stops an in-flight selection and its pending %s input activation when disabled',
     async (type) => {
-      stubReducedMotionPreference(false)
+      stubImmediateMotion(false)
       vi.useFakeTimers({
         toFake: [
           'setTimeout',
@@ -541,23 +540,4 @@ function renderSelectedInput(type: 'terminal' | 'agentConsole') {
   container.append(viewport, tail)
   document.body.append(container)
   return { node, input, viewport }
-}
-
-function stubReducedMotionPreference(matches = true): void {
-  reducedMotion = matches
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      get matches() {
-        return reducedMotion
-      },
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }

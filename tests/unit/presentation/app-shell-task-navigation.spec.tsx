@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useRef, useState } from 'react'
 import { AppShellProjectArea } from '../../../src/presentation/app-shell/shell/project-sidebar/AppShellProjectArea'
@@ -13,11 +14,7 @@ describe('task navigation', () => {
   it.each([false, true])(
     'keeps the same task view and usable sidebar toggle when initially collapsed is %s',
     async (initialIsCollapsed) => {
-      const matchMedia = window.matchMedia.bind(window)
-      vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-        ...matchMedia(query),
-        matches: query === '(prefers-reduced-motion: reduce)'
-      }))
+      stubImmediateMotion()
       const workbench = createWorkbenchSnapshot('/one', 'One')
       window.cleancode = {
         listProjectIssues: async () => ({

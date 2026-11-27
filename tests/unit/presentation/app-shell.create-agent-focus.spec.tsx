@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
@@ -103,7 +104,7 @@ describe('app shell create Agent focus', () => {
   })
 
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
     reactFlowSpies.setCenter.mockClear()
     reactFlowSpies.setViewport.mockClear()
     window.localStorage.clear()
@@ -500,22 +501,6 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: async () => undefined,
     fitView: async () => undefined
   }
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
 
 function createAgent(

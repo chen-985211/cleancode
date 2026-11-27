@@ -100,6 +100,74 @@ describe('git branch workspaces e2e', () => {
   }, electronScenarioTimeoutMs)
 
   it(
+    'creates from the chosen local base after a remote refresh fails',
+    { timeout: electronScenarioTimeoutMs },
+    async () => {
+      const project = workbench.projectDirectory
+      const remote = join(workbench.registryDirectory, 'upstream.git')
+      await execGit(project, ['branch', 'feature/login'])
+      const baseCommit = (await execGit(project, ['rev-parse', 'feature/login'])).stdout.trim()
+      await execGit(project, ['commit', '--allow-empty', '-m', 'Advance main'])
+      await execGit(project, ['clone', '--bare', project, remote])
+      await execGit(project, ['remote', 'add', 'origin', remote])
+      await execGit(project, ['fetch', 'origin'])
+      await execGit(project, ['remote', 'set-head', 'origin', 'main'])
+      await execGit(project, ['branch', '3'])
+      await execGit(project, ['switch', 'feature/login'])
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await page.getByRole('button', { name: '新建分支工作区' }).click()
+      const form = page.getByRole('dialog', { name: '新建分支工作区' })
+      const name = form.getByLabel('分支名称')
+      expect(await name.inputValue()).toBe('')
+      await name.fill('test/login-api')
+      const base = form.getByRole('button', { name: '基准分支' })
+      await base.click()
+      const menu = page.getByRole('menu', { name: '基准分支' })
+      expect(await menu.getByRole('menuitemradio').allTextContents()).toEqual([
+        'origin/main',
+        'feature/login'
+      ])
+      expect(
+        await menu
+          .getByRole('menuitemradio', { name: 'origin/main', exact: true })
+          .getAttribute('aria-checked')
+      ).toBe('true')
+      await mkdir('test-results/worktree-base', { recursive: true })
+      await page.locator('.branch-workspace-base-menu[data-surface-motion-state="open"]').waitFor()
+      await page.screenshot({
+        path: 'test-results/worktree-base/menu.png',
+        clip: { x: 0, y: 80, width: 320, height: 455 }
+      })
+      await page.keyboard.press('Escape')
+      await menu.waitFor({ state: 'hidden' })
+      expect(await base.evaluate((button) => button === document.activeElement)).toBe(true)
+      await execGit(project, [
+        'remote',
+        'set-url',
+        'origin',
+        join(workbench.registryDirectory, 'unavailable')
+      ])
+      const create = form.getByRole('button', { name: '创建 Worktree' })
+      await create.click()
+      await page.getByText('无法使用该基准分支。请重试或选择其他分支。').waitFor()
+      expect(await name.inputValue()).toBe('test/login-api')
+      await base.click()
+      await menu.getByRole('menuitemradio', { name: 'feature/login', exact: true }).click()
+      expect(await base.textContent()).toBe('feature/login')
+      await create.click()
+      await waitForCurrentWorkspace(
+        page.getByRole('button', { name: /test\/login-api.*独立工作区/ })
+      )
+      expect(
+        (
+          await execGit(branchWorktreeDirectory(project, 'test/login-api'), ['rev-parse', 'HEAD'])
+        ).stdout.trim()
+      ).toBe(baseCommit)
+      await expectCurrentGitBranch(project, 'feature/login')
+    }
+  )
+
+  it(
     'creates a git worktree branch workspace and switches terminal working directories',
     { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {

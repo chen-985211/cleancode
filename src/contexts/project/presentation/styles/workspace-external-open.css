@@ -133,10 +133,3 @@
   flex: 0 0 auto;
   color: var(--cc-muted-strong);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-external-open-control,
-  .workspace-external-open-control__button {
-    transition: none;
-  }
-}

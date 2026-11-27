@@ -62,7 +62,8 @@ interface ProjectSidebarProps<TWorkbench extends ProjectWorkbenchViewModel> {
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
   readonly onCreateBranchWorkspace: (
     workbench: TWorkbench,
-    branchName: string
+    branchName: string,
+    baseBranch: string
   ) => void | Promise<boolean>
   readonly onRemoveProject: (workbench: TWorkbench) => void
   readonly onReorderProject: (workbench: TWorkbench, beforeProjectDirectory: string | null) => void
@@ -199,7 +200,8 @@ interface ProjectCardProps<TWorkbench extends ProjectWorkbenchViewModel> {
   readonly onCheckoutMainBranch: (workbench: TWorkbench, branchName: string) => void
   readonly onCreateBranchWorkspace: (
     workbench: TWorkbench,
-    branchName: string
+    branchName: string,
+    baseBranch: string
   ) => void | Promise<boolean>
   readonly onRemoveProject: (workbench: TWorkbench) => void
   readonly isDragging: boolean
@@ -262,6 +264,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
   const removeProjectButtonRef = useRef<HTMLButtonElement>(null)
   const {
     branchName,
+    base,
     close: closeBranchWorkspaceForm,
     completeClose: completeBranchWorkspaceFormClose,
     formRef,
@@ -273,8 +276,9 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
     surfaceRef: branchWorkspaceFormSurfaceRef,
     toggle: toggleBranchWorkspaceForm,
     triggerRef
-  } = useProjectSidebarBranchWorkspaceForm((newBranchName) =>
-    onCreateBranchWorkspace(workbench, newBranchName)
+  } = useProjectSidebarBranchWorkspaceForm(
+    workbench.project.directory,
+    (newBranchName, baseBranch) => onCreateBranchWorkspace(workbench, newBranchName, baseBranch)
   )
   if (intent && intent.id !== handledIntentId) {
     setHandledIntentId(intent.id)
@@ -391,6 +395,7 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             aria-controls={`${workbench.project.id}-branch-workspace-form`}
             aria-expanded={isBranchWorkspaceFormOpen}
             aria-label={t('sidebar.newBranchWorkspace')}
+            disabled={isSubmitting}
             ref={triggerRef}
             onClick={toggleBranchWorkspaceForm}
           >
@@ -408,18 +413,19 @@ function ProjectCard<TWorkbench extends ProjectWorkbenchViewModel>({
             <TrashIcon size={14} weight="bold" aria-hidden="true" />
           </button>
         </TooltipLabel>
+        <ProjectSidebarBranchWorkspaceForm
+          base={base}
+          branchName={branchName}
+          isSubmitting={isSubmitting}
+          formRef={formRef}
+          open={isBranchWorkspaceFormOpen}
+          projectId={workbench.project.id}
+          surfaceRef={branchWorkspaceFormSurfaceRef}
+          onBranchNameChange={setBranchName}
+          onExitComplete={completeBranchWorkspaceFormClose}
+          onSubmit={submitBranchWorkspace}
+        />
       </div>
-      <ProjectSidebarBranchWorkspaceForm
-        branchName={branchName}
-        isSubmitting={isSubmitting}
-        formRef={formRef}
-        open={isBranchWorkspaceFormOpen}
-        projectId={workbench.project.id}
-        surfaceRef={branchWorkspaceFormSurfaceRef}
-        onBranchNameChange={setBranchName}
-        onExitComplete={completeBranchWorkspaceFormClose}
-        onSubmit={submitBranchWorkspace}
-      />
       <div
         className={
           isExpanded
