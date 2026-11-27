@@ -101,7 +101,7 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 第一方通用界面图标统一使用 Phosphor Icons。主画布、顶部工具栏、小地图、节点、节点菜单、快捷执行栏和 Agent 局部状态通过表现层 `WorkbenchIcons` 选择语义角色；Provider 品牌图标和产品专属几何保留为显式例外。
 
-关于页 GitHub Star 按钮使用 `@animate-ui/react` 官方原语提供滚动数字、星标填充、粒子与按压动效，接收 Platform 查询的 Star 数量，不启用原语自身的 GitHub 请求。为保留官方示例的星标形状，该组件局部使用 Hugeicons 的 Star 图形；其他通用界面图标继续使用 Phosphor。组件通过既有 motion preference owner 将减少动态效果偏好传给上游动效上下文。
+关于页 GitHub Star 按钮使用 `@animate-ui/react` 官方原语提供滚动数字、星标填充、粒子与按压动效，接收 Platform 查询的 Star 数量，不启用原语自身的 GitHub 请求。为保留官方示例的星标形状，该组件局部使用 Hugeicons 的 Star 图形；其他通用界面图标继续使用 Phosphor。组件显式指定上游动效遵循 CleanCode 的节奏。
 
 应用更新入口按产品选型局部复用 Animate UI 官方 Lucide Download 图标；胶囊进度与重启确认使用
 Animate UI 的 Radix 原语，`radix-ui` 是其显式 peer 依赖。该局部图标例外不改变其余界面的
@@ -186,7 +186,7 @@ Agent 应用级偏好继续使用独立的 schema v1 JSON。`mcpToolCategories` 
 - `check:logging`：使用 TypeScript AST 检查日志、错误构造归属和 IPC 错误边界；绑定符号覆盖导入别名、namespace 与常量别名，避免注释、字符串和局部同名误报。上下文 domain/application/infrastructure 的业务错误使用所属工厂，公共错误与保留错误身份的诊断重建遵循日志规范。
 - `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
 - `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
-- `check:motion`：检查生产 CSS 动效只消费语义时长与曲线 token；持续 spinner、reduced-motion clamp 和登记过的专属 motion owner 作为显式例外。
+- `check:motion`：检查生产 CSS 动效只消费语义时长与曲线 token；持续 spinner 和登记过的专属 motion owner 作为显式例外；生产样式和脚本不能按系统动效偏好分支。
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:portable-paths`：使用 TypeScript AST 阻止生产代码和测试手工拼接文件系统分隔符、用单平台绝对路径正则断言平台中立路径，以及 Unit/Contract 测试从宿主 `node:path` 读取 `delimiter` 或 `sep`；确定性测试必须显式选择 `posix` 或 `win32` 语义。
 - `check:test-stability`：使用 TypeScript AST 阻止 Electron E2E 固定等待、原始 timer sleep、直接 `expect.poll` / `vi.waitUntil`、自动重试和捕获后重复场景动作；Node 侧状态轮询统一由测试支撑收口并保留最后观测诊断。

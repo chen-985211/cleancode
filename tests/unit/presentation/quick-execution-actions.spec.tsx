@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
@@ -18,19 +19,7 @@ describe('quick execution actions', () => {
     const canvas = document.createElement('div')
     canvas.className = 'react-flow'
     document.body.append(canvas)
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: true,
-        media: '(prefers-reduced-motion: reduce)',
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn()
-      }))
-    )
+    stubImmediateMotion()
   })
 
   afterEach(() => {

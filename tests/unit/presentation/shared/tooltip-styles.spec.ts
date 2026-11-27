@@ -24,9 +24,12 @@ describe('tooltip styles', () => {
     expect(tooltipSurfaceRule).not.toContain('white-space: nowrap;')
   })
 
-  it('removes motion when the user prefers reduced motion', () => {
-    expect(tooltipStyles).toContain('@media (prefers-reduced-motion: reduce)')
-    expect(tooltipStyles).toContain('transition: none;')
+  it('plays distinct enter and exit animations for the tooltip surface', () => {
+    expect(readTooltipSurfaceRule()).toContain('animation: cc-tooltip-enter')
+    const closing = tooltipStyles
+      .split(".cc-tooltip-content[data-state='closed'] {")[1]
+      ?.split('}')[0]
+    expect(closing).toContain('animation: cc-tooltip-exit')
   })
 
   it('keeps the Radix positioning wrapper from intercepting nearby controls', () => {

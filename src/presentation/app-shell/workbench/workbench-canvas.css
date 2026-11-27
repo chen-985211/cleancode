@@ -515,30 +515,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .canvas-empty__panel {
-    animation: none;
-  }
-
-  .canvas-empty__loading-character {
-    color: var(--cc-muted-strong);
-    transform: none;
-    animation: none;
-  }
-
-  .canvas-empty__action {
-    transition: none;
-  }
-
-  .canvas-empty__brand {
-    color: var(--cc-foreground);
-    background: none;
-    letter-spacing: -0.035em;
-    -webkit-text-fill-color: currentcolor;
-    animation: none;
-  }
-}
-
 .app-shell__statusbar {
   position: absolute;
   z-index: 7;

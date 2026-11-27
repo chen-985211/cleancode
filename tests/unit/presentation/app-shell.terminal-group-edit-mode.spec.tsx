@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
@@ -66,7 +67,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell terminal group edit mode', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
     reactFlowProps.latest = null
     reactFlowProps.renderCount = 0
     appShellRenderStats.sidebarRenderCount = 0
@@ -610,22 +611,6 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: async () => undefined,
     fitView: async () => undefined
   }
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
 
 function createWorkbenchWithTerminalBlocks(): WorkbenchSnapshot {

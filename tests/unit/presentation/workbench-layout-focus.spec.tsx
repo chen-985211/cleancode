@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { render, waitFor } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useLayoutEffect, useRef, useState } from 'react'
@@ -11,7 +12,7 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 
 describe('workbench layout focus', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -361,20 +362,4 @@ function createReactFlowInstance(
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     setViewport
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }

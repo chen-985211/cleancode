@@ -181,7 +181,7 @@ describe('canvas menu surface', () => {
     expect(scheduler.pendingTimeouts).toBe(0)
   })
 
-  it('settles live menu motion when the system preference changes at runtime', () => {
+  it('retains live menu motion when the system preference changes at runtime', () => {
     const media = createMutableMediaQueryList(false)
     vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
     const scheduler = new TestFrameScheduler()
@@ -192,6 +192,9 @@ describe('canvas menu surface', () => {
 
     act(() => media.setMatches(true))
 
+    expect(menu).toHaveAttribute('data-motion-state', 'opening')
+    expect(scheduler.pendingFrames).toBe(1)
+    act(() => scheduler.finish())
     expect(menu).toHaveAttribute('data-motion-state', 'open')
     expect(scheduler.pendingFrames).toBe(0)
     expect(scheduler.pendingTimeouts).toBe(0)

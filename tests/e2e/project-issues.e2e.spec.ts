@@ -309,10 +309,10 @@ describe('project issues', () => {
       await page.screenshot({ path: 'test-results/project-issues-dark-narrow.png' })
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await page.getByRole('button', { name: '返回任务列表' }).click()
-      expect(await pages.getAttribute('data-page-motion-state')).toBe('closed')
+      await pages.and(page.locator('[data-page-motion-state="closed"]')).waitFor()
       expect(await page.locator('.project-issues__reader').count()).toBe(0)
       await page.getByRole('button', { name: 'Fix terminal resizing', exact: true }).click()
-      expect(await pages.getAttribute('data-page-motion-state')).toBe('open')
+      await pages.and(page.locator('[data-page-motion-state="open"]')).waitFor()
       await page.getByRole('button', { name: '打开工作区', exact: true }).click()
       const after = await page.evaluate(
         async () => (await window.cleancode!.listWorkbenches())[0]!.project

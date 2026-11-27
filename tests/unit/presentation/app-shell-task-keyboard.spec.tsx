@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { fireEvent, render, screen } from '@testing-library/react'
 import {
   applicationShortcutCommands,
@@ -14,11 +15,7 @@ import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFix
 
 describe('task view keyboard navigation', () => {
   beforeEach(() => {
-    const matchMedia = window.matchMedia.bind(window)
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      ...matchMedia(query),
-      matches: query === '(prefers-reduced-motion: reduce)'
-    }))
+    stubImmediateMotion()
     window.cleancode = {
       listProjectIssues: async () => ({
         repository: { name: 'owner/repo', defaultBranch: 'main' },

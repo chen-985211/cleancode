@@ -150,7 +150,7 @@ describe('workspace row menu interaction', () => {
     }
   })
 
-  it('toggles immediately and restores menu focus when motion is reduced', () => {
+  it('animates toggles and restores menu focus with system reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
@@ -161,16 +161,24 @@ describe('workspace row menu interaction', () => {
       removeListener: vi.fn(),
       dispatchEvent: () => true
     }))
+    const frames = installMotionFrames()
     const { trigger } = renderSidebar(true)
     clickWithFocus(trigger)
+    frames.advance(16)
+    expect(readOpacity(screen.getByRole('menu'))).toBeLessThan(1)
+    frames.finish()
     expect(readOpacity(screen.getByRole('menu'))).toBe(1)
     expect(screen.getByRole('menuitem', { name: '归档工作区' })).toHaveFocus()
 
     clickWithFocus(trigger)
     expectMenuClosed(trigger)
+    frames.finish()
     expect(document.querySelector('.workspace-row-menu')).toBeNull()
 
     clickWithFocus(trigger)
+    frames.advance(16)
+    expect(readOpacity(screen.getByRole('menu'))).toBeLessThan(1)
+    frames.finish()
     expect(readOpacity(screen.getByRole('menu'))).toBe(1)
     expect(screen.getByRole('menuitem', { name: '归档工作区' })).toHaveFocus()
   })

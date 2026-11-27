@@ -87,17 +87,6 @@ describe('workbench canvas empty state styles', () => {
     expect(waveKeyframes).toContain('scale(1.1)')
     expect(waveKeyframes).toContain('rotateY(10deg)')
   })
-
-  it('projects the final wordmark immediately when reduced motion is requested', () => {
-    const reducedMotion = canvasStyles.split('@media (prefers-reduced-motion: reduce)')[1] ?? ''
-
-    expect(reducedMotion).toContain('.canvas-empty__brand')
-    expect(reducedMotion).toContain('.canvas-empty__loading-character')
-    expect(reducedMotion).toContain('animation: none;')
-    expect(reducedMotion).toContain('background: none;')
-    expect(reducedMotion).toContain('-webkit-text-fill-color: currentcolor;')
-    expect(reducedMotion).toContain('letter-spacing: -0.035em;')
-  })
 })
 
 function readRule(selector: string): string {

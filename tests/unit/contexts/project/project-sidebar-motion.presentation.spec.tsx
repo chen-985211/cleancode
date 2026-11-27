@@ -214,17 +214,23 @@ describe('project sidebar hover and disclosure motion', () => {
     }
   })
 
-  it('settles immediately under reduced motion and cancels frames on unmount', () => {
+  it('animates with the system preference enabled and cancels frames on unmount', () => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     vi.spyOn(window, 'matchMedia').mockReturnValue({ ...media, matches: true })
     const { unmount } = render(<ProjectSidebar {...createProps()} />)
     const title = screen.getByRole('button', { name: 'motion-alpha' })
     const card = title.closest<HTMLElement>('.project-card')!
     fireEvent.click(title)
+    act(() => vi.advanceTimersByTime(64))
+    expect(progress(card)).toBeGreaterThan(0)
+    expect(progress(card)).toBeLessThan(1)
+    act(() => vi.advanceTimersByTime(2000))
     expect(progress(card)).toBe(0)
     expect(card).toHaveAttribute('data-project-disclosure-state', 'closed')
     fireEvent.click(title)
-    expect(progress(card)).toBe(1)
+    act(() => vi.advanceTimersByTime(64))
+    expect(progress(card)).toBeGreaterThan(0)
+    expect(progress(card)).toBeLessThan(1)
     unmount()
     expect(vi.getTimerCount()).toBe(0)
   })

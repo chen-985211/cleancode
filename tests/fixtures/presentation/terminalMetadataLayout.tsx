@@ -65,9 +65,7 @@ function Fixture() {
   ]
   return (
     <I18nProvider initialLocale="zh-CN">
-      <CanvasMenuMotionProvider
-        reducedMotion={matchMedia('(prefers-reduced-motion: reduce)').matches}
-      >
+      <CanvasMenuMotionProvider>
         <WorkbenchToolbar
           isDesktopRuntime={false}
           hasWorkbench={true}

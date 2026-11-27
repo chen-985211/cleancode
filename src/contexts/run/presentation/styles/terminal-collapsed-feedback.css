@@ -81,20 +81,3 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .terminal-collapsed-feedback__fill,
-  .terminal-collapsed-feedback__glyph {
-    transition: none !important;
-  }
-
-  .terminal-collapsed-feedback__glyph {
-    transform: none;
-    filter: none;
-  }
-
-  .terminal-collapsed-feedback[data-status='done']
-    .terminal-collapsed-feedback__fill[data-progress-phase='complete'] {
-    clip-path: inset(0);
-  }
-}

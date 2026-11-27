@@ -648,18 +648,3 @@
     background: var(--cc-surface-raised);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .block-template-library-trigger,
-  .block-template-library-close,
-  .block-template-library-tabs button,
-  .block-template-library-search,
-  .block-template-card,
-  .block-template-card-tools button,
-  .block-template-card-actions button,
-  .block-template-card-delete button,
-  .block-template-card-edit button,
-  .block-template-library-error button {
-    transition: none;
-  }
-}

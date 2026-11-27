@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
@@ -9,7 +10,7 @@ import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent connection approval location', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
     const canvas = document.createElement('div')
     canvas.className = 'react-flow'
     canvas.getBoundingClientRect = () => new DOMRect(280, 0, 1000, 800)
@@ -152,22 +153,6 @@ describe('Agent connection approval location', () => {
     }
   )
 })
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
-}
 
 function createFlowNode(id: string): WorkbenchFlowNode {
   return { data: {}, id, position: { x: 0, y: 0 }, type: 'terminal' } as WorkbenchFlowNode

@@ -485,7 +485,7 @@ describe('quick execution bar', () => {
     expect(returnAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('-6px')
   })
 
-  it('restores a cancelled drag immediately when motion is reduced', async () => {
+  it('animates a cancelled drag back to its slot with system reduced motion', async () => {
     const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue(createMediaQueryList(true))
     try {
       render(
@@ -503,10 +503,9 @@ describe('quick execution bar', () => {
       await startReorder(source)
       fireEvent.pointerCancel(window, { pointerId: 1 })
 
-      expect(source).not.toHaveClass('quick-execution__slot--dragging')
-      expect(
-        document.querySelector('[data-quick-execution-return-animation]')
-      ).not.toBeInTheDocument()
+      expect(source).toHaveClass('quick-execution__slot--dragging')
+      expect(document.querySelector('[data-quick-execution-return-animation]')).toBeInTheDocument()
+      await waitFor(() => expect(source).not.toHaveClass('quick-execution__slot--dragging'))
     } finally {
       matchMedia.mockRestore()
     }

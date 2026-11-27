@@ -85,6 +85,66 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
+    'animates terminal and Agent creation and removal with system reduced motion enabled',
+    async () => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCreationReady(page)
+      const terminal = '.terminal-node-anchor'
+      const agent = '.agent-console-node'
+      const motion = await page.evaluateHandle(
+        ({ terminal, agent }) => {
+          const observed = new Set<string>()
+          let frame = 0
+          const sample = () => {
+            for (const [kind, selector] of Object.entries({ terminal, agent })) {
+              const shell = document.querySelector(selector)
+              if (!shell || !shell.checkVisibility()) continue
+              const scale = new DOMMatrixReadOnly(getComputedStyle(shell).transform).a
+              if (scale <= 0 || scale >= 1) continue
+              for (const phase of ['create', 'delete']) {
+                if (shell.classList.contains('workbench-object-motion--' + phase))
+                  observed.add(kind + '-' + phase)
+              }
+            }
+            frame = requestAnimationFrame(sample)
+          }
+          sample()
+          return {
+            stop: () => {
+              cancelAnimationFrame(frame)
+              return [...observed].sort()
+            }
+          }
+        },
+        { terminal, agent }
+      )
+      try {
+        await selectBlankCanvasAction(page, '新建终端')
+        await waitForCreatedNodeActivation(page, '[data-terminal-block-id]', 'terminal')
+        await page.locator('.terminal-node__title').click({ button: 'right' })
+        await page.getByRole('menuitem', { name: '移除终端' }).click()
+        await page.locator(terminal).waitFor({ state: 'detached' })
+        await createCodexAgent(page)
+        await waitForCreatedNodeActivation(page, '[data-agent-console-node]', 'agent')
+        await page.getByRole('button', { name: 'Agent 1 更多操作' }).click()
+        await page.getByRole('menuitem', { name: '移除' }).click()
+        await page.locator(agent).waitFor({ state: 'detached' })
+        expect(await motion.evaluate((recorder) => recorder.stop())).toEqual([
+          'agent-create',
+          'agent-delete',
+          'terminal-create',
+          'terminal-delete'
+        ])
+      } finally {
+        await motion.evaluate((recorder) => recorder.stop())
+        await motion.dispose()
+      }
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'normalizes terminal and Agent creation into the same safe result from maximum zoom',
     async () => {
       await expectDesktopRuntime(page)

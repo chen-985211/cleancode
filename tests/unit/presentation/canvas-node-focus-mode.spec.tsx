@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react'
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import { useState } from 'react'
@@ -23,14 +24,7 @@ const cases = [
 
 describe('canvas node positioning mode', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: true,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn()
-      }))
-    )
+    stubImmediateMotion()
   })
 
   afterEach(() => {

@@ -390,17 +390,6 @@
   --workspace-selection: var(--cc-sidebar-selection-hover);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .project-card,
-  .project-list > .project-list__hover {
-    transition: none;
-  }
-
-  .workspace-list {
-    transform: none;
-  }
-}
-
 .workspace-group {
   position: relative;
   z-index: 1;

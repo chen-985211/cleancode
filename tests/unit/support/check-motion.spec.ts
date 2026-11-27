@@ -59,7 +59,7 @@ describe('motion quality gate', () => {
     }
   })
 
-  it('allows only registered named owners and the renderer reduced-motion clamp', async () => {
+  it('allows only registered named owners and rejects system-dependent motion', async () => {
     const directory = await createFixture()
 
     try {
@@ -91,6 +91,9 @@ describe('motion quality gate', () => {
       )
 
       expect(await collectMotionViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ line: 1, rule: 'system-motion-preference' }),
+        expect.objectContaining({ line: 3, rule: 'raw-motion-timing' }),
+        expect.objectContaining({ line: 4, rule: 'raw-motion-timing' }),
         expect.objectContaining({ filePath: 'src/presentation/app-shell/styles/base.css', line: 7 })
       ])
     } finally {

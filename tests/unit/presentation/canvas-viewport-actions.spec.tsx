@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbench/viewport/workbenchDirectZoom'
@@ -18,7 +19,7 @@ vi.mock(
 describe('canvas viewport actions', () => {
   beforeEach(() => {
     directZoomSpies.cancel.mockClear()
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -46,7 +47,7 @@ describe('canvas viewport actions', () => {
     expect(setViewport).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps viewport controls functional without spatial motion when reduced motion is preferred', () => {
+  it('keeps viewport controls functional without spatial motion with explicit immediate motion', () => {
     const { instance, setViewport } = createReactFlowInstance()
     const { result } = renderHook(() =>
       useCanvasViewportActions({
@@ -89,20 +90,4 @@ function createReactFlowInstance(): {
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>,
     setViewport
   }
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }

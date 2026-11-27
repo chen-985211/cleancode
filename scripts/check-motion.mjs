@@ -11,7 +11,6 @@ const ignoredDirectories = new Set([
   'out',
   'release'
 ])
-const rendererReducedMotionPath = 'src/platform/renderer-bootstrap/renderer.css'
 const registeredOwnerExceptions = new Map([
   [
     'src/presentation/app-shell/workbench/nodes/agent/agent-tool-approval.css',
@@ -32,7 +31,7 @@ export async function collectMotionViolations({ cwd = process.cwd() } = {}) {
   const sourceDirectory = join(cwd, 'src')
   if (!existsSync(sourceDirectory)) return []
 
-  return collectCssFiles(sourceDirectory, cwd)
+  return collectSourceFiles(sourceDirectory, cwd)
     .flatMap((filePath) => findFileViolations(cwd, filePath))
     .sort((left, right) => left.filePath.localeCompare(right.filePath) || left.line - right.line)
 }
@@ -55,18 +54,20 @@ export async function runMotionGate({ cwd = process.cwd(), logger = console } = 
 
 function findFileViolations(cwd, filePath) {
   const source = readFileSync(join(cwd, filePath), 'utf8')
-  const violations = []
+  const violations = Array.from(source.matchAll(/\bprefers-reduced-motion\b/gi), (match) => ({
+    filePath,
+    line: lineNumberAt(source, match.index),
+    rule: 'system-motion-preference',
+    message: 'Use the application motion rules independently of the system motion preference.'
+  }))
+  if (!filePath.endsWith('.css')) return violations
 
   for (const match of source.matchAll(motionDeclarationPattern)) {
     const declaration = match[0]
     const property = match[1]
     const value = match[2].trim()
     const index = match.index ?? 0
-    if (
-      value === 'none' ||
-      isRegisteredOwnerException(filePath, source, index) ||
-      isRendererReducedMotionClamp(filePath, property, value, source, index)
-    ) {
+    if (value === 'none' || isRegisteredOwnerException(filePath, source, index)) {
       continue
     }
 
@@ -93,29 +94,6 @@ function isRegisteredOwnerException(filePath, source, declarationIndex) {
   return Boolean(ownerMatch?.[1] && registeredOwners?.has(ownerMatch[1]))
 }
 
-function isRendererReducedMotionClamp(filePath, property, value, source, declarationIndex) {
-  return (
-    filePath === rendererReducedMotionPath &&
-    (property === 'transition-duration' || property === 'animation-duration') &&
-    value === '0.01ms !important' &&
-    isInsideReducedMotionMedia(source, declarationIndex)
-  )
-}
-
-function isInsideReducedMotionMedia(source, declarationIndex) {
-  const mediaIndex = source.lastIndexOf('@media (prefers-reduced-motion: reduce)', declarationIndex)
-  if (mediaIndex < 0) return false
-  const blockStart = source.indexOf('{', mediaIndex)
-  if (blockStart < 0 || blockStart > declarationIndex) return false
-
-  let depth = 0
-  for (let index = blockStart; index < declarationIndex; index += 1) {
-    if (source[index] === '{') depth += 1
-    if (source[index] === '}') depth -= 1
-  }
-  return depth > 0
-}
-
 function isTokenizedSpinner(property, value) {
   return (
     property === 'animation' &&
@@ -125,14 +103,14 @@ function isTokenizedSpinner(property, value) {
   )
 }
 
-function collectCssFiles(directory, cwd) {
+function collectSourceFiles(directory, cwd) {
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const absolutePath = join(directory, entry.name)
       if (entry.isDirectory()) {
-        return ignoredDirectories.has(entry.name) ? [] : collectCssFiles(absolutePath, cwd)
+        return ignoredDirectories.has(entry.name) ? [] : collectSourceFiles(absolutePath, cwd)
       }
-      return entry.isFile() && entry.name.endsWith('.css')
+      return entry.isFile() && /\.(?:css|tsx?|jsx?)$/.test(entry.name)
         ? [toPosixPath(relative(cwd, absolutePath))]
         : []
     })

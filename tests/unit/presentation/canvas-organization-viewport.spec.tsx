@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, fireEvent, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
@@ -22,14 +23,7 @@ const bounds = { x: -500, y: -350, width: 1_000, height: 700 }
 
 describe('canvas organization viewport', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: true,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn()
-      }))
-    )
+    stubImmediateMotion()
   })
   afterEach(() => vi.unstubAllGlobals())
 

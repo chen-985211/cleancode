@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
@@ -74,7 +75,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell create terminal focus', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
     reactFlowSpies.fitView.mockClear()
     reactFlowSpies.setCenter.mockClear()
     reactFlowSpies.setViewport.mockClear()
@@ -128,7 +129,7 @@ describe('app shell create terminal focus', () => {
   })
 
   it('marks a newly projected terminal for object materialization when motion is allowed', async () => {
-    stubReducedMotionPreference(false)
+    stubImmediateMotion(false)
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
@@ -345,22 +346,6 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: reactFlowSpies.zoomIn,
     fitView: reactFlowSpies.fitView
   }
-}
-
-function stubReducedMotionPreference(matches = true): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
 
 function createTerminalBlockSnapshot(

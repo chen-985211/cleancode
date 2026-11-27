@@ -114,9 +114,3 @@
 .github-stars-button__particles {
   color: var(--cc-github-star);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .github-stars-button {
-    transition: none;
-  }
-}

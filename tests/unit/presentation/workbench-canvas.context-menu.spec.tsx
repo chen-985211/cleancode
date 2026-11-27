@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { createGraph } from '../../fixtures/presentation/workbenchCanvasContextMenuGraph'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
@@ -99,7 +100,7 @@ describe('workbench canvas object context menu', () => {
   )
 
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
     reactFlowProps.latest = null
     reactFlowSpies.getNodesBounds.mockClear()
     reactFlowSpies.setViewport.mockClear()
@@ -420,22 +421,6 @@ interface MockReactFlowProps {
   readonly onNodeDrag?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
 
 function renderCanvas({

@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 
 import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
@@ -6,7 +7,7 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 
 describe('focus Agent console in canvas', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -55,22 +56,6 @@ function createReactFlowInstance(
     getZoom: () => 0.6,
     setViewport
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
 
 function createAgent(): WorkspaceAgentSnapshot {

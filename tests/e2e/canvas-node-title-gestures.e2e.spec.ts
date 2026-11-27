@@ -25,6 +25,7 @@ import {
 } from '../support/e2eWorkbench'
 import { createCodexAgent, launchWorkspaceAgentsE2e } from '../support/e2eWorkspaceAgents'
 import { setElectronContentSize } from '../support/e2eWindow'
+import { waitForCanvasViewportToSettle } from '../support/terminalSelectionE2e'
 
 const nodeCases = {
   terminal: { title: '.terminal-node__title strong' },
@@ -128,6 +129,7 @@ describe.each(Object.entries(nodeCases))('canvas %s title gestures e2e', (nodeTy
       await fitCanvas.click()
       await otherNode.locator('.terminal-node__title strong').click()
       await fitCanvas.click()
+      await waitForCanvasViewportToSettle(page)
       // Move focus away explicitly so a drag must not restore the terminal input.
       await fitCanvas.focus()
       const before = await readNodeState(node)

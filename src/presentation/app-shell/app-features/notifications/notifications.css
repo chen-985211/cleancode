@@ -376,26 +376,3 @@
     height: 44px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .notification-stack,
-  .notification-stack-item,
-  .notification-card,
-  .notification-card__title-layer {
-    transition: none;
-  }
-
-  .notification-card,
-  .notification-card[data-surface-motion-state='closing'],
-  .notification-card__title-layer,
-  .notification-card__title-layer[data-notification-status-motion-state='outgoing'] {
-    transform: none;
-  }
-
-  @starting-style {
-    .notification-card[data-surface-motion-state='opening'],
-    .notification-card__title-layer[data-notification-status-motion-state='current'] {
-      transform: none;
-    }
-  }
-}

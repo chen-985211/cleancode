@@ -75,8 +75,8 @@ export function CanvasMenuMotionProvider({
   resetKey,
   scheduler
 }: CanvasMenuMotionProviderProps) {
-  const systemReducedMotion = usePrefersReducedMotion()
-  const resolvedReducedMotion = reducedMotion ?? systemReducedMotion
+  const defaultReducedMotion = usePrefersReducedMotion()
+  const resolvedReducedMotion = reducedMotion ?? defaultReducedMotion
   const coordinator = useMemo(
     () =>
       createCanvasMenuCoordinator({

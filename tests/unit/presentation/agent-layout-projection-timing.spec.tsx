@@ -1,3 +1,4 @@
+import { stubImmediateMotion } from '../../support/applicationMotion'
 import { act, render, waitFor } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
@@ -13,7 +14,7 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 
 describe('Agent layout projection timing', () => {
   beforeEach(() => {
-    stubReducedMotionPreference()
+    stubImmediateMotion()
   })
 
   afterEach(() => {
@@ -180,20 +181,4 @@ function noop(): void {}
 async function noopAsync(): Promise<void> {}
 async function noopOptionalAsync(): Promise<undefined> {
   return undefined
-}
-
-function stubReducedMotionPreference(): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  )
 }
