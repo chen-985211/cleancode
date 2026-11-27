@@ -67,10 +67,10 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
       >
         <svg viewBox="0 0 14 14" aria-hidden="true">
           <path
-            d="m3.9 3.9 6.2 6.2m0-6.2-6.2 6.2"
+            d="M4.4 4.4L9.6 9.6M9.6 4.4L4.4 9.6"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.8"
+            strokeWidth="2"
             strokeLinecap="round"
           />
         </svg>
