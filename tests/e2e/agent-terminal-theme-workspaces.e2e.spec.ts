@@ -203,41 +203,29 @@ describe('Agent terminal theme across workspaces e2e', () => {
     electronScenarioTimeoutMs
   )
 
-  it(
-    'keeps terminal reading insets on the same visual plane after a theme switch',
-    async () => {
+  it.each(['terminal', 'agent'] as const)(
+    'keeps %s reading insets on the same visual plane after a theme switch',
+    async (kind) => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
-      await createCodexAgent(page, workbench.projectDirectory)
-      await waitForPersistedAgent(page)
-      await selectBlankCanvasAction(page, '新建终端')
 
-      const terminalProjection = page.locator(
-        '[data-terminal-block-id] .terminal-theme-projection[data-terminal-source-theme="light"]'
-      )
-      const agentProjection = page.locator(
-        '[data-agent-console-node] .terminal-theme-projection[data-terminal-source-theme="light"]'
-      )
-      await terminalProjection
-        .locator('.terminal-viewport .xterm-helper-textarea')
-        .waitFor({ state: 'attached' })
-      await agentProjection
-        .locator('.agent-terminal-viewport .xterm-helper-textarea')
-        .waitFor({ state: 'attached' })
-      await waitForAgentTerminal(page, 'main', 'light')
+      // Keep other canvas nodes and their shadows out of the projection screenshot.
+      if (kind === 'agent') {
+        await createCodexAgent(page, workbench.projectDirectory)
+        await waitForAgentTerminal(page, 'main', 'light')
+      } else {
+        await page.locator('.status-path', { hasText: workbench.projectDirectory }).waitFor()
+        await selectBlankCanvasAction(page, '新建终端')
+        await waitForTerminalShellReady(page, 'Terminal 1')
+      }
 
+      const projection = page.locator(
+        '.terminal-theme-projection[data-terminal-source-theme="light"]'
+      )
       await selectTheme(page, 'dark')
-      await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
-
-      await page.getByRole('button', { name: '展开小地图' }).click()
-      const agentMinimapNode = page.locator('[data-minimap-node-id^="agent:"]').first()
-      await agentMinimapNode.focus()
-      await agentMinimapNode.press('Enter')
-      // Sample the terminal surface without the bottom-right navigation overlay.
-      await page.getByRole('button', { name: '收起小地图' }).click()
-      await page.locator('.canvas-minimap__panel').waitFor({ state: 'detached' })
-      await expectProjectionColorContinuity(page, agentProjection, 'agent')
+      await page.getByRole('button', { name: '适应画布', exact: true }).click()
+      await expectProjectionColorContinuity(page, projection, kind)
     },
     electronScenarioTimeoutMs
   )

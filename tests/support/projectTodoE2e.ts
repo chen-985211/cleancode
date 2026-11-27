@@ -30,6 +30,7 @@ export async function startProjectTodoScenario() {
 
   const desktop = await launch()
   await desktop.page.getByRole('button', { name: '添加项目', exact: true }).click()
+  await desktop.page.getByRole('button', { name: '打开待办清单', exact: true }).waitFor()
   return {
     ...desktop,
     async restart() {

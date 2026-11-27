@@ -96,15 +96,18 @@
 }
 
 .project-list {
+  --project-scrollbar-width: 6px;
+
   position: relative;
   min-height: 0;
   flex: 1 1 auto;
   margin-top: 6px;
+  /* Put the stable gutter in the sidebar padding so rows align with the heading. */
+  margin-inline-end: calc(-1 * var(--project-scrollbar-width));
   padding: 0 4px 44px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--cc-scrollbar) transparent;
-  scrollbar-width: thin;
+  scrollbar-gutter: stable;
   isolation: isolate;
 }
 
@@ -141,7 +144,7 @@
 }
 
 .project-list::-webkit-scrollbar {
-  width: 6px;
+  width: var(--project-scrollbar-width);
 }
 
 .project-list::-webkit-scrollbar-track {
@@ -151,6 +154,11 @@
 .project-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
   corner-shape: round;
+  background: color-mix(in srgb, var(--cc-scrollbar) 45%, transparent);
+}
+
+.project-list::-webkit-scrollbar-thumb:hover,
+.project-list::-webkit-scrollbar-thumb:active {
   background: var(--cc-scrollbar);
 }
 
