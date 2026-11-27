@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { GitCliIssueBaseAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliIssueBaseAdapter'
 
+import { listWorkspaceBaseBranches } from '../../../../src/contexts/project/application/use-cases/listWorkspaceBaseBranches'
 import { GitCliWorkspaceBaseAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliWorkspaceBaseAdapter'
 
 const exec = promisify(execFile)
@@ -130,12 +131,15 @@ describe('real Git workspace base resolution', () => {
       await git(checkout, 'remote', 'set-url', 'origin', join(root, 'offline'))
       const adapter = new GitCliWorkspaceBaseAdapter()
       const release = 'refs/remotes/origin/release'
-      expect(await adapter.list(checkout, null)).toEqual({
+      expect(await listWorkspaceBaseBranches(adapter, checkout, null)).toEqual({
         branches: [release],
         defaultBranch: release
       })
       await git(checkout, 'config', '--unset-all', 'remote.origin.fetch')
-      expect(await adapter.list(checkout, null)).toEqual({ branches: [], defaultBranch: null })
+      expect(await listWorkspaceBaseBranches(adapter, checkout, null)).toEqual({
+        branches: [],
+        defaultBranch: null
+      })
     }
   )
 
@@ -162,8 +166,38 @@ describe('real Git workspace base resolution', () => {
 
   it('offers no bases in an ordinary project directory and propagates filesystem errors', async () => {
     const adapter = new GitCliWorkspaceBaseAdapter()
-    await expect(adapter.list(root, null)).resolves.toEqual({ branches: [], defaultBranch: null })
-    await expect(adapter.list(join(root, 'missing'), null)).rejects.toThrow()
+    await expect(listWorkspaceBaseBranches(adapter, root, null)).resolves.toEqual({
+      branches: [],
+      defaultBranch: null
+    })
+    await expect(listWorkspaceBaseBranches(adapter, join(root, 'missing'), null)).rejects.toThrow()
+  })
+
+  it('offers local and remote bases even when the cached refs exceed the Git output buffer', async () => {
+    await git(checkout, 'pack-refs', '--all')
+    // Append sorted packed refs after origin/main without creating thousands of loose files.
+    const suffix = 'x'.repeat(180)
+    const packed = Array.from(
+      { length: 22000 },
+      (_, i) => `${original} refs/remotes/zz-cache/${String(i).padStart(5, '0')}-${suffix}\n`
+    ).join('')
+    await appendFile(join(checkout, '.git', 'packed-refs'), packed)
+    const adapter = new GitCliWorkspaceBaseAdapter()
+    expect((await listWorkspaceBaseBranches(adapter, checkout, 'main')).branches).toEqual([
+      'refs/remotes/origin/main',
+      'refs/heads/main'
+    ])
+    await git(
+      checkout,
+      'config',
+      '--replace-all',
+      'remote.origin.fetch',
+      `+refs/heads/release:refs/remotes/zz-cache/21999-${suffix}`
+    )
+    expect((await listWorkspaceBaseBranches(adapter, checkout, 'main')).branches).toEqual([
+      `refs/remotes/zz-cache/21999-${suffix}`,
+      'refs/heads/main'
+    ])
   })
 
   it('offers only the remote default and active local workspace among unrelated branches', async () => {
@@ -184,10 +218,10 @@ describe('real Git workspace base resolution', () => {
     )
     const latest = await git(source, 'rev-parse', 'HEAD')
     const adapter = new GitCliWorkspaceBaseAdapter()
-    const choices = await adapter.list(checkout, 'feature/login')
+    const choices = await listWorkspaceBaseBranches(adapter, checkout, 'feature/login')
     expect(choices.defaultBranch).toBe('refs/remotes/origin/main')
     expect(choices.branches).toEqual(['refs/remotes/origin/main', 'refs/heads/feature/login'])
-    expect((await adapter.list(checkout, null)).branches).toEqual([
+    expect((await listWorkspaceBaseBranches(adapter, checkout, null)).branches).toEqual([
       'refs/remotes/origin/main',
       'refs/heads/main'
     ])
@@ -202,7 +236,7 @@ describe('real Git workspace base resolution', () => {
     })
     expect(await adapter.resolve(checkout, 'refs/heads/main')).toBe(original)
     await git(checkout, 'remote', 'remove', 'origin')
-    expect(await adapter.list(checkout, 'feature/login')).toEqual({
+    expect(await listWorkspaceBaseBranches(adapter, checkout, 'feature/login')).toEqual({
       branches: ['refs/heads/feature/login'],
       defaultBranch: 'refs/heads/feature/login'
     })
@@ -212,12 +246,15 @@ describe('real Git workspace base resolution', () => {
     const adapter = new GitCliWorkspaceBaseAdapter()
     await git(checkout, 'switch', '--detach')
     await git(checkout, 'branch', '-d', 'main')
-    expect(await adapter.list(checkout, null)).toEqual({
+    expect(await listWorkspaceBaseBranches(adapter, checkout, null)).toEqual({
       branches: ['refs/remotes/origin/main'],
       defaultBranch: 'refs/remotes/origin/main'
     })
     await git(checkout, 'remote', 'remove', 'origin')
-    expect(await adapter.list(checkout, null)).toEqual({ branches: [], defaultBranch: null })
+    expect(await listWorkspaceBaseBranches(adapter, checkout, null)).toEqual({
+      branches: [],
+      defaultBranch: null
+    })
   })
 
   it('creates from a local branch with an unreachable remote and preserves the source checkout', async () => {

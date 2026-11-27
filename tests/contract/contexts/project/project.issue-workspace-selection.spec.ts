@@ -242,7 +242,7 @@ function fixture() {
   const create = new CreateBranchWorkspaceUseCase(projects, git, directories, transactions)
   const records = new Map<string, WorkspaceInitializationSnapshot>()
   const preparation = new PrepareWorkspaceInitializationUseCase({
-    baseBranches: { list: vi.fn(), resolve: vi.fn() },
+    baseBranches: { open: vi.fn(), resolve: vi.fn() },
     projects,
     registry,
     transactions,

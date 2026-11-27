@@ -1,4 +1,5 @@
-import { execFile } from 'node:child_process'
+import { createInterface } from 'node:readline'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -31,6 +32,43 @@ export async function runGit(directory: string, args: readonly string[]): Promis
   })
 
   return stdout
+}
+
+export async function forEachGitLine(
+  directory: string,
+  args: readonly string[],
+  visit: (line: string) => void
+): Promise<void> {
+  const child = spawn('git', args, {
+    cwd: directory,
+    env: createGitProcessEnvironment(),
+    timeout: 60000,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+  let stderr = ''
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+    stderr = (stderr + chunk).slice(-8192)
+  })
+  const finished = new Promise<void>((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', (code, signal) => {
+      if (code === 0) resolve()
+      else reject(new Error(stderr.trim() || `Git exited with ${signal ?? code}`))
+    })
+  })
+  const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
+  try {
+    await Promise.all([
+      finished,
+      (async () => {
+        for await (const line of lines) visit(line)
+      })()
+    ])
+  } finally {
+    lines.close()
+    if (child.exitCode === null && child.signalCode === null) child.kill()
+  }
 }
 
 export async function isGitRepository(directory: string): Promise<boolean> {

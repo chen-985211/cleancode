@@ -513,6 +513,7 @@ describe('branch workspace action notifications', () => {
       ({ currentWorkbench }) => {
         const actions = useBranchWorkspaceActions({
           currentWorkbench,
+          rememberCheckout: vi.fn(),
           rememberCreatedWorkspace: vi.fn(),
           forgetWorkspaceTerminalStates: vi.fn(),
           notifications,
@@ -610,6 +611,7 @@ function renderBranchWorkspaceActions(
     () => {
       const actions = useBranchWorkspaceActions({
         currentWorkbench: workbench,
+        rememberCheckout: vi.fn(),
         rememberCreatedWorkspace: overrides.rememberCreatedWorkspace ?? vi.fn(),
         forgetWorkspaceTerminalStates: vi.fn(),
         notifications,

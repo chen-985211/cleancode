@@ -1,4 +1,1 @@
-export interface WorkspaceBaseBranches {
-  readonly branches: readonly string[]
-  readonly defaultBranch: string | null
-}
+export type { WorkspaceBaseBranches } from '../../domain/services/WorkspaceBaseBranchSelection'

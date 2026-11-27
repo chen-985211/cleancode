@@ -456,7 +456,7 @@ function fixture() {
     createAgent: vi.fn(),
     run: vi.fn()
   }
-  const baseBranches = { list: vi.fn(), resolve: vi.fn(async () => 'a'.repeat(40)) }
+  const baseBranches = { open: vi.fn(), resolve: vi.fn(async () => 'a'.repeat(40)) }
   let remembered = ProjectRegistry.empty().rememberProject('/project')
   const registry = {
     get: async () => remembered.toSnapshot(),

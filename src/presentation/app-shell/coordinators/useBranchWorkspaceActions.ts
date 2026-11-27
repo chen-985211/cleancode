@@ -24,6 +24,7 @@ interface UseBranchWorkspaceActionsInput {
   readonly notifications: AppNotificationController
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly rememberCreatedWorkspace: (workbench: WorkbenchSnapshot) => void
+  readonly rememberCheckout: (origin: WorkbenchSnapshot, checkout: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly terminateWorkspaceTerminalSessions: (
@@ -60,6 +61,7 @@ export function useBranchWorkspaceActions({
   notifications,
   replaceWorkbench,
   rememberCreatedWorkspace,
+  rememberCheckout,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
   terminateWorkspaceTerminalSessions,
@@ -71,6 +73,7 @@ export function useBranchWorkspaceActions({
   const translateRef = useRef(t)
   const currentActionOccurrenceIdsRef = useRef(new Map<string, string>())
   const selectionEpoch = useRef(0)
+  const appliedCheckoutEpochs = useRef(new Map<string, number>())
   const currentWorkbenchRef = useRef(currentWorkbench)
   useLayoutEffect(() => {
     currentWorkbenchRef.current = currentWorkbench
@@ -404,6 +407,7 @@ export function useBranchWorkspaceActions({
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'checkout-main')
       const occurrenceId = beginSelectionAttempt(key)
+      const epoch = selectionEpoch.current
 
       try {
         const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
@@ -411,8 +415,14 @@ export function useBranchWorkspaceActions({
           branchName
         })
 
-        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
         if (checkedOutWorkbench) {
+          const projectId = checkedOutWorkbench.project.id
+          if ((appliedCheckoutEpochs.current.get(projectId) ?? 0) > epoch) return
+          appliedCheckoutEpochs.current.set(projectId, epoch)
+          if (!isCurrentSelectionAttempt(key, occurrenceId)) {
+            rememberCheckout(workbench, checkedOutWorkbench)
+            return
+          }
           replaceWorkbench(checkedOutWorkbench)
         }
         if (settleSelectionAttempt(key, occurrenceId)) dismissPublishedActionError(key)
@@ -433,6 +443,7 @@ export function useBranchWorkspaceActions({
       dismissPublishedActionError,
       isCurrentSelectionAttempt,
       publishActionError,
+      rememberCheckout,
       replaceWorkbench,
       settleSelectionAttempt
     ]

@@ -24,6 +24,7 @@ import {
 } from '../../domain/value-objects/WorkspaceDefaults'
 import { getAppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
 
+import { listWorkspaceBaseBranches } from './listWorkspaceBaseBranches'
 import type { WorkspaceBaseBranchPort } from '../ports/WorkspaceBaseBranchPort'
 
 export interface CreateInitializedWorkspaceCommand {
@@ -66,7 +67,8 @@ export class PrepareWorkspaceInitializationUseCase {
 
   async listBaseBranches(projectDirectory: string) {
     const project = await this.requireProject(projectDirectory)
-    return this.dependencies.baseBranches.list(
+    return listWorkspaceBaseBranches(
+      this.dependencies.baseBranches,
       project.directory,
       project.workspaces.find((item) => item.isCurrent)?.gitBranch ?? null
     )

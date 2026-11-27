@@ -1,52 +1,45 @@
-import type { WorkspaceBaseBranches } from '../../application/dto/WorkspaceBaseBranches'
-import type { WorkspaceBaseBranchPort } from '../../application/ports/WorkspaceBaseBranchPort'
+import type {
+  WorkspaceBaseBranchPort,
+  WorkspaceBaseRefReader
+} from '../../application/ports/WorkspaceBaseBranchPort'
 import { createProjectError } from '../../application/errors/ProjectErrors'
 import { fetchTrackingBranch, readGitCommit } from './GitBaseCommit'
-import { isGitRepository, runGit } from './GitProcess'
+import { forEachGitLine, isGitRepository, runGit } from './GitProcess'
 import { readFetchRefspecs, resolveTrackingSource } from './GitFetchRefspec'
 
 export class GitCliWorkspaceBaseAdapter implements WorkspaceBaseBranchPort {
-  async list(directory: string, currentBranch: string | null): Promise<WorkspaceBaseBranches> {
-    if (!(await isGitRepository(directory))) return { branches: [], defaultBranch: null }
-    const output = await runGit(directory, [
-      'for-each-ref',
-      '--format=%(refname)%09%(symref)%09%(HEAD)%09%(upstream)',
-      'refs/heads/',
-      'refs/remotes/'
-    ])
-    const refs = output
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => {
-        const [name, target, head, upstream] = line.split('\t')
-        return { name, target, checkedOut: head === '*', upstream }
-      })
-    const locals = refs.filter((ref) => !ref.target && ref.name.startsWith('refs/heads/'))
-    const local =
-      locals.find((ref) => currentBranch && ref.name === `refs/heads/${currentBranch}`) ??
-      locals.find((ref) => ref.checkedOut) ??
-      locals[0]
-
-    const remotes = refs.filter((ref) => ref.name.startsWith('refs/remotes/'))
-    const remoteBranches = new Set(remotes.filter((ref) => !ref.target).map((ref) => ref.name))
-    const remoteDefaults = remotes.filter((ref) => ref.target && ref.name.endsWith('/HEAD'))
-    const candidates = [
-      remoteDefaults.find((ref) => ref.name === 'refs/remotes/origin/HEAD')?.target,
-      ...remoteDefaults.map((ref) => ref.target),
-      'refs/remotes/origin/main',
-      'refs/remotes/origin/master',
-      local?.upstream,
-      ...remoteBranches
-    ]
-    let remote: string | undefined
-    if (remoteBranches.size) {
-      const refspecs = await readFetchRefspecs(directory)
-      remote = candidates.find(
-        (ref) => ref && remoteBranches.has(ref) && resolveTrackingSource(refspecs, ref)
-      )
+  async open(directory: string): Promise<WorkspaceBaseRefReader | null> {
+    if (!(await isGitRepository(directory))) return null
+    const refspecs = await readFetchRefspecs(directory)
+    return {
+      visit: (refs, accept) =>
+        forEachGitLine(
+          directory,
+          [
+            'for-each-ref',
+            '--sort=refname',
+            '--format=%(refname)%09%(symref)%09%(HEAD)%09%(upstream)',
+            ...refs
+          ],
+          (line) => {
+            const [name, target, head, upstream] = line.split('\t')
+            // Git also matches descendants of an exact ref pattern when that ref is missing.
+            if (!refs.some((ref) => (ref.endsWith('/') ? name.startsWith(ref) : name === ref)))
+              return
+            if (name.startsWith('refs/heads/')) {
+              if (!target) accept({ kind: 'local', name, checkedOut: head === '*', upstream })
+            } else {
+              const trackingRef = target || name
+              if (
+                trackingRef.startsWith('refs/remotes/') &&
+                resolveTrackingSource(refspecs, trackingRef)
+              ) {
+                accept({ kind: 'remote', name, target })
+              }
+            }
+          }
+        )
     }
-    const branches = [remote, local?.name].filter((ref) => ref !== undefined)
-    return { branches, defaultBranch: branches[0] ?? null }
   }
 
   async resolve(directory: string, ref: string): Promise<string> {
