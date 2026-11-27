@@ -16,7 +16,12 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { e2eShellReadyMarker } from '../support/e2eTerminal'
+import {
+  asE2eTerminalInput,
+  createE2ePrintCommand,
+  waitForTerminalShellReady,
+  writeTerminalCommand
+} from '../support/e2eTerminal'
 import { writeAgentTerminalInput } from '../support/e2eAgentRuntime'
 import { panCanvasLeft } from '../support/e2eCanvasActions'
 import { pollUntilState } from '../support/e2ePolling'
@@ -93,6 +98,7 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCreationReady(page)
       const terminal = '.terminal-node-anchor'
       const agent = '.agent-console-node'
+      const terminalMarker = 'TERMINAL_EXIT_CONTENT'
       const motion = await page.evaluateHandle(
         ({ terminal, agent, terminalMarker, agentMarker }) => {
           const expectedRows = new Map<string, Element>()
@@ -144,12 +150,18 @@ describe('workspace Agents e2e', () => {
             }
           }
         },
-        { terminal, agent, terminalMarker: e2eShellReadyMarker, agentMarker: 'CC_E2E_CODEX_READY' }
+        { terminal, agent, terminalMarker, agentMarker: 'CC_E2E_CODEX_READY' }
       )
       try {
         await selectBlankCanvasAction(page, '新建终端')
         await waitForCreatedNodeActivation(page, '[data-terminal-block-id]', 'terminal')
-        await waitForTerminalDomText(page.locator('.terminal-viewport'), e2eShellReadyMarker)
+        await waitForTerminalShellReady(page, 'Terminal 1')
+        await writeTerminalCommand(
+          page,
+          'Terminal 1',
+          asE2eTerminalInput(createE2ePrintCommand(terminalMarker))
+        )
+        await waitForTerminalDomText(page.locator('.terminal-viewport'), terminalMarker)
         await motion.evaluate((recorder) => recorder.watchRemoval('terminal'))
         await page.locator('.terminal-node__title').click({ button: 'right' })
         await page.getByRole('menuitem', { name: '移除终端' }).click()

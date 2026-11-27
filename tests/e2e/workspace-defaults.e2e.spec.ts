@@ -94,6 +94,10 @@ describe('workspace default contents e2e', () => {
     await page.waitForLoadState('domcontentloaded')
     await expectDesktopRuntime(page)
     await page.getByRole('button', { name: '添加项目', exact: true }).click()
+    await page
+      .getByRole('group', { name: `项目 ${basename(workbench.projectDirectory)}`, exact: true })
+      .getByRole('button', { name: '新建分支工作区', exact: true })
+      .waitFor()
   }, electronScenarioTimeoutMs)
 
   afterEach(async ({ task }) => {
