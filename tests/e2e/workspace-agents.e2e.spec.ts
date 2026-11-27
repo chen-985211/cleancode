@@ -16,6 +16,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { e2eShellReadyMarker } from '../support/e2eTerminal'
 import { writeAgentTerminalInput } from '../support/e2eAgentRuntime'
 import { panCanvasLeft } from '../support/e2eCanvasActions'
 import { pollUntilState } from '../support/e2ePolling'
@@ -93,49 +94,78 @@ describe('workspace Agents e2e', () => {
       const terminal = '.terminal-node-anchor'
       const agent = '.agent-console-node'
       const motion = await page.evaluateHandle(
-        ({ terminal, agent }) => {
+        ({ terminal, agent, terminalMarker, agentMarker }) => {
+          const expectedRows = new Map<string, Element>()
+          const failures = new Set<string>()
           const observed = new Set<string>()
           let frame = 0
           const sample = () => {
             for (const [kind, selector] of Object.entries({ terminal, agent })) {
               const shell = document.querySelector(selector)
-              if (!shell || !shell.checkVisibility()) continue
+              if (!shell) continue
+              const rows = expectedRows.get(kind)
+              if (rows) {
+                const marker = kind === 'terminal' ? terminalMarker : agentMarker
+                if (
+                  shell.querySelector('.xterm-rows') !== rows ||
+                  !rows.checkVisibility({ opacityProperty: true }) ||
+                  !rows.textContent?.includes(marker)
+                )
+                  failures.add(kind + ': lost terminal output during removal')
+              }
+              if (!shell.checkVisibility()) continue
               const scale = new DOMMatrixReadOnly(getComputedStyle(shell).transform).a
               if (scale <= 0 || scale >= 1) continue
               for (const phase of ['create', 'delete']) {
-                if (shell.classList.contains('workbench-object-motion--' + phase))
-                  observed.add(kind + '-' + phase)
+                if (!shell.classList.contains('workbench-object-motion--' + phase)) continue
+                observed.add(kind + '-' + phase)
+                const host = shell.closest('.react-flow__node')!.getBoundingClientRect()
+                const rect = shell.getBoundingClientRect()
+                if (
+                  Math.abs(rect.left + rect.width / 2 - host.left - host.width / 2) > 1 ||
+                  Math.abs(rect.top + rect.height / 2 - host.top - host.height / 2) > 1
+                )
+                  failures.add(kind + '-' + phase + ': off center')
               }
             }
             frame = requestAnimationFrame(sample)
           }
           sample()
           return {
+            watchRemoval: (kind: 'terminal' | 'agent') => {
+              const selector = kind === 'terminal' ? terminal : agent
+              const rows = document.querySelector(selector + ' .xterm-rows')
+              if (!rows) throw new Error('Missing terminal rows for ' + kind)
+              expectedRows.set(kind, rows)
+            },
             stop: () => {
               cancelAnimationFrame(frame)
-              return [...observed].sort()
+              return { phases: [...observed].sort(), failures: [...failures] }
             }
           }
         },
-        { terminal, agent }
+        { terminal, agent, terminalMarker: e2eShellReadyMarker, agentMarker: 'CC_E2E_CODEX_READY' }
       )
       try {
         await selectBlankCanvasAction(page, '新建终端')
         await waitForCreatedNodeActivation(page, '[data-terminal-block-id]', 'terminal')
+        await waitForTerminalDomText(page.locator('.terminal-viewport'), e2eShellReadyMarker)
+        await motion.evaluate((recorder) => recorder.watchRemoval('terminal'))
         await page.locator('.terminal-node__title').click({ button: 'right' })
         await page.getByRole('menuitem', { name: '移除终端' }).click()
         await page.locator(terminal).waitFor({ state: 'detached' })
         await createCodexAgent(page)
         await waitForCreatedNodeActivation(page, '[data-agent-console-node]', 'agent')
+        await waitForAgentTerminals(page, 1)
+        await waitForTerminalDomText(page.locator('.agent-terminal-viewport'), 'CC_E2E_CODEX_READY')
+        await motion.evaluate((recorder) => recorder.watchRemoval('agent'))
         await page.getByRole('button', { name: 'Agent 1 更多操作' }).click()
         await page.getByRole('menuitem', { name: '移除' }).click()
         await page.locator(agent).waitFor({ state: 'detached' })
-        expect(await motion.evaluate((recorder) => recorder.stop())).toEqual([
-          'agent-create',
-          'agent-delete',
-          'terminal-create',
-          'terminal-delete'
-        ])
+        expect(await motion.evaluate((recorder) => recorder.stop())).toEqual({
+          phases: ['agent-create', 'agent-delete', 'terminal-create', 'terminal-delete'],
+          failures: []
+        })
       } finally {
         await motion.evaluate((recorder) => recorder.stop())
         await motion.dispose()

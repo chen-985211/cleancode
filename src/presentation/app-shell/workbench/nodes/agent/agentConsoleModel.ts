@@ -18,6 +18,7 @@ export interface AgentTerminalMeasurement {
 }
 
 export interface AgentConsoleProps {
+  readonly isExiting?: boolean
   readonly agent?: WorkspaceAgentSnapshot
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench?: WorkbenchSnapshot | null

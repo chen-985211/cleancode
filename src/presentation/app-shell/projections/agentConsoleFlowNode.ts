@@ -17,6 +17,7 @@ interface CreateAgentConsoleFlowNodeInput {
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+  readonly isRemovalPending?: boolean
   readonly isSelected: boolean
   readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly onMcpCapabilityChange: (
@@ -38,6 +39,7 @@ export function createAgentConsoleFlowNode({
   currentWorkbench,
   currentWorkspace,
   isSelected,
+  isRemovalPending,
   onGraphUpdated,
   onMcpCapabilityChange,
   onRemove,
@@ -61,6 +63,7 @@ export function createAgentConsoleFlowNode({
         objectId: agent.agentId
       }),
       agent,
+      isRemovalPending,
       approvalController,
       currentWorkbench,
       currentWorkspace,

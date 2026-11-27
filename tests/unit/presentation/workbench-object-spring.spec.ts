@@ -69,8 +69,16 @@ describe('workbench object spring', () => {
     )
 
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0)
+    // The original terminal grows gently at first, reaches half size near
+    // 200 ms, then settles without overshooting its final footprint.
     scheduler.advanceNextFrame(80)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(0.13)
+    scheduler.advanceNextFrame(125)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.37)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(0.62)
+    scheduler.advanceNextFrame(140)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.86)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(1)
 
     scheduler.advanceUntilIdle()
@@ -94,8 +102,8 @@ describe('workbench object spring', () => {
 
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
     scheduler.advanceNextFrame(80)
-    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0)
-    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(1)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.45)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(0.6)
 
     scheduler.advanceUntilIdle()
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0)
