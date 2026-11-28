@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { DismissableLayerBranch } from '@radix-ui/react-dismissable-layer'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../../../i18n/useI18n'
 import { useNativeWindowState } from '../lifecycle/useWindowFullScreenState'
@@ -50,9 +51,9 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
     }
   }, [snap])
 
-  // Window controls must remain above the settings surface and outside its inert app root.
+  // Window chrome remains interactive outside the app root and any open modal.
   return createPortal(
-    <div
+    <DismissableLayerBranch
       className="desktop-window-controls"
       role="group"
       aria-label={t('app.windowControls')}
@@ -102,7 +103,7 @@ export function DesktopWindowControls({ api }: { readonly api: DesktopWindowCont
           />
         </svg>
       </button>
-    </div>,
+    </DismissableLayerBranch>,
     document.body
   )
 }

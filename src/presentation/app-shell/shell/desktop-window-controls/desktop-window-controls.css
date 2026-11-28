@@ -6,6 +6,7 @@
   display: flex;
   align-items: center;
   gap: 1px;
+  pointer-events: auto;
   user-select: none;
   -webkit-app-region: no-drag;
 }

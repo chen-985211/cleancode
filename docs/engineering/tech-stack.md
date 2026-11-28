@@ -47,7 +47,7 @@ electron-builder 负责把这些入口、生产依赖和 Electron runtime 组装
 `electron-builder.yml`，产物写入被 Git 忽略的 `release/`。
 
 当前目标矩阵为 macOS Universal DMG/ZIP、Windows x64 NSIS 和 Linux x64 AppImage/DEB。
-Windows 主进程构建使用 `node-gyp` 和目标 Electron 的头文件编译窗口分屏 Node-API 模块，产物随 `out/main` 分发并解包到 `app.asar.unpacked`。Windows 11 通过主窗口的 `WM_NCHITTEST` 将绿色按钮识别为 `HTMAXBUTTON`。renderer 提供相对于内容区的物理像素矩形，操作系统负责显示分屏菜单。Windows 10 使用相同的窗口按钮和 Electron 窗口操作。
+Windows 主进程构建使用 `node-gyp` 和目标 Electron 的头文件编译窗口分屏 Node-API 模块，产物随 `out/main` 分发并解包到 `app.asar.unpacked`。开发实例从自身 profile 加载按内容哈希保存的副本，让运行中的窗口和下一次构建可以同时使用各自版本。Windows 11 通过主窗口的 `WM_NCHITTEST` 将绿色按钮识别为 `HTMAXBUTTON`。renderer 提供相对于内容区的物理像素矩形，操作系统负责显示分屏菜单。Windows 10 使用相同的窗口按钮和 Electron 窗口操作。
 `node-pty` 是生产原生依赖，必须在目标操作系统安装并由 electron-builder 按目标 Electron
 版本处理；Windows 开发、E2E 和打包必须从应用补丁后的源码重建，打包只接受
 `build/Release/conpty.node` 并移除同架构 prebuild，禁止在重建模块不可用时静默加载未打补丁的

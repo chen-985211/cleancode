@@ -1,7 +1,5 @@
 export const mainWindowStateSchemaVersion = 1
-export function getMainWindowMinimumSize(platform: NodeJS.Platform = process.platform) {
-  return platform === 'win32' ? { width: 330, height: 320 } : { width: 960, height: 640 }
-}
+export const mainWindowMinimumSize = { width: 960, height: 640 } as const
 const mainWindowDefaultSize = { width: 1_200, height: 800 } as const
 
 export interface MainWindowBounds {
@@ -44,22 +42,18 @@ export function resolveMainWindowFullScreenOptions(displayMode: MainWindowDispla
   return displayMode === 'fullscreen' ? { fullscreen: true } : {}
 }
 
-export function decodeMainWindowState(
-  value: unknown,
-  platform: NodeJS.Platform = process.platform
-): MainWindowStateSnapshot | null {
+export function decodeMainWindowState(value: unknown): MainWindowStateSnapshot | null {
   if (!isRecord(value) || value.version !== mainWindowStateSchemaVersion) return null
   if (!isMainWindowDisplayMode(value.displayMode) || !isRecord(value.normalBounds)) return null
 
   const { x, y, width, height } = value.normalBounds
-  const minimumSize = getMainWindowMinimumSize(platform)
   if (
     !isInteger(x) ||
     !isInteger(y) ||
     !isInteger(width) ||
     !isInteger(height) ||
-    width < minimumSize.width ||
-    height < minimumSize.height
+    width < mainWindowMinimumSize.width ||
+    height < mainWindowMinimumSize.height
   ) {
     return null
   }

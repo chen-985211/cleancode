@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { Dialog } from 'radix-ui'
 import { DesktopWindowControls } from '../../../src/presentation/app-shell/shell/desktop-window-controls/DesktopWindowControls'
 import type {
   DesktopWindowControlsApi,
@@ -7,6 +8,48 @@ import type {
 import { createDeferred } from '../../fixtures/deferred'
 
 describe('desktop window caption buttons', () => {
+  it('performs caption actions without dismissing an open modal', async () => {
+    const perform = vi.fn().mockResolvedValue(undefined)
+    const onOpenChange = vi.fn()
+    vi.useFakeTimers()
+    try {
+      render(
+        <>
+          <DesktopWindowControls
+            api={{
+              perform,
+              readState: async () => ({ focused: true, maximized: false }),
+              onStateChange: () => () => undefined
+            }}
+          />
+          <Dialog.Root open onOpenChange={onOpenChange}>
+            <Dialog.Portal>
+              <Dialog.Overlay data-testid="backdrop" />
+              <Dialog.Content aria-describedby={undefined}>
+                <Dialog.Title>Preview</Dialog.Title>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+        </>
+      )
+      // Radix installs its document pointer listener after the opening gesture.
+      await act(async () => vi.advanceTimersByTimeAsync(0))
+      for (const name of ['关闭窗口', '最小化窗口', '最大化窗口']) {
+        const button = screen.getByLabelText(name)
+        fireEvent.pointerDown(button, { button: 0 })
+        fireEvent.click(button)
+      }
+      expect(perform.mock.calls).toEqual([['close'], ['minimize'], ['toggle-maximize']])
+      expect(onOpenChange).not.toHaveBeenCalled()
+      const backdrop = screen.getByTestId('backdrop')
+      fireEvent.pointerDown(backdrop, { button: 0 })
+      fireEvent.click(backdrop)
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('dispatches accessible actions and follows the latest native window state', async () => {
     const initial = createDeferred<DesktopWindowState>()
     const unsubscribe = vi.fn()

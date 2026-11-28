@@ -54,6 +54,12 @@ it(
       if (colorScheme === 'light') await thumbnail.click()
       else await thumbnail.press('Enter')
       await dialog.waitFor()
+      if (process.platform !== 'darwin') {
+        // Trial clicks verify the native caption hit areas without changing the window state.
+        for (const action of ['close', 'minimize', 'maximize']) {
+          await page.locator('.desktop-caption-' + action).click({ trial: true })
+        }
+      }
       const { scrollTop } = await opening.jsonValue()
       await opening.dispose()
       expect(scrollTop).toBeGreaterThan(0)
