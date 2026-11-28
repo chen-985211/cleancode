@@ -1,5 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { _electron as electron, type ElectronApplication } from 'playwright'
 
 import { resolveAppIconPath } from '../../../src/platform/electron-main/appIconPath'
 
@@ -109,50 +112,138 @@ describe('platform app icon', () => {
     expect(electronBuilderConfig).toMatch(/win:\n\s+icon: public\/app-icon-windows\.png/)
   })
 
-  it('keeps the dock artwork within balanced margins with an optically compensated mark', () => {
-    const svg = readFileSync(join(process.cwd(), 'public', 'app-icon.svg'), 'utf8')
-    const basePlate = svg.match(
-      /<rect\s+x="([\d.]+)"\s+y="([\d.]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/
-    )
-    const markTransform = svg.match(
-      /<path[\s\S]*?transform="translate\(([\d.]+) ([\d.]+)\) scale\(([\d.]+)\)/
-    )
-
-    expect(basePlate).not.toBeNull()
-    expect(markTransform).not.toBeNull()
-
-    const [, x, y, width, height] = basePlate!
-    const [, markX, markY, markScale] = markTransform!
-
-    expect(Number(width) / 1024).toBeLessThanOrEqual(0.81)
-    expect(Number(x) + Number(width) / 2).toBe(512)
-    expect(Number(y) + Number(height) / 2).toBe(512)
-    expect(Number(markX)).toBeGreaterThanOrEqual(516)
-    expect(Number(markX)).toBeLessThanOrEqual(524)
-    expect(Number(markY)).toBe(512)
-    expect(Number(markScale)).toBeLessThanOrEqual(0.8)
-  })
-
-  it('uses a larger, centered Windows plate while preserving the mark proportions', () => {
-    const svg = readFileSync(join(process.cwd(), 'public', 'app-icon-windows.svg'), 'utf8')
-    const basePlate = svg.match(
-      /<rect\s+x="([\d.]+)"\s+y="([\d.]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/
-    )
-    const markTransform = svg.match(
-      /<path[\s\S]*?transform="translate\(([\d.]+) ([\d.]+)\) scale\(([\d.]+)\)/
-    )
-
-    expect(basePlate).not.toBeNull()
-    expect(markTransform).not.toBeNull()
-
-    const [, x, y, width, height] = basePlate!
-    const [, markX, markY, markScale] = markTransform!
-
-    expect([Number(x), Number(y), Number(width), Number(height)]).toEqual([48, 48, 928, 928])
-    expect(Number(x) + Number(width) / 2).toBe(512)
-    expect(Number(y) + Number(height) / 2).toBe(512)
-    expect(Number(markX)).toBeCloseTo(521.01, 2)
-    expect(Number(markY)).toBe(512)
-    expect(Number(markScale)).toBeCloseTo(0.900971, 6)
-  })
+  it.each([
+    { asset: 'app-icon', plateWidth: 830 },
+    { asset: 'app-icon-windows', plateWidth: 928 }
+  ])(
+    'renders the graphite plate, edge highlight and lime cursor at the intended size in $asset SVG and PNG',
+    async ({ asset, plateWidth }) => {
+      const profile = await mkdtemp(join(tmpdir(), 'cleancode-app-icon-'))
+      let application: ElectronApplication | undefined
+      try {
+        application = await electron.launch({
+          args: [
+            join(process.cwd(), 'tests', 'fixtures', 'terminalRasterBrowser.mjs'),
+            `--user-data-dir=${profile}`,
+            '--force-color-profile=srgb'
+          ]
+        })
+        const page = await application.firstWindow()
+        for (const [extension, mime] of [
+          ['svg', 'image/svg+xml'],
+          ['png', 'image/png']
+        ] as const) {
+          const fileName = `${asset}.${extension}`
+          const data = readFileSync(join(process.cwd(), 'public', fileName)).toString('base64')
+          const artwork = await page.evaluate(
+            async ({ src, plateWidth }) => {
+              const image = new Image()
+              image.src = src
+              await image.decode()
+              const width = image.naturalWidth
+              const height = image.naturalHeight
+              const native = new OffscreenCanvas(width, height).getContext('2d')!
+              native.drawImage(image, 0, 0)
+              const margins = (line: ImageData) => {
+                const alpha = line.data.filter((_, index) => index % 4 === 3)
+                return [
+                  alpha.findIndex((value) => value >= 245),
+                  alpha.length - 1 - alpha.findLastIndex((value) => value >= 245)
+                ]
+              }
+              // Align each plate to the same 107 px footprint to compare the artwork.
+              const context = new OffscreenCanvas(132, 132).getContext('2d')!
+              context.imageSmoothingQuality = 'high'
+              const size = (107 * width) / plateWidth
+              const offset = (132 - size) / 2
+              context.drawImage(image, offset, offset, size, size)
+              const rgba = context.getImageData(0, 0, 132, 132).data
+              let platePixels = 0
+              let limePixels = 0
+              for (let i = 0; i < rgba.length; i += 4) {
+                if (rgba[i + 3]! >= 245) platePixels++
+                if (rgba[i + 1]! - rgba[i]! > 20 && rgba[i + 1]! - rgba[i + 2]! > 55) limePixels++
+              }
+              const pixel = (x: number, y: number) => {
+                const index = (y * 132 + x) * 4
+                return Array.from(rgba.subarray(index, index + 4)) as [
+                  number,
+                  number,
+                  number,
+                  number
+                ]
+              }
+              const fourSides = (x: number, y: number) => [
+                pixel(x, y)[1],
+                pixel(131 - y, x)[1],
+                pixel(131 - x, 131 - y)[1],
+                pixel(y, 131 - x)[1]
+              ]
+              return {
+                size: [image.naturalWidth, image.naturalHeight],
+                margins: [
+                  ...margins(native.getImageData(0, height / 2, width, 1)),
+                  ...margins(native.getImageData(width / 2, 0, 1, height))
+                ],
+                outerAlpha: [
+                  pixel(8, 66)[3],
+                  pixel(123, 66)[3],
+                  pixel(66, 8)[3],
+                  pixel(66, 123)[3]
+                ],
+                innerAlpha: [
+                  pixel(16, 66)[3],
+                  pixel(115, 66)[3],
+                  pixel(66, 16)[3],
+                  pixel(66, 115)[3]
+                ],
+                center: pixel(66, 66)[1],
+                innerFace: pixel(66, 39)[1],
+                outerFace: fourSides(66, 18),
+                rim: [
+                  ...fourSides(21, 21),
+                  ...fourSides(46, 13),
+                  ...fourSides(66, 13),
+                  ...fourSides(85, 13)
+                ],
+                ink: pixel(60, 80),
+                cursor: pixel(99, 89),
+                cursorBand: [85, 87, 92, 94].map((y) => pixel(99, y)[1] > 150),
+                cursorPercent: (limePixels / platePixels) * 100
+              }
+            },
+            { src: `data:${mime};base64,${data}`, plateWidth }
+          )
+          expect(artwork.size, fileName).toEqual([1024, 1024])
+          expect(artwork.margins, fileName).toEqual(Array(4).fill((1024 - plateWidth) / 2))
+          expect(Math.max(...artwork.outerAlpha), fileName).toBeLessThan(32)
+          expect(artwork.innerAlpha, fileName).toEqual([255, 255, 255, 255])
+          expect(artwork.innerFace - artwork.center, fileName).toBeGreaterThan(3)
+          expect(artwork.center, fileName).toBeLessThan(35)
+          expect(Math.min(...artwork.outerFace) - artwork.innerFace, fileName).toBeGreaterThan(6)
+          expect(
+            Math.max(...artwork.outerFace) - Math.min(...artwork.outerFace),
+            fileName
+          ).toBeLessThan(5)
+          expect(
+            Math.min(...artwork.rim) - Math.max(...artwork.outerFace),
+            fileName
+          ).toBeGreaterThan(20)
+          expect(artwork.ink[0], fileName).toBeGreaterThan(225)
+          expect(artwork.ink[2], fileName).toBeLessThan(artwork.ink[0])
+          expect(artwork.cursor, fileName).toEqual([195, 239, 117, 255])
+          expect(artwork.cursorBand, fileName).toEqual([false, true, true, false])
+          expect(artwork.cursorPercent, fileName).toBeGreaterThan(1)
+          expect(artwork.cursorPercent, fileName).toBeLessThan(1.25)
+        }
+      } finally {
+        try {
+          await application?.close()
+        } finally {
+          await rm(profile, { recursive: true, force: true })
+        }
+      }
+    },
+    30_000
+  )
 })
