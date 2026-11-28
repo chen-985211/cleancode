@@ -12,9 +12,9 @@ describe('platform window frame', () => {
     })
   })
 
-  it('keeps native framing on other desktop platforms', () => {
-    expect(resolveWindowFrameOptions('linux')).toEqual({})
-    expect(resolveWindowFrameOptions('win32')).toEqual({})
+  it('lets the workbench draw the Windows and Linux caption buttons', () => {
+    expect(resolveWindowFrameOptions('win32')).toEqual({ frame: false })
+    expect(resolveWindowFrameOptions('linux')).toEqual({ frame: false, autoHideMenuBar: true })
   })
 
   it('removes the window-scoped default menu only on Windows', () => {

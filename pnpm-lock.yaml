@@ -31,6 +31,9 @@ importers:
       '@phosphor-icons/react':
         specifier: 2.1.10
         version: 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-dismissable-layer':
+        specifier: 1.2.1
+        version: 1.2.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-tooltip':
         specifier: 1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -146,6 +149,9 @@ importers:
       lint-staged:
         specifier: 17.0.8
         version: 17.0.8
+      node-gyp:
+        specifier: 12.4.0
+        version: 12.4.0
       playwright:
         specifier: 1.61.1
         version: 1.61.1

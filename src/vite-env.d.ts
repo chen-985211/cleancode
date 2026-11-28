@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import type { DesktopWindowControlsApi } from './platform/ipc/desktopWindowControls'
 
 import type {
   AgentTurnCompletedEvent,
@@ -135,6 +136,7 @@ declare global {
       getApplicationRepositoryStars(): Promise<number>
       showApplicationQuitConfirmation(command: ApplicationQuitConfirmationCommand): Promise<boolean>
       getPathForFile(file: File): string
+      readonly desktopWindowControls?: DesktopWindowControlsApi
       getWindowFullScreenState(): Promise<boolean>
       onWindowFullScreenStateChange(listener: (isFullScreen: boolean) => void): () => void
       onApplicationQuitRequested(listener: (request: ApplicationQuitRequest) => void): () => void

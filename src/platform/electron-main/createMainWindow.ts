@@ -19,7 +19,8 @@ import {
   resolveMainWindowStartupState
 } from './mainWindowStatePolicy'
 import { resolveWindowFrameOptions, shouldRemoveDefaultWindowMenu } from './windowFrameOptions'
-import { bindWindowFullScreenState } from './windowFullScreenState'
+import { bindDesktopWindowState } from './desktopWindowControls'
+import { bindWindowsSnapLayout } from './windowsSnapLayout'
 
 const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 
@@ -80,7 +81,11 @@ export function createMainWindow(input: {
     target: mainWindow
   })
   if (shouldRemoveDefaultWindowMenu(process.platform)) mainWindow.removeMenu()
-  bindWindowFullScreenState(mainWindow)
+  bindDesktopWindowState(mainWindow)
+  bindWindowsSnapLayout(
+    mainWindow,
+    app.isPackaged ? undefined : join(app.getPath('userData'), 'windows-snap-layout')
+  )
   bindApplicationQuitConfirmationToWindow({
     coordinator: input.applicationQuitConfirmation,
     platform: process.platform,

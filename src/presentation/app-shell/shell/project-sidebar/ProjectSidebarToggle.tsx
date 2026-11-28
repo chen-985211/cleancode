@@ -3,6 +3,7 @@ import type { Ref } from 'react'
 
 import { useI18n } from '../../../i18n/useI18n'
 import { TooltipLabel } from '../../../shared/components/Tooltip'
+import { DesktopWindowControls } from '../desktop-window-controls/DesktopWindowControls'
 
 export function ProjectSidebarToggle({
   buttonRef,
@@ -18,6 +19,7 @@ export function ProjectSidebarToggle({
   readonly onToggle: () => void
 }) {
   const { t } = useI18n()
+  const controls = window.cleancode?.desktopWindowControls
 
   return (
     <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
@@ -26,7 +28,12 @@ export function ProjectSidebarToggle({
         className="app-shell__titlebar-navigation-surface"
         aria-hidden="true"
       />
-      <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
+      <span
+        className="app-shell__titlebar-traffic-light-pad"
+        data-custom-controls={controls ? true : undefined}
+        aria-hidden="true"
+      />
+      {controls && <DesktopWindowControls api={controls} />}
       <TooltipLabel content={shortcutTooltip} side="bottom">
         <button
           ref={buttonRef}

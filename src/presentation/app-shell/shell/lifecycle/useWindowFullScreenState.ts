@@ -1,27 +1,37 @@
 import { useEffect, useState } from 'react'
 
 export function useWindowFullScreenState(): boolean {
-  const [isFullScreen, setIsFullScreen] = useState(false)
+  return useNativeWindowState(
+    false,
+    window.cleancode?.getWindowFullScreenState,
+    window.cleancode?.onWindowFullScreenStateChange
+  )
+}
+
+export function useNativeWindowState<T>(
+  initialValue: T,
+  read: (() => Promise<T>) | undefined,
+  subscribe: ((listener: (value: T) => void) => () => void) | undefined
+): T {
+  const [value, setValue] = useState(initialValue)
 
   useEffect(() => {
-    const api = window.cleancode
-    if (!api?.getWindowFullScreenState || !api.onWindowFullScreenStateChange) return
+    if (!read || !subscribe) return
 
     let disposed = false
     let receivedChangeEvent = false
-    const unsubscribe = api.onWindowFullScreenStateChange((nextIsFullScreen) => {
+    const unsubscribe = subscribe((next) => {
       if (disposed) return
 
       receivedChangeEvent = true
-      setIsFullScreen(nextIsFullScreen)
+      setValue(next)
     })
 
-    void api
-      .getWindowFullScreenState()
-      .then((initialIsFullScreen) => {
+    void read()
+      .then((initial) => {
         if (disposed || receivedChangeEvent) return
 
-        setIsFullScreen(initialIsFullScreen)
+        setValue(initial)
       })
       .catch(() => undefined)
 
@@ -29,7 +39,7 @@ export function useWindowFullScreenState(): boolean {
       disposed = true
       unsubscribe()
     }
-  }, [])
+  }, [read, subscribe])
 
-  return isFullScreen
+  return value
 }

@@ -1,0 +1,87 @@
+.desktop-window-controls {
+  position: fixed;
+  z-index: 1700;
+  top: 7px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+body:has(.app-shell--window-full-screen) .desktop-window-controls {
+  display: none;
+}
+
+.desktop-window-controls button {
+  position: relative;
+  display: grid;
+  width: 22px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  color: var(--cc-caption-glyph);
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.desktop-window-controls button::before {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 0.5px solid var(--caption-rim);
+  border-radius: 50%;
+  background: var(--caption-color);
+  content: '';
+}
+
+.desktop-caption-close {
+  --caption-color: var(--cc-caption-close);
+  --caption-rim: var(--cc-caption-close-rim);
+}
+.desktop-caption-minimize {
+  --caption-color: var(--cc-caption-minimize);
+  --caption-rim: var(--cc-caption-minimize-rim);
+}
+.desktop-caption-maximize {
+  --caption-color: var(--cc-caption-maximize);
+  --caption-rim: var(--cc-caption-maximize-rim);
+}
+
+.desktop-window-controls[data-inactive]:not(:hover, [data-snap-pointer]) button::before {
+  background: var(--cc-caption-inactive);
+  border-color: var(--cc-caption-inactive-rim);
+}
+
+.desktop-window-controls button:active::before,
+.desktop-window-controls[data-snap-pointer='pressed'] .desktop-caption-maximize::before {
+  filter: brightness(0.83);
+}
+
+.desktop-window-controls svg {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.desktop-window-controls:is(:hover, [data-snap-pointer]) svg,
+.desktop-window-controls:not([data-inactive]):focus-within svg {
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .desktop-window-controls svg {
+    opacity: 1;
+  }
+  .desktop-window-controls button::before {
+    border-color: ButtonText;
+  }
+}

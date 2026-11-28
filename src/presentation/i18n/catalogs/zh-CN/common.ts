@@ -1,6 +1,11 @@
 export const zhCNCommonMessages = {
   'app.settings': '应用设置',
   'app.windowNavigation': '窗口导航',
+  'app.windowControls': '窗口控制',
+  'app.closeWindow': '关闭窗口',
+  'app.minimizeWindow': '最小化窗口',
+  'app.maximizeWindow': '最大化窗口',
+  'app.restoreWindow': '还原窗口',
   'app.workspace': 'cleancode 工作区',
   'common.cancel': '取消',
   'common.close': '关闭',

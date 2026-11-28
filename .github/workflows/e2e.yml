@@ -125,6 +125,10 @@ jobs:
             "process.stdout.write(require('node:path').resolve(process.argv[1]))" \
             "$packaged_relative_path")
           echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
+      - name: Verify native maximize and restore in a visible packaged window
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: pnpm test:e2e:visible tests/e2e/desktop-window-controls.e2e.spec.ts -t "maximizes and restores a visible window" --outputFile=test-results/timings/packaged-window-controls.json
       - name: Run packaged Windows terminal smoke test
         shell: bash
         env:

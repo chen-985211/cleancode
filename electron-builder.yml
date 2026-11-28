@@ -18,6 +18,7 @@ publish:
   releaseType: prerelease
 asarUnpack:
   - node_modules/node-pty/**/*
+  - out/main/windows-snap-layout.node
 
 mac:
   category: public.app-category.developer-tools

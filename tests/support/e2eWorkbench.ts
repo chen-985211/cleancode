@@ -448,7 +448,7 @@ function readCaseInsensitiveEnvironmentValue(
   return name ? environment[name] : undefined
 }
 
-async function assertElectronRunsInBackground(
+export async function assertElectronRunsInBackground(
   electronApplication: ElectronApplication
 ): Promise<void> {
   await electronApplication.firstWindow()

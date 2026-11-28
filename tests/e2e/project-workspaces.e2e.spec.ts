@@ -63,7 +63,7 @@ describe('project workspaces e2e', () => {
       const titlebarNavigation = page.getByRole('navigation', { name: '窗口导航' })
       const sidebar = page.locator('#project-sidebar')
       const collapseSidebar = titlebarNavigation.getByRole('button', { name: '收起侧边栏' })
-      const windowedTitlebarInset = process.platform === 'darwin' ? 80 : 12
+      const windowedTitlebarInset = 80
 
       await waitForSidebarTitlebarGeometry(page, 'windowed sidebar titlebar geometry', {
         button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },

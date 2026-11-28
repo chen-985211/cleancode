@@ -3,6 +3,11 @@ import type { zhCNCommonMessages } from '../zh-CN/common'
 export const enCommonMessages = {
   'app.settings': 'Application settings',
   'app.windowNavigation': 'Window navigation',
+  'app.windowControls': 'Window controls',
+  'app.closeWindow': 'Close window',
+  'app.minimizeWindow': 'Minimize window',
+  'app.maximizeWindow': 'Maximize window',
+  'app.restoreWindow': 'Restore window',
   'app.workspace': 'cleancode workspace',
   'common.cancel': 'Cancel',
   'common.close': 'Close',

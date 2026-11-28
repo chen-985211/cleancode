@@ -51,7 +51,8 @@
   flex: 0 0 12px;
 }
 
-.app-shell--mac .app-shell__titlebar-traffic-light-pad {
+.app-shell--mac .app-shell__titlebar-traffic-light-pad,
+.app-shell__titlebar-traffic-light-pad[data-custom-controls] {
   width: 80px;
   flex-basis: 80px;
 }

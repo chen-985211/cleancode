@@ -18,6 +18,7 @@
 @import '../../../contexts/project/presentation/styles/project-sidebar-branch-selector.css';
 @import './project-sidebar/project-sidebar-layout.css';
 @import './project-sidebar/project-sidebar-titlebar.css';
+@import './desktop-window-controls/desktop-window-controls.css';
 @import '../../../contexts/project/presentation/styles/project-sidebar-branch-workspace-form.css';
 @import '../../../contexts/project/presentation/styles/project-sidebar-archive.css';
 @import '../../../contexts/project/presentation/styles/project-sidebar-project-removal.css';
